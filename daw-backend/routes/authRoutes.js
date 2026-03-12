@@ -25,7 +25,11 @@ const { verifyToken } = require("../middleware/authJwt");
  * description: Login successful
  */
 router.post("/login", authController.login);
-
 router.get("/me", verifyToken, authController.getMe);
 
+router.post(
+  "/force-change-password",
+  verifyToken,
+  authController.forceChangePassword,
+);
 module.exports = router;

@@ -37,4 +37,16 @@ const verifyToken = (req, res, next) => {
   }
 };
 
-module.exports = { verifyToken };
+const authorizeRoles = (...allowedRoles) => {
+  return (req, res, next) => {
+    // req.userRole didapat dari fungsi verifyToken sebelumnya
+    if (!req.userRole || !allowedRoles.includes(req.userRole)) {
+      return res.status(403).json({
+        message: `Forbidden! Role '${req.userRole}' does not have access to this action.`,
+      });
+    }
+    next();
+  };
+};
+
+module.exports = { verifyToken, authorizeRoles };

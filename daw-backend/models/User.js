@@ -1,5 +1,6 @@
 const { DataTypes } = require("sequelize");
 const sequelize = require("../config/database");
+const bcrypt = require("bcryptjs");
 
 const User = sequelize.define(
   "User",
@@ -31,9 +32,29 @@ const User = sequelize.define(
       type: DataTypes.ENUM("Active", "Suspended"),
       defaultValue: "Active",
     },
+    lastLogin: {
+      type: DataTypes.DATE,
+      allowNull: true,
+    },
   },
   {
     timestamps: true,
+    hooks: {
+      // Hook ini otomatis mengenkripsi password sebelum user baru dibuat
+      beforeCreate: async (user) => {
+        if (user.password) {
+          const salt = await bcrypt.genSalt(10);
+          user.password = await bcrypt.hash(user.password, salt);
+        }
+      },
+      // Hook ini untuk enkripsi jika admin mereset password
+      beforeUpdate: async (user) => {
+        if (user.changed("password")) {
+          const salt = await bcrypt.genSalt(10);
+          user.password = await bcrypt.hash(user.password, salt);
+        }
+      },
+    },
   },
 );
 

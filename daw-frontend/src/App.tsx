@@ -19,6 +19,7 @@ import InvestmentsManager from "./pages/admin/InvestmentsManager";
 import { Toaster } from "sonner";
 import EditProject from "./pages/admin/EditProject";
 import ProtectedRoute from "./components/ProtectedRoute";
+import ForceChangePassword from "./pages/admin/ForceChangePassword";
 
 function App() {
   return (
@@ -42,7 +43,10 @@ function App() {
 
         {/* Admin Login */}
         <Route path="/admin/login" element={<Login />} />
-
+        <Route
+          path="/force-change-password"
+          element={<ForceChangePassword />}
+        />
         {/* Admin Route */}
         <Route element={<ProtectedRoute />}>
           <Route path="/admin" element={<AdminLayout />}>

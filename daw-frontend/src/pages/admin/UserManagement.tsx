@@ -1,14 +1,14 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   Search,
   UserPlus,
   Shield,
-  MoreVertical,
   Edit,
   Key,
   ShieldAlert,
   ShieldCheck,
   X,
+  Trash2, // <-- Tambahan icon Trash2 untuk tombol delete
 } from "lucide-react";
 
 interface AdminUser {
@@ -17,48 +17,36 @@ interface AdminUser {
   email: string;
   role: "Superadmin" | "Editor" | "Viewer";
   status: "Active" | "Suspended";
-  lastLogin: string;
+  lastLogin: string | null;
+  createdAt: string;
 }
 
-const initialUsers: AdminUser[] = [
-  {
-    id: "usr1",
-    name: "Jap Calvin",
-    email: "calvin@daw.co.id",
-    role: "Superadmin",
-    status: "Active",
-    lastLogin: "Just now",
-  },
-  {
-    id: "usr2",
-    name: "Corporate Comms",
-    email: "corcom@daw.co.id",
-    role: "Editor",
-    status: "Active",
-    lastLogin: "2 hours ago",
-  },
-  {
-    id: "usr3",
-    name: "HR Department",
-    email: "hrd@daw.co.id",
-    role: "Viewer",
-    status: "Active",
-    lastLogin: "Yesterday",
-  },
-  {
-    id: "usr4",
-    name: "Former Vendor IT",
-    email: "vendor.it@daw.co.id",
-    role: "Editor",
-    status: "Suspended",
-    lastLogin: "Oct 12, 2025",
-  },
-];
-
 export default function UserManagement() {
-  const [users, setUsers] = useState<AdminUser[]>(initialUsers);
+  const [users, setUsers] = useState<AdminUser[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+
+  // Fungsi Fetch Data dari API
+  const fetchUsers = async () => {
+    setIsLoading(true);
+    try {
+      const token = localStorage.getItem("daw_token");
+      const response = await fetch("http://localhost:5000/api/users", {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await response.json();
+      setUsers(data);
+    } catch (error) {
+      console.error("Error fetching users:", error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchUsers();
+  }, []);
 
   // State untuk form tambah user baru
   const [formData, setFormData] = useState({
@@ -74,52 +62,71 @@ export default function UserManagement() {
       user.email.toLowerCase().includes(searchTerm.toLowerCase()),
   );
 
-  // Fungsi Tambah User
-  const handleAddUser = () => {
+  // FIX 1: Tambahkan keyword 'async' di sini
+  const handleAddUser = async () => {
     if (!formData.name || !formData.email) {
       alert("Please fill in all required fields.");
       return;
     }
+    try {
+      const token = localStorage.getItem("daw_token");
+      const response = await fetch("http://localhost:5000/api/users", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify(formData),
+      });
 
-    const newUser: AdminUser = {
-      id: `usr-${Date.now()}`,
-      name: formData.name,
-      email: formData.email,
-      role: formData.role,
-      status: "Active",
-      lastLogin: "Never",
-    };
+      const result = await response.json();
 
-    setUsers([newUser, ...users]);
-    setFormData({ name: "", email: "", role: "Editor" });
-    setIsModalOpen(false);
-
-    // Simulasi pengiriman email
-    alert(
-      `An invitation email with a temporary password has been sent to ${formData.email}`,
-    );
+      if (response.ok) {
+        alert(`Success! Temp Password: ${result.tempPassword}`);
+        fetchUsers(); // Refresh daftar user
+        setIsModalOpen(false);
+        setFormData({ name: "", email: "", role: "Editor" });
+      } else {
+        alert(result.message);
+      }
+    } catch {
+      console.error("Failed to invite user");
+    }
   };
 
-  // Fungsi Toggle Status (Active/Suspended)
-  const toggleUserStatus = (id: string) => {
-    setUsers(
-      users.map((user) => {
-        if (user.id === id) {
-          // Cegah Superadmin mensuspend dirinya sendiri
-          if (user.role === "Superadmin" && user.name === "Jap Calvin") {
-            alert(
-              "Action denied: You cannot suspend the primary Superadmin account.",
-            );
-            return user;
-          }
-          return {
-            ...user,
-            status: user.status === "Active" ? "Suspended" : "Active",
-          };
-        }
-        return user;
-      }),
-    );
+  // Toggle Status (Active/Suspended)
+  const toggleUserStatus = async (user: AdminUser) => {
+    const newStatus = user.status === "Active" ? "Suspended" : "Active";
+    try {
+      const token = localStorage.getItem("daw_token");
+      await fetch(`http://localhost:5000/api/users/${user.id}`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ ...user, status: newStatus }),
+      });
+      fetchUsers(); // Refresh UI
+    } catch {
+      console.error("Update status failed");
+    }
+  };
+
+  // Delete User (Akan dipakai di tombol Trash2)
+  const handleDeleteUser = async (id: string) => {
+    if (!confirm("Are you sure you want to delete this user?")) return;
+    try {
+      const token = localStorage.getItem("daw_token");
+      const res = await fetch(`http://localhost:5000/api/users/${id}`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.ok) fetchUsers();
+      else alert("Cannot delete Superadmin or action not permitted.");
+    } catch {
+      console.error("Delete failed");
+    }
   };
 
   // Helper untuk warna Badge Role
@@ -187,7 +194,17 @@ export default function UserManagement() {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {filteredUsers.length > 0 ? (
+              {/* FIX 2: Tampilkan Loading State jika sedang fetch data */}
+              {isLoading ? (
+                <tr>
+                  <td colSpan={5} className="px-6 py-12 text-center">
+                    <div className="flex flex-col items-center justify-center space-y-3">
+                      <div className="w-6 h-6 border-2 border-daw-green border-t-transparent rounded-full animate-spin"></div>
+                      <p className="text-sm text-slate-500">Loading users...</p>
+                    </div>
+                  </td>
+                </tr>
+              ) : filteredUsers.length > 0 ? (
                 filteredUsers.map((user) => (
                   <tr
                     key={user.id}
@@ -230,37 +247,67 @@ export default function UserManagement() {
                       )}
                     </td>
                     <td className="px-6 py-4">
-                      <p className="text-sm text-slate-600">{user.lastLogin}</p>
+                      <p className="text-sm text-slate-600">
+                        {user.lastLogin
+                          ? new Date(user.lastLogin).toLocaleDateString()
+                          : "Never"}
+                      </p>
                     </td>
                     <td className="px-6 py-4 text-right">
-                      <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                        <button
-                          onClick={() => toggleUserStatus(user.id)}
-                          className="p-2 text-slate-400 hover:text-amber-600 hover:bg-amber-50 rounded-lg transition-colors"
-                          title={
-                            user.status === "Active"
+                      <div className="flex items-center justify-end gap-3 opacity-0 group-hover:opacity-100 transition-opacity">
+                        {/* 1. Tombol Suspend / Activate */}
+                        <div className="relative flex items-center justify-center group/tooltip">
+                          <button
+                            onClick={() => toggleUserStatus(user)}
+                            className={`p-2 rounded-lg transition-colors ${
+                              user.status === "Active"
+                                ? "text-slate-400 hover:text-amber-600 hover:bg-amber-50"
+                                : "text-slate-400 hover:text-green-600 hover:bg-green-50"
+                            }`}
+                          >
+                            <ShieldAlert className="w-4 h-4" />
+                          </button>
+                          {/* Tooltip text */}
+                          <span className="absolute -top-8 scale-0 transition-all rounded bg-slate-800 p-2 text-xs text-white group-hover/tooltip:scale-100 z-10 whitespace-nowrap shadow-lg">
+                            {user.status === "Active"
                               ? "Suspend User"
-                              : "Reactivate User"
-                          }
-                        >
-                          <ShieldAlert className="w-4 h-4" />
-                        </button>
-                        <button
-                          className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
-                          title="Reset Password"
-                        >
-                          <Key className="w-4 h-4" />
-                        </button>
-                        <button
-                          className="p-2 text-slate-400 hover:text-daw-green hover:bg-green-50 rounded-lg transition-colors"
-                          title="Edit User"
-                        >
-                          <Edit className="w-4 h-4" />
-                        </button>
+                              : "Reactivate User"}
+                          </span>
+                        </div>
+
+                        {/* 2. Tombol Reset Password */}
+                        <div className="relative flex items-center justify-center group/tooltip">
+                          <button className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors">
+                            <Key className="w-4 h-4" />
+                          </button>
+                          <span className="absolute -top-8 scale-0 transition-all rounded bg-slate-800 p-2 text-xs text-white group-hover/tooltip:scale-100 z-10 whitespace-nowrap shadow-lg">
+                            Reset Password
+                          </span>
+                        </div>
+
+                        {/* 3. Tombol Edit */}
+                        <div className="relative flex items-center justify-center group/tooltip">
+                          <button className="p-2 text-slate-400 hover:text-daw-green hover:bg-green-50 rounded-lg transition-colors">
+                            <Edit className="w-4 h-4" />
+                          </button>
+                          <span className="absolute -top-8 scale-0 transition-all rounded bg-slate-800 p-2 text-xs text-white group-hover/tooltip:scale-100 z-10 whitespace-nowrap shadow-lg">
+                            Edit User Data
+                          </span>
+                        </div>
+
+                        {/* 4. Tombol Delete */}
+                        <div className="relative flex items-center justify-center group/tooltip">
+                          <button
+                            onClick={() => handleDeleteUser(user.id)}
+                            className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                          <span className="absolute -top-8 scale-0 transition-all rounded bg-slate-800 p-2 text-xs text-white group-hover/tooltip:scale-100 z-10 whitespace-nowrap shadow-lg">
+                            Delete User
+                          </span>
+                        </div>
                       </div>
-                      <button className="p-2 text-slate-400 md:hidden">
-                        <MoreVertical className="w-4 h-4" />
-                      </button>
                     </td>
                   </tr>
                 ))

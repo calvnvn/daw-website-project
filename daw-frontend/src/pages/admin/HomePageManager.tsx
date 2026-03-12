@@ -3,7 +3,6 @@ import { MonitorPlay, Type, BarChart3 } from "lucide-react";
 import IntroManager from "@/components/IntroManager";
 import StatsManager from "@/components/StatsManager";
 import HeroManager from "@/components/HeroManager";
-// Kita buat nanti
 
 export default function HomepageManager() {
   const [activeTab, setActiveTab] = useState<"hero" | "intro" | "stats">(

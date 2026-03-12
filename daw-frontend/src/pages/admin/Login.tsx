@@ -33,9 +33,15 @@ export default function Login() {
         body: JSON.stringify({ email, password }),
       });
       const data = await response.json();
+      if (response.status === 403) {
+        toast.error("Access Denied", {
+          description: data.message || "Your account has been suspended.",
+        });
+        return;
+      }
+
       if (response.ok) {
         localStorage.setItem("daw_token", data.accessToken);
-
         localStorage.setItem(
           "daw_user",
           JSON.stringify({
@@ -44,12 +50,24 @@ export default function Login() {
             role: data.role,
           }),
         );
-
         toast.success(`Welcome back, ${data.name}!`, {
           description: "Successfully authenticated to DAW Admin Portal.",
         });
 
-        navigate("/admin");
+        // 🔐 2. CEK FIRST-TIME LOGIN (FORCE CHANGE PASSWORD)
+        if (data.needsPasswordChange) {
+          toast.info("Security Check", {
+            description: "Please change your temporary password to continue.",
+          });
+          // Arahkan ke halaman ganti password (pastikan rute ini nanti kamu buat di App.tsx)
+          navigate("/force-change-password");
+        } else {
+          // Jika normal, masuk ke dashboard
+          toast.success(`Welcome back, ${data.name}!`, {
+            description: "Successfully authenticated to DAW Admin Portal.",
+          });
+          navigate("/admin");
+        }
       } else {
         toast.error("Authentication Failed", {
           description: data.message || "Invalid email or password.",
