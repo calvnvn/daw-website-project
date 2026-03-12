@@ -14,7 +14,7 @@ const investmentRoutes = require("./routes/investmentRoutes");
 const homeRoutes = require("./routes/homeRoutes");
 const inquiryRoutes = require("./routes/inquiryRoutes");
 const userRoutes = require("./routes/userRoutes");
-
+const dashboardRoutes = require("./routes/dashboardRoutes");
 const HeroSlide = require("./models/HeroSlide");
 const HomeSetting = require("./models/HomeSetting");
 const ImpactStat = require("./models/ImpactStat");
@@ -39,6 +39,8 @@ app.use("/api/investment", investmentRoutes);
 app.use("/api/homepage", homeRoutes);
 app.use("/api/inquiries", inquiryRoutes);
 app.use("/api/users", userRoutes);
+app.use("/api/auth", authRoutes);
+app.use("/api/dashboard", dashboardRoutes);
 
 // --- SWAGGER API DOCS SETUP ---
 const swaggerOptions = {

@@ -6,30 +6,33 @@ const storage = multer.diskStorage({
     cb(null, "./public/uploads/");
   },
   filename: (req, file, cb) => {
+    // FIX: Hanya panggil SATU KALI cb()
     const uniqueSuffix = Date.now() + "-" + Math.round(Math.random() * 1e9);
-    cb(null, uniqueSuffix + path.extname(file.originalname));
-    cb(null, "management-" + Date.now() + path.extname(file.originalname));
+    const safeName =
+      file.fieldname + "-" + uniqueSuffix + path.extname(file.originalname);
+    cb(null, safeName);
   },
 });
 
 const fileFilter = (req, file, cb) => {
+  // FIX: Hapus deklarasi ganda, gunakan satu logika filter yang solid
   if (file.mimetype.startsWith("image/")) {
     cb(null, true);
   } else {
-    cb(new Error("Only Image Files are Allowed"), false);
+    cb(
+      new multer.MulterError(
+        "LIMIT_UNEXPECTED_FILE",
+        "Only image files are allowed!",
+      ),
+    );
   }
 };
 
 const upload = multer({
   storage: storage,
   fileFilter: fileFilter,
-  limits: { fileSize: 10 * 1024 * 1024 }, // Maksimal 5MB per gambar
-  fileFilter: (req, file, cb) => {
-    if (file.mimetype.startsWith("image/")) {
-      cb(null, true);
-    } else {
-      cb(new Error("Only images are allowed!"), false);
-    }
+  limits: {
+    fileSize: 10 * 1024 * 1024, // Maksimal 10MB PER GAMBAR
   },
 });
 
