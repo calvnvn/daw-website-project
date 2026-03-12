@@ -42,7 +42,7 @@ export default function AdminLayout() {
     { name: "Projects", path: "/admin/projects", icon: FolderTree },
     { name: "Investments", path: "/admin/investments", icon: Briefcase },
     { name: "About Us", path: "/admin/about", icon: Users },
-    { name: "Inbox", path: "/admin/inbox", icon: Inbox, badge: 3 },
+    { name: "Inbox", path: "/admin/inbox", icon: Inbox },
     { name: "User Access", path: "/admin/users", icon: Shield },
     { name: "Settings", path: "/admin/settings", icon: Settings },
   ];

@@ -11,10 +11,12 @@ const historyRoutes = require("./routes/historyRoutes");
 const aboutRoutes = require("./routes/aboutRoutes");
 const managementRoutes = require("./routes/managementRoutes");
 const investmentRoutes = require("./routes/investmentRoutes");
+const homeRoutes = require("./routes/homeRoutes");
+const inquiryRoutes = require("./routes/inquiryRoutes");
+
 const HeroSlide = require("./models/HeroSlide");
 const HomeSetting = require("./models/HomeSetting");
 const ImpactStat = require("./models/ImpactStat");
-const homeRoutes = require("./routes/homeRoutes");
 const path = require("path");
 
 dotenv.config();
@@ -34,6 +36,7 @@ app.use("/api/history", historyRoutes);
 app.use("/api/management", managementRoutes);
 app.use("/api/investment", investmentRoutes);
 app.use("/api/homepage", homeRoutes);
+app.use("/api/inquiries", inquiryRoutes);
 
 // --- SWAGGER API DOCS SETUP ---
 const swaggerOptions = {

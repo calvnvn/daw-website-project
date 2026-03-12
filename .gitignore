@@ -1,13 +1,9 @@
-# Folder library yang berat banget
 **/node_modules/
 
-# Rahasia dapur (SANGAT PENTING)
 **/.env
 
-# Hasil build
 **/dist/
 **/build/
 
-# File sampah OS
 .DS_Store
 Thumbs.db
