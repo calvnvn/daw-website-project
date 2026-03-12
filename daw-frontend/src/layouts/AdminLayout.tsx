@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Link, Outlet, useLocation, useNavigate } from "react-router-dom";
 import {
   LayoutDashboard,
@@ -15,17 +15,43 @@ import {
   Shield,
   Briefcase,
   AlertTriangle,
+  ChevronRight,
+  MessageSquare,
 } from "lucide-react";
-import logoDaw from "@/assets/logo-daw.png";
+import logoDaw from "../assets/logo-daw.png";
 
 export default function AdminLayout() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isDesktopCollapsed, setIsDesktopCollapsed] = useState(false);
-
   const [isLogoutModalOpen, setIsLogoutModalOpen] = useState(false);
+
+  const [unreadInquiries, setUnreadInquiries] = useState<any[]>([]);
+  const [isNotifOpen, setIsNotifOpen] = useState(false);
 
   const location = useLocation();
   const navigate = useNavigate();
+
+  useEffect(() => {
+    const fetchUnreadInquiries = async () => {
+      try {
+        const token = localStorage.getItem("daw_token");
+        const res = await fetch("http://localhost:5000/api/inquiries", {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (res.ok) {
+          const data = await res.json();
+          const unread = data.filter((item: any) => !item.isRead);
+          setUnreadInquiries(unread);
+        }
+      } catch (error) {
+        console.error("Failed to fetch notifications");
+        console.log(error);
+      }
+    };
+
+    fetchUnreadInquiries();
+    setIsNotifOpen(false);
+  }, [location.pathname]);
 
   const userData = JSON.parse(localStorage.getItem("daw_user") || "{}");
 
@@ -42,7 +68,12 @@ export default function AdminLayout() {
     { name: "Projects", path: "/admin/projects", icon: FolderTree },
     { name: "Investments", path: "/admin/investments", icon: Briefcase },
     { name: "About Us", path: "/admin/about", icon: Users },
-    { name: "Inbox", path: "/admin/inbox", icon: Inbox },
+    {
+      name: "Inbox",
+      path: "/admin/inbox",
+      icon: Inbox,
+      badge: unreadInquiries.length > 0 ? unreadInquiries.length : undefined,
+    },
     { name: "User Access", path: "/admin/users", icon: Shield },
     { name: "Settings", path: "/admin/settings", icon: Settings },
   ];
@@ -169,15 +200,12 @@ export default function AdminLayout() {
         {/* TOP HEADER */}
         <header className="h-20 bg-white border-b border-slate-200 flex items-center justify-between px-6 lg:px-8 shrink-0 z-10 sticky top-0 transition-all">
           <div className="flex items-center gap-4">
-            {/* Tombol Toggle Mobile (Muncul di layar kecil) */}
             <button
               className="md:hidden p-2 -ml-2 text-slate-500 hover:bg-slate-100 rounded-lg transition-colors"
               onClick={() => setIsMobileMenuOpen(true)}
             >
               <Menu className="w-6 h-6" />
             </button>
-
-            {/* Tombol Toggle Desktop (Muncul di layar besar) */}
             <button
               className="hidden md:block p-2 -ml-2 text-slate-500 hover:text-daw-green hover:bg-slate-50 rounded-lg transition-colors"
               onClick={() => setIsDesktopCollapsed(!isDesktopCollapsed)}
@@ -189,21 +217,116 @@ export default function AdminLayout() {
               )}
             </button>
 
-            <div>
-              <h2 className="text-xl font-serif font-bold text-slate-800 hidden sm:block">
-                PT Dharma Agung Wijaya
-              </h2>
+            {/* ---> 1. DYNAMIC BREADCRUMBS <--- */}
+            <div className="hidden sm:flex items-center gap-2 text-sm font-medium">
+              {location.pathname
+                .split("/")
+                .filter((x) => x)
+                .map((path, index, array) => {
+                  const isLast = index === array.length - 1;
+                  return (
+                    <div key={path} className="flex items-center gap-2">
+                      <span
+                        className={`capitalize ${isLast ? "text-slate-900 font-bold" : "text-slate-400"}`}
+                      >
+                        {path.replace(/-/g, " ")}
+                      </span>
+                      {!isLast && (
+                        <ChevronRight className="w-4 h-4 text-slate-300" />
+                      )}
+                    </div>
+                  );
+                })}
             </div>
           </div>
 
-          <div className="flex items-center gap-4">
-            <button className="p-2 text-slate-400 hover:text-daw-green hover:bg-slate-50 rounded-full transition-colors relative">
+          <div className="flex items-center gap-4 relative">
+            {/* ---> 2. NOTIFICATION BELL & DROPDOWN <--- */}
+            <button
+              onClick={() => setIsNotifOpen(!isNotifOpen)}
+              className={`p-2 rounded-full transition-colors relative ${isNotifOpen ? "bg-daw-green/10 text-daw-green" : "text-slate-400 hover:text-daw-green hover:bg-slate-50"}`}
+            >
               <Bell className="w-5 h-5" />
-              <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-red-500 rounded-full border-2 border-white"></span>
+              {unreadInquiries.length > 0 && (
+                <span className="absolute top-1 right-1.5 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-white animate-pulse"></span>
+              )}
             </button>
+
+            {/* Panel Dropdown Notifikasi */}
+            {isNotifOpen && (
+              <div className="absolute top-full right-0 mt-4 w-80 sm:w-96 bg-white rounded-2xl shadow-xl border border-slate-200 overflow-hidden z-50 animate-in slide-in-from-top-2">
+                <div className="p-4 border-b border-slate-100 flex justify-between items-center bg-slate-50">
+                  <h3 className="font-bold text-slate-900">Notifications</h3>
+                  {unreadInquiries.length > 0 && (
+                    <span className="bg-daw-green/10 text-daw-green text-xs font-bold px-2 py-1 rounded-md">
+                      {unreadInquiries.length} New
+                    </span>
+                  )}
+                </div>
+
+                <div className="max-h-[300px] overflow-y-auto custom-scrollbar">
+                  {unreadInquiries.length > 0 ? (
+                    <div className="divide-y divide-slate-50">
+                      {unreadInquiries.slice(0, 5).map((inq) => (
+                        <div
+                          key={inq.id}
+                          className="p-4 hover:bg-slate-50 transition-colors cursor-pointer group"
+                          onClick={() => {
+                            setIsNotifOpen(false);
+                            navigate("/admin/inbox");
+                          }}
+                        >
+                          <div className="flex gap-3 items-start">
+                            <div className="w-8 h-8 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center shrink-0 mt-0.5 group-hover:bg-blue-100">
+                              <MessageSquare className="w-4 h-4" />
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm font-bold text-slate-900 truncate">
+                                {inq.name}
+                              </p>
+                              <p className="text-xs text-slate-500 truncate mt-0.5">
+                                {inq.subject}
+                              </p>
+                              <p className="text-xs text-slate-400 mt-1 line-clamp-1">
+                                {inq.message}
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="p-8 text-center flex flex-col items-center">
+                      <div className="w-12 h-12 bg-slate-50 rounded-full flex items-center justify-center mb-3">
+                        <Bell className="w-6 h-6 text-slate-300" />
+                      </div>
+                      <p className="text-sm font-bold text-slate-700">
+                        All Caught Up!
+                      </p>
+                      <p className="text-xs text-slate-400 mt-1">
+                        You have no new notifications.
+                      </p>
+                    </div>
+                  )}
+                </div>
+
+                {unreadInquiries.length > 0 && (
+                  <div className="p-3 border-t border-slate-100 bg-white">
+                    <button
+                      onClick={() => {
+                        setIsNotifOpen(false);
+                        navigate("/admin/inbox");
+                      }}
+                      className="w-full py-2 text-sm font-bold text-daw-green hover:bg-daw-green/10 rounded-lg transition-colors"
+                    >
+                      View All Messages
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         </header>
-
         {/* DYNAMIC CONTENT (Area Utama) */}
         <main className="flex-1 overflow-y-auto p-6 md:p-10 scroll-smooth bg-[#F8FAFC]">
           <div className="max-w-7xl mx-auto">
