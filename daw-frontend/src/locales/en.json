@@ -1,0 +1,272 @@
+{
+  "nav": {
+    "home": "Home",
+    "about": "About Us",
+    "ourCompany": "Our Company",
+    "history": "History",
+    "philosophy": "Philosophy",
+    "management": "Our Management",
+    "businesses": "Our Businesses",
+    "resources": "Resources",
+    "energy": "Energy",
+    "investments": "Other Investments",
+    "sustainability": "Sustainability",
+    "contact": "Contact Us",
+    "cta": "Contact Us"
+  },
+  "hero": {
+    "slide1": {
+      "title": "A Transformation Company.",
+      "subtitle": "\"Success is born through honesty, persistence, and commitment in the light of constant prayer.\""
+    },
+    "slide2": {
+      "title": "Continuous Improvement.",
+      "subtitle": "Advancing Indonesia's resources and renewable energy sectors through modern technology and ethical practices."
+    },
+    "slide3": {
+      "title": "Interdependence Co-arising.",
+      "subtitle": "Integrating businesses from upstream to downstream to create sustainable value for society."
+    },
+    "ctaPrimary": "Explore Our Businesses",
+    "ctaSecondary": "Discover Our Vision"
+  },
+  "intro": {
+    "tagline": "OUR LOGO",
+    "headline": "A Leading Operating Holding Company.",
+    "body": "PT Dharma Agung Wijaya (DAW Group) focuses on two core pillars: Renewable Energy and Resources. We are committed to operational excellence and living in harmony with Mother Nature, integrating our businesses from upstream to downstream to create sustainable value for society.",
+    "cta": "Learn More About Our History"
+  },
+  "business": {
+    "sectionTitle": "Our Businesses",
+    "filterAll": "All Projects",
+    "filterResources": "Resources",
+    "filterEnergy": "Energy",
+    "readMore": "Read More",
+    "projects": {
+      "item1": {
+        "title": "East Kalimantan Operations",
+        "subtitle": "Managing a total plantable area of 10,000 Ha and a 45 tonnes/hour capacity CPO mill."
+      },
+      "item2": {
+        "title": "West Kalimantan Operations",
+        "subtitle": "Operating two CPO mills in Bengkayang and Sanggau, supported by an 11,000 Ha land bank."
+      },
+      "item3": {
+        "title": "Jambi CPO Mill",
+        "subtitle": "A newly acquired 45 tonnes/hour capacity mill in Sarolangun, operational since 2015."
+      },
+      "item4": {
+        "title": "Sanggau CPO Mill",
+        "subtitle": "A strategic CPO mill supporting downstream palm oil operations in West Kalimantan."
+      },
+      "item5": {
+        "title": "Hydropower - Project Kualu",
+        "subtitle": "A 15 MW potential hydropower plant located in North Sumatera, connected to the channels of Toba Lake."
+      },
+      "item6": {
+        "title": "Stockpile Jambi - PKS",
+        "subtitle": "Supplying high-quality Palm Kernel Shells with 4k ARB calorific value as a sustainable fuel alternative."
+      }
+    },
+    "statistics": {
+      "items": {
+        "area": {
+          "value": "10,000+ Ha",
+          "label": "Total Plantable Area",
+          "desc": "in East Kalimantan region."
+        },
+        "power": {
+          "value": "15 MW",
+          "label": "Hydropower Capacity",
+          "desc": "potential at Project Kualu."
+        },
+        "capacity": {
+          "value": "45 Tonnes/hr",
+          "label": "CPO Mill Capacity",
+          "desc": "per mill in Bengkayang, Sanggau, and Jambi."
+        },
+        "pln": {
+          "value": "5 PLN Plants",
+          "label": "O&M Services",
+          "desc": "across Sumatera, Kalimantan, and Sulawesi."
+        }
+      }
+    },
+    "investmentsTeaser": {
+      "tagline": "PORTFOLIO",
+      "headline": "Other Investments.",
+      "body": "Beyond our core operations in Resources and Renewable Energy, we strategically invest in emerging sectors to diversify our business ecosystem and drive long-term sustainable growth.",
+      "cta": "Explore All Investments",
+      "categories": {
+        "fnb": "Food & Beverage",
+        "steel": "Precision Stainless Steel",
+        "finance": "Microfinance",
+        "edu": "International K12 School"
+      }
+    }
+  },
+  "footer": {
+    "ctaHeadline": "Advancing Sustainable Development.",
+    "ctaSub": "Inquiries regarding our operational holdings and strategic partnerships may be directed to our corporate office.",
+    "ctaButton": "Contact Corporate Office",
+    "officeTitle": "Headquarters",
+    "address": "Alamanda Tower, 22nd Floor Jl. TB Simatupang Kav 23-24 Cilandak Barat, Jakarta Selatan, \n+62 21 2966 1956.",
+    "sectorsTitle": "Core Sectors",
+    "quickLinks": "Sitemap",
+    "copyright": "© 2026 PT Dharma Agung Wijaya. All rights reserved."
+  },
+  "about": {
+    "title": "About Us",
+    "menu": {
+      "company": "Our Company",
+      "history": "History",
+      "philosophy": "Philosophy",
+      "management": "Our Management"
+    },
+    "company": {
+      "spiritTitle": "Founders' Spirit",
+      "spiritText": "\"Success is born through honesty, persistence, and commitment in the light of constant prayer.\"",
+      "missionTitle": "Our Mission",
+      "missionText": "We are a <1>transformation-making</1> company that creates value to society based on interdependence co-arising.",
+      "visionTitle": "Our Vision",
+      "visionText": "To become one of the most respected palm oil and renewable energy companies, in terms of operational excellence and commitment to live in <1>harmony with mother nature</1>."
+    },
+    "history": {
+      "title": "Our Journey",
+      "y2005": "DAW Group was founded as an investment holding company in a food and beverage industry (Garudafood Group).",
+      "y2009": "DAW Group was transformed as an operating holding company that focuses in resources and energy industry. The resources division focuses in the Palm Oil business, while the energy division focuses in renewable energy business."
+    },
+    "philosophy": {
+      "title": "Our Philosophy",
+      "pillars": {
+        "human": {
+          "title": "Human Values",
+          "desc": "To understand and apply humanitarian values encompassing: Truth, Right Conduct, Love, Non-Violence, and Peace. Not violating religious prohibitions. Sincerity and harmony in thinking, speaking and taking action."
+        },
+        "ethics": {
+          "title": "Business Ethics",
+          "desc": "Using the ethical norms prevailing in the community in interaction and management of business environment so that there will finally be 'a sustainable mutual benefit'. Also paying attention to various problems emerging in DAW's business mission although formally this is not their responsibility."
+        },
+        "unity": {
+          "title": "Unity Through Harmony",
+          "desc": "To maintain harmony and unity with the business community internally (employees and shareholders). To maintain equilibrium and harmony between the business aspect and other aspects."
+        },
+        "speed": {
+          "title": "Speed and Leading Change",
+          "desc": "To maintain and raise the speed in the way of thinking and way of action. To institutionalize changes properly and sustain ably so that there will be an added value for the company with technological power as its pillar."
+        },
+        "smart": {
+          "title": "Working Smart in Learning Culture",
+          "desc": "Diligent, persevering, serious and consistent in the work one is involved in. Emphasising the process of swift, systematic and accurate working. Invariably enhancing the method and quality of working through self-development in a culture of learning continuously nurtured by and along with the company."
+        }
+      }
+    },
+    "management": {
+      "titleDirectors": "Board of Directors",
+      "titleDivision": "Division Heads",
+      "sudhamek": {
+        "name": "Sudhamek AWS",
+        "role": "Chairman",
+        "desc": "Mr Sudhamek is the Chairman of PT. Dharma Agung Wijaya since 2009. He is also the Chairman of Garudafood Group since 2012. Previously, he had been the CEO of Garudafood group for 18 years. In 2016, Mr. Sudhamek was inducted as a member of the National Economic & Industry Committe by The President of the Republic of Indonesia: Mr. Joko Widodo; within the same year, He was also awarded with Doctor Honoris Causa by The Universitas Kristen Satya Wacana, on his concept called the Spirituality Based Company (SBC). He is affiliated with other organisations, including as the Chairman of the oldest Buddhist organization in Indonesia (Buddhayana), one of the founders of ICRP (Indonesian Conference on Religion And Peace), and as the Board of Governors of an educational institution called Global Sevilla School, which he established together with the late Mr. Nurcholish Madjid."
+      },
+      "adhitya": {
+        "name": "Adhitya Soenjoto",
+        "role": "President Director",
+        "desc": "He is the President Director of PT. Dharma Agung Wijaya since 2009, responsible for managing the whole business operation of DAW Group. He sits in the management board of other business units under DAW Group, such as: the Director of PT. Hanusentra Agro Lestari (a palm oil plantation) since 2012, the Director of PT Sentosa Bumi Wijaya (a palm oil mill) since 2010 and the Director of PT. Bina Niaga Multiusaha (precision stainless steel rolling mill) since 2016. From 2007 until 2008, he worked at Ernst & Young in Hong Kong, as an auditor. He obtained his Bachelor of Art Degree in Economics in 2005, at The University of Michigan - Ann Arbor, USA. He then obtained his MBA Degree in 2009, at Babson College, Boston - Massachusetts, USA."
+      },
+      "yudie": {
+        "name": "Yudie Soenjoto",
+        "role": "Vice President Director",
+        "desc": "He is the Director of PT. Dharma Agung Wijaya since June 2014, with management responsibility over Energy Division of DAW group. Within the energy division, he serves as director at PT. BEA. He is affiliated with an educational institution a Board Member Executive Secreatry at Global Sevilla School. Prior to joining DAW group, he had served as Project Manager at Garudafood Group, from February 2010 until December 2011. He obtained his Bachelor Degree in Mechanical Engineering from University of Michigan - Ann Arbor. In 2014, he completed his M.B.A in entrepreneurship at Babson College, Wellesley, MA"
+      },
+      "hendy": {
+        "name": "Hendy Liusgria",
+        "role": "Chief Financial Officer",
+        "desc": "He is the Chief Financial Officer for PT. Dharma Agung Wijaya since 2019, with management responsibilities over the financials and tax of both Resources Division and Energy Division of DAW Group. Mr. Hendy had extensive and long term experiences in finance and tax, previously served as the CFO of PT Sinar Niaga Sejahtera, which is the distribution company serving Garudafood Group."
+      },
+      "eduard": {
+        "name": "Eduard Siregar",
+        "role": "Division Head",
+        "desc": "Previously, he served the responsibility as Head of Financial Accounting under the Resources Division. In 2017, Mr Eduard served as the Head of Resources division of DAW, managing the operation of four palm oil mills and plantation in Sumatera and Kalimantan."
+      },
+      "sentiyono": {
+        "name": "Sentiyono",
+        "role": "Division Head",
+        "desc": "He is the Head of Bioenergy Division of DAW Group since 2017, managing the operation of palm kernel shells trading business and renewable energy developments in the bioenergy sectors. He is also a certified Toyota Trainer in various subjects, such as Toyota Practical Problem Solving, Quality Control Check, and Project management."
+      }
+    },
+    "readMore": "Read More"
+  },
+  "businessesPage": {
+    "hero": {
+      "title": "Our Businesses",
+      "subtitle": "An integrated ecosystem driving sustainable growth across Resources, Renewable Energy, and Strategic Investments."
+    },
+    "nav": {
+      "resources": "Resources",
+      "energy": "Energy",
+      "investments": "Investments"
+    },
+    "resources": {
+      "title": "Resources",
+      "intro": "DAW Group Resources division focuses on the Palm Oil business. Our palm oil plantation is located in East Kalimantan with a total plantable area of 10,000 hectares.",
+      "downstream": "In the downstream sector, DAW Group currently has four CPO Mills in operation. Two CPO Mills directly owned by DAW are located in East Kalimantan and Jambi Province; and two other CPO Mills in Lampung and Jambi Province are owned through Tudung Group.",
+      "mapLabel": "Our operating Palm Oil plantation and Palm Oil mills in Kalimantan, Indonesia",
+      "projectsTitle": "Resources Projects"
+    },
+    "energy": {
+      "title": "Energy",
+      "hydropower": {
+        "title": "Hydropower Development",
+        "desc": "DAW Group Energy Division focuses within the renewable energy sector. In 2014, we obtained one hydropower project in North Sumatera (Toba Samosir Region), with a capacity of 15 Megawatts. We believe hydropower in Indonesia is really important in contributing to the country's heavy need for power generation.",
+        "mapLabel": "Our Hydropower Location in Indonesia"
+      },
+      "omServices": {
+        "title": "O&M Services for PLN",
+        "desc": "Entered in 2011, we provide Operation and Maintenance services for Indonesia state-owned electricity company (PLN), focusing mainly on coal-fired power plants. We serve 5 plants across Sumatera, Kalimantan, and Sulawesi, and expanded to privately owned power plants (IPP) in 2014."
+      },
+      "esco": {
+        "title": "Energy Savings (ESCO)",
+        "desc": "We provide solutions to clients in food & beverage, textile, chemical, and steel industries for maximum energy efficiency. We assist clients from the Investment Grade Audit (IGA), design, financing, installation, until the operational stage."
+      },
+      "projectsTitle": "Our Energy Projects"
+    },
+    "investments": {
+      "title": "Other Investments",
+      "intro": "DAW also invests in other diversified businesses. Below is a summary of our other investments:",
+      "categories": {
+        "fnb": "Food & Beverage and Distribution",
+        "steel": "Precision Stainless Steel Mill",
+        "finance": "Microfinance and Cooperatives",
+        "edu": "International K12 School"
+      }
+    }
+  },
+  "contactPage": {
+    "title": "Contact Us",
+    "subtitle": "Corporate Communication",
+    "description": "For official inquiries regarding PT Dharma Agung Wijaya, please contact our corporate headquarters or submit the formal communication form below.",
+    "info": {
+      "addressTitle": "Headquarters",
+      "address": "Alamanda Tower, 22nd Floor. Jl. TB Simatupang Kav 23-24, Cilandak Barat, South Jakarta",
+      "phoneTitle": "Direct Line",
+      "phone": "+62 21 2966 1956",
+      "websiteTitle": "Official Website",
+      "website": "www.daw.co.id"
+    },
+    "form": {
+      "title": "Contact Form",
+      "name": "Full Name",
+      "namePlaceholder": "Enter your name",
+      "email": "Official Email",
+      "emailPlaceholder": "Enter your email address",
+      "phone": "Phone Number",
+      "phonePlaceholder": "Enter your contact number",
+      "message": "Message Body",
+      "messagePlaceholder": "State the purpose of your inquiry clearly",
+      "submit": "Send us an email",
+      "sending": "Transmitting message...",
+      "success": "Message sent. We will respond shortly."
+    }
+  }
+}

@@ -1,0 +1,80 @@
+import { useTranslation } from "react-i18next";
+import ScrollReveal from "../ScrollReveal";
+import {
+  Heart,
+  Briefcase,
+  Users,
+  Zap,
+  Lightbulb,
+  CheckCircle,
+} from "lucide-react";
+import { useAbout } from "@/contexts/AboutContext"; // 👈 1. Import Hook Context
+
+export default function Philosophy() {
+  const { t } = useTranslation();
+  const { aboutData, isLoading } = useAbout(); // 👈 2. Panggil Data
+
+  // Map ikon berdasarkan ID pilar
+  const getIconForPillar = (id: string) => {
+    switch (id.toLowerCase()) {
+      case "human":
+        return <Heart className="w-6 h-6" />;
+      case "ethics":
+        return <Briefcase className="w-6 h-6" />;
+      case "unity":
+        return <Users className="w-6 h-6" />;
+      case "speed":
+        return <Zap className="w-6 h-6" />;
+      case "smart":
+        return <Lightbulb className="w-6 h-6" />;
+      default:
+        return <CheckCircle className="w-6 h-6" />; // Fallback icon jika admin buat id baru
+    }
+  };
+
+  if (isLoading)
+    return <div className="animate-pulse h-64 bg-slate-100 rounded-xl"></div>;
+
+  // 3. Tentukan sumber data: Utamakan Database, kalau kosong pakai Fallback Kosong
+  const pillarsToRender = aboutData?.philosophyPillars?.length
+    ? aboutData.philosophyPillars
+    : [];
+
+  return (
+    <div>
+      <ScrollReveal direction="up" delay={0}>
+        <h2 className="font-serif text-4xl text-slate-900 mb-10">
+          {aboutData?.philosophyTitle || t("about.philosophy.title")}
+        </h2>
+      </ScrollReveal>
+
+      <ScrollReveal direction="up" delay={50}>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 lg:gap-8">
+          {pillarsToRender.map((pillar) => (
+            <div
+              key={pillar.id} // Pakai ID dari database
+              className="p-8 border border-slate-100 bg-slate-50/50 rounded-2xl hover:shadow-[0_8px_30px_rgba(0,0,0,0.04)] hover:border-daw-green/20 hover:bg-white transition-all duration-500 h-full"
+            >
+              <div className="w-12 h-12 flex items-center justify-center rounded-full bg-daw-green/10 text-daw-green mb-6">
+                {getIconForPillar(pillar.id)} {/* Pasang ikon dinamis */}
+              </div>
+              <h3 className="font-serif text-xl font-bold text-slate-900 mb-4">
+                {pillar.title} {/* 👈 Langsung render dari DB */}
+              </h3>
+              <p className="font-sans text-slate-600 leading-relaxed text-[15px]">
+                {pillar.text} {/* 👈 Langsung render dari DB */}
+              </p>
+            </div>
+          ))}
+
+          {/* Fallback Message jika Database belum diisi */}
+          {pillarsToRender.length === 0 && (
+            <div className="col-span-full text-center py-10 text-slate-500">
+              No philosophy pillars defined yet.
+            </div>
+          )}
+        </div>
+      </ScrollReveal>
+    </div>
+  );
+}

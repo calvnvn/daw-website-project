@@ -1,0 +1,21 @@
+@import "tailwindcss";
+@theme {
+  --color-daw-green: #004b23;
+  --color-daw-green-hover: #003619;
+  --font-sans: "Inter", sans-serif;
+  --font-serif: "Lora", serif;
+}
+.prose p:empty::before {
+  content: "";
+  display: inline-block;
+}
+
+/* Memastikan tag br di dalam prose bekerja */
+.prose br {
+  display: block;
+  content: "";
+  margin-top: 1em;
+}
+.prose {
+  hyphens: none;
+}

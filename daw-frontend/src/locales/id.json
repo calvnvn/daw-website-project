@@ -1,0 +1,273 @@
+{
+  "nav": {
+    "home": "Beranda",
+    "about": "Tentang Kami",
+    "ourCompany": "Perusahaan Kami",
+    "history": "Sejarah",
+    "philosophy": "Filosofi",
+    "management": "Manajemen Kami",
+    "businesses": "Bisnis Kami",
+    "resources": "Sumber Daya Alam",
+    "energy": "Energi",
+    "investments": "Investasi Lainnya",
+    "sustainability": "Keberlanjutan",
+    "contact": "Hubungi Kami",
+    "cta": "Hubungi Kami"
+  },
+  "hero": {
+    "slide1": {
+      "title": "Perusahaan Transformasi.",
+      "subtitle": "\"Kesuksesan lahir melalui kejujuran, kegigihan, dan komitmen dalam terang doa yang tiada henti.\""
+    },
+    "slide2": {
+      "title": "Perbaikan Berkelanjutan.",
+      "subtitle": "Memajukan sektor sumber daya alam dan energi terbarukan Indonesia melalui teknologi modern dan praktik etis."
+    },
+    "slide3": {
+      "title": "Saling Menumbuhkembangkan.",
+      "subtitle": "Mengintegrasikan bisnis dari hulu ke hilir untuk menciptakan nilai berkelanjutan bagi masyarakat."
+    },
+    "ctaPrimary": "Jelajahi Bisnis Kami",
+    "ctaSecondary": "Temukan Visi Kami"
+  },
+  "intro": {
+    "tagline": "LOGO KAMI",
+    "headline": "Perusahaan Induk Operasional Terkemuka.",
+    "body": "PT Dharma Agung Wijaya (DAW Group) berfokus pada dua pilar utama: Energi Terbarukan dan Sumber Daya Alam. Kami berkomitmen pada keunggulan operasional dan hidup selaras dengan Alam, mengintegrasikan bisnis kami dari hulu ke hilir untuk menciptakan nilai berkelanjutan bagi masyarakat.",
+    "cta": "Pelajari Lebih Lanjut Sejarah Kami"
+  },
+  "business": {
+    "sectionTitle": "Bisnis Kami",
+    "filterAll": "Semua Proyek",
+    "filterResources": "Sumber Daya Alam",
+    "filterEnergy": "Energi",
+    "readMore": "Baca Selengkapnya",
+    "projects": {
+      "item1": {
+        "title": "Operasi Kalimantan Timur",
+        "subtitle": "Mengelola total area siap tanam seluas 10.000 Ha dan pabrik CPO berkapasitas 45 ton/jam."
+      },
+      "item2": {
+        "title": "Operasi Kalimantan Barat",
+        "subtitle": "Mengoperasikan dua pabrik CPO di Bengkayang dan Sanggau, didukung oleh land bank seluas 11.000 Ha."
+      },
+      "item3": {
+        "title": "Pabrik CPO Jambi",
+        "subtitle": "Pabrik berkapasitas 45 ton/jam yang berlokasi di Sarolangun, telah beroperasi penuh sejak 2015."
+      },
+      "item4": {
+        "title": "Pabrik CPO Sanggau",
+        "subtitle": "Pabrik CPO strategis yang mendukung operasi hilir kelapa sawit di Kalimantan Barat."
+      },
+      "item5": {
+        "title": "PLTA - Proyek Kualu",
+        "subtitle": "Pembangkit Listrik Tenaga Air dengan potensi 15 MW di Sumatera Utara, terhubung dengan aliran Danau Toba."
+      },
+      "item6": {
+        "title": "Stockpile Jambi - Cangkang Sawit",
+        "subtitle": "Menyediakan Cangkang Kelapa Sawit (PKS) berkualitas tinggi dengan nilai kalori 4k ARB sebagai alternatif bahan bakar berkelanjutan."
+      }
+    },
+    "statistics": {
+      "items": {
+        "area": {
+          "value": "10.000+ Ha",
+          "label": "Total Area Tanam",
+          "desc": "di wilayah Kalimantan Timur."
+        },
+        "power": {
+          "value": "15 MW",
+          "label": "Kapasitas PLTA",
+          "desc": "potensi pada Proyek Kualu."
+        },
+        "capacity": {
+          "value": "45 Ton/jam",
+          "label": "Kapasitas Pabrik CPO",
+          "desc": "per pabrik di Bengkayang, Sanggau, dan Jambi."
+        },
+        "pln": {
+          "value": "5 Pembangkit PLN",
+          "label": "Layanan O&M",
+          "desc": "tersebar di Sumatera, Kalimantan, dan Sulawesi."
+        }
+      }
+    },
+    "investmentsTeaser": {
+      "tagline": "PORTOFOLIO",
+      "headline": "Investasi Lainnya.",
+      "body": "Di luar operasi inti kami pada sektor Sumber Daya Alam dan Energi Terbarukan, kami berinvestasi secara strategis di berbagai sektor berkembang untuk mendiversifikasi ekosistem bisnis dan mendorong pertumbuhan jangka panjang.",
+      "cta": "Lihat Semua Investasi",
+      "categories": {
+        "fnb": "Makanan & Minuman",
+        "steel": "Baja Tahan Karat Presisi",
+        "finance": "Keuangan Mikro",
+        "edu": "Sekolah Internasional K12"
+      }
+    }
+  },
+  "footer": {
+    "ctaHeadline": "Memajukan Pembangunan Berkelanjutan.",
+    "ctaSub": "Pertanyaan mengenai holding operasional dan kemitraan strategis dapat ditujukan ke kantor korporat kami.",
+    "ctaButton": "Hubungi Kantor Korporat",
+    "officeTitle": "Kantor Pusat",
+    "address": "Alamanda Tower, 22nd Floor Jl. TB Simatupang Kav 23-24 Cilandak Barat, Jakarta Selatan, \n+62 21 2966 1956.",
+    "sectorsTitle": "Sektor Inti",
+    "quickLinks": "Peta Situs",
+    "copyright": "© 2026 PT Dharma Agung Wijaya. Hak cipta dilindungi undang-undang."
+  },
+  "about": {
+    "title": "Tentang Kami",
+    "menu": {
+      "company": "Perusahaan Kami",
+      "history": "Sejarah",
+      "philosophy": "Filosofi",
+      "management": "Manajemen Kami"
+    },
+    "company": {
+      "spiritTitle": "Semangat Pendiri",
+      "spiritText": "\"Kesuksesan lahir melalui kejujuran, kegigihan, dan komitmen dalam terang doa yang tiada henti.\"",
+      "missionTitle": "Misi Kami",
+      "missionText": "Kami adalah perusahaan <1>pembuat transformasi</1> yang menciptakan nilai bagi masyarakat berdasarkan prinsip saling menumbuhkembangkan (interdependence co-arising).",
+      "visionTitle": "Visi Kami",
+      "visionText": "Menjadi salah satu perusahaan kelapa sawit dan energi terbarukan yang paling dihormati, dalam hal keunggulan operasional dan komitmen untuk hidup <1>selaras dengan alam</1>."
+    },
+    "history": {
+      "title": "Perjalanan Kami",
+      "y2005": "DAW Group didirikan sebagai perusahaan induk investasi di industri makanan dan minuman (Garudafood Group).",
+      "y2009": "DAW Group bertransformasi menjadi perusahaan induk operasional yang berfokus pada industri sumber daya alam dan energi. Divisi sumber daya alam berfokus pada bisnis Kelapa Sawit, sedangkan divisi energi berfokus pada bisnis energi terbarukan."
+    },
+    "philosophy": {
+      "title": "Filosofi Kami",
+      "pillars": {
+        "human": {
+          "title": "Nilai-Nilai Kemanusiaan",
+          "desc": "Memahami dan menerapkan nilai-nilai kemanusiaan yang meliputi: Kebenaran, Kebajikan, Cinta Kasih, Tanpa Kekerasan, dan Kedamaian. Tidak melanggar larangan agama. Ketulusan dan keselarasan dalam berpikir, berbicara, dan bertindak."
+        },
+        "ethics": {
+          "title": "Etika Bisnis",
+          "desc": "Menggunakan norma-norma etika yang berlaku di masyarakat dalam interaksi dan manajemen lingkungan bisnis sehingga pada akhirnya tercipta 'keuntungan bersama yang berkelanjutan'. Serta menaruh perhatian pada berbagai masalah yang muncul dalam misi bisnis DAW meskipun secara formal itu bukan tanggung jawab mereka."
+        },
+        "unity": {
+          "title": "Persatuan Melalui Harmoni",
+          "desc": "Menjaga keharmonisan dan persatuan dengan komunitas bisnis secara internal (karyawan dan pemegang saham). Menjaga keseimbangan dan keselarasan antara aspek bisnis dan aspek lainnya."
+        },
+        "speed": {
+          "title": "Kecepatan dan Memimpin Perubahan",
+          "desc": "Mempertahankan dan meningkatkan kecepatan dalam cara berpikir dan bertindak. Melembagakan perubahan secara tepat dan berkelanjutan sehingga ada nilai tambah bagi perusahaan dengan kekuatan teknologi sebagai pilarnya."
+        },
+        "smart": {
+          "title": "Bekerja Cerdas dalam Budaya Belajar",
+          "desc": "Rajin, tekun, serius, dan konsisten dalam pekerjaan yang ditekuninya. Menekankan pada proses kerja yang cepat, sistematis, dan akurat. Senantiasa meningkatkan metode dan kualitas kerja melalui pengembangan diri dalam budaya belajar yang terus dibina oleh dan bersama perusahaan."
+        }
+      }
+    },
+    "management": {
+      "titleDirectors": "Dewan Direksi",
+      "titleDivision": "Kepala Divisi",
+      "sudhamek": {
+        "name": "Sudhamek AWS",
+        "role": "Chairman",
+        "desc": "Bapak Sudhamek adalah Chairman PT. Dharma Agung Wijaya sejak 2009. Ia juga merupakan Chairman Garudafood Group sejak 2012. Sebelumnya, ia telah menjadi CEO Garudafood Group selama 18 tahun. Pada tahun 2016, Bapak Sudhamek dilantik sebagai anggota Komite Ekonomi & Industri Nasional oleh Presiden Republik Indonesia: Bapak Joko Widodo; pada tahun yang sama, Beliau juga dianugerahi gelar Doctor Honoris Causa oleh Universitas Kristen Satya Wacana, atas konsepnya yang disebut Spirituality Based Company (SBC). Beliau berafiliasi dengan berbagai organisasi, termasuk sebagai Ketua organisasi Buddhis tertua di Indonesia (Buddhayana), salah satu pendiri ICRP (Konferensi Agama dan Perdamaian Indonesia), dan sebagai Dewan Gubernur lembaga pendidikan Global Sevilla School, yang didirikannya bersama mendiang Bapak Nurcholish Madjid."
+      },
+      "adhitya": {
+        "name": "Adhitya Soenjoto",
+        "role": "Presiden Direktur",
+        "desc": "Ia menjabat sebagai Presiden Direktur PT. Dharma Agung Wijaya sejak 2009, bertanggung jawab mengelola seluruh operasi bisnis DAW Group. Ia duduk di dewan manajemen unit bisnis lain di bawah DAW Group, seperti: Direktur PT. Hanusentra Agro Lestari (perkebunan kelapa sawit) sejak 2012, Direktur PT Sentosa Bumi Wijaya (pabrik kelapa sawit) sejak 2010 dan Direktur PT. Bina Niaga Multiusaha (pabrik rolling baja tahan karat presisi) sejak 2016. Dari 2007 hingga 2008, ia bekerja di Ernst & Young di Hong Kong, sebagai auditor. Ia memperoleh gelar Bachelor of Art di bidang Ekonomi pada 2005, di University of Michigan - Ann Arbor, AS. Ia kemudian memperoleh gelar MBA pada 2009, di Babson College, Boston - Massachusetts, AS."
+      },
+      "yudie": {
+        "name": "Yudie Soenjoto",
+        "role": "Wakil Presiden Direktur",
+        "desc": "Ia menjabat sebagai Direktur PT. Dharma Agung Wijaya sejak Juni 2014, dengan tanggung jawab manajemen atas Divisi Energi DAW Group. Di dalam divisi energi, ia menjabat sebagai direktur di PT. BEA. Ia berafiliasi dengan lembaga pendidikan sebagai Anggota Dewan Sekretaris Eksekutif di Global Sevilla School. Sebelum bergabung dengan DAW Group, ia pernah menjabat sebagai Manajer Proyek di Garudafood Group, dari Februari 2010 hingga Desember 2011. Ia memperoleh gelar Sarjana Teknik Mesin dari University of Michigan - Ann Arbor. Pada tahun 2014, ia menyelesaikan M.B.A dalam bidang kewirausahaan di Babson College, Wellesley, MA."
+      },
+      "hendy": {
+        "name": "Hendy Liusgria",
+        "role": "Chief Financial Officer",
+        "desc": "Beliau adalah Chief Financial Officer PT. Dharma Agung Wijaya sejak 2019, dengan tanggung jawab manajemen atas keuangan dan pajak dari Divisi Sumber Daya dan Divisi Energi DAW Group. Bapak Hendy memiliki pengalaman luas dan panjang di bidang keuangan dan pajak, sebelumnya menjabat sebagai CFO PT Sinar Niaga Sejahtera, yang merupakan perusahaan distribusi yang melayani Garudafood Group."
+      },
+      "eduard": {
+        "name": "Eduard Siregar",
+        "role": "Kepala Divisi",
+        "desc": "Sebelumnya, ia mengemban tanggung jawab sebagai Kepala Akuntansi Keuangan di bawah Divisi Sumber Daya. Pada tahun 2017, Bapak Eduard menjabat sebagai Kepala Divisi Sumber Daya DAW, mengelola operasi empat pabrik kelapa sawit dan perkebunan di Sumatera dan Kalimantan."
+      },
+      "sentiyono": {
+        "name": "Sentiyono",
+        "role": "Kepala Divisi",
+        "desc": "Ia adalah Kepala Divisi Bioenergi DAW Group sejak 2017, mengelola operasi bisnis perdagangan cangkang kelapa sawit dan pengembangan energi terbarukan di sektor bioenergi. Ia juga merupakan Pelatih Toyota bersertifikat dalam berbagai mata pelajaran, seperti Pemecahan Masalah Praktis Toyota, Pemeriksaan Kontrol Kualitas, dan Manajemen proyek."
+      }
+    },
+
+    "readMore": "Baca Selengkapnya"
+  },
+  "businessesPage": {
+    "hero": {
+      "title": "Bisnis Kami",
+      "subtitle": "Ekosistem terintegrasi yang mendorong pertumbuhan berkelanjutan di sektor Sumber Daya Alam, Energi Terbarukan, dan Investasi Strategis."
+    },
+    "nav": {
+      "resources": "Sumber Daya",
+      "energy": "Energi",
+      "investments": "Investasi"
+    },
+    "resources": {
+      "title": "Sumber Daya Alam",
+      "intro": "Divisi Sumber Daya Alam DAW Group berfokus pada bisnis Kelapa Sawit. Perkebunan kelapa sawit kami berlokasi di Kalimantan Timur dengan total area siap tanam seluas 10.000 hektar.",
+      "downstream": "Di sektor hilir, DAW Group saat ini mengoperasikan empat Pabrik CPO. Dua Pabrik CPO yang dimiliki langsung oleh DAW berlokasi di Kalimantan Timur dan Provinsi Jambi; dan dua Pabrik CPO lainnya di Lampung dan Provinsi Jambi dimiliki melalui Tudung Group.",
+      "mapLabel": "Operasional perkebunan dan pabrik kelapa sawit kami di Kalimantan, Indonesia",
+      "projectsTitle": "Proyek Sumber Daya Alam"
+    },
+    "energy": {
+      "title": "Energi",
+      "hydropower": {
+        "title": "Pengembangan PLTA",
+        "desc": "Divisi Energi DAW Group berfokus pada sektor energi terbarukan. Pada tahun 2014, kami memperoleh satu proyek PLTA di Sumatera Utara (Kawasan Toba Samosir), dengan kapasitas 15 Megawatt. Kami percaya PLTA di Indonesia sangat penting dalam berkontribusi terhadap besarnya kebutuhan pembangkit listrik negara.",
+        "mapLabel": "Lokasi PLTA Kami di Indonesia"
+      },
+      "omServices": {
+        "title": "Layanan O&M untuk PLN",
+        "desc": "Dimulai pada tahun 2011, kami menyediakan layanan Operasi dan Pemeliharaan (O&M) untuk PLN, dengan fokus utama pada PLTU batu bara. Kami melayani 5 pembangkit listrik di Sumatera, Kalimantan, dan Sulawesi, dan berekspansi ke pembangkit listrik swasta (IPP) pada tahun 2014."
+      },
+      "esco": {
+        "title": "Penghematan Energi (ESCO)",
+        "desc": "Kami memberikan solusi efisiensi energi maksimal bagi klien di industri makanan & minuman, tekstil, kimia, dan baja. Kami mendampingi klien mulai dari tahap Investment Grade Audit (IGA), desain, pembiayaan, instalasi, hingga tahap operasional."
+      },
+      "projectsTitle": "Proyek Energi Kami"
+    },
+    "investments": {
+      "title": "Investasi Lainnya",
+      "intro": "DAW juga berinvestasi di berbagai bisnis yang terediversifikasi. Berikut adalah ringkasan investasi kami lainnya:",
+      "categories": {
+        "fnb": "Distribusi serta Makanan & Minuman",
+        "steel": "Pabrik Baja Tahan Karat Presisi",
+        "finance": "Keuangan Mikro dan Koperasi",
+        "edu": "Sekolah Internasional K12"
+      }
+    }
+  },
+  "contactPage": {
+    "title": "Hubungi Kami",
+    "subtitle": "Komunikasi Korporat",
+    "description": "Untuk pertanyaan resmi terkait PT Dharma Agung Wijaya, silakan hubungi kantor pusat kami atau kirimkan formulir komunikasi resmi di bawah ini.",
+    "info": {
+      "addressTitle": "Kantor Pusat",
+      "address": "Alamanda Tower, Lantai 22. Jl. TB Simatupang Kav 23-24, Cilandak Barat, Jakarta Selatan",
+      "phoneTitle": "Saluran Telepon",
+      "phone": "+62 21 2966 1956",
+      "websiteTitle": "Situs Resmi",
+      "website": "www.daw.co.id"
+    },
+    "form": {
+      "title": "Formulir Kontak",
+      "name": "Nama Lengkap",
+      "namePlaceholder": "Masukkan nama Anda",
+      "email": "Email Resmi",
+      "emailPlaceholder": "Masukkan alamat email Anda",
+      "phone": "Nomor Telepon",
+      "phonePlaceholder": "Masukkan nomor kontak Anda",
+      "message": "Isi Pesan",
+      "messagePlaceholder": "Sampaikan tujuan pesan Anda secara jelas",
+      "submit": "Kirim email kepada kami",
+      "sending": "Mengirimkan pesan...",
+      "success": "Pesan terkirim. Kami akan segera merespons Anda."
+    }
+  }
+}
