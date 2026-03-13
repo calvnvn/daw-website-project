@@ -11,7 +11,8 @@ import {
   Send,
   X,
 } from "lucide-react";
-import { useDropzone } from "react-dropzone"; // 1. Import hook
+import { useDropzone } from "react-dropzone";
+import api from "@/lib/api";
 
 export default function CreateProject() {
   const navigate = useNavigate();
@@ -125,6 +126,7 @@ export default function CreateProject() {
         description: `File ${bigGalleryFile.name} melebihi 10MB.`,
       });
     }
+
     setIsLoading(true);
     const loadingToast = toast.loading("Publishing to DAW Database...");
 
@@ -137,40 +139,50 @@ export default function CreateProject() {
       payload.append("status", targetStatus);
 
       const userStr = localStorage.getItem("daw_user");
-      let authorName = "Unknown Author";
-      if (userStr) {
-        try {
-          const userObj = JSON.parse(userStr);
-          authorName = userObj.name || "Unknown Author";
-        } catch {
-          console.error("Fail to read user data from database.");
-        }
-      }
+      const authorName = userStr ? JSON.parse(userStr).name : "Unknown Author";
       payload.append("author", authorName);
 
       if (coverFile) payload.append("cover_image", coverFile);
       galleryFiles.forEach((file) => payload.append("gallery", file));
 
-      const token = localStorage.getItem("daw_token");
-      const response = await fetch("http://localhost:5000/api/projects", {
-        method: "POST",
-        headers: { Authorization: `Bearer ${token}` },
-        body: payload,
+      // 3. EKSEKUSI DENGAN AXIOS
+      // Penjelasan: Axios menerima (URL, Data, Config)
+      const response = await api.post("/projects", payload, {
+        // Fitur Progress Bar
+        onUploadProgress: (progressEvent) => {
+          const total = progressEvent.total || 0;
+          const current = progressEvent.loaded;
+
+          if (total > 0) {
+            const percent = Math.round((current * 100) / total);
+            // Kita perbarui teks toast yang sama menggunakan ID loadingToast
+            toast.loading(`Uploading: ${percent}% completed...`, {
+              id: loadingToast,
+            });
+          }
+        },
       });
 
-      if (response.ok) {
+      // 4. Handle Response Sukses
+      // Axios menganggap 2xx sebagai sukses. Status create biasanya 201.
+      if (response.status === 201 || response.status === 200) {
         toast.success(
           `Project ${targetStatus === "Draft" ? "Saved" : "Published"}!`,
           { id: loadingToast },
         );
         navigate("/admin/projects");
-      } else {
-        const data = await response.json();
-        toast.error("Error", { description: data.message, id: loadingToast });
       }
-    } catch (err) {
+    } catch (err: any) {
+      // 5. Handle Error
+      // Axios menyimpan pesan error dari backend di err.response.data
       console.error("Publish error:", err);
-      toast.error("Network Error", { id: loadingToast });
+      const errorMessage =
+        err.response?.data?.message || "Connection to server failed.";
+
+      toast.error("Error", {
+        description: errorMessage,
+        id: loadingToast,
+      });
     } finally {
       setIsLoading(false);
     }
@@ -291,7 +303,6 @@ export default function CreateProject() {
                 <label className="block text-sm font-bold text-slate-700 mb-2 uppercase tracking-wide">
                   Main Article Content
                 </label>
-                {/* 👇 Kunci 2: Trik CSS untuk memaksa tinggi ReactQuill stabil sejak awal */}
                 <div
                   className="rounded-lg overflow-hidden border border-slate-200 flex-1 flex flex-col min-h-[400px]
                   [&_.quill]:flex-1 [&_.quill]:flex [&_.quill]:flex-col

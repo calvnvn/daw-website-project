@@ -79,7 +79,7 @@ require("./models/Project");
 require("./models/Management");
 
 sequelize
-  .sync({ alter: true })
+  .sync({ alter: false })
   .then(() => {
     console.log("[DATABASE] MySQL/MariaDB Connected & Tables Synced.");
     app.listen(PORT, () => {
