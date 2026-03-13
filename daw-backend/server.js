@@ -16,11 +16,15 @@ const inquiryRoutes = require("./routes/inquiryRoutes");
 const userRoutes = require("./routes/userRoutes");
 const dashboardRoutes = require("./routes/dashboardRoutes");
 const businessRoutes = require("./routes/businessRoutes");
+const pageRoutes = require("./routes/pageRoutes");
+const menuRoutes = require("./routes/menuRoutes");
 const HeroSlide = require("./models/HeroSlide");
 const HomeSetting = require("./models/HomeSetting");
 const ImpactStat = require("./models/ImpactStat");
 const BusinessSection = require("./models/BusinessSection");
 const BusinessMapMarker = require("./models/BusinessMapMarker");
+const Page = require("./models/Page");
+const Menu = require("./models/Menu");
 const path = require("path");
 
 dotenv.config();
@@ -45,6 +49,8 @@ app.use("/api/users", userRoutes);
 app.use("/api/auth", authRoutes);
 app.use("/api/dashboard", dashboardRoutes);
 app.use("/api/businesses", businessRoutes);
+app.use("/api/pages", pageRoutes);
+app.use("/api/menus", menuRoutes);
 
 // --- SWAGGER API DOCS SETUP ---
 const swaggerOptions = {
@@ -97,13 +103,14 @@ BusinessMapMarker.belongsTo(BusinessSection, {
 
 sequelize
   .sync({ alter: false })
-  .then(() => {
+  .then(async () => {
     console.log("[DATABASE] MySQL/MariaDB Connected & Tables Synced.");
     app.listen(PORT, () => {
       console.log(`[SERVER] Running on http://localhost:${PORT}`);
     });
   })
+
   .catch((err) => {
     console.error("[DATABASE] Connection failed:", err.message);
-    console.error(err);
+    app.listen(5000, () => console.log("Server running on port 5000"));
   });

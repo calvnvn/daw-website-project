@@ -18,6 +18,7 @@ import {
   ChevronRight,
   MessageSquare,
   Building2,
+  Menu as MenuIcon,
 } from "lucide-react";
 import logoDaw from "../assets/logo-daw.png";
 
@@ -76,6 +77,7 @@ export default function AdminLayout() {
       icon: Inbox,
       badge: unreadInquiries.length > 0 ? unreadInquiries.length : undefined,
     },
+    { name: "Menu Manager", path: "/admin/menu-manager", icon: MenuIcon },
     { name: "User Access", path: "/admin/users", icon: Shield },
     { name: "Settings", path: "/admin/settings", icon: Settings },
   ];

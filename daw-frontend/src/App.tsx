@@ -21,6 +21,7 @@ import EditProject from "./pages/admin/EditProject";
 import ProtectedRoute from "./components/ProtectedRoute";
 import ForceChangePassword from "./pages/admin/ForceChangePassword";
 import ManageBusinesses from "./pages/admin/ManageBusinesses";
+import MenuManager from "./pages/admin/MenuManager";
 
 function App() {
   return (
@@ -54,6 +55,7 @@ function App() {
             <Route index element={<Dashboard />} />
             <Route path="projects" element={<ProjectManagement />} />
             <Route path="projects/create" element={<CreateProject />} />
+            <Route path="menu-manager" element={<MenuManager />} />
             <Route path="settings" element={<GlobalSettings />} />
             <Route path="home" element={<HomepageManager />} />
             <Route path="businesses" element={<ManageBusinesses />} />
