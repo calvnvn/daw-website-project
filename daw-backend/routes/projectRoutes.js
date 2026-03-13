@@ -23,7 +23,13 @@ router.post(
         if (err.code === "LIMIT_FILE_SIZE") {
           return res
             .status(400)
-            .json({ message: "File terlalu besar! Maksimal 10MB." });
+            .json({ message: "File is too large! Max limit is 10MB." });
+        }
+        if (err.code === "LIMIT_UNEXPECTED_FILE") {
+          return res.status(400).json({
+            message:
+              "Too many files! You can only upload a maximum of 10 gallery images.",
+          });
         }
         return res.status(400).json({ message: err.message });
       } else if (err) {
