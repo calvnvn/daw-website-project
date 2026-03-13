@@ -19,6 +19,7 @@ const HeroSlide = require("./models/HeroSlide");
 const HomeSetting = require("./models/HomeSetting");
 const ImpactStat = require("./models/ImpactStat");
 const path = require("path");
+const { generalLimiter } = require("./middleware/rateLimiter");
 
 dotenv.config();
 const app = express();
@@ -26,9 +27,7 @@ const app = express();
 // --- MIDDLEWARE ---
 app.use(cors());
 app.use(express.json());
-app.use("/uploads", express.static(path.join(__dirname, "public/uploads")));
-app.use(express.urlencoded({ extended: true }));
-
+app.use("/api/", generalLimiter);
 app.use("/api/auth", authRoutes);
 app.use("/api/projects", projectRoutes);
 app.use("/api/settings", settingsRoutes);
@@ -41,6 +40,9 @@ app.use("/api/inquiries", inquiryRoutes);
 app.use("/api/users", userRoutes);
 app.use("/api/auth", authRoutes);
 app.use("/api/dashboard", dashboardRoutes);
+
+app.use("/uploads", express.static(path.join(__dirname, "public/uploads")));
+app.use(express.urlencoded({ extended: true }));
 
 // --- SWAGGER API DOCS SETUP ---
 const swaggerOptions = {
