@@ -1,6 +1,7 @@
 const sequelize = require("../config/database");
 const fs = require("fs");
 const path = require("path");
+const { removeFile } = require("../utils/fileRemover"); // File Remover
 
 // GET Project Function
 exports.getAllProjects = async (req, res) => {
@@ -38,11 +39,8 @@ exports.createProject = async (req, res) => {
 
     const galleryJsonString = JSON.stringify(galleryImagesNames);
 
-    // INSERT Raw Query
-    const query = `
-  INSERT INTO Projects (id, title, excerpt, content, category, status, author, cover_image, gallery, views, createdAt, updatedAt) 
-  VALUES (UUID(), :title, :excerpt, :content, :category, :status, :author, :cover_image, :gallery, 0, NOW(), NOW())
-`;
+    // INSERT
+    const query = `INSERT INTO Projects (id, title, excerpt, content, category, status, author, cover_image, gallery, views, createdAt, updatedAt) VALUES (UUID(), :title, :excerpt, :content, :category, :status, :author, :cover_image, :gallery, 0, NOW(), NOW())`;
 
     await sequelize.query(query, {
       replacements: {
@@ -89,13 +87,19 @@ exports.uploadInlineImage = async (req, res) => {
 exports.deleteProject = async (req, res) => {
   try {
     const { id } = req.params;
-
     const [project] = await sequelize.query(
       `SELECT cover_image, gallery FROM Projects WHERE id = :id`,
       { replacements: { id }, type: sequelize.QueryTypes.SELECT },
     );
 
     if (!project) return res.status(404).json({ message: "Project not found" });
+
+    // Auto remove upload files
+    removeFile(project.cover_image);
+    if (project.gallery) {
+      const galleryFiles = JSON.parse(project.gallery);
+      galleryFiles.forEach((file) => removeFile(file));
+    }
 
     const deleteFile = (fileName) => {
       if (!fileName) return;
