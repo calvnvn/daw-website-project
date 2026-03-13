@@ -15,9 +15,12 @@ const homeRoutes = require("./routes/homeRoutes");
 const inquiryRoutes = require("./routes/inquiryRoutes");
 const userRoutes = require("./routes/userRoutes");
 const dashboardRoutes = require("./routes/dashboardRoutes");
+const businessRoutes = require("./routes/businessRoutes");
 const HeroSlide = require("./models/HeroSlide");
 const HomeSetting = require("./models/HomeSetting");
 const ImpactStat = require("./models/ImpactStat");
+const BusinessSection = require("./models/BusinessSection");
+const BusinessMapMarker = require("./models/BusinessMapMarker");
 const path = require("path");
 
 dotenv.config();
@@ -41,6 +44,7 @@ app.use("/api/inquiries", inquiryRoutes);
 app.use("/api/users", userRoutes);
 app.use("/api/auth", authRoutes);
 app.use("/api/dashboard", dashboardRoutes);
+app.use("/api/businesses", businessRoutes);
 
 // --- SWAGGER API DOCS SETUP ---
 const swaggerOptions = {
@@ -77,6 +81,19 @@ const PORT = process.env.PORT || 5000;
 require("./models/User");
 require("./models/Project");
 require("./models/Management");
+
+// --- RELASI DATABASE ---
+BusinessSection.hasMany(BusinessMapMarker, {
+  foreignKey: "sectionId",
+  sourceKey: "id",
+  as: "mapMarkers",
+  onDelete: "CASCADE",
+});
+
+BusinessMapMarker.belongsTo(BusinessSection, {
+  foreignKey: "sectionId",
+  targetKey: "id",
+});
 
 sequelize
   .sync({ alter: false })

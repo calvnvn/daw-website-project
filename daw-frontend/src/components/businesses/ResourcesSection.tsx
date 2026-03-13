@@ -151,9 +151,7 @@ export default function ResourcesSection() {
 
   return (
     <div className="space-y-24">
-      {/* 1. Teks Narasi & Peta Interaktif */}
       <div className="flex flex-col space-y-16">
-        {/* Atas: Narasi & Angka */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 items-center">
           <div className="lg:col-span-7 space-y-8">
             <ScrollReveal direction="up" delay={0}>

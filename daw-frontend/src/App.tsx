@@ -20,6 +20,7 @@ import { Toaster } from "sonner";
 import EditProject from "./pages/admin/EditProject";
 import ProtectedRoute from "./components/ProtectedRoute";
 import ForceChangePassword from "./pages/admin/ForceChangePassword";
+import ManageBusinesses from "./pages/admin/ManageBusinesses";
 
 function App() {
   return (
@@ -55,6 +56,7 @@ function App() {
             <Route path="projects/create" element={<CreateProject />} />
             <Route path="settings" element={<GlobalSettings />} />
             <Route path="home" element={<HomepageManager />} />
+            <Route path="businesses" element={<ManageBusinesses />} />
             <Route path="about" element={<AboutUsManager />} />
             <Route path="inbox" element={<Inbox />} />
             <Route path="users" element={<UserManagement />} />

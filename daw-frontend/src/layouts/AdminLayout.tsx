@@ -17,6 +17,7 @@ import {
   AlertTriangle,
   ChevronRight,
   MessageSquare,
+  Building2,
 } from "lucide-react";
 import logoDaw from "../assets/logo-daw.png";
 
@@ -66,6 +67,7 @@ export default function AdminLayout() {
     { name: "Dashboard", path: "/admin", icon: LayoutDashboard },
     { name: "Homepage", path: "/admin/home", icon: MonitorPlay },
     { name: "Projects", path: "/admin/projects", icon: FolderTree },
+    { name: "Businesses", path: "/admin/businesses", icon: Building2 },
     { name: "Investments", path: "/admin/investments", icon: Briefcase },
     { name: "About Us", path: "/admin/about", icon: Users },
     {

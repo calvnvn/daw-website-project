@@ -8,6 +8,7 @@ import "./lib/i18n";
 import { SettingsProvider } from "./contexts/SettingsContext";
 import { AboutProvider } from "./contexts/AboutContext.tsx";
 import { InvestmentProvider } from "./contexts/InvestmentContext";
+import { BusinessProvider } from "./contexts/BusinessContext";
 import { HomeProvider } from "./contexts/HomeContext";
 
 const queryClient = new QueryClient();
@@ -20,7 +21,9 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
           <AboutProvider>
             <InvestmentProvider>
               <HomeProvider>
-                <App />
+                <BusinessProvider>
+                  <App />
+                </BusinessProvider>
               </HomeProvider>
             </InvestmentProvider>
           </AboutProvider>
