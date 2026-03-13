@@ -264,3 +264,16 @@ exports.getPublicProjectById = async (req, res) => {
     res.status(500).json({ message: "Failed to fetch project detail." });
   }
 };
+
+exports.incrementProjectView = async (req, res) => {
+  try {
+    const { id } = req.params;
+    await sequelize.query(
+      "UPDATE Projects SET views = views + 1 WHERE id = :id",
+      { replacements: { id }, type: sequelize.QueryTypes.UPDATE },
+    );
+    res.status(200).json({ message: "View incremented" });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};

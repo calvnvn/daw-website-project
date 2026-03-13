@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
 import {
   ArrowLeft,
@@ -7,7 +7,6 @@ import {
   ChevronLeft,
   ImageIcon,
   Calendar,
-  User,
 } from "lucide-react";
 import ScrollReveal from "@/components/ScrollReveal";
 import ProjectDetailSkeleton from "@/components/ProjectDetailSkeleton";
@@ -39,21 +38,37 @@ export default function ProjectDetail() {
   const [selectedImageIndex, setSelectedImageIndex] = useState<number | null>(
     null,
   );
+  const hasFetched = useRef<string | null>(null);
 
   // 3. Menghindari "Calling State Synchronously"
   useEffect(() => {
-    setIsLoading(true);
-    window.scrollTo({ top: 0, behavior: "smooth" });
-    setSelectedImageIndex(null);
+    // 1. Cegah StrictMode double-call:
+    // Jika ID saat ini sama dengan ID yang baru saja di-fetch, jangan lari lagi.
+    if (hasFetched.current === id) return;
 
-    // Fetch Data Utama
-    fetch(`http://localhost:5000/api/projects/public/${id}`)
-      .then((res) => {
+    // 2. Set loading dan scroll secara asinkron ringan (Cegah Cascading Render)
+    // Menggunakan setTimeout 0 melempar eksekusi ke antrean berikutnya,
+    // sehingga React menyelesaikan render saat ini dulu.
+    const preparePage = setTimeout(() => {
+      setIsLoading(true);
+      window.scrollTo({ top: 0, behavior: "smooth" });
+      setSelectedImageIndex(null);
+    }, 0);
+
+    // Tandai bahwa ID ini sedang diproses
+    hasFetched.current = id || null;
+
+    // 3. Fetch Data Utama
+    const fetchData = async () => {
+      try {
+        const res = await fetch(
+          `http://localhost:5000/api/projects/public/${id}`,
+        );
         if (!res.ok) throw new Error("Project not found");
-        return res.json();
-      })
-      .then((data: ProjectData) => {
+
+        const data: ProjectData = await res.json();
         setProject(data);
+
         if (data.gallery) {
           const parsed = JSON.parse(data.gallery);
           setGalleryUrls(
@@ -62,18 +77,24 @@ export default function ProjectDetail() {
         } else {
           setGalleryUrls([]);
         }
-      })
-      .catch((err) => console.error("Error fetching project:", err))
-      .finally(() => setIsLoading(false));
 
-    // Fetch Data Sidebar (Other Projects)
-    fetch(`http://localhost:5000/api/projects/public`)
-      .then((res) => res.json())
-      .then((data: ProjectData[]) => {
-        const filtered = data.filter((p) => p.id !== id).slice(0, 4);
+        const resOther = await fetch(
+          `http://localhost:5000/api/projects/public`,
+        );
+        const otherData: ProjectData[] = await resOther.json();
+        const filtered = otherData.filter((p) => p.id !== id).slice(0, 4);
         setOtherProjects(filtered);
-      })
-      .catch((err) => console.error("Error fetching other projects:", err));
+      } catch (err) {
+        console.error("Error fetching data:", err);
+        hasFetched.current = null;
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchData();
+
+    return () => clearTimeout(preparePage);
   }, [id]);
 
   const closeLightbox = () => setSelectedImageIndex(null);
