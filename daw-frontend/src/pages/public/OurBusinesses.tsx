@@ -7,6 +7,7 @@ import DynamicBusinessSection, {
 } from "@/components/businesses/DynamicBusinessSection";
 import InvestmentsSection from "@/components/businesses/InvestmentsSection";
 import api from "@/lib/api";
+import ScrollReveal from "@/components/ScrollReveal";
 
 export default function OurBusinesses() {
   const { t } = useTranslation();
@@ -76,13 +77,13 @@ export default function OurBusinesses() {
 
   return (
     <div className="bg-white min-h-screen selection:bg-daw-green selection:text-white">
-      {/* 🚀 PROGRESS BAR DARI DYNAMIC PAGE */}
+      {/* PROGRESS BAR DARI DYNAMIC PAGE */}
       <div
         className="fixed top-0 left-0 h-1.5 bg-gradient-to-r from-daw-green via-emerald-400 to-daw-green z-[100] transition-all duration-150 ease-out shadow-[0_0_10px_rgba(16,185,129,0.5)]"
         style={{ width: `${scrollProgress}%` }}
       />
 
-      {/* --- 🚀 HERO BANNER (UPGRADED TO MATCH DYNAMIC PAGE) --- */}
+      {/* --- HERO BANNER --- */}
       <section className="relative h-[85vh] min-h-[600px] flex items-center justify-center overflow-hidden">
         {/* Parallax Background */}
         <div
@@ -97,21 +98,18 @@ export default function OurBusinesses() {
         <div className="absolute inset-0 bg-gradient-to-b from-slate-900/60 via-slate-900/40 to-slate-900/80" />
 
         {/* Text Content */}
-        <div className="relative z-10 text-center px-6 max-w-5xl mt-16 animate-in fade-in slide-in-from-bottom-12 duration-1000">
-          <p className="text-emerald-400 font-bold tracking-[0.4em] uppercase text-[11px] mb-6 drop-shadow-md">
-            Our Core Pillars
-          </p>
-
-          <h1 className="text-5xl md:text-7xl lg:text-8xl font-serif font-bold text-white mb-10 leading-[1.1] tracking-tight drop-shadow-lg">
-            {t("businessesPage.hero.title", "Our Businesses")}
-          </h1>
-
-          <div className="flex items-center justify-center gap-8">
-            <div className="h-px w-16 bg-white/30" />
-            <div className="w-3 h-3 border-2 border-daw-green rotate-45" />
-            <div className="h-px w-16 bg-white/30" />
+        <ScrollReveal direction="up" delay={0}>
+          <div className="relative z-10 text-center px-6 max-w-5xl mt-16 animate-in fade-in slide-in-from-bottom-12 duration-1000">
+            <h1 className="text-5xl md:text-7xl lg:text-8xl font-serif font-bold text-white mb-10 leading-[1.1] tracking-tight drop-shadow-lg">
+              {t("businessesPage.hero.title", "Our Businesses")}
+            </h1>
+            <div className="flex items-center justify-center gap-8">
+              <div className="h-px w-16 bg-white/30" />
+              <div className="w-3 h-3 border-2 border-daw-green rotate-45" />
+              <div className="h-px w-16 bg-white/30" />
+            </div>
           </div>
-        </div>
+        </ScrollReveal>
 
         {/* Scroll Indicator Decoration */}
         <div className="absolute bottom-12 left-1/2 -translate-x-1/2 flex flex-col items-center gap-2 text-white/50 animate-bounce">
@@ -150,7 +148,7 @@ export default function OurBusinesses() {
           <div className="py-32 text-center flex flex-col items-center justify-center gap-4">
             <div className="w-12 h-12 border-4 border-daw-green border-t-transparent rounded-full animate-spin"></div>
             <p className="text-slate-400 font-bold tracking-[0.2em] uppercase text-xs">
-              Memuat Data Bisnis...
+              Loading Business Data...
             </p>
           </div>
         ) : (

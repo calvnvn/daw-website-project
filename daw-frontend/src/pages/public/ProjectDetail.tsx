@@ -40,10 +40,27 @@ export default function ProjectDetail() {
   );
   const hasFetched = useRef<string | null>(null);
 
+  // Progress Bar & Parallax
+  const [scrollProgress, setScrollProgress] = useState(0);
+  const [offsetY, setOffsetY] = useState(0);
+
+  useEffect(() => {
+    const handleScroll = () => {
+      // Progress Bar
+      const totalHeight =
+        document.documentElement.scrollHeight - window.innerHeight;
+      const progress = (window.scrollY / totalHeight) * 100;
+      setScrollProgress(progress);
+
+      // Parallax Offset
+      setOffsetY(window.scrollY);
+    };
+    window.addEventListener("scroll", handleScroll);
+    return () => window.removeEventListener("scroll", handleScroll);
+  }, []);
+
   // 3. Menghindari "Calling State Synchronously"
   useEffect(() => {
-    // 1. Cegah StrictMode double-call:
-    // Jika ID saat ini sama dengan ID yang baru saja di-fetch, jangan lari lagi.
     if (hasFetched.current === id) return;
 
     // 2. Set loading dan scroll secara asinkron ringan (Cegah Cascading Render)
@@ -139,17 +156,32 @@ export default function ProjectDetail() {
 
   return (
     <>
-      <div className="min-h-screen bg-white pb-20">
+      <div
+        className="fixed top-0 left-0 h-1.5 bg-gradient-to-r from-daw-green via-emerald-400 to-daw-green z-[100] transition-all duration-150 ease-out shadow-[0_0_10px_rgba(16,185,129,0.5)]"
+        style={{ width: `${scrollProgress}%` }}
+      />
+      <div className="min-h-screen bg-white pb-20 selection:bg-daw-green selection:text-white">
         {/* --- HERO BANNER SECTION (Konsisten dengan Desain Asli) --- */}
-        <section className="relative w-full h-[50vh] min-h-[400px] flex items-center justify-center overflow-hidden bg-slate-900">
-          {heroImage && (
-            <div
-              className="absolute inset-0 w-full h-full bg-cover bg-center transform scale-100 hover:scale-110 transition-transform duration-[15000ms] ease-out"
-              style={{ backgroundImage: `url(${heroImage})` }}
-            />
-          )}
-          <div className="absolute inset-0 bg-daw-green/70 mix-blend-multiply" />
-          <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-black/30" />
+        <section className="relative h-[85vh] min-h-[600px] flex items-center justify-center overflow-hidden bg-slate-900">
+          {/* Layer 1: Parallax Wrapper */}
+          <div
+            className="absolute inset-0 w-full h-full"
+            style={{
+              transform: `translateY(${offsetY * 0.4}px)`,
+              willChange: "transform",
+            }}
+          >
+            {/* Layer 2: Slow Zoom Image */}
+            {heroImage && (
+              <div
+                className="absolute inset-0 w-full h-[110%] -top-[5%] bg-cover bg-center transition-transform duration-[15000ms] ease-out scale-110"
+                style={{ backgroundImage: `url(${heroImage})` }}
+              />
+            )}
+          </div>
+          {/* Layer 3: Multiply & Cinematic Overlay */}
+          <div className="absolute inset-0 bg-[#004B23]/70 mix-blend-multiply" />
+          <div className="absolute inset-0 bg-gradient-to-b from-slate-900/60 via-slate-900/40 to-slate-900/80" />
 
           <div className="relative z-10 text-center px-6 mt-16 max-w-4xl mx-auto">
             <ScrollReveal direction="up" delay={0}>
@@ -160,12 +192,18 @@ export default function ProjectDetail() {
                 {project.title}
               </h1>
             </ScrollReveal>
+
             <ScrollReveal direction="up" delay={200}>
               <div className="w-20 h-1.5 bg-white/80 mx-auto rounded-full shadow-sm"></div>
             </ScrollReveal>
           </div>
+          <div className="absolute bottom-12 left-1/2 -translate-x-1/2 flex flex-col items-center gap-2 text-white/50 animate-bounce">
+            <span className="text-[10px] font-bold tracking-widest uppercase">
+              Scroll to Explore
+            </span>
+            <ChevronRight className="rotate-90 w-4 h-4" />
+          </div>
         </section>
-
         {/* --- BREADCRUMBS (Konsisten dengan Desain Asli) --- */}
         <div className="bg-slate-50 border-b border-slate-100 py-4 mb-10">
           <div className="container mx-auto px-6 max-w-7xl">
@@ -187,7 +225,6 @@ export default function ProjectDetail() {
             </div>
           </div>
         </div>
-
         {/* --- MAIN CONTENT & SIDEBAR --- */}
         <div className="container mx-auto px-6 max-w-7xl">
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 lg:gap-16 items-start">

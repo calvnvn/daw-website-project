@@ -79,7 +79,7 @@ export default function AboutUs() {
         {/* Text Content */}
         <div className="relative z-10 text-center px-6 max-w-5xl mt-16 animate-in fade-in slide-in-from-bottom-12 duration-1000">
           <ScrollReveal direction="up" delay={0}>
-            {/* Judul yang lebih besar dan mewah */}
+            {/* Judul yang lebih besar */}
             <h1 className="text-5xl md:text-7xl lg:text-8xl font-serif font-bold text-white mb-10 leading-[1.1] tracking-tight drop-shadow-lg">
               {t("about.title", "About Us")}
             </h1>
@@ -102,7 +102,6 @@ export default function AboutUs() {
       </section>
       {/* --- END BANNER SECTION --- */}
 
-      {/* --- MAIN CONTENT SECTION --- */}
       {/* --- MAIN CONTENT SECTION --- */}
       {/* Tambahkan padding top yang lebih besar agar lega (py-24) */}
       <section className="py-24 relative">
