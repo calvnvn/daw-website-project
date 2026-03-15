@@ -1,5 +1,5 @@
 import { useTranslation } from "react-i18next";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   MapPin,
   Phone,
@@ -7,6 +7,7 @@ import {
   ArrowRight,
   CheckCircle2,
   ChevronDown,
+  ChevronRight,
   Mail,
 } from "lucide-react";
 import ScrollReveal from "@/components/ScrollReveal";
@@ -21,6 +22,20 @@ export default function ContactUs() {
   const { t } = useTranslation();
   const [isSuccess, setIsSuccess] = useState(false);
   const { settings, isLoading } = useSettings();
+
+  // Scroll Progress Logic
+  const [scrollProgress, setScrollProgress] = useState(0);
+
+  useEffect(() => {
+    const handleScroll = () => {
+      const totalHeight =
+        document.documentElement.scrollHeight - window.innerHeight;
+      const progress = (window.scrollY / totalHeight) * 100;
+      setScrollProgress(progress);
+    };
+    window.addEventListener("scroll", handleScroll);
+    return () => window.removeEventListener("scroll", handleScroll);
+  }, []);
 
   // 1. UPDATE SCHEMA: Tambahkan Company (Opsional) dan Subject (Wajib)
   const contactSchema = z.object({
@@ -67,7 +82,7 @@ export default function ContactUs() {
           email: data.email,
           phone: data.phone,
           message: data.message,
-          company: data.company || "", // Kirim string kosong jika tidak diisi
+          company: data.company || "",
           subject: data.subject,
         }),
       });
@@ -101,26 +116,46 @@ export default function ContactUs() {
 
   return (
     <div className="bg-white min-h-screen">
-      {/* --- HERO BANNER SECTION --- */}
-      <section className="relative w-full h-[50vh] min-h-[400px] flex items-center justify-center overflow-hidden">
+      {/* Progress Scrolling Bar */}
+      <div
+        className="fixed top-0 left-0 h-1.5 bg-gradient-to-r from-daw-green via-emerald-400 to-daw-green z-[100] transition-all duration-150 ease-out shadow-[0_0_10px_rgba(16,185,129,0.5)]"
+        style={{ width: `${scrollProgress}%` }}
+      />
+      {/* --- BANNER SECTION --- */}
+      <section className="relative h-[85vh] flex items-center justify-center overflow-hidden">
+        {/* Background Image with Slow Zoom Animation */}
         <div
-          className="absolute inset-0 w-full h-full bg-cover bg-center transform scale-100 hover:scale-105 transition-transform duration-[20000ms] ease-out"
-          style={{ backgroundImage: `url(${bannerImg})` }}
+          className="absolute inset-0 bg-cover bg-center transition-transform duration-700 hover:scale-105"
+          style={{
+            backgroundImage: `url(${bannerImg})`,
+            backgroundAttachment: "fixed", // Menambahkan efek parallax
+          }}
         />
-        <div className="absolute inset-0 bg-[#004B23]/80 mix-blend-multiply" />
-        <div className="absolute inset-0 bg-gradient-to-t from-[#081C15] via-transparent to-transparent" />
-
-        <div className="relative z-10 text-center px-6 mt-16 max-w-4xl">
+        {/* DAW Green Overlay (Multiply for rich color blending) */}
+        <div className="absolute inset-0 bg-daw-green/70 mix-blend-multiply" />
+        {/* Gradient Overlay untuk keterbacaan teks */}
+        <div className="absolute inset-0 bg-gradient-to-b from-slate-900/60 via-slate-900/40 to-slate-900/80" />{" "}
+        {/* Text Content */}
+        <div className="relative z-10 text-center px-6 max-w-5xl mt-16 animate-in fade-in slide-in-from-bottom-12 duration-1000">
           <ScrollReveal direction="up" delay={0}>
-            <h1 className="text-5xl md:text-6xl font-serif text-white tracking-tight drop-shadow-lg mb-6">
+            <h1 className="text-5xl md:text-7xl lg:text-8xl font-serif font-bold text-white mb-10 leading-[1.1] tracking-tight drop-shadow-lg">
               {t("contactPage.title", "Get in Touch")}
             </h1>
           </ScrollReveal>
           <ScrollReveal direction="up" delay={200}>
-            <p className="text-lg md:text-xl text-slate-300 font-light tracking-widest uppercase">
-              {t("contactPage.subtitle", "We are here to assist you")}
-            </p>
+            {/* Dekorasi Garis (Mirip di Dynamic Page) */}
+            <div className="flex items-center justify-center gap-8">
+              <div className="h-px w-16 bg-white/30" />
+              <div className="w-3 h-3 border-2 border-daw-green rotate-45" />
+              <div className="h-px w-16 bg-white/30" />
+            </div>
           </ScrollReveal>
+        </div>
+        <div className="absolute bottom-12 left-1/2 -translate-x-1/2 flex flex-col items-center gap-2 text-white/50 animate-bounce">
+          <span className="text-[10px] font-bold tracking-widest uppercase">
+            Scroll to Explore
+          </span>
+          <ChevronRight className="rotate-90 w-4 h-4" />
         </div>
       </section>
 

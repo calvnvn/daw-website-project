@@ -6,7 +6,6 @@ import TransformationIntro from "@/components/TransformationIntro";
 import OtherInvestmentsTeaser from "@/components/OtherInvestmentsTeaser";
 
 export default function Home() {
-  // Progress Bar
   const [scrollProgress, setScrollProgress] = useState(0);
 
   useEffect(() => {

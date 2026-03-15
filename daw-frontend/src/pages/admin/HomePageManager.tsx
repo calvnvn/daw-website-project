@@ -12,7 +12,7 @@ export default function HomepageManager() {
   return (
     <div className="max-w-6xl mx-auto space-y-6 animate-in fade-in duration-500 pb-12">
       {/* --- HEADER --- */}
-      <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm sticky top-0 z-20">
+      <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm  top-0 z-20">
         <h1 className="text-2xl font-serif font-bold text-slate-900">
           Homepage Manager
         </h1>

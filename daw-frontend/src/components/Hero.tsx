@@ -86,7 +86,7 @@ export default function Hero() {
             />
           </div>{" "}
           {/* OVERLAY */}
-          <div className="absolute inset-0 bg-[#004B23]/50 mix-blend-multiply" />
+          <div className="absolute inset-0 bg-[#004B23]/20 mix-blend-multiply" />
           <div className="absolute bottom-0 left-0 right-0 h-2/3 bg-gradient-to-t from-black/90 via-black/40 to-transparent" />
           <div className="absolute top-0 left-0 right-0 h-48 bg-gradient-to-b from-black/70 to-transparent" />
         </div>
