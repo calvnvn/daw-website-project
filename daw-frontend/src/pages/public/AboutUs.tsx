@@ -1,3 +1,4 @@
+import { useState, useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import { useSearchParams } from "react-router-dom";
 import OurCompany from "@/components/about/OurCompany";
@@ -5,12 +6,28 @@ import History from "@/components/about/History";
 import Philosophy from "@/components/about/Philosophy";
 import Management from "@/components/about/Management";
 import ScrollReveal from "@/components/ScrollReveal";
+import { ChevronRight } from "lucide-react"; // Tambahkan icon ini
 import bannerImg from "@/assets/about-banner.jpg";
 
 export default function AboutUs() {
   const { t } = useTranslation();
   const [searchParams, setSearchParams] = useSearchParams();
   const activeTab = searchParams.get("tab") || "company";
+
+  // Scroll Progress Logic
+  const [scrollProgress, setScrollProgress] = useState(0);
+
+  useEffect(() => {
+    const handleScroll = () => {
+      const totalHeight =
+        document.documentElement.scrollHeight - window.innerHeight;
+      const progress = (window.scrollY / totalHeight) * 100;
+      setScrollProgress(progress);
+    };
+    window.addEventListener("scroll", handleScroll);
+    return () => window.removeEventListener("scroll", handleScroll);
+  }, []);
+
   // Untuk ubah tab dan URL automatically
   const handleTabChange = (tabId: string) => {
     setSearchParams({ tab: tabId });
@@ -40,37 +57,58 @@ export default function AboutUs() {
 
   return (
     <div className="bg-white min-h-screen">
+      {/* Progress Scrolling Bar */}
+      <div
+        className="fixed top-0 left-0 h-1.5 bg-gradient-to-r from-daw-green via-emerald-400 to-daw-green z-[100] transition-all duration-150 ease-out shadow-[0_0_10px_rgba(16,185,129,0.5)]"
+        style={{ width: `${scrollProgress}%` }}
+      />
       {/* --- BANNER SECTION --- */}
-      <section className="relative w-full h-[50vh] min-h-[400px] flex items-center justify-center overflow-hidden">
+      <section className="relative h-[85vh] flex items-center justify-center overflow-hidden">
         {/* Background Image with Slow Zoom Animation */}
         <div
-          className="absolute inset-0 w-full h-full bg-cover bg-center transform scale-100 hover:scale-110 transition-transform duration-[15000ms] ease-out"
-          style={{ backgroundImage: `url(${bannerImg})` }}
+          className="absolute inset-0 bg-cover bg-center transition-transform duration-700 hover:scale-105"
+          style={{
+            backgroundImage: `url(${bannerImg})`,
+            backgroundAttachment: "fixed", // Menambahkan efek parallax
+          }}
         />
-
         {/* DAW Green Overlay (Multiply for rich color blending) */}
         <div className="absolute inset-0 bg-daw-green/70 mix-blend-multiply" />
-
-        {/* Gradient Overlay for text readability */}
-        <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-black/30" />
-
+        {/* Gradient Overlay untuk keterbacaan teks */}
+        <div className="absolute inset-0 bg-gradient-to-b from-slate-900/60 via-slate-900/40 to-slate-900/80" />{" "}
         {/* Text Content */}
-        <div className="relative z-10 text-center px-6 mt-16">
+        <div className="relative z-10 text-center px-6 max-w-5xl mt-16 animate-in fade-in slide-in-from-bottom-12 duration-1000">
           <ScrollReveal direction="up" delay={0}>
-            <h1 className="text-5xl md:text-6xl lg:text-7xl font-serif text-white tracking-tight drop-shadow-lg mb-6">
+            {/* Judul yang lebih besar dan mewah */}
+            <h1 className="text-5xl md:text-7xl lg:text-8xl font-serif font-bold text-white mb-10 leading-[1.1] tracking-tight drop-shadow-lg">
               {t("about.title", "About Us")}
             </h1>
           </ScrollReveal>
-
           <ScrollReveal direction="up" delay={200}>
-            <div className="w-20 h-1.5 bg-white/80 mx-auto rounded-full shadow-sm"></div>
+            {/* Dekorasi Garis (Mirip di Dynamic Page) */}
+            <div className="flex items-center justify-center gap-8">
+              <div className="h-px w-16 bg-white/30" />
+              <div className="w-3 h-3 border-2 border-daw-green rotate-45" />
+              <div className="h-px w-16 bg-white/30" />
+            </div>
           </ScrollReveal>
+        </div>
+        <div className="absolute bottom-12 left-1/2 -translate-x-1/2 flex flex-col items-center gap-2 text-white/50 animate-bounce">
+          <span className="text-[10px] font-bold tracking-widest uppercase">
+            Scroll to Explore
+          </span>
+          <ChevronRight className="rotate-90 w-4 h-4" />
         </div>
       </section>
       {/* --- END BANNER SECTION --- */}
 
       {/* --- MAIN CONTENT SECTION --- */}
-      <section className="py-15">
+      {/* --- MAIN CONTENT SECTION --- */}
+      {/* Tambahkan padding top yang lebih besar agar lega (py-24) */}
+      <section className="py-24 relative">
+        {/* Dekorasi blur di background */}
+        <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-daw-green/[0.03] rounded-full blur-[120px] -z-10 pointer-events-none" />
+
         <div className="container mx-auto px-6 max-w-7xl">
           <div className="grid md:grid-cols-12 gap-12 lg:gap-20">
             {/* SIDEBAR NAV */}
@@ -89,7 +127,7 @@ export default function AboutUs() {
                         border-b-[3px] md:border-b-0 md:border-l-[3px] 
                         ${
                           activeTab === tab.id
-                            ? "border-daw-green text-daw-green font-bold md:bg-slate-50/80"
+                            ? "border-daw-green text-daw-green font-bold md:bg-slate-50/80 rounded-r-xl" // Tambah rounded biar nyambung
                             : "border-transparent text-slate-500 hover:text-slate-900 hover:border-slate-200"
                         }`}
                       >
@@ -100,8 +138,9 @@ export default function AboutUs() {
                 </ScrollReveal>
               </div>
             </div>
+
             {/* Dynamic Content */}
-            <div className="md:col-span-9">
+            <div className="md:col-span-9 animate-in fade-in slide-in-from-right-10 duration-1000">
               <div className="max-w-4xl min-h-[600px]">{renderContent()}</div>
             </div>
           </div>

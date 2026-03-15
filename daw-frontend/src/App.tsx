@@ -22,6 +22,9 @@ import ProtectedRoute from "./components/ProtectedRoute";
 import ForceChangePassword from "./pages/admin/ForceChangePassword";
 import ManageBusinesses from "./pages/admin/ManageBusinesses";
 import MenuManager from "./pages/admin/MenuManager";
+import PageManager from "./pages/admin/PageManager";
+import ContentManager from "./pages/admin/ContentManager";
+import DynamicPage from "./pages/public/DynamicPage";
 
 function App() {
   return (
@@ -41,6 +44,7 @@ function App() {
           <Route path="/businesses" element={<OurBusinesses />} />
           <Route path="/contact-us" element={<ContactUs />} />
           <Route path="/projects/:id" element={<ProjectDetail />} />
+          <Route path="page/:slug" element={<DynamicPage />} />
         </Route>
 
         {/* Admin Login */}
@@ -55,7 +59,10 @@ function App() {
             <Route index element={<Dashboard />} />
             <Route path="projects" element={<ProjectManagement />} />
             <Route path="projects/create" element={<CreateProject />} />
-            <Route path="menu-manager" element={<MenuManager />} />
+            <Route path="content" element={<ContentManager />} />
+
+            {/* <Route path="menu-manager" element={<MenuManager />} />
+            <Route path="page-manager" element={<PageManager />} /> */}
             <Route path="settings" element={<GlobalSettings />} />
             <Route path="home" element={<HomepageManager />} />
             <Route path="businesses" element={<ManageBusinesses />} />

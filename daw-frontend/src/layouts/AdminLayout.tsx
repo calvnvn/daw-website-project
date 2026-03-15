@@ -19,7 +19,9 @@ import {
   MessageSquare,
   Building2,
   Menu as MenuIcon,
+  FileText,
 } from "lucide-react";
+
 import logoDaw from "../assets/logo-daw.png";
 
 export default function AdminLayout() {
@@ -77,7 +79,10 @@ export default function AdminLayout() {
       icon: Inbox,
       badge: unreadInquiries.length > 0 ? unreadInquiries.length : undefined,
     },
-    { name: "Menu Manager", path: "/admin/menu-manager", icon: MenuIcon },
+    // { name: "Page Manager", path: "/admin/page-manager", icon: FileText }, // TAMBAHKAN INI
+    // { name: "Menu Manager", path: "/admin/menu-manager", icon: MenuIcon },
+
+    { name: "Content Manager", path: "/admin/content", icon: FileText },
     { name: "User Access", path: "/admin/users", icon: Shield },
     { name: "Settings", path: "/admin/settings", icon: Settings },
   ];

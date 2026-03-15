@@ -11,6 +11,18 @@ const Page = sequelize.define("Page", {
     type: DataTypes.STRING,
     allowNull: false,
   },
+  subtitle: {
+    type: DataTypes.STRING,
+    allowNull: true,
+  },
+  heroImage: {
+    type: DataTypes.TEXT("long"),
+    allowNull: true,
+  },
+  templateType: {
+    type: DataTypes.ENUM("classic", "modern", "split"),
+    defaultValue: "classic",
+  },
   slug: {
     type: DataTypes.STRING,
     allowNull: false,

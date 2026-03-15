@@ -193,7 +193,7 @@ export default function MenuManager() {
 
       const newParentId = targetMenu.parentId;
 
-      let siblings = flatMenus.filter(
+      const siblings = flatMenus.filter(
         (m) => m.parentId === newParentId && m.id !== sourceId,
       );
 
@@ -314,7 +314,7 @@ export default function MenuManager() {
             Menu Manager
           </h1>
           <p className="text-sm text-slate-500 mt-1">
-            Atur struktur navigasi website Anda
+            Set up your website navigation structure
           </p>
         </div>
         {!editingId && (
@@ -322,7 +322,7 @@ export default function MenuManager() {
             onClick={resetForm}
             className="flex items-center gap-2 bg-daw-green hover:bg-[#003b1c] text-white px-5 py-2.5 rounded-lg font-medium transition-colors shadow-sm"
           >
-            <Plus className="w-4 h-4" /> Tambah Menu
+            <Plus className="w-4 h-4" /> Add Menu
           </button>
         )}
       </div>
@@ -331,16 +331,16 @@ export default function MenuManager() {
         {/* KIRI: TREE VIEW DISPLAY */}
         <div className="lg:col-span-7 bg-slate-50/50 p-6 rounded-xl border border-slate-200 min-h-[500px]">
           <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wider mb-6 flex items-center gap-2">
-            Struktur Menu Saat Ini
+            Current Menu Structure
           </h3>
 
           {isLoading ? (
             <div className="text-center p-10 text-slate-400 animate-pulse font-bold">
-              Memuat Struktur...
+              Loading Structure..
             </div>
           ) : menus.length === 0 ? (
             <div className="text-center p-12 bg-white border border-dashed border-slate-300 rounded-xl text-slate-500">
-              Belum ada menu. Silakan tambah di sebelah kanan.
+              There's no menu yet. Please add one on the right.
             </div>
           ) : (
             <div className="space-y-1">{renderMenuTree(menus)}</div>
@@ -358,7 +358,7 @@ export default function MenuManager() {
                 onClick={resetForm}
                 className="text-xs flex items-center gap-1 text-slate-400 hover:text-red-500"
               >
-                <X className="w-3 h-3" /> Batal Edit
+                <X className="w-3 h-3" /> Cancel Edit
               </button>
             )}
           </div>
@@ -367,7 +367,7 @@ export default function MenuManager() {
             {/* 1. NAMA MENU */}
             <div>
               <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">
-                Label Menu *
+                Menu Labels *
               </label>
               <input
                 type="text"
@@ -376,7 +376,7 @@ export default function MenuManager() {
                 onChange={(e) =>
                   setFormData({ ...formData, label: e.target.value })
                 }
-                placeholder="Contoh: Tentang Kami"
+                placeholder="Ex: About Us"
                 className="w-full px-4 py-2.5 rounded-lg bg-slate-50 border border-slate-200 focus:bg-white focus:border-daw-green focus:ring-2 focus:ring-daw-green/20 transition-all outline-none"
               />
             </div>
@@ -384,7 +384,7 @@ export default function MenuManager() {
             {/* 2. PARENT MENU (HIERARKI) */}
             <div>
               <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">
-                Induk Menu (Opsional)
+                Parent Menu (Optional)
               </label>
               <select
                 value={formData.parentId}
@@ -393,7 +393,7 @@ export default function MenuManager() {
                 }
                 className="w-full px-4 py-2.5 rounded-lg bg-slate-50 border border-slate-200 focus:bg-white focus:border-daw-green focus:ring-2 focus:ring-daw-green/20 outline-none"
               >
-                <option value="">-- Jadikan Menu Utama --</option>
+                <option value="">-- Make it Main Menu --</option>
                 {flatMenus.map(
                   (m) =>
                     // Cegah menu menjadikan dirinya sendiri sebagai parent
@@ -405,8 +405,8 @@ export default function MenuManager() {
                 )}
               </select>
               <p className="text-[10px] text-slate-400 mt-1 flex items-center gap-1">
-                <AlertCircle className="w-3 h-3" /> Pilih induk jika ini adalah
-                sub-menu (dropdown).
+                <AlertCircle className="w-3 h-3" /> Select the parent if this is
+                a submenu (dropdown).
               </p>
             </div>
 
@@ -462,7 +462,7 @@ export default function MenuManager() {
             {formData.type === "page" ? (
               <div className="animate-in slide-in-from-top-2 duration-300">
                 <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">
-                  Pilih Halaman Terhubung *
+                  Select Connected Pages *
                 </label>
                 <select
                   required={formData.type === "page"}
@@ -473,7 +473,7 @@ export default function MenuManager() {
                   className="w-full px-4 py-2.5 rounded-lg bg-slate-50 border border-slate-200 focus:bg-white focus:border-daw-green focus:ring-2 focus:ring-daw-green/20 outline-none"
                 >
                   <option value="" disabled>
-                    -- Pilih Halaman --
+                    -- Select Page --
                   </option>
                   {pages.map((p) => (
                     <option key={p.id} value={p.id}>
@@ -484,14 +484,14 @@ export default function MenuManager() {
                 {/* Opsional: Tombol pintasan ke pembuat halaman */}
                 <p className="text-[10px] text-right mt-2">
                   <span className="text-daw-green hover:underline cursor-pointer">
-                    Atau buat halaman baru &rarr;
+                    Or create a new page &rarr;
                   </span>
                 </p>
               </div>
             ) : (
               <div className="animate-in slide-in-from-top-2 duration-300">
                 <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">
-                  URL Tujuan (External) *
+                  Destination URL (External) *
                 </label>
                 <input
                   type="url"
@@ -513,7 +513,7 @@ export default function MenuManager() {
                   Status Menu
                 </span>
                 <span className="text-[10px] text-slate-500">
-                  Menu tidak aktif akan disembunyikan dari Navbar publik.
+                  Inactive menus will be hidden from the public Navbar.
                 </span>
               </div>
               <label className="relative inline-flex items-center cursor-pointer">
@@ -537,10 +537,10 @@ export default function MenuManager() {
             >
               <Save className="w-5 h-5" />
               {isSaving
-                ? "Menyimpan..."
+                ? "Saving..."
                 : editingId
-                  ? "Simpan Perubahan"
-                  : "Simpan Menu Baru"}
+                  ? "Save Changes"
+                  : "Save New Menu"}
             </button>
           </form>
         </div>
