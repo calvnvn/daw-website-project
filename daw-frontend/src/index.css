@@ -9,23 +9,22 @@
   --font-serif: "Lora", serif;
 }
 
-.prose {
-  /* 1. Paksa rata kiri tanpa kompromi */
-  text-align: left !important;
-
-  /* 2. Matikan algoritma 'pretty' yang bikin newline aneh */
-  text-wrap: wrap !important;
-
-  /* 3. KUNCI: Jangan putus baris di tanda hubung (-) atau tengah kata */
-  word-break: keep-all !important;
-  overflow-wrap: break-word !important;
-
-  /* 4. Bersihkan perilaku sisa browser */
-  hyphens: none !important;
-  line-break: auto !important;
+/* 🚀 REACT QUILL ALIGNMENT FIX FOR TAILWIND PROSE */
+.prose .ql-align-center {
+  text-align: center !important;
+}
+.prose .ql-align-right {
+  text-align: right !important;
+}
+.prose .ql-align-justify {
+  text-align: justify !important;
 }
 
-/* Pastikan paragraf tidak punya spasi aneh */
-.prose p {
-  white-space: normal !important;
+/* Mempercantik Caption Gambar Otomatis */
+.prose .image-caption {
+  font-size: 0.875rem !important; /* text-sm */
+  color: #64748b !important; /* text-slate-500 */
+  font-style: italic !important;
+  margin-top: -1.5rem !important; /* Tarik teks lebih dekat ke gambar */
+  margin-bottom: 2rem !important;
 }

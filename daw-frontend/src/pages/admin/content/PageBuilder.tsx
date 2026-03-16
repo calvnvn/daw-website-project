@@ -122,20 +122,23 @@ export default function PageBuilder() {
   };
 
   useEffect(() => {
+    resetForm();
     fetchPages();
   }, []);
 
   const handleTitleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const newTitle = e.target.value;
-    if (!editingId) {
-      const autoSlug = newTitle
-        .toLowerCase()
-        .replace(/[^a-z0-9]+/g, "-")
-        .replace(/(^-|-$)+/g, "");
-      setFormData({ ...formData, title: newTitle, slug: autoSlug });
-    } else {
-      setFormData({ ...formData, title: newTitle });
-    }
+    setFormData((prev) => {
+      if (!editingId) {
+        const autoSlug = newTitle
+          .toLowerCase()
+          .replace(/[^a-z0-9]+/g, "-")
+          .replace(/(^-|-$)+/g, "");
+        return { ...prev, title: newTitle, slug: autoSlug };
+      } else {
+        return { ...prev, title: newTitle };
+      }
+    });
   };
 
   const syncSlugWithTitle = () => {
@@ -161,26 +164,40 @@ export default function PageBuilder() {
   };
 
   const handleEdit = async (page: Page) => {
-    const toastId = toast.loading("Loading page details...");
+    const toastId = toast.loading(`Membuka "${page.title}"...`);
+
     try {
       const response = await api.get(`/pages/slug/${page.slug}`);
-      const data = response.data;
-      setFormData({
-        title: data.title || "",
-        slug: data.slug || "",
-        subtitle: data.subtitle || "",
-        templateType: data.templateType || "classic",
-        content: data.content || "",
+
+      // Deteksi otomatis jika API membalas dalam bentuk Array (misal: [ { data } ])
+      const exactData = Array.isArray(response.data)
+        ? response.data[0]
+        : response.data;
+
+      console.log("1. Data Mentah dari API:", exactData); // Debug 1
+
+      // Kunci ID dan Gambar
+      setEditingId(exactData.id);
+      setHeroImage(exactData.heroImage || "");
+
+      setFormData(() => {
+        const newData = {
+          title: exactData.title || "",
+          slug: exactData.slug || "",
+          subtitle: exactData.subtitle || "",
+          templateType: exactData.templateType || "classic",
+          content: exactData.content || "",
+        };
+        console.log("2. Data yang akan masuk ke Input Form:", newData); // Debug 2
+        return newData;
       });
-      setHeroImage(data.heroImage || "");
-      setEditingId(page.id);
+
       toast.dismiss(toastId);
     } catch (error) {
-      toast.error("Failed to load page", { id: toastId });
-      console.error(error);
+      toast.error("Gagal memuat detail artikel", { id: toastId });
+      console.error("Edit fetch error:", error);
     }
   };
-
   const handleDelete = async (id: string, title: string) => {
     if (!confirm(`Delete "${title}"? This cannot be undone.`)) return;
     const toastId = toast.loading("Deleting page...");
@@ -388,12 +405,12 @@ export default function PageBuilder() {
                     required
                     value={formData.slug}
                     onChange={(e) =>
-                      setFormData({
-                        ...formData,
+                      setFormData((prev) => ({
+                        ...prev,
                         slug: e.target.value
                           .toLowerCase()
                           .replace(/[^a-z0-9-]+/g, ""),
-                      })
+                      }))
                     }
                     className="w-full p-4 bg-transparent outline-none font-mono text-sm text-slate-600"
                     placeholder="company-history"
@@ -419,7 +436,10 @@ export default function PageBuilder() {
                   type="text"
                   value={formData.subtitle}
                   onChange={(e) =>
-                    setFormData({ ...formData, subtitle: e.target.value })
+                    setFormData((prev) => ({
+                      ...prev,
+                      subtitle: e.target.value,
+                    }))
                   }
                   className="w-full p-4 rounded-xl bg-slate-50 border border-slate-200 focus:bg-white focus:border-daw-green outline-none text-slate-600"
                   placeholder="Small text under title..."
@@ -442,7 +462,7 @@ export default function PageBuilder() {
                     <div className="absolute inset-0 bg-slate-900/60 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-center justify-center backdrop-blur-sm">
                       <button
                         type="button"
-                        onClick={() => setHeroImage("")} // 🚀 Panggil fungsi yang benar
+                        onClick={() => setHeroImage("")}
                         className="bg-red-500 text-white px-5 py-2.5 rounded-xl flex items-center gap-2 font-bold text-sm hover:bg-red-600 transition-colors shadow-lg transform hover:scale-105"
                       >
                         <Trash2 className="w-4 h-4" /> Remove Image
@@ -548,9 +568,12 @@ export default function PageBuilder() {
             </label>
             <div className="rounded-2xl border border-slate-200 overflow-hidden bg-white">
               <ReactQuill
+                ref={quillRef}
                 theme="snow"
                 value={formData.content}
-                onChange={(val) => setFormData({ ...formData, content: val })}
+                onChange={(val) =>
+                  setFormData((prev) => ({ ...prev, content: val }))
+                }
                 modules={quillModules}
                 className="min-h-[450px] flex flex-col [&_.ql-editor]:p-8 [&_.ql-editor]:text-slate-700 [&_.ql-editor]:text-lg [&_.ql-toolbar]:border-0 [&_.ql-toolbar]:border-b [&_.ql-container]:border-0"
               />

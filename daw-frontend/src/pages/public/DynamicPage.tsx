@@ -335,14 +335,16 @@ export default function DynamicPage() {
                 <article
                   ref={articleRef}
                   className={`w-full text-left
-                    /* 1. RESET OVERRIDE */
-                    [text-wrap:wrap!important] [word-break:keep-all!important]
+                    /* 1. KUNCI ANTI OVERFLOW: Gunakan break-words sebagai jaring pengaman */
+                    break-words
                     
                     /* 2. PROSE CORE */ 
                     prose prose-slate prose-lg md:prose-xl max-w-none
                     
-                    /* 3. PARAGRAPH: Line height 1.6 adalah standar editorial premium */
+                    /* 3. PARAGRAPH & MEDIA SAFETY: Pastikan gambar/iframe tidak meluber */
                     [&_p]:leading-[1.6] [&_p]:text-slate-700 [&_p]:mb-8 [&_p]:text-[1.125rem] 
+                    [&_img]:max-w-full [&_img]:h-auto [&_img]:rounded-2xl
+                    [&_iframe]:max-w-full [&_iframe]:rounded-xl
                     
                     /* 4. JUDUL & DROP CAP */
                     prose-headings:font-serif prose-headings:text-slate-900 prose-headings:tracking-tight
