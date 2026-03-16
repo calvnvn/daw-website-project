@@ -14,6 +14,7 @@ import {
   Layers,
   Monitor,
   UploadCloud,
+  FileText,
 } from "lucide-react";
 import api from "@/lib/api";
 import imageCompression from "browser-image-compression";
@@ -225,8 +226,23 @@ export default function PageBuilder() {
               Loading...
             </div>
           ) : pages.length === 0 ? (
-            <div className="text-center p-8 bg-white border border-dashed border-slate-300 rounded-xl text-slate-500 text-sm">
-              No pages found.
+            <div className="text-center py-12 px-6 bg-white border border-dashed border-slate-300 rounded-2xl">
+              <div className="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center mx-auto mb-4">
+                <FileText className="w-8 h-8 text-slate-300" />
+              </div>
+              <h4 className="text-sm font-bold text-slate-900 mb-1">
+                No Pages Created
+              </h4>
+              <p className="text-xs text-slate-500 mb-4">
+                Start building your website by creating your first editorial
+                page.
+              </p>
+              <button
+                onClick={resetForm}
+                className="text-xs font-bold text-daw-green bg-daw-green/5 px-4 py-2 rounded-lg hover:bg-daw-green hover:text-white transition-all"
+              >
+                + Create Page
+              </button>
             </div>
           ) : (
             <div className="space-y-3 max-h-[60vh] overflow-y-auto custom-scrollbar pr-2">
@@ -381,9 +397,12 @@ export default function PageBuilder() {
                         handleImageUpload(e.dataTransfer.files[0]);
                       }
                     }}
-                    className={`relative border-2 border-dashed rounded-2xl p-10 flex flex-col items-center justify-center transition-all cursor-pointer overflow-hidden
-                      ${isDragging ? "border-daw-green bg-daw-green/5 scale-[0.98]" : "border-slate-300 bg-slate-50 hover:bg-slate-100 hover:border-slate-400"}
-                    `}
+                    className={`relative border-2 border-dashed rounded-3xl p-12 flex flex-col items-center justify-center transition-all duration-300 group 
+                      ${
+                        isDragging
+                          ? "border-daw-green bg-daw-green/5 scale-[0.99] ring-4 ring-daw-green/10"
+                          : "border-slate-300 bg-slate-50 hover:border-daw-green hover:bg-slate-100/50"
+                      }`}
                   >
                     <input
                       type="file"
@@ -394,16 +413,27 @@ export default function PageBuilder() {
                       className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
                     />
                     <div
-                      className={`p-4 rounded-full mb-4 transition-colors ${isDragging ? "bg-daw-green text-white" : "bg-white text-slate-400 shadow-sm"}`}
+                      className={`p-5 rounded-2xl mb-4 transition-all duration-500 ${isDragging ? "bg-daw-green text-white scale-110 rotate-6" : "bg-white text-slate-400 shadow-sm group-hover:text-daw-green"}`}
                     >
-                      <UploadCloud className="w-8 h-8" />
+                      <UploadCloud
+                        className={`w-10 h-10 ${isDragging ? "animate-bounce" : ""}`}
+                      />
                     </div>
-                    <p className="text-sm font-bold text-slate-700">
-                      Drag & drop an image here
-                    </p>
-                    <p className="text-xs text-slate-500 mt-2 font-medium">
-                      or click to browse your files
-                    </p>
+                    <div className="text-center space-y-1">
+                      <p className="text-base font-bold text-slate-700">
+                        {isDragging
+                          ? "Drop to optimize"
+                          : "Drag & drop hero image"}
+                      </p>
+                      <p className="text-sm text-slate-500 font-medium">
+                        or click to browse your workstation
+                      </p>
+                    </div>
+                    <div className="mt-6 flex gap-2">
+                      <span className="px-3 py-1 rounded-full bg-white border border-slate-200 text-[10px] font-bold text-slate-400 uppercase tracking-tighter">
+                        PNG, JPG, WEBP (Max 5MB)
+                      </span>
+                    </div>
                   </div>
                 )}
               </div>

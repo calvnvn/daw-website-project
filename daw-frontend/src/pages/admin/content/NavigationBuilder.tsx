@@ -216,11 +216,15 @@ export default function NavigationBuilder() {
           onDragOver={(e) => handleDragOver(e, menu.id)}
           onDragLeave={() => setDragOverMenuId(null)}
           onDrop={(e) => handleDrop(e, menu)}
-          className={`group flex items-center justify-between p-3 mb-2 rounded-xl border transition-all duration-200
+          className={`group flex items-center justify-between p-3 mb-2 rounded-xl border transition-all duration-200 
             ${editingId === menu.id ? "bg-daw-green/5 border-daw-green shadow-sm" : "bg-white border-slate-200"}
-            ${draggedMenuId === menu.id ? "opacity-30 scale-95 border-dashed" : "opacity-100 scale-100"}
-            ${dragOverMenuId === menu.id ? "border-b-4 border-b-daw-green bg-daw-green/10 translate-y-1 shadow-md" : ""}
-          `}
+            ${draggedMenuId === menu.id ? "opacity-30 scale-95 grayscale" : "opacity-100 scale-100"}
+  ${
+    dragOverMenuId === menu.id
+      ? "border-t-4 border-t-daw-green bg-daw-green/[0.02] -translate-y-1"
+      : ""
+  }
+`}
           style={{ marginLeft: `${depth * 1.5}rem` }}
         >
           <div className="flex items-center gap-3">

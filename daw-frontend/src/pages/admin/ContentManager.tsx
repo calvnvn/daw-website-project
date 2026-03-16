@@ -53,11 +53,27 @@ export default function ContentManager() {
       </div>
 
       {/* --- DYNAMIC RENDERER --- */}
-      {/* We use conditional rendering to show the correct component. 
-        Because they are separated, they manage their own state safely.
-      */}
-      <div className="min-h-[600px]">
-        {activeTab === "pages" ? <PageBuilder /> : <NavigationBuilder />}
+      <div className="min-h-[600px] relative">
+        {/* Tab Pages: Tetap terpasang di memori, hanya diatur visibilitasnya */}
+        <div
+          className={
+            activeTab === "pages"
+              ? "block animate-in fade-in duration-500"
+              : "hidden"
+          }
+        >
+          <PageBuilder />
+        </div>
+        {/* Tab Navigation: Tetap terpasang di memori */}
+        <div
+          className={
+            activeTab === "menus"
+              ? "block animate-in fade-in duration-500"
+              : "hidden"
+          }
+        >
+          <NavigationBuilder />
+        </div>
       </div>
     </div>
   );
