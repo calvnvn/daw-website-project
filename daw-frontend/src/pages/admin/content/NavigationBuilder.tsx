@@ -6,9 +6,7 @@ import {
   Link as LinkIcon,
   FileText,
   CornerDownRight,
-  Save,
   X,
-  AlertCircle,
   GripVertical,
 } from "lucide-react";
 import api from "@/lib/api";
@@ -45,6 +43,20 @@ export default function NavigationBuilder() {
     isActive: true,
   });
 
+  const isCircularMove = (
+    draggedId: string,
+    targetParentId: string,
+    allMenus: Menu[],
+  ) => {
+    let currentId: string | null = targetParentId;
+    while (currentId !== null) {
+      if (currentId === draggedId) return true;
+      const parent = allMenus.find((m) => m.id === currentId);
+      currentId = parent ? parent.parentId : null;
+    }
+    return false;
+  };
+
   const fetchData = async () => {
     setIsLoading(true);
     try {
@@ -58,6 +70,7 @@ export default function NavigationBuilder() {
       setPages(pagesRes.data);
     } catch (error) {
       toast.error("Failed to load navigation data.");
+      console.error(error);
     } finally {
       setIsLoading(false);
     }
@@ -81,6 +94,15 @@ export default function NavigationBuilder() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    if (editingId && formData.parentId) {
+      if (isCircularMove(editingId, formData.parentId, flatMenus)) {
+        toast.error(
+          "Invalid Configuration: Cannot set a child menu as the parent of its own ancestor.",
+        );
+        return;
+      }
+    }
     setIsSaving(true);
     const toastId = toast.loading("Saving menu...");
     try {
@@ -102,6 +124,7 @@ export default function NavigationBuilder() {
       resetForm();
       fetchData();
     } catch (error) {
+      console.error(error);
       toast.error("Failed to save", { id: toastId });
     } finally {
       setIsSaving(false);
@@ -117,6 +140,7 @@ export default function NavigationBuilder() {
       fetchData();
       if (editingId === id) resetForm();
     } catch (error) {
+      console.error(error);
       toast.error("Failed to delete", { id: toastId });
     }
   };
@@ -139,30 +163,45 @@ export default function NavigationBuilder() {
       return;
     }
 
-    const toastId = toast.loading("Reordering...");
+    if (isCircularMove(sourceId, targetMenu.id, flatMenus)) {
+      toast.error(
+        "Invalid hierarchy: Cannot nest a parent menu within its own sub-menu.",
+      );
+      setDraggedMenuId(null);
+      return;
+    }
+
+    const toastId = toast.loading("Updating navigation structure...");
     try {
       const sourceMenu = flatMenus.find((m) => m.id === sourceId);
-      if (!sourceMenu) throw new Error();
+      if (!sourceMenu) throw new Error("Source menu not found.");
+
       const newParentId = targetMenu.parentId;
       const siblings = flatMenus
         .filter((m) => m.parentId === newParentId && m.id !== sourceId)
         .sort((a, b) => a.orderIndex - b.orderIndex);
+
       const targetIndex = siblings.findIndex((m) => m.id === targetMenu.id);
-      siblings.splice(targetIndex + 1, 0, {
+      siblings.splice(targetIndex, 0, {
         ...sourceMenu,
         parentId: newParentId,
       });
-
       const updatedPayload = siblings.map((m, i) => ({
         id: m.id,
         parentId: newParentId,
         orderIndex: i,
       }));
+
       await api.put("/menus/reorder", { updatedMenus: updatedPayload });
-      toast.success("Order saved!", { id: toastId });
+      toast.success("Navigation structure updated successfully.", {
+        id: toastId,
+      });
       fetchData();
     } catch (error) {
-      toast.error("Failed to reorder", { id: toastId });
+      console.error(error);
+      toast.error("System error: Failed to reorder navigation.", {
+        id: toastId,
+      });
     } finally {
       setDraggedMenuId(null);
     }
@@ -215,12 +254,20 @@ export default function NavigationBuilder() {
             <button
               onClick={() => {
                 setEditingId(menu.id);
-                setFormData(menu as any);
+                // 🚀 FIX: Konversi null menjadi empty string agar React form tidak crash
+                setFormData({
+                  label: menu.label,
+                  type: menu.type,
+                  pageId: menu.pageId || "",
+                  externalLink: menu.externalLink || "",
+                  parentId: menu.parentId || "",
+                  isActive: menu.isActive,
+                });
               }}
               className="p-1.5 text-slate-400 hover:text-daw-green rounded-md"
             >
               <Edit2 className="w-4 h-4" />
-            </button>
+            </button>{" "}
             <button
               onClick={() => handleDelete(menu.id)}
               className="p-1.5 text-slate-400 hover:text-red-500 rounded-md"
