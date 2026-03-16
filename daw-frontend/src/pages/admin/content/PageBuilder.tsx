@@ -89,11 +89,11 @@ export default function PageBuilder() {
 
   const resetForm = () => {
     setEditingId(null);
+    setHeroImage("");
     setFormData({
       title: "",
       slug: "",
       subtitle: "",
-      heroImage: "",
       templateType: "classic",
       content: "",
     });
@@ -108,14 +108,15 @@ export default function PageBuilder() {
         title: data.title || "",
         slug: data.slug || "",
         subtitle: data.subtitle || "",
-        heroImage: data.heroImage || "",
         templateType: data.templateType || "classic",
         content: data.content || "",
       });
+      setHeroImage(data.heroImage || "");
       setEditingId(page.id);
       toast.dismiss(toastId);
     } catch (error) {
       toast.error("Failed to load page", { id: toastId });
+      console.error(error);
     }
   };
 
@@ -129,6 +130,7 @@ export default function PageBuilder() {
       if (editingId === id) resetForm();
     } catch (error) {
       toast.error("Failed to delete page", { id: toastId });
+      console.error(error);
     }
   };
 
@@ -136,6 +138,7 @@ export default function PageBuilder() {
     e.preventDefault();
     if (!formData.title || !formData.slug)
       return toast.error("Title & Slug are required!");
+
     setIsSaving(true);
     const toastId = toast.loading("Saving...");
     try {
@@ -160,7 +163,7 @@ export default function PageBuilder() {
     }
   };
 
-  const handleImageUpload = (file: File) => {
+  const handleImageUpload = async (file: File) => {
     if (!file) return;
 
     if (!file.type.startsWith("image/")) {
@@ -172,7 +175,6 @@ export default function PageBuilder() {
     }
 
     const toastId = toast.loading("Compressing image...");
-
     try {
       const options = {
         maxSizeMB: 0.8,
@@ -191,7 +193,7 @@ export default function PageBuilder() {
       const reader = new FileReader();
       reader.onloadend = () => {
         setHeroImage(reader.result as string);
-        toast.success("Image uploaded!");
+        toast.success("Image optimized & uploaded!", { id: toastId });
       };
       reader.readAsDataURL(compressedFile);
     } catch (error) {
@@ -305,8 +307,26 @@ export default function PageBuilder() {
                 <label className="text-xs font-bold text-slate-500 uppercase">
                   URL Slug *
                 </label>
-                <div className="flex items-center gap-2 p-4 rounded-xl bg-slate-50 border border-slate-200 text-slate-400 font-mono text-sm">
-                  <Globe className="w-4 h-4" /> /page/{formData.slug}
+                <div className="flex items-center w-full rounded-xl bg-slate-50 border border-slate-200 focus-within:bg-white focus-within:border-daw-green overflow-hidden transition-colors">
+                  <div className="pl-4 pr-2 py-4 text-slate-400 flex items-center gap-2 border-r border-slate-200/50">
+                    <Globe className="w-4 h-4" />
+                    <span className="text-sm font-mono">/page/</span>
+                  </div>
+                  <input
+                    type="text"
+                    required
+                    value={formData.slug}
+                    onChange={(e) =>
+                      setFormData({
+                        ...formData,
+                        slug: e.target.value
+                          .toLowerCase()
+                          .replace(/[^a-z0-9-]+/g, ""),
+                      })
+                    }
+                    className="w-full p-4 bg-transparent outline-none font-mono text-sm text-slate-600"
+                    placeholder="company-history"
+                  />
                 </div>
               </div>
               <div className="space-y-2 md:col-span-2">
@@ -330,20 +350,17 @@ export default function PageBuilder() {
                   Hero Background Image
                 </label>
 
-                {formData.heroImage ? (
-                  // Tampilan Preview Jika Gambar Sudah Ada
+                {heroImage ? (
                   <div className="relative w-full h-56 rounded-2xl overflow-hidden group border border-slate-200 shadow-sm">
                     <img
-                      src={formData.heroImage}
+                      src={heroImage}
                       alt="Hero Preview"
                       className="w-full h-full object-cover"
                     />
                     <div className="absolute inset-0 bg-slate-900/60 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-center justify-center backdrop-blur-sm">
                       <button
                         type="button"
-                        onClick={() =>
-                          setFormData({ ...formData, heroImage: "" })
-                        }
+                        onClick={() => setHeroImage("")} // 🚀 Panggil fungsi yang benar
                         className="bg-red-500 text-white px-5 py-2.5 rounded-xl flex items-center gap-2 font-bold text-sm hover:bg-red-600 transition-colors shadow-lg transform hover:scale-105"
                       >
                         <Trash2 className="w-4 h-4" /> Remove Image
@@ -351,7 +368,6 @@ export default function PageBuilder() {
                     </div>
                   </div>
                 ) : (
-                  // Tampilan Dropzone Kosong
                   <div
                     onDragOver={(e) => {
                       e.preventDefault();
@@ -369,7 +385,6 @@ export default function PageBuilder() {
                       ${isDragging ? "border-daw-green bg-daw-green/5 scale-[0.98]" : "border-slate-300 bg-slate-50 hover:bg-slate-100 hover:border-slate-400"}
                     `}
                   >
-                    {/* Input file yang disembunyikan tapi menutupi seluruh area */}
                     <input
                       type="file"
                       accept="image/*"
@@ -378,7 +393,6 @@ export default function PageBuilder() {
                       }
                       className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
                     />
-
                     <div
                       className={`p-4 rounded-full mb-4 transition-colors ${isDragging ? "bg-daw-green text-white" : "bg-white text-slate-400 shadow-sm"}`}
                     >
@@ -390,14 +404,6 @@ export default function PageBuilder() {
                     <p className="text-xs text-slate-500 mt-2 font-medium">
                       or click to browse your files
                     </p>
-                    <div className="mt-4 flex gap-3 text-[10px] uppercase font-bold text-slate-400">
-                      <span className="bg-white px-2 py-1 rounded-md border border-slate-200">
-                        Max 3MB
-                      </span>
-                      <span className="bg-white px-2 py-1 rounded-md border border-slate-200">
-                        JPG, PNG, WEBP
-                      </span>
-                    </div>
                   </div>
                 )}
               </div>

@@ -50,9 +50,6 @@ export default function Login() {
             role: data.role,
           }),
         );
-        toast.success(`Welcome back, ${data.name}!`, {
-          description: "Successfully authenticated to DAW Admin Portal.",
-        });
 
         // 🔐 2. CEK FIRST-TIME LOGIN (FORCE CHANGE PASSWORD)
         if (data.needsPasswordChange) {

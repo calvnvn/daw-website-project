@@ -98,7 +98,7 @@ export default function NavigationBuilder() {
     if (editingId && formData.parentId) {
       if (isCircularMove(editingId, formData.parentId, flatMenus)) {
         toast.error(
-          "Invalid Configuration: Cannot set a child menu as the parent of its own ancestor.",
+          "Hierarchy Error: A child menu cannot be assigned as the parent of its own ancestor.",
         );
         return;
       }
@@ -342,14 +342,19 @@ export default function NavigationBuilder() {
               className="w-full px-4 py-3 rounded-xl bg-slate-50 border border-slate-200 focus:border-daw-green outline-none"
             >
               <option value="">-- Main Menu --</option>
-              {flatMenus.map(
-                (m) =>
-                  m.id !== editingId && (
-                    <option key={m.id} value={m.id}>
-                      {m.label}
-                    </option>
-                  ),
-              )}
+              {flatMenus
+                .filter((m) => {
+                  const isSelf = m.id === editingId;
+                  const isDescendant = editingId
+                    ? isCircularMove(editingId, m.id, flatMenus)
+                    : false;
+                  return !isSelf && !isDescendant;
+                })
+                .map((m) => (
+                  <option key={m.id} value={m.id}>
+                    {m.label}
+                  </option>
+                ))}
             </select>
           </div>
           <div className="grid grid-cols-2 gap-3">
