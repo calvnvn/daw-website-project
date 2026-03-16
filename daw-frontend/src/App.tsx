@@ -21,8 +21,6 @@ import EditProject from "./pages/admin/EditProject";
 import ProtectedRoute from "./components/ProtectedRoute";
 import ForceChangePassword from "./pages/admin/ForceChangePassword";
 import ManageBusinesses from "./pages/admin/ManageBusinesses";
-import MenuManager from "./pages/admin/MenuManager";
-import PageManager from "./pages/admin/PageManager";
 import ContentManager from "./pages/admin/ContentManager";
 import DynamicPage from "./pages/public/DynamicPage";
 

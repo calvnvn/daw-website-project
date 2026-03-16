@@ -10,25 +10,28 @@ import { AboutProvider } from "./contexts/AboutContext.tsx";
 import { InvestmentProvider } from "./contexts/InvestmentContext";
 import { BusinessProvider } from "./contexts/BusinessContext";
 import { HomeProvider } from "./contexts/HomeContext";
+import { HelmetProvider } from "react-helmet-async"; // 🚀 1. Import ini
 
 const queryClient = new QueryClient();
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
     <QueryClientProvider client={queryClient}>
-      <BrowserRouter>
-        <SettingsProvider>
-          <AboutProvider>
-            <InvestmentProvider>
-              <HomeProvider>
-                <BusinessProvider>
-                  <App />
-                </BusinessProvider>
-              </HomeProvider>
-            </InvestmentProvider>
-          </AboutProvider>
-        </SettingsProvider>
-      </BrowserRouter>
+      <HelmetProvider>
+        <BrowserRouter>
+          <SettingsProvider>
+            <AboutProvider>
+              <InvestmentProvider>
+                <HomeProvider>
+                  <BusinessProvider>
+                    <App />
+                  </BusinessProvider>
+                </HomeProvider>
+              </InvestmentProvider>
+            </AboutProvider>
+          </SettingsProvider>
+        </BrowserRouter>
+      </HelmetProvider>
     </QueryClientProvider>
   </React.StrictMode>,
 );
