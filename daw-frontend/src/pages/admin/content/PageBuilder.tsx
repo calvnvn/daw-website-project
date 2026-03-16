@@ -16,7 +16,7 @@ import {
   UploadCloud,
 } from "lucide-react";
 import api from "@/lib/api";
-
+import imageCompression from "browser-image-compression";
 interface Page {
   id: string;
   title: string;
@@ -37,10 +37,11 @@ export default function PageBuilder() {
     title: "",
     slug: "",
     subtitle: "",
-    heroImage: "",
     templateType: "classic",
     content: "",
   });
+
+  const [heroImage, setHeroImage] = useState<string>("");
 
   const quillModules = useMemo(
     () => ({
@@ -138,16 +139,21 @@ export default function PageBuilder() {
     setIsSaving(true);
     const toastId = toast.loading("Saving...");
     try {
+      const payload = {
+        ...formData,
+        heroImage: heroImage,
+      };
       if (editingId) {
-        await api.put(`/pages/${editingId}`, formData);
+        await api.put(`/pages/${editingId}`, payload);
         toast.success("Page updated!", { id: toastId });
       } else {
-        await api.post("/pages", formData);
+        await api.post("/pages", payload);
         toast.success("Page published!", { id: toastId });
       }
       resetForm();
       fetchPages();
     } catch (error) {
+      console.error(error);
       toast.error("Failed to save page", { id: toastId });
     } finally {
       setIsSaving(false);
@@ -165,11 +171,33 @@ export default function PageBuilder() {
       return toast.error("Ukuran gambar terlalu besar! Maksimal 5MB.");
     }
 
-    const reader = new FileReader();
-    reader.onloadend = () => {
-      setFormData({ ...formData, heroImage: reader.result as string });
-    };
-    reader.readAsDataURL(file);
+    const toastId = toast.loading("Compressing image...");
+
+    try {
+      const options = {
+        maxSizeMB: 0.8,
+        maxWidthOrHeight: 1920,
+        useWebWorker: true,
+        initialQuality: 0.7,
+      };
+
+      const compressedFile = await imageCompression(file, options);
+
+      console.log(`Original: ${(file.size / 1024 / 1024).toFixed(2)} MB`);
+      console.log(
+        `Compressed: ${(compressedFile.size / 1024 / 1024).toFixed(2)} MB`,
+      );
+
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setHeroImage(reader.result as string);
+        toast.success("Image uploaded!");
+      };
+      reader.readAsDataURL(compressedFile);
+    } catch (error) {
+      console.error(error);
+      toast.error("Failed to compress image.", { id: toastId });
+    }
   };
 
   return (
