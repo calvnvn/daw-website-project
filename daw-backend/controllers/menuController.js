@@ -1,7 +1,17 @@
 const Menu = require("../models/Menu");
 const Page = require("../models/Page");
 const sequelize = require("../config/database");
+const isDescendant = async (menuId, targetParentId) => {
+  if (!targetParentId) return false;
+  if (menuId === targetParentId) return true;
 
+  let current = await Menu.findByPk(targetParentId);
+  while (current && current.parentId) {
+    if (current.parentId === menuId) return true;
+    current = await Menu.findByPk(current.parentId);
+  }
+  return false;
+};
 exports.getMenuTree = async (req, res) => {
   try {
     const menus = await Menu.findAll({
@@ -134,11 +144,17 @@ exports.deleteMenu = async (req, res) => {
 
 // Endpoint Khusus untuk menangkap hasil Drag & Drop
 exports.reorderMenus = async (req, res) => {
-  const { updatedMenus } = req.body; // Array berisi: [{ id, orderIndex, parentId }, ...]
+  const { updatedMenus } = req.body;
   const t = await sequelize.transaction();
 
   try {
     for (const item of updatedMenus) {
+      const circular = await isDescendant(item.id, item.parentId);
+      if (circular) {
+        throw new Error(
+          `Integritas data terlanggar: Menu ID ${item.id} tidak boleh menjadi anak dari keturunannya sendiri.`,
+        );
+      }
       await Menu.update(
         { orderIndex: item.orderIndex, parentId: item.parentId },
         { where: { id: item.id }, transaction: t },

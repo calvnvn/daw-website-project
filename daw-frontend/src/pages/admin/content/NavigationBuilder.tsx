@@ -8,8 +8,16 @@ import {
   CornerDownRight,
   X,
   GripVertical,
+  ArrowUp,
 } from "lucide-react";
 import api from "@/lib/api";
+
+// 🚀 FIX 4: Hapus tipe 'any', buat interface yang jelas
+interface PageOption {
+  id: string;
+  title: string;
+  slug?: string;
+}
 
 interface Menu {
   id: string;
@@ -26,7 +34,7 @@ interface Menu {
 export default function NavigationBuilder() {
   const [menus, setMenus] = useState<Menu[]>([]);
   const [flatMenus, setFlatMenus] = useState<Menu[]>([]);
-  const [pages, setPages] = useState<any[]>([]); // To populate the dropdown
+  const [pages, setPages] = useState<PageOption[]>([]); // 🚀 FIX 4 diterapkan
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -43,9 +51,10 @@ export default function NavigationBuilder() {
     isActive: true,
   });
 
+  // 🚀 FIX 2: Izinkan targetParentId menerima string | null
   const isCircularMove = (
     draggedId: string,
-    targetParentId: string,
+    targetParentId: string | null,
     allMenus: Menu[],
   ) => {
     let currentId: string | null = targetParentId;
@@ -92,6 +101,19 @@ export default function NavigationBuilder() {
     });
   };
 
+  // 🚀 FIX 1: Buat fungsi handleEdit agar tombol Edit tidak Error
+  const handleEdit = (menu: Menu) => {
+    setEditingId(menu.id);
+    setFormData({
+      label: menu.label,
+      type: menu.type,
+      pageId: menu.pageId || "",
+      externalLink: menu.externalLink || "",
+      parentId: menu.parentId || "",
+      isActive: menu.isActive,
+    });
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -131,6 +153,7 @@ export default function NavigationBuilder() {
     }
   };
 
+  // 🚀 FIX 3: Fungsi handleDelete dan Drag Logic digunakan kembali di bawah
   const handleDelete = async (id: string) => {
     if (!confirm("Are you sure? Sub-menus will also be deleted.")) return;
     const toastId = toast.loading("Deleting menu...");
@@ -145,16 +168,21 @@ export default function NavigationBuilder() {
     }
   };
 
-  // Drag & Drop Logic
   const handleDragStart = (e: React.DragEvent, id: string) => {
     e.dataTransfer.setData("text/plain", id);
     setDraggedMenuId(id);
   };
+
   const handleDragOver = (e: React.DragEvent, id: string) => {
     e.preventDefault();
     if (dragOverMenuId !== id) setDragOverMenuId(id);
   };
-  const handleDrop = async (e: React.DragEvent, targetMenu: Menu) => {
+
+  const handleDrop = async (
+    e: React.DragEvent,
+    targetMenu: Menu,
+    mode: "sibling" | "child",
+  ) => {
     e.preventDefault();
     setDragOverMenuId(null);
     const sourceId = e.dataTransfer.getData("text/plain");
@@ -163,10 +191,10 @@ export default function NavigationBuilder() {
       return;
     }
 
-    if (isCircularMove(sourceId, targetMenu.id, flatMenus)) {
-      toast.error(
-        "Invalid hierarchy: Cannot nest a parent menu within its own sub-menu.",
-      );
+    const newParentId = mode === "child" ? targetMenu.id : targetMenu.parentId;
+
+    if (isCircularMove(sourceId, newParentId, flatMenus)) {
+      toast.error("Hierarchy violation detected.");
       setDraggedMenuId(null);
       return;
     }
@@ -176,16 +204,24 @@ export default function NavigationBuilder() {
       const sourceMenu = flatMenus.find((m) => m.id === sourceId);
       if (!sourceMenu) throw new Error("Source menu not found.");
 
-      const newParentId = targetMenu.parentId;
       const siblings = flatMenus
         .filter((m) => m.parentId === newParentId && m.id !== sourceId)
         .sort((a, b) => a.orderIndex - b.orderIndex);
 
-      const targetIndex = siblings.findIndex((m) => m.id === targetMenu.id);
-      siblings.splice(targetIndex, 0, {
-        ...sourceMenu,
-        parentId: newParentId,
-      });
+      if (mode === "child") {
+        siblings.push({ ...sourceMenu, parentId: newParentId });
+      } else {
+        const targetIndex = siblings.findIndex((m) => m.id === targetMenu.id);
+        if (targetIndex === -1) {
+          siblings.push({ ...sourceMenu, parentId: newParentId });
+        } else {
+          siblings.splice(targetIndex, 0, {
+            ...sourceMenu,
+            parentId: newParentId,
+          });
+        }
+      }
+
       const updatedPayload = siblings.map((m, i) => ({
         id: m.id,
         parentId: newParentId,
@@ -209,28 +245,34 @@ export default function NavigationBuilder() {
 
   const renderMenuTree = (menuList: Menu[], depth = 0) => {
     return menuList.map((menu) => (
-      <div key={menu.id} className="w-full">
+      <div key={menu.id} className="relative">
+        <div
+          onDragOver={(e) => {
+            e.preventDefault();
+            handleDragOver(e, `${menu.id}-top`);
+          }}
+          onDrop={(e) => handleDrop(e, menu, "sibling")}
+          className={`h-2 transition-all ${dragOverMenuId === `${menu.id}-top` ? "bg-daw-green mb-2" : ""}`}
+        />
+
         <div
           draggable
+          // 🚀 FIX 3: Tambahkan onDragStart agar variabel dipakai
           onDragStart={(e) => handleDragStart(e, menu.id)}
-          onDragOver={(e) => handleDragOver(e, menu.id)}
-          onDragLeave={() => setDragOverMenuId(null)}
-          onDrop={(e) => handleDrop(e, menu)}
-          className={`group flex items-center justify-between p-3 mb-2 rounded-xl border transition-all duration-200 
-            ${editingId === menu.id ? "bg-daw-green/5 border-daw-green shadow-sm" : "bg-white border-slate-200"}
-            ${draggedMenuId === menu.id ? "opacity-30 scale-95 grayscale" : "opacity-100 scale-100"}
-  ${
-    dragOverMenuId === menu.id
-      ? "border-t-4 border-t-daw-green bg-daw-green/[0.02] -translate-y-1"
-      : ""
-  }
-`}
+          className={`group flex items-center justify-between p-3 rounded-xl border bg-white transition-all
+          ${dragOverMenuId === `${menu.id}-child` ? "border-daw-green ring-2 ring-daw-green/10" : "border-slate-200"}
+          ${draggedMenuId === menu.id ? "opacity-40 grayscale scale-[0.98]" : "opacity-100"} 
+          `}
           style={{ marginLeft: `${depth * 1.5}rem` }}
+          onDragOver={(e) => {
+            e.preventDefault();
+            // 🚀 FIX 3: Tambahkan pemanggilan handleDragOver agar linter puas
+            handleDragOver(e, `${menu.id}-child`);
+          }}
+          onDrop={(e) => handleDrop(e, menu, "child")}
         >
           <div className="flex items-center gap-3">
-            <div className="cursor-grab active:cursor-grabbing p-1 -ml-1">
-              <GripVertical className="w-4 h-4 text-slate-400" />
-            </div>
+            <GripVertical className="w-4 h-4 text-slate-300 hidden md:block cursor-grab active:cursor-grabbing" />
             {depth > 0 && (
               <CornerDownRight className="w-4 h-4 text-slate-300" />
             )}
@@ -254,32 +296,33 @@ export default function NavigationBuilder() {
               </p>
             </div>
           </div>
-          <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+
+          <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
             <button
-              onClick={() => {
-                setEditingId(menu.id);
-                // 🚀 FIX: Konversi null menjadi empty string agar React form tidak crash
-                setFormData({
-                  label: menu.label,
-                  type: menu.type,
-                  pageId: menu.pageId || "",
-                  externalLink: menu.externalLink || "",
-                  parentId: menu.parentId || "",
-                  isActive: menu.isActive,
-                });
-              }}
-              className="p-1.5 text-slate-400 hover:text-daw-green rounded-md"
+              type="button"
+              className="p-1 hover:bg-slate-100 rounded md:hidden"
+              title="Move Up"
+            >
+              <ArrowUp className="w-4 h-4 text-slate-400" />
+            </button>
+            <button
+              type="button"
+              onClick={() => handleEdit(menu)}
+              className="p-1.5 text-slate-400 hover:text-daw-green transition-colors"
             >
               <Edit2 className="w-4 h-4" />
-            </button>{" "}
+            </button>
+            {/* 🚀 FIX 3: Kembalikan tombol Delete yang terhapus */}
             <button
+              type="button"
               onClick={() => handleDelete(menu.id)}
-              className="p-1.5 text-slate-400 hover:text-red-500 rounded-md"
+              className="p-1.5 text-slate-400 hover:text-red-500 transition-colors"
             >
               <Trash2 className="w-4 h-4" />
             </button>
           </div>
         </div>
+
         {menu.children && menu.children.length > 0 && (
           <div className="border-l-2 border-slate-100 ml-5 pl-3">
             {renderMenuTree(menu.children, depth + 1)}
@@ -436,7 +479,7 @@ export default function NavigationBuilder() {
           <button
             type="submit"
             disabled={isSaving}
-            className="w-full flex justify-center bg-slate-900 hover:bg-black text-white py-4 rounded-xl font-bold mt-4"
+            className="w-full flex justify-center bg-slate-900 hover:bg-black text-white py-4 rounded-xl font-bold mt-4 transition-colors"
           >
             {isSaving
               ? "Saving..."
