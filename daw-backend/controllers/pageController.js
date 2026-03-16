@@ -5,6 +5,8 @@ const createDOMPurify = require("dompurify");
 const window = new JSDOM("").window;
 const dompurify = createDOMPurify(window);
 
+const stripHtml = (html) => html.replace(/<[^>]*>?/gm, "");
+
 // --- HELPER: GENERATE UNIQUE SLUG ---
 const generateUniqueSlug = async (title, slug, id = null) => {
   let baseSlug = (slug || title)
@@ -76,6 +78,16 @@ exports.createPage = async (req, res) => {
 
     const finalSlug = await generateUniqueSlug(title, slug);
     const sanitizedContent = dompurify.sanitize(content);
+
+    // 🚀 SEO AUTOMATION LIMIT BREAK
+    // Jika meta deskripsi kosong, ambil dari konten mentah sebanyak 150 karakter
+    let finalMetaDesc = metaDescription;
+    if (!finalMetaDesc || finalMetaDesc.trim() === "") {
+      const cleanText = stripHtml(sanitizedContent);
+      finalMetaDesc =
+        cleanText.substring(0, 150) + (cleanText.length > 150 ? "..." : "");
+    }
+
     const newPage = await Page.create({
       title,
       slug: finalSlug,
@@ -83,7 +95,7 @@ exports.createPage = async (req, res) => {
       heroImage, // State terpisah yang kita bahas tadi
       templateType,
       content: sanitizedContent,
-      metaDescription,
+      metaDescription: finalMetaDesc,
     });
     res
       .status(201)
@@ -114,6 +126,12 @@ exports.updatePage = async (req, res) => {
     const finalSlug = await generateUniqueSlug(title, slug, id);
     const sanitizedContent = dompurify.sanitize(content);
 
+    let finalMetaDesc = metaDescription;
+    if (!finalMetaDesc || finalMetaDesc.trim() === "") {
+      const cleanText = stripHtml(sanitizedContent);
+      finalMetaDesc =
+        cleanText.substring(0, 150) + (cleanText.length > 150 ? "..." : "");
+    }
     await page.update({
       title,
       slug: finalSlug,
@@ -121,7 +139,7 @@ exports.updatePage = async (req, res) => {
       heroImage,
       templateType,
       content: sanitizedContent,
-      metaDescription,
+      metaDescription: finalMetaDesc,
     });
 
     res.status(200).json({ message: "Page updated successfully" });

@@ -114,12 +114,15 @@ export default function DynamicNavbar() {
 
             {/* 2. MENU STATIS: ABOUT US (Hardcoded original Abang) */}
             <div className="relative group py-2">
-              <span className={`cursor-pointer ${navLinkClass}`}>
-                {t("nav.about", "ABOUT US")}
+              {/* 🚀 Split Target Statis Desktop */}
+              <div className="flex items-center cursor-pointer">
+                <Link to="/about" className={navLinkClass}>
+                  {t("nav.about", "ABOUT US")}
+                </Link>
                 <ChevronDown
-                  className={`h-4 w-4 transition-transform duration-300 group-hover:rotate-180 ${isTransparent ? "opacity-100" : "text-slate-500"}`}
+                  className={`h-4 w-4 ml-1 transition-transform duration-300 group-hover:rotate-180 ${isTransparent ? "opacity-100 text-white" : "text-slate-500"}`}
                 />
-              </span>
+              </div>
               <div className="absolute top-full left-0 mt-2 w-56 bg-white shadow-xl border border-slate-100 border-t-2 border-t-daw-green rounded-b-md opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-300 transform translate-y-2 group-hover:translate-y-0 flex flex-col overflow-hidden">
                 <Link to="/about?tab=company" className={dropdownItemClass}>
                   {t("nav.ourCompany", "Our Company")}
@@ -164,28 +167,58 @@ export default function DynamicNavbar() {
             {menus.map((menu) => {
               const hasChildren = menu.children && menu.children.length > 0;
               const link = resolveLink(menu);
-              const isExternal = menu.type === "external";
+              const isExternal = menu.type === "external"; // 🚀 FIX: Deklarasi isExternal ditambahkan
 
               return (
                 <div key={menu.id} className="relative group py-2">
                   {hasChildren ? (
                     <>
-                      <span className={`cursor-pointer ${navLinkClass}`}>
-                        {menu.label}
+                      {/* Split Target Desktop (Link & Hover) */}
+                      <div className="flex items-center cursor-pointer">
+                        <Link to={link} className={navLinkClass}>
+                          {menu.label}
+                        </Link>
                         <ChevronDown
-                          className={`h-4 w-4 transition-transform duration-300 group-hover:rotate-180 ${isTransparent ? "opacity-100" : "text-slate-500"}`}
+                          className={`h-4 w-4 ml-1 transition-transform duration-300 group-hover:rotate-180 ${isTransparent ? "opacity-100 text-white" : "text-slate-500"}`}
                         />
-                      </span>
+                      </div>
+
+                      {/* Dropdown Desktop */}
                       <div className="absolute top-full left-0 mt-2 w-56 bg-white shadow-xl border border-slate-100 border-t-2 border-t-daw-green rounded-b-md opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-300 transform translate-y-2 group-hover:translate-y-0 flex flex-col overflow-hidden">
-                        {menu.children.map((child) => (
-                          <Link
-                            key={child.id}
-                            to={resolveLink(child)}
-                            className={dropdownItemClass}
-                          >
-                            {child.label}
-                          </Link>
-                        ))}
+                        {menu.children.map((child) => {
+                          const childLink = resolveLink(child);
+                          const isChildExternal = child.type === "external";
+
+                          return isChildExternal ? (
+                            isLocalRoute(childLink) ? (
+                              <Link
+                                key={child.id}
+                                to={childLink}
+                                className={dropdownItemClass}
+                              >
+                                {child.label}
+                              </Link>
+                            ) : (
+                              <a
+                                key={child.id}
+                                href={childLink}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className={dropdownItemClass}
+                              >
+                                {child.label}
+                              </a>
+                            )
+                          ) : (
+                            <Link
+                              key={child.id}
+                              to={childLink}
+                              className={dropdownItemClass}
+                            >
+                              {child.label}
+                            </Link>
+                          );
+                        })}
                       </div>
                     </>
                   ) : isExternal ? (
@@ -257,16 +290,28 @@ export default function DynamicNavbar() {
             </Link>
 
             {/* 2. STATIC ACCORDION: ABOUT US */}
-            <div className="flex flex-col">
-              <button
-                onClick={() => toggleMobileAccordion("static-about")}
-                className="text-[13px] py-3 tracking-wide font-bold text-slate-800 hover:text-daw-green transition-colors flex items-center justify-between uppercase"
-              >
-                {t("nav.about", "ABOUT US")}
-                <ChevronDown
-                  className={`h-5 w-5 text-slate-400 transition-transform duration-300 ${openMobileAccordions["static-about"] ? "rotate-180" : ""}`}
-                />
-              </button>
+            <div className="flex flex-col w-full">
+              {/* 🚀 Split Target Statis Mobile */}
+              <div className="flex items-center justify-between border-b border-slate-50/50">
+                <Link
+                  to="/about"
+                  onClick={closeMenu}
+                  className="flex-1 text-[13px] py-3 tracking-wide font-bold text-slate-800 hover:text-daw-green transition-colors uppercase"
+                >
+                  {t("nav.about", "ABOUT US")}
+                </Link>
+                <button
+                  onClick={(e) => {
+                    e.preventDefault();
+                    toggleMobileAccordion("static-about");
+                  }}
+                  className="p-2 ml-2 bg-slate-50 rounded-lg hover:bg-slate-100 transition-colors active:scale-95"
+                >
+                  <ChevronDown
+                    className={`h-5 w-5 text-slate-500 transition-transform duration-300 ${openMobileAccordions["static-about"] ? "rotate-180" : ""}`}
+                  />
+                </button>
+              </div>{" "}
               <div
                 className={`flex flex-col pl-4 border-l-2 border-slate-100 overflow-hidden transition-all duration-300 ${openMobileAccordions["static-about"] ? "max-h-96 mt-2" : "max-h-0"}`}
               >
@@ -343,22 +388,37 @@ export default function DynamicNavbar() {
             {menus.map((menu) => {
               const hasChildren = menu.children && menu.children.length > 0;
               const link = resolveLink(menu);
-              const isExternal = menu.type === "external";
+              const isExternal = menu.type === "external"; // 🚀 FIX: Deklarasi isExternal ditambahkan
               const isOpen = openMobileAccordions[menu.id] || false;
 
               return (
                 <div key={menu.id} className="flex flex-col">
                   {hasChildren ? (
                     <>
-                      <button
-                        onClick={() => toggleMobileAccordion(menu.id)}
-                        className="text-[13px] py-3 tracking-wide font-bold text-slate-800 hover:text-daw-green transition-colors flex items-center justify-between uppercase"
-                      >
-                        {menu.label}
-                        <ChevronDown
-                          className={`h-5 w-5 text-slate-400 transition-transform duration-300 ${isOpen ? "rotate-180" : ""}`}
-                        />
-                      </button>
+                      {/* Split Target Mobile (Link & Accordion Toggle) */}
+                      <div className="flex items-center justify-between border-b border-slate-50/50">
+                        <Link
+                          to={link}
+                          onClick={closeMenu}
+                          className="flex-1 text-[13px] py-3 tracking-wide font-bold text-slate-800 hover:text-daw-green transition-colors uppercase"
+                        >
+                          {menu.label}
+                        </Link>
+                        <button
+                          onClick={(e) => {
+                            e.preventDefault();
+                            toggleMobileAccordion(menu.id);
+                          }}
+                          className="p-2 ml-2 bg-slate-50 rounded-lg hover:bg-slate-100 transition-colors active:scale-95"
+                          aria-label="Toggle Submenu"
+                        >
+                          <ChevronDown
+                            className={`h-5 w-5 text-slate-500 transition-transform duration-300 ${isOpen ? "rotate-180" : ""}`}
+                          />
+                        </button>
+                      </div>
+
+                      {/* Dropdown / Accordion Anak Mobile */}
                       <div
                         className={`flex flex-col pl-4 border-l-2 border-slate-100 overflow-hidden transition-all duration-300 ${isOpen ? "max-h-96 mt-2" : "max-h-0"}`}
                       >
