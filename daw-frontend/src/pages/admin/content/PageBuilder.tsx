@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useCallback } from "react";
+import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import ReactQuill from "react-quill-new";
 import "react-quill-new/dist/quill.snow.css";
 import { toast } from "sonner";
@@ -15,6 +15,7 @@ import {
   Monitor,
   UploadCloud,
   FileText,
+  RefreshCw,
 } from "lucide-react";
 import api from "@/lib/api";
 import imageCompression from "browser-image-compression";
@@ -22,8 +23,8 @@ interface Page {
   id: string;
   title: string;
   slug: string;
-  subtitle: string;
-  heroImage: string;
+  subtitle?: string | null;
+  heroImage?: string | null;
   templateType: "classic" | "modern" | "split";
   content: string;
 }
@@ -43,6 +44,9 @@ export default function PageBuilder() {
   });
 
   const [heroImage, setHeroImage] = useState<string>("");
+
+  const quillRef = useRef<ReactQuill>(null);
+
   const imageHandler = useCallback(() => {
     const input = document.createElement("input");
     input.setAttribute("type", "file");
@@ -51,7 +55,7 @@ export default function PageBuilder() {
 
     input.onchange = async () => {
       const file = input.files?.[0];
-      if (file) {
+      if (file && quillRef.current) {
         const toastId = toast.loading("Optimizing article image...");
         try {
           const options = {
@@ -61,16 +65,17 @@ export default function PageBuilder() {
           };
           const compressedFile = await imageCompression(file, options);
           const reader = new FileReader();
+
           reader.onloadend = () => {
             const base64data = reader.result as string;
 
-            // Masukkan ke posisi kursor di Quill
-            const quill = document.querySelector(".ql-editor") as any;
-            if (quill) {
-              const range = window.getSelection()?.getRangeAt(0);
-              const img = document.createElement("img");
-              img.src = base64data;
-              range?.insertNode(img);
+            // API from ReactQuill
+            const editor = quillRef.current?.getEditor();
+            const range = editor?.getSelection();
+
+            if (editor) {
+              const cursorIndex = range ? range.index : editor.getLength();
+              editor.insertEmbed(cursorIndex, "image", base64data);
             }
             toast.success("Image added & optimized!", { id: toastId });
           };
@@ -96,7 +101,7 @@ export default function PageBuilder() {
           ["clean"],
         ],
         handlers: {
-          image: imageHandler, //  Override fungsi upload gambar bawaan
+          image: imageHandler,
         },
       },
     }),
@@ -131,6 +136,16 @@ export default function PageBuilder() {
     } else {
       setFormData({ ...formData, title: newTitle });
     }
+  };
+
+  const syncSlugWithTitle = () => {
+    if (!formData.title) return toast.error("Judul masih kosong!");
+    const newSlug = formData.title
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/(^-|-$)+/g, "");
+    setFormData({ ...formData, slug: newSlug });
+    toast.success("Slug disinkronkan dengan judul baru!");
   };
 
   const resetForm = () => {
@@ -211,26 +226,21 @@ export default function PageBuilder() {
 
   const handleImageUpload = async (file: File) => {
     if (!file) return;
-
     if (!file.type.startsWith("image/")) {
       return toast.error("Hanya file gambar yang diperbolehkan!");
     }
-
     if (file.size > 5 * 1024 * 1024) {
       return toast.error("Ukuran gambar terlalu besar! Maksimal 5MB.");
     }
 
     const toastId = toast.loading("Compressing image...");
     try {
-      const options = {
+      const compressedFile = await imageCompression(file, {
         maxSizeMB: 0.8,
         maxWidthOrHeight: 1920,
         useWebWorker: true,
         initialQuality: 0.7,
-      };
-
-      const compressedFile = await imageCompression(file, options);
-
+      });
       console.log(`Original: ${(file.size / 1024 / 1024).toFixed(2)} MB`);
       console.log(
         `Compressed: ${(compressedFile.size / 1024 / 1024).toFixed(2)} MB`,
@@ -388,6 +398,17 @@ export default function PageBuilder() {
                     className="w-full p-4 bg-transparent outline-none font-mono text-sm text-slate-600"
                     placeholder="company-history"
                   />
+                  {/* Sync Slug */}
+                  {editingId && (
+                    <button
+                      type="button"
+                      onClick={syncSlugWithTitle}
+                      title="Sync Slug dengan Judul"
+                      className="pr-4 pl-2 text-slate-400 hover:text-daw-green transition-colors"
+                    >
+                      <RefreshCw className="w-4 h-4" />
+                    </button>
+                  )}
                 </div>
               </div>
               <div className="space-y-2 md:col-span-2">
