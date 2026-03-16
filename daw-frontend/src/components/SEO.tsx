@@ -13,8 +13,8 @@ interface SEOProps {
 
 export default function SEO({
   title,
-  description = "PT Dharma Agung Wijaya (DAW) is a leading company committed to sustainable business practices, energy transition, and innovative investments.",
-  image = "/daw-default-banner.jpg", // Pastikan nanti Abang punya gambar default ini di folder public
+  description = "PT Dharma Agung Wijaya (DAW Group) is an operating holding company focusing on Renewable Energy and Natural Resources (Agribusiness), committed to living in harmony with mother nature.",
+  image = "/daw-default-banner.jpg", // Pastikan file ini ada di folder public/ (1200x630px)
   url = typeof window !== "undefined"
     ? window.location.href
     : "https://daw.co.id",
@@ -25,13 +25,20 @@ export default function SEO({
 }: SEOProps) {
   const siteName = "PT Dharma Agung Wijaya";
 
-  // SMART TITLE: Jika judul sudah ada "DAW", jangan ditumpuk panjang-panjang
+  // Ganti baseUrl jika domain utama bukan daw.co.id (misal: .com atau .id)
+  const baseUrl = "https://daw.co.id";
+
+  // 1. SMART TITLE LOGIC
   const pageTitle =
     title.includes("DAW") || title.includes(siteName)
       ? title
       : `${title} | ${siteName}`;
 
-  // JSON-LD (Structured Data) - Format resmi standar Google
+  // 2. ABSOLUTE IMAGE URL ASSEMBLY
+  // Penting: WhatsApp/LinkedIn tidak bisa baca gambar jika URL-nya relatif (hanya /nama-file.jpg)
+  const absoluteImage = image.startsWith("http") ? image : `${baseUrl}${image}`;
+
+  // 3. JSON-LD (Structured Data for Google Search Engine)
   const structuredData = {
     "@context": "https://schema.org",
     "@type": type === "article" ? "Article" : "Organization",
@@ -39,7 +46,7 @@ export default function SEO({
       ? {
           headline: title,
           description: description,
-          image: image,
+          image: absoluteImage,
           author: {
             "@type": "Organization",
             name: author,
@@ -49,7 +56,7 @@ export default function SEO({
             name: siteName,
             logo: {
               "@type": "ImageObject",
-              url: "https://daw.co.id/logo-daw.png", // Ganti dengan URL asli jika sudah live
+              url: `${baseUrl}/logo-daw.png`, // Pastikan file logo-daw.png ada di folder public/
             },
           },
           datePublished: publishedAt || new Date().toISOString(),
@@ -57,15 +64,16 @@ export default function SEO({
         }
       : {
           name: siteName,
-          url: url,
-          logo: "https://daw.co.id/logo-daw.png",
+          url: baseUrl,
+          logo: `${baseUrl}/logo-daw.png`,
           description: description,
           address: {
             "@type": "PostalAddress",
-            streetAddress: "Jl. Cendana Parc North 10 No.10, Kadu, Kec. Curug",
-            addressLocality: "Kabupaten Tangerang",
-            addressRegion: "Banten",
-            postalCode: "15810",
+            streetAddress:
+              "Alamanda Tower, 22nd Floor, Jl. TB Simatupang Kav 23-24 Cilandak Barat",
+            addressLocality: "Jakarta Selatan",
+            addressRegion: "DKI Jakarta",
+            postalCode: "12430",
             addressCountry: "ID",
           },
         }),
@@ -73,30 +81,39 @@ export default function SEO({
 
   return (
     <Helmet>
-      {/* --- STANDARD SEO (Dasar Google) --- */}
+      {/* --- STANDARD BROWSER SEO --- */}
       <title>{pageTitle}</title>
       <meta name="description" content={description} />
       <link rel="canonical" href={url} />
 
-      {/* --- OPEN GRAPH (Preview WhatsApp, LinkedIn, Facebook) --- */}
+      {/* --- OPEN GRAPH SYSTEM (Standard for WA, LinkedIn, Facebook) --- */}
       <meta property="og:site_name" content={siteName} />
       <meta property="og:title" content={pageTitle} />
       <meta property="og:description" content={description} />
       <meta property="og:type" content={type} />
       <meta property="og:url" content={url} />
-      <meta property="og:image" content={image} />
-      <meta property="og:image:alt" content={`Cover image for ${title}`} />
+      <meta property="og:image" content={absoluteImage} />
+      <meta property="og:image:alt" content={`Preview for ${title}`} />
 
-      {/* --- TWITTER CARDS (Preview platform X) --- */}
+      {/* --- TWITTER CARDS --- */}
       <meta name="twitter:card" content="summary_large_image" />
       <meta name="twitter:title" content={pageTitle} />
       <meta name="twitter:description" content={description} />
-      <meta name="twitter:image" content={image} />
+      <meta name="twitter:image" content={absoluteImage} />
 
-      {/* --- ADVANCED STRUCTURED DATA (Informasi Rahasia untuk Robot) --- */}
-      <script type="application/ld+json">
-        {JSON.stringify(structuredData)}
-      </script>
+      {/* --- GOOGLE BOT SPECIAL (JSON-LD) --- */}
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(structuredData) }}
+      />
     </Helmet>
   );
 }
+
+/** * TIPS PRODUCTION UNTUK DEVELOPER (CALVIN):
+ * 1. Gunakan 'LinkedIn Post Inspector' (online tool gratis) untuk ngetes link.
+ * 2. Karena ini React SPA, pastikan hosting di-set untuk "Fallthrough to index.html"
+ * agar URL seperti /page/energy tidak 404 saat di-refresh.
+ * 3. File 'daw-default-banner.jpg' dan 'logo-daw.png' harus ditaruh di folder ROOT public/,
+ * BUKAN di src/assets/ agar path baseUrl/logo-daw.png valid.
+ */

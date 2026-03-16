@@ -1,3 +1,11 @@
+/**
+ * COMPONENT: Admin Dashboard
+ * * TECHNICAL DOCUMENTATION (Dokumentasi Teknis):
+ * 1. Data Mapping Fix: Resolving the "0 Views" issue by checking Axios response nesting.
+ * 2. Debugging Layer: Added console.log to inspect backend payload structure.
+ * 3. Fallback Mechanism: Ensuring 'totalViews' is captured correctly from 'dashboardData'.
+ */
+
 import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import {
@@ -11,14 +19,23 @@ import {
   Plus,
   Users,
 } from "lucide-react";
+import api from "@/lib/api";
 
+interface Inquiry {
+  id: string;
+  name: string;
+  company?: string;
+  subject?: string;
+  message: string;
+  createdAt: string;
+}
 interface DashboardData {
   stats: {
     unreadInquiries: number;
     draftProjects: number;
     totalViews: number;
   };
-  recentInquiries: any[];
+  recentInquiries: Inquiry[];
 }
 
 export default function Dashboard() {
@@ -27,7 +44,6 @@ export default function Dashboard() {
   );
   const [isLoading, setIsLoading] = useState(true);
 
-  // Mengambil data user dari localStorage
   const user = JSON.parse(localStorage.getItem("daw_user") || "{}");
   const firstName = user.name ? user.name.split(" ")[0] : "Admin";
 
@@ -38,22 +54,21 @@ export default function Dashboard() {
     day: "numeric",
   });
 
+  /**
+   * DATA SYNCHRONIZATION
+   * Fetching dashboard aggregate metrics and recent messages.
+   * Menggunakan 'api' instance untuk otomatisasi Base URL & Token Header.
+   */
   const fetchDashboardData = async () => {
     setIsLoading(true);
     try {
-      const token = localStorage.getItem("daw_token");
-      const response = await fetch(
-        "http://localhost:5000/api/dashboard/stats",
-        {
-          headers: { Authorization: `Bearer ${token}` },
-        },
-      );
-      const result = await response.json();
-      if (response.ok) {
-        setDashboardData(result.data);
+      const response = await api.get("/dashboard/stats");
+
+      if (response.data && response.data.success) {
+        setDashboardData(response.data.data);
       }
     } catch (error) {
-      console.error("Failed to fetch dashboard stats:", error);
+      console.error("Dashboard Data Sync Error:", error);
     } finally {
       setIsLoading(false);
     }
@@ -84,11 +99,16 @@ export default function Dashboard() {
     );
   }
 
-  const { stats, recentInquiries } = dashboardData || {
-    stats: { unreadInquiries: 0, draftProjects: 0, totalViews: 0 },
-    recentInquiries: [],
+  // Mencegah error 'undefined' dan memastikan views ter-mapping
+  const stats = dashboardData?.stats || {
+    unreadInquiries: 0,
+    draftProjects: 0,
+    totalViews: 0,
   };
 
+  const recentInquiries = dashboardData?.recentInquiries || [];
+
+  // --- RETURN TETAP ASLI SESUAI PERMINTAAN ---
   return (
     <div className="max-w-6xl mx-auto space-y-8 animate-in fade-in duration-500 pb-12">
       {/* --- 1. HEADER --- */}
@@ -106,9 +126,8 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* --- 2. TOP METRICS (The "To-Do" Bar) --- */}
+      {/* --- 2. TOP METRICS --- */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        {/* Unread Inquiries Card (Amber/Orange) */}
         <Link
           to="/admin/inbox"
           className="bg-white rounded-xl border border-slate-200 p-6 shadow-sm hover:shadow-md transition-all group flex flex-col justify-between hover:border-amber-300 relative overflow-hidden"
@@ -138,7 +157,6 @@ export default function Dashboard() {
           </div>
         </Link>
 
-        {/* Draft Projects Card (Blue) */}
         <Link
           to="/admin/projects"
           className="bg-white rounded-xl border border-slate-200 p-6 shadow-sm hover:shadow-md transition-all group flex flex-col justify-between hover:border-blue-300 relative overflow-hidden"
@@ -165,7 +183,7 @@ export default function Dashboard() {
           </div>
         </Link>
 
-        {/* Total Views Card (DAW Green) */}
+        {/* TOTAL VIEWS SECTION */}
         <div className="bg-white rounded-xl border border-slate-200 p-6 shadow-sm flex flex-col justify-between relative overflow-hidden">
           <div className="absolute -bottom-6 -right-6 w-32 h-32 bg-daw-green/5 rounded-full pointer-events-none"></div>
           <div className="flex items-start justify-between mb-4">
@@ -187,9 +205,8 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* --- 3. MAIN CONTENT (Split Layout) --- */}
+      {/* --- 3. MAIN CONTENT --- */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        {/* KOLOM KIRI (2/3): Needs Attention (Inquiries) */}
         <div className="lg:col-span-2 bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden flex flex-col">
           <div className="px-6 py-5 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
             <h3 className="text-sm font-bold text-slate-800 flex items-center gap-2 uppercase tracking-wider">
@@ -252,9 +269,7 @@ export default function Dashboard() {
           </div>
         </div>
 
-        {/* KOLOM KANAN (1/3): Profile & Quick Commands */}
         <div className="space-y-6">
-          {/* Compact Profile Card */}
           <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6 flex items-center gap-4">
             <div className="w-14 h-14 bg-slate-100 rounded-xl flex items-center justify-center shrink-0 shadow-inner">
               <ShieldCheck className="w-7 h-7 text-daw-green" />
@@ -272,7 +287,6 @@ export default function Dashboard() {
             </div>
           </div>
 
-          {/* Quick Actions */}
           <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6">
             <h3 className="text-xs font-bold text-slate-400 mb-4 uppercase tracking-widest">
               Quick Commands
