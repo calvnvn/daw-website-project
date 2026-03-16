@@ -19,7 +19,6 @@ const { verifyToken } = require("../middleware/authJwt");
  * username:
  * password:
  * type: string
- * type: string
  * responses:
  * 200:
  * description: Login successful

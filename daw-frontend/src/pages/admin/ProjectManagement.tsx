@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 import { Link } from "react-router-dom";
 import { toast } from "sonner";
+import api from "@/lib/api";
 
 // 1. Sesuaikan Interface dengan kolom tabel MySQL kita
 interface AdminProject {
@@ -46,24 +47,19 @@ export default function ProjectManagement() {
   useEffect(() => {
     const fetchProjects = async () => {
       try {
-        const token = localStorage.getItem("daw_token");
-        const response = await fetch("http://localhost:5000/api/projects", {
-          method: "GET",
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        });
+        const response = await api.get("/projects");
 
-        const data = await response.json();
-
-        if (response.ok) {
-          setProjects(data);
-        } else {
-          toast.error("Failed to load projects", { description: data.message });
+        // Handle double nesting dari backend DAW Group
+        if (response.data && response.data.success) {
+          setProjects(response.data.data);
+        } else if (Array.isArray(response.data)) {
+          setProjects(response.data);
         }
-      } catch {
+      } catch (error: any) {
+        console.error("Fetch Projects Error:", error);
         toast.error("Connection Error", {
-          description: "Cannot connect to server.",
+          description:
+            error.response?.data?.message || "Cannot connect to server.",
         });
       } finally {
         setIsLoading(false);
@@ -72,40 +68,40 @@ export default function ProjectManagement() {
 
     fetchProjects();
   }, []);
-  const handleDelete = async (id: string) => {
-    // Deletion Confirmation
-    if (!window.confirm("Are you sure you want to delete this project?"))
-      return;
 
-    const loadingToast = toast.loading("Deleting project...");
+  const handleDeleteRequest = (id: string, title: string) => {
+    toast.warning("Confirm Deletion", {
+      description: `Are you sure you want to delete "${title}"?`,
+      duration: Infinity, // Toast tidak akan hilang sampai user memilih
+      action: {
+        label: "Yes, Delete",
+        onClick: () => executeDelete(id),
+      },
+      cancel: {
+        label: "Cancel",
+        onClick: () => toast.dismiss(),
+      },
+    });
+  };
+
+  const executeDelete = async (id: string) => {
+    const loadingToast = toast.loading("Processing deletion...");
 
     try {
-      const token = localStorage.getItem("daw_token");
-      const response = await fetch(`http://localhost:5000/api/projects/${id}`, {
-        method: "DELETE",
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
+      const response = await api.delete(`/projects/${id}`);
 
-      if (response.ok) {
-        toast.success("Project deleted successfully!", { id: loadingToast });
-        // Hapus data dari layar secara instan tanpa perlu memanggil ulang API
-        setProjects((prevProjects) => prevProjects.filter((p) => p.id !== id));
-      } else {
-        const data = await response.json();
-        toast.error("Failed to delete", {
-          description: data.message,
-          id: loadingToast,
-        });
+      if (response.data && response.data.success) {
+        toast.success("Project removed successfully", { id: loadingToast });
+        setProjects((prev) => prev.filter((p) => p.id !== id));
       }
-    } catch {
-      toast.error("Network Error", {
-        description: "Cannot connect to server.",
+    } catch (error: any) {
+      toast.error("Deletion failed", {
         id: loadingToast,
+        description: error.response?.data?.message || "Server error occurred.",
       });
     }
   };
+
   return (
     <div className="max-w-6xl mx-auto space-y-6 animate-in fade-in duration-500 pb-12">
       {/* --- HEADER --- */}
@@ -244,12 +240,16 @@ export default function ProjectManagement() {
                     </td>
                     <td className="px-6 py-4 text-right">
                       <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                        <button
+                        <Link
+                          to={`/projects/${project.id}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
                           className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
-                          title="View Article"
+                          title="View Article Live"
                         >
                           <Eye className="w-4 h-4" />
-                        </button>
+                        </Link>
+
                         {/* --- EDIT ARTICLE --- */}
                         <Link
                           to={`/admin/projects/edit/${project.id}`}
@@ -260,9 +260,11 @@ export default function ProjectManagement() {
                         </Link>
                         {/* --- DELETE ACTION --- */}
                         <button
-                          onClick={() => handleDelete(project.id)}
-                          className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                          title="Delete"
+                          onClick={() =>
+                            handleDeleteRequest(project.id, project.title)
+                          } // 🚀 Panggil fungsi trigger
+                          className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all"
+                          title="Delete Record"
                         >
                           <Trash2 className="w-4 h-4" />
                         </button>

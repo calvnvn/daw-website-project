@@ -1,4 +1,14 @@
-import { useState, useRef, useMemo, useCallback } from "react";
+/**
+ * MODULE: Create Project (Page Builder)
+ * PATH: /src/pages/admin/CreateProject.tsx
+ * * TECHNICAL DOCUMENTATION (FINAL AUDIT CLEAN):
+ * 1. Double Append Fixed: Removed redundant payload.append for images.
+ * 2. Memory Leak Guard: Sub-component handles individual gallery object URLs.
+ * 3. SEO Intelligence: Optimized fallback and slug preview.
+ * 4. Progress Tracking: Real-time upload percentage for large assets.
+ */
+
+import { useState, useRef, useMemo, useCallback, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import ReactQuill from "react-quill-new";
 import "react-quill-new/dist/quill.snow.css";
@@ -7,12 +17,48 @@ import {
   ArrowLeft,
   Image as ImageIcon,
   Images,
+  Search,
   Save,
   Send,
   X,
+  Link as LinkIcon,
 } from "lucide-react";
 import { useDropzone } from "react-dropzone";
-import api from "@/lib/api";
+import api, { BASE_UPLOAD_URL } from "@/lib/api";
+import { compressImage } from "@/utils/imageHelper";
+
+const GalleryPreviewItem = ({
+  file,
+  onRemove,
+}: {
+  file: File;
+  onRemove: () => void;
+}) => {
+  const [preview, setPreview] = useState<string>("");
+
+  useEffect(() => {
+    const objectUrl = URL.createObjectURL(file);
+    setPreview(objectUrl);
+    return () => URL.revokeObjectURL(objectUrl);
+  }, [file]);
+
+  return (
+    <div className="relative aspect-square rounded-lg overflow-hidden group border border-slate-100 shadow-sm">
+      <img
+        src={preview}
+        className="w-full h-full object-cover"
+        alt="Gallery Preview"
+      />
+      <button
+        type="button"
+        onClick={onRemove}
+        className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity z-10 hover:bg-red-600 shadow-md"
+      >
+        <X className="w-3 h-3" />
+      </button>
+    </div>
+  );
+};
 
 export default function CreateProject() {
   const navigate = useNavigate();
@@ -27,16 +73,38 @@ export default function CreateProject() {
     status: "Draft",
     cover_image: "",
     gallery: "[]",
+    seo_title: "",
+    meta_description: "",
   });
+
+  const [coverFile, setCoverFile] = useState<File | null>(null);
+  const [galleryFiles, setGalleryFiles] = useState<File[]>([]);
+  const [coverPreview, setCoverPreview] = useState<string | null>(null);
+
+  // Sync Preview untuk Cover Image
+  useEffect(() => {
+    if (!coverFile) {
+      setCoverPreview(null);
+      return;
+    }
+    const objectUrl = URL.createObjectURL(coverFile);
+    setCoverPreview(objectUrl);
+    return () => URL.revokeObjectURL(objectUrl);
+  }, [coverFile]);
+
+  // Preview URL otomatis
+  const generatedSlug = useMemo(() => {
+    return formData.title
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/(^-|-$)+/g, "");
+  }, [formData.title]);
 
   const removeGalleryFile = (index: number) => {
     setGalleryFiles((prev) => prev.filter((_, i) => i !== index));
   };
 
-  const [coverFile, setCoverFile] = useState<File | null>(null);
-  const [galleryFiles, setGalleryFiles] = useState<File[]>([]);
-
-  // 1. Image Handler untuk WYSIWYG
+  // WYSIWYG Image Handler
   const imageHandler = useCallback(() => {
     const input = document.createElement("input");
     input.setAttribute("type", "file");
@@ -49,29 +117,25 @@ export default function CreateProject() {
         const uploadData = new FormData();
         uploadData.append("inline_image", file);
 
+        const toastId = toast.loading("Uploading image...");
         try {
-          const token = localStorage.getItem("daw_token");
-          const response = await fetch(
-            "http://localhost:5000/api/projects/upload-inline",
-            {
-              method: "POST",
-              headers: { Authorization: `Bearer ${token}` },
-              body: uploadData,
-            },
+          const response = await api.post(
+            "/projects/upload-inline",
+            uploadData,
           );
+          const quill = quillRef.current?.getEditor();
+          const range = quill?.getSelection();
+          const imageUrl = response.data.url.startsWith("http")
+            ? response.data.url
+            : `${BASE_UPLOAD_URL}/${response.data.url}`;
 
-          const data = await response.json();
-          if (response.ok) {
-            const quill = quillRef.current?.getEditor();
-            const range = quill?.getSelection();
-            quill?.insertEmbed(range?.index || 0, "image", data.url);
-          } else {
-            toast.error("Upload Failed", { description: data.message });
-          }
-        } catch (err) {
-          console.error("Inline upload error:", err); // Pakai 'err' agar satpam diam
-          toast.error("Server Error", {
-            description: "Failed to connect to server.",
+          quill?.insertEmbed(range?.index || 0, "image", response.data.url);
+          toast.success("Image added to content", { id: toastId });
+        } catch (err: any) {
+          toast.error("Upload failed", {
+            id: toastId,
+            description:
+              err.response?.data?.message || "Check server connection.",
           });
         }
       }
@@ -95,76 +159,68 @@ export default function CreateProject() {
   );
 
   const handlePublish = async (targetStatus: string) => {
-    if (!formData.title.trim()) {
-      return toast.error("Title Must Be Filled In", {
-        description: "Please name your project.",
-      });
-    }
-
-    if (!formData.content || formData.content === "<p><br></p>") {
-      return toast.error("Empty Content", {
-        description: "Write the content of the article first..",
-      });
-    }
-
-    if (targetStatus === "Published" && !coverFile) {
-      return toast.error("Cover Image Missing", {
-        description: "Published projects must have a cover image..",
-      });
-    }
-    const MAX_SIZE = 10 * 1024 * 1024;
-
-    if (coverFile && coverFile.size > MAX_SIZE) {
-      return toast.error("File Cover Terlalu Besar", {
-        description: "Maksimal ukuran gambar adalah 10MB.",
-      });
-    }
-
-    const bigGalleryFile = galleryFiles.find((file) => file.size > MAX_SIZE);
-    if (bigGalleryFile) {
-      return toast.error("File Galeri Terlalu Besar", {
-        description: `File ${bigGalleryFile.name} melebihi 10MB.`,
-      });
-    }
+    // Validations
+    if (!formData.title.trim()) return toast.error("Title required");
+    if (!formData.content || formData.content === "<p><br></p>")
+      return toast.error("Content is empty");
+    if (targetStatus === "Published" && !coverFile)
+      return toast.error("Cover image required for publishing");
 
     setIsLoading(true);
-    const loadingToast = toast.loading("Publishing to DAW Database...");
+    const loadingToast = toast.loading("Optimizing and Publishing...");
 
     try {
       const payload = new FormData();
-      payload.append("title", formData.title);
-      payload.append("excerpt", formData.excerpt);
+
+      // 🚀 1. OPTIMIZED COVER
+      if (coverFile) {
+        const optimizedCover = await compressImage(coverFile);
+        payload.append("cover_image", optimizedCover);
+      }
+
+      // 🚀 2. OPTIMIZED GALLERY
+      for (const file of galleryFiles) {
+        const optimizedFile = await compressImage(file);
+        payload.append("gallery", optimizedFile);
+      }
+
+      // 🚀 3. DATA TEXT & SEO
+      payload.append("title", formData.title.trim());
+      payload.append("slug", generatedSlug);
+      payload.append("excerpt", formData.excerpt.trim());
       payload.append("content", formData.content);
       payload.append("category", formData.category);
       payload.append("status", targetStatus);
+      payload.append(
+        "seo_title",
+        formData.seo_title.trim() || formData.title.trim(),
+      );
+      payload.append(
+        "meta_description",
+        formData.meta_description.trim() || formData.excerpt.trim(),
+      );
 
-      const userStr = localStorage.getItem("daw_user");
-      const authorName = userStr ? JSON.parse(userStr).name : "Unknown Author";
+      // Safety User Fetch
+      let authorName = "Admin";
+      try {
+        const userStr = localStorage.getItem("daw_user");
+        if (userStr) {
+          const userObj = JSON.parse(userStr);
+          authorName = userObj.name || "Admin";
+        }
+      } catch (e) {
+        console.warn("User parse error: ", e);
+      }
       payload.append("author", authorName);
 
-      if (coverFile) payload.append("cover_image", coverFile);
-      galleryFiles.forEach((file) => payload.append("gallery", file));
-
-      // 3. EKSEKUSI DENGAN AXIOS
-      // Penjelasan: Axios menerima (URL, Data, Config)
+      // Execution with Progress Tracker
       const response = await api.post("/projects", payload, {
-        // Fitur Progress Bar
-        onUploadProgress: (progressEvent) => {
-          const total = progressEvent.total || 0;
-          const current = progressEvent.loaded;
-
-          if (total > 0) {
-            const percent = Math.round((current * 100) / total);
-            // Kita perbarui teks toast yang sama menggunakan ID loadingToast
-            toast.loading(`Uploading: ${percent}% completed...`, {
-              id: loadingToast,
-            });
-          }
+        onUploadProgress: (p) => {
+          const percent = Math.round((p.loaded * 100) / (p.total || 1));
+          toast.loading(`Uploading: ${percent}%...`, { id: loadingToast });
         },
       });
 
-      // 4. Handle Response Sukses
-      // Axios menganggap 2xx sebagai sukses. Status create biasanya 201.
       if (response.status === 201 || response.status === 200) {
         toast.success(
           `Project ${targetStatus === "Draft" ? "Saved" : "Published"}!`,
@@ -173,14 +229,8 @@ export default function CreateProject() {
         navigate("/admin/projects");
       }
     } catch (err: any) {
-      // 5. Handle Error
-      // Axios menyimpan pesan error dari backend di err.response.data
-      console.error("Publish error:", err);
-      const errorMessage =
-        err.response?.data?.message || "Connection to server failed.";
-
       toast.error("Error", {
-        description: errorMessage,
+        description: err.response?.data?.message || "Sync failed.",
         id: loadingToast,
       });
     } finally {
@@ -188,247 +238,244 @@ export default function CreateProject() {
     }
   };
 
-  const onDropCover = useCallback((acceptedFiles: File[]) => {
-    if (acceptedFiles.length > 0) {
-      setCoverFile(acceptedFiles[0]);
-    }
-  }, []);
-
+  // Dropzone Handlers
   const {
     getRootProps: getRootCoverProps,
     getInputProps: getInputCoverProps,
     isDragActive: isCoverDragActive,
   } = useDropzone({
-    onDrop: onDropCover,
+    onDrop: (files) => {
+      if (files.length > 0) setCoverFile(files[0]);
+    },
     accept: { "image/*": [] },
     multiple: false,
   });
-
-  const onDropGallery = useCallback((acceptedFiles: File[]) => {
-    setGalleryFiles((prev) => [...prev, ...acceptedFiles]);
-  }, []);
 
   const {
     getRootProps: getRootGalleryProps,
     getInputProps: getInputGalleryProps,
     isDragActive: isGalleryDragActive,
   } = useDropzone({
-    onDrop: onDropGallery,
+    onDrop: (files) => setGalleryFiles((prev) => [...prev, ...files]),
     accept: { "image/*": [] },
-    multiple: true, // Boleh banyak
+    multiple: true,
   });
 
   return (
     <div className="max-w-7xl mx-auto animate-in fade-in duration-500 pb-12">
-      <div className="flex items-center justify-between mb-8">
+      {/* TOOLBAR HEADER */}
+      <div className="flex items-center justify-between mb-8 top-0 bg-slate-50/80 backdrop-blur-md z-30 py-4 border-b border-slate-200 px-1">
         <div className="flex items-center gap-4">
           <button
             onClick={() => navigate("/admin/projects")}
-            className="p-2 hover:bg-slate-100 rounded-lg"
+            className="p-2 hover:bg-white rounded-lg transition-all border border-transparent hover:border-slate-200"
           >
             <ArrowLeft className="w-5 h-5 text-slate-500" />
           </button>
-          <h1 className="text-2xl font-serif font-bold">Create New Project</h1>
+          <div>
+            <h1 className="text-xl font-serif font-bold text-slate-900">
+              Create New Project
+            </h1>
+            {formData.title && (
+              <p className="text-[10px] font-mono text-slate-400 uppercase tracking-tighter mt-1 flex items-center gap-1">
+                <LinkIcon className="w-2.5 h-2.5" /> daw.co.id/page/
+                {generatedSlug}
+              </p>
+            )}
+          </div>
         </div>
         <div className="flex gap-3">
           <button
             onClick={() => handlePublish("Draft")}
             disabled={isLoading}
-            className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-5 py-2.5 bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 rounded-lg font-medium transition-colors shadow-sm disabled:opacity-50"
+            className="px-5 py-2 bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 rounded-lg font-bold text-sm shadow-sm transition-all active:scale-95"
           >
-            <Save className="w-4 h-4" />
-            <span>Save Draft</span>
+            <Save className="w-4 h-4 inline mr-2 text-slate-400" /> Save Draft
           </button>
           <button
             onClick={() => handlePublish("Published")}
             disabled={isLoading}
-            className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-5 py-2.5 bg-daw-green hover:bg-[#003b1c] text-white rounded-lg font-medium transition-colors shadow-sm disabled:opacity-50"
+            className="px-5 py-2 bg-daw-green hover:bg-[#003b1c] text-white rounded-lg font-bold text-sm shadow-sm transition-all active:scale-95"
           >
-            <Send className="w-4 h-4" />
-            <span>{isLoading ? "Processing..." : "Publish"}</span>
+            <Send className="w-4 h-4 inline mr-2" />{" "}
+            {isLoading ? "Publishing..." : "Publish"}
           </button>
         </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         <div className="lg:col-span-2 space-y-6">
-          <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden flex flex-col min-h-[600px]">
-            <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6 space-y-8">
-              {/* 1. TITLE INPUT */}
-              <div>
-                <label className="block text-sm font-bold text-slate-700 mb-2 uppercase tracking-wide">
-                  Project Title
-                </label>
-                <input
-                  type="text"
-                  placeholder="Enter project title..."
-                  className={`w-full p-4 text-2xl font-serif font-bold border rounded-lg focus:outline-none focus:ring-2 focus:ring-daw-green/50 transition-all ${
-                    !formData.title
-                      ? "border-red-200 bg-red-50/30"
-                      : "border-slate-200 bg-slate-50/50"
-                  }`}
-                  value={formData.title}
-                  onChange={(e) =>
-                    setFormData({ ...formData, title: e.target.value })
-                  }
-                />
-              </div>
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden p-8 space-y-8">
+            {/* INPUT JUDUL */}
+            <input
+              type="text"
+              placeholder="Start with a compelling title..."
+              className="w-full p-0 text-3xl font-serif font-bold border-none focus:ring-0 placeholder:text-slate-200 transition-all"
+              value={formData.title}
+              onChange={(e) =>
+                setFormData({ ...formData, title: e.target.value })
+              }
+            />
 
-              {/* 2. SHORT DESCRIPTION */}
-              <div>
-                <label className="flex items-center justify-between text-sm font-bold text-slate-700 mb-2 uppercase tracking-wide">
-                  <span>Short Description</span>
-                  <span className="text-xs font-normal text-slate-400 lowercase tracking-normal">
-                    {formData.excerpt.length}/150 characters
-                  </span>
-                </label>
-                <textarea
-                  placeholder="A brief summary for the homepage card (max 150 chars)..."
-                  maxLength={150}
-                  rows={
-                    2
-                  } /* 👇 Kunci 1: Paksa hanya 2 baris agar terlihat seperti 'ringkasan' */
-                  className="w-full p-4 text-slate-600 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-daw-green/50 bg-slate-50/50 resize-none transition-all h-[80px]"
-                  value={formData.excerpt}
-                  onChange={(e) =>
-                    setFormData({ ...formData, excerpt: e.target.value })
+            {/* INPUT EXCERPT */}
+            <div className="space-y-2">
+              <label className="flex justify-between text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                <span>Summary (Excerpt)</span>
+                <span
+                  className={
+                    formData.excerpt.length >= 145 ? "text-red-500" : ""
                   }
-                />
-              </div>
-
-              {/* 3. MAIN ARTICLE */}
-              <div className="flex flex-col flex-1">
-                {" "}
-                {/* Flex-1 agar dia mengisi sisa ruang */}
-                <label className="block text-sm font-bold text-slate-700 mb-2 uppercase tracking-wide">
-                  Main Article Content
-                </label>
-                <div
-                  className="rounded-lg overflow-hidden border border-slate-200 flex-1 flex flex-col min-h-[400px]
-                  [&_.quill]:flex-1 [&_.quill]:flex [&_.quill]:flex-col
-                  [&_.ql-container]:flex-1 [&_.ql-container]:flex [&_.ql-container]:flex-col
-                  [&_.ql-editor]:flex-1 [&_.ql-editor]:text-lg [&_.ql-toolbar]:bg-slate-50"
                 >
-                  <ReactQuill
-                    ref={quillRef}
-                    theme="snow"
-                    modules={modules}
-                    value={formData.content}
-                    onChange={(content) =>
-                      setFormData({ ...formData, content })
+                  {formData.excerpt.length}/150
+                </span>
+              </label>
+              <textarea
+                placeholder="Write a brief summary for preview cards..."
+                maxLength={150}
+                rows={2}
+                className="w-full p-4 bg-slate-50 border border-slate-100 rounded-xl outline-none text-slate-600 text-sm h-[80px] resize-none focus:ring-2 focus:ring-daw-green/5"
+                value={formData.excerpt}
+                onChange={(e) =>
+                  setFormData({ ...formData, excerpt: e.target.value })
+                }
+              />
+            </div>
+
+            {/* WYSIWYG EDITOR */}
+            <div className="space-y-2">
+              <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                Main Content
+              </label>
+              <div className="min-h-[400px] border border-slate-100 rounded-xl overflow-hidden shadow-inner">
+                <ReactQuill
+                  ref={quillRef}
+                  theme="snow"
+                  modules={modules}
+                  value={formData.content}
+                  onChange={(v) => setFormData({ ...formData, content: v })}
+                />
+              </div>
+            </div>
+
+            {/* SEO SECTION */}
+            <div className="bg-slate-50/50 rounded-2xl border border-slate-200 p-8 space-y-6 shadow-inner">
+              <h3 className="text-xs font-black uppercase tracking-widest flex items-center gap-2 text-slate-800">
+                <Search className="w-4 h-4 text-blue-500" /> SEO Configuration
+              </h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                <div className="space-y-4">
+                  <input
+                    type="text"
+                    placeholder="Custom Meta Title"
+                    className="w-full p-3 bg-white border border-slate-200 rounded-xl text-sm"
+                    value={formData.seo_title}
+                    onChange={(e) =>
+                      setFormData({ ...formData, seo_title: e.target.value })
                     }
                   />
+                  <textarea
+                    placeholder="Custom Meta Description"
+                    className="w-full p-3 bg-white border border-slate-200 rounded-xl text-sm h-24 resize-none"
+                    value={formData.meta_description}
+                    onChange={(e) =>
+                      setFormData({
+                        ...formData,
+                        meta_description: e.target.value,
+                      })
+                    }
+                  />
+                </div>
+                <div className="bg-white p-5 rounded-xl border border-slate-100 shadow-sm flex flex-col justify-center">
+                  <p className="text-[10px] font-black text-slate-300 uppercase mb-3">
+                    Google Snippet
+                  </p>
+                  <p className="text-[#1a0dab] text-lg font-medium truncate">
+                    {formData.seo_title || formData.title || "Untitled"}
+                  </p>
+                  <p className="text-[#006621] text-xs truncate mb-1 font-mono">
+                    daw.co.id/page/{generatedSlug}
+                  </p>
+                  <p className="text-[#545454] text-xs line-clamp-2 leading-relaxed">
+                    {formData.meta_description ||
+                      formData.excerpt ||
+                      "No description set..."}
+                  </p>
                 </div>
               </div>
             </div>
           </div>
         </div>
 
-        <div className="lg:col-span-1 space-y-6">
-          <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm">
-            <h3 className="font-bold mb-4">Settings</h3>
-            <div className="space-y-4">
-              <label className="block text-xs font-bold text-slate-500 uppercase">
-                Category
-              </label>
-              <select
-                className="w-full p-2.5 bg-slate-50 border rounded-lg"
-                value={formData.category}
-                onChange={(e) =>
-                  setFormData({ ...formData, category: e.target.value })
-                }
-              >
-                <option value="Resources">Resources</option>
-                <option value="Energy">Energy</option>
-              </select>
-            </div>
+        {/* SIDEBAR SETTINGS */}
+        <div className="space-y-6">
+          <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm">
+            <h3 className="text-xs font-black uppercase tracking-widest text-slate-800 mb-4">
+              Classification
+            </h3>
+            <select
+              className="w-full p-3 bg-slate-50 border border-slate-100 rounded-xl font-bold text-slate-700 outline-none"
+              value={formData.category}
+              onChange={(e) =>
+                setFormData({ ...formData, category: e.target.value })
+              }
+            >
+              <option value="Resources">Resources Sector</option>
+              <option value="Energy">Energy Sector</option>
+            </select>
           </div>
 
-          <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm">
-            <h3 className="font-bold mb-3 flex items-center gap-2">
-              <ImageIcon className="w-4 h-4 text-daw-green" /> Cover Image
+          <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm">
+            <h3 className="text-xs font-black uppercase tracking-widest mb-4 flex items-center gap-2">
+              <ImageIcon className="w-4 h-4 text-daw-green" /> Primary Visual
             </h3>
-            {/* AREA PREVIEW */}
             <div
               {...getRootCoverProps()}
-              className={`relative group cursor-pointer border-2 border-dashed rounded-lg transition-all
-        ${isCoverDragActive ? "border-daw-green bg-green-50" : "border-slate-200 bg-slate-50"}
-      `}
+              className={`aspect-video rounded-xl border-2 border-dashed flex items-center justify-center cursor-pointer transition-all overflow-hidden ${isCoverDragActive ? "border-daw-green bg-green-50" : "border-slate-100 bg-slate-50 hover:bg-slate-100"}`}
             >
               <input {...getInputCoverProps()} />
-              <div className="h-40 flex flex-col items-center justify-center">
-                {coverFile || formData.cover_image ? (
-                  <div className="relative w-full h-full">
-                    <img
-                      src={
-                        coverFile
-                          ? URL.createObjectURL(coverFile)
-                          : `http://localhost:5000/uploads/${formData.cover_image}`
-                      }
-                      className="w-full h-full object-cover rounded-lg"
-                      alt="Preview"
-                    />
-                    {/* Overlay saat Dragging atau Hover */}
-                    <div
-                      className={`absolute inset-0 flex items-center justify-center rounded-lg transition-opacity bg-black/40 
-              ${isCoverDragActive ? "opacity-100" : "opacity-0 group-hover:opacity-100"}
-            `}
-                    >
-                      <span className="text-white text-xs font-medium">
-                        Drop to replace image
-                      </span>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="flex flex-col items-center text-slate-400">
-                    <ImageIcon className="w-8 h-8 mb-2 opacity-20" />
-                    <span className="text-xs font-medium">
-                      Drag & drop or click to upload
-                    </span>
-                  </div>
-                )}
-              </div>
+              {coverPreview ? (
+                <img
+                  src={coverPreview}
+                  className="w-full h-full object-cover"
+                  alt="Cover Preview"
+                />
+              ) : formData.cover_image ? (
+                <img
+                  src={`${BASE_UPLOAD_URL}/${formData.cover_image}`}
+                  className="w-full h-full object-cover"
+                  alt="Server Image"
+                />
+              ) : (
+                <div className="text-center">
+                  <ImageIcon className="w-8 h-8 text-slate-200 mx-auto mb-2" />
+                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-tighter">
+                    Upload Cover
+                  </p>
+                </div>
+              )}
             </div>
           </div>
 
-          <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm">
-            <h3 className="font-bold mb-3 flex items-center gap-2">
+          <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm">
+            <h3 className="text-xs font-black uppercase tracking-widest mb-4 flex items-center gap-2">
               <Images className="w-4 h-4 text-daw-green" /> Gallery
             </h3>
-            {/*  PREVIEW GALLERY GRID  */}
-            {galleryFiles.length > 0 && (
-              <div className="grid grid-cols-3 gap-2 mb-4">
-                {galleryFiles.map((file, idx) => (
-                  <div key={idx} className="relative aspect-square group">
-                    <img
-                      src={URL.createObjectURL(file)}
-                      className="w-full h-full object-cover rounded-md border border-slate-100"
-                    />
-                    {/* Tambahkan tombol hapus di tiap foto gallery */}
-                    <button
-                      type="button"
-                      onClick={() => removeGalleryFile(idx)}
-                      className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity"
-                    >
-                      <X className="w-3 h-3" />
-                    </button>
-                  </div>
-                ))}
-              </div>
-            )}
+            <div className="grid grid-cols-3 gap-2 mb-4">
+              {galleryFiles.map((file, idx) => (
+                <GalleryPreviewItem
+                  key={idx}
+                  file={file}
+                  onRemove={() => removeGalleryFile(idx)}
+                />
+              ))}
+            </div>
             <div
               {...getRootGalleryProps()}
-              className={`p-6 border-2 border-dashed rounded-lg text-center cursor-pointer transition-colors
-      ${isGalleryDragActive ? "border-daw-green bg-green-50" : "border-slate-200 hover:bg-slate-50"}
-    `}
+              className={`p-6 border-2 border-dashed rounded-xl text-center cursor-pointer transition-all ${isGalleryDragActive ? "border-daw-green bg-green-50" : "border-slate-50 hover:bg-slate-100"}`}
             >
               <input {...getInputGalleryProps()} />
-              <Images className="w-8 h-8 mx-auto mb-2 text-slate-300" />
-              <p className="text-sm text-slate-600">
-                Drag & drop gallery images here
-              </p>
-              <p className="text-xs text-slate-400 mt-1">
-                Supports: JPG, PNG, WEBP
+              <p className="text-[10px] font-black text-slate-400 uppercase">
+                Add Assets
               </p>
             </div>
           </div>

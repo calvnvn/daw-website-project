@@ -1,3 +1,4 @@
+const fs = require("fs");
 const express = require("express");
 const cors = require("cors");
 const dotenv = require("dotenv");
@@ -116,3 +117,25 @@ sequelize
     console.error("[DATABASE] Connection failed:", err.message);
     app.listen(5000, () => console.log("Server running on port 5000"));
   });
+
+const uploadPath = path.join(process.cwd(), "public", "uploads");
+
+// Log untuk memastikan folder benar-benar terbaca saat server start
+if (!fs.existsSync(uploadPath)) {
+  console.error("❌ ERROR: Folder uploads TIDAK DITEMUKAN di:", uploadPath);
+} else {
+  console.log("✅ SUCCESS: Folder uploads ditemukan di:", uploadPath);
+}
+
+app.use("/uploads", express.static(uploadPath));
+
+// 🚀 Fix 2: Middleware Anti-Error Ekstensi (Handle .jpeg vs .jpg)
+app.use("/uploads", (req, res, next) => {
+  if (req.url.toLocaleLowerCase().endsWith(".jpeg")) {
+    const altPath = req.url.replace(/\.jpeg$/i, ".jpg");
+    if (fs.existsSync(path.join(uploadPath, altPath))) {
+      return res.redirect(`/uploads${altPath}`);
+    }
+  }
+  next();
+});

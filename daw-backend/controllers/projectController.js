@@ -21,7 +21,16 @@ exports.getAllProjects = async (req, res) => {
 // POST Project Function
 exports.createProject = async (req, res) => {
   try {
-    const { title, excerpt, content, category, status, author } = req.body;
+    const {
+      title,
+      excerpt,
+      content,
+      category,
+      status,
+      seo_title,
+      meta_description,
+      existing_gallery,
+    } = req.body;
     console.log("--- DATA MASUK ---");
     console.log("Judul:", title);
     console.log("Status asli dari Frontend:", status);
@@ -44,20 +53,35 @@ exports.createProject = async (req, res) => {
   VALUES (UUID(), :title, :excerpt, :content, :category, :status, :author, :cover_image, :gallery, 0, NOW(), NOW())
 `;
 
-    await sequelize.query(query, {
-      replacements: {
-        title: title || "Untitled Project",
-        excerpt: excerpt || "",
-        content: content || "",
-        category: category || "Resources",
-        status: status || "Draft",
-        author: author || "Admin",
-        cover_image: coverImageName,
-        gallery: galleryJsonString,
+    await sequelize.query(
+      `UPDATE Projects SET 
+      title = :title, 
+      excerpt = :excerpt, 
+      content = :content, 
+      category = :category,  -- 👈 Pastikan ini ada
+      status = :status, 
+      cover_image = :cover_image, 
+      gallery = :gallery,
+      seo_title = :seo_title,
+      meta_description = :meta_description,
+      updatedAt = NOW()
+    WHERE id = :id`,
+      {
+        replacements: {
+          id,
+          title,
+          excerpt: excerpt || "",
+          content,
+          category,
+          status,
+          cover_image: finalCover,
+          gallery: JSON.stringify(finalGallery),
+          seo_title: seo_title || title,
+          meta_description: meta_description || excerpt,
+        },
+        type: sequelize.QueryTypes.UPDATE,
       },
-      type: sequelize.QueryTypes.INSERT,
-    });
-
+    );
     res
       .status(201)
       .json({ message: "Project created successfully with images!" });
