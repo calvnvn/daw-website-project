@@ -4,21 +4,22 @@ import "react-quill-new/dist/quill.snow.css";
 import { toast } from "sonner";
 import {
   Plus,
-  Edit2,
   Trash2,
   Save,
   X,
-  Layout,
   Sparkles,
   Globe,
-  Layers,
-  Monitor,
-  UploadCloud,
   FileText,
   RefreshCw,
+  UploadCloud,
+  LayoutTemplate,
+  Link as LinkIcon,
+  ImagePlus,
+  PenTool,
 } from "lucide-react";
 import api from "@/lib/api";
 import imageCompression from "browser-image-compression";
+
 interface Page {
   id: string;
   title: string;
@@ -27,6 +28,7 @@ interface Page {
   heroImage?: string | null;
   templateType: "classic" | "modern" | "split";
   content: string;
+  sidebarLinks?: { label: string; url: string }[];
 }
 
 export default function PageBuilder() {
@@ -41,10 +43,10 @@ export default function PageBuilder() {
     subtitle: "",
     templateType: "classic",
     content: "",
+    sidebarLinks: [] as { label: string; url: string }[],
   });
 
   const [heroImage, setHeroImage] = useState<string>("");
-
   const quillRef = useRef<ReactQuill>(null);
 
   const imageHandler = useCallback(() => {
@@ -59,8 +61,8 @@ export default function PageBuilder() {
         const toastId = toast.loading("Optimizing article image...");
         try {
           const options = {
-            maxSizeMB: 0.5, //  Kompres sampai di bawah 500KB
-            maxWidthOrHeight: 1200, // Ukuran ideal untuk artikel web
+            maxSizeMB: 0.5,
+            maxWidthOrHeight: 1200,
             useWebWorker: true,
           };
           const compressedFile = await imageCompression(file, options);
@@ -68,8 +70,6 @@ export default function PageBuilder() {
 
           reader.onloadend = () => {
             const base64data = reader.result as string;
-
-            // API from ReactQuill
             const editor = quillRef.current?.getEditor();
             const range = editor?.getSelection();
 
@@ -82,13 +82,12 @@ export default function PageBuilder() {
           reader.readAsDataURL(compressedFile);
         } catch (error) {
           toast.error("Failed to process image", { id: toastId });
-          console.error(error);
+          console.error("Error: ", error);
         }
       }
     };
   }, []);
 
-  // 2. Daftarkan imageHandler ke dalam Quill Modules
   const quillModules = useMemo(
     () => ({
       toolbar: {
@@ -100,9 +99,7 @@ export default function PageBuilder() {
           ["link", "image", "video"],
           ["clean"],
         ],
-        handlers: {
-          image: imageHandler,
-        },
+        handlers: { image: imageHandler },
       },
     }),
     [imageHandler],
@@ -115,7 +112,7 @@ export default function PageBuilder() {
       setPages(response.data);
     } catch (error) {
       toast.error("Failed to fetch page data.");
-      console.log(error);
+      console.error("Error: ", error);
     } finally {
       setIsLoading(false);
     }
@@ -148,7 +145,7 @@ export default function PageBuilder() {
       .replace(/[^a-z0-9]+/g, "-")
       .replace(/(^-|-$)+/g, "");
     setFormData({ ...formData, slug: newSlug });
-    toast.success("Slug disinkronkan dengan judul baru!");
+    toast.success("Slug synchronized / Slug berhasil disinkronkan!");
   };
 
   const resetForm = () => {
@@ -160,55 +157,49 @@ export default function PageBuilder() {
       subtitle: "",
       templateType: "classic",
       content: "",
+      sidebarLinks: [],
     });
   };
 
   const handleEdit = async (page: Page) => {
-    const toastId = toast.loading(`Membuka "${page.title}"...`);
-
+    const toastId = toast.loading(`Loading "${page.title}"...`);
     try {
       const response = await api.get(`/pages/slug/${page.slug}`);
-
-      // Deteksi otomatis jika API membalas dalam bentuk Array (misal: [ { data } ])
       const exactData = Array.isArray(response.data)
         ? response.data[0]
         : response.data;
 
-      console.log("1. Data Mentah dari API:", exactData); // Debug 1
-
-      // Kunci ID dan Gambar
       setEditingId(exactData.id);
       setHeroImage(exactData.heroImage || "");
-
-      setFormData(() => {
-        const newData = {
-          title: exactData.title || "",
-          slug: exactData.slug || "",
-          subtitle: exactData.subtitle || "",
-          templateType: exactData.templateType || "classic",
-          content: exactData.content || "",
-        };
-        console.log("2. Data yang akan masuk ke Input Form:", newData); // Debug 2
-        return newData;
-      });
-
+      setFormData(() => ({
+        title: exactData.title || "",
+        slug: exactData.slug || "",
+        subtitle: exactData.subtitle || "",
+        templateType: exactData.templateType || "classic",
+        content: exactData.content || "",
+        sidebarLinks:
+          typeof exactData.sidebarLinks === "string"
+            ? JSON.parse(exactData.sidebarLinks)
+            : exactData.sidebarLinks || [],
+      }));
       toast.dismiss(toastId);
     } catch (error) {
-      toast.error("Gagal memuat detail artikel", { id: toastId });
-      console.error("Edit fetch error:", error);
+      toast.error("Failed to load details", { id: toastId });
+      console.error("Error: ", error);
     }
   };
+
   const handleDelete = async (id: string, title: string) => {
     if (!confirm(`Delete "${title}"? This cannot be undone.`)) return;
-    const toastId = toast.loading("Deleting page...");
+    const toastId = toast.loading("Removing document...");
     try {
       await api.delete(`/pages/${id}`);
-      toast.success("Page deleted", { id: toastId });
+      toast.success("Document removed", { id: toastId });
       fetchPages();
       if (editingId === id) resetForm();
     } catch (error) {
-      toast.error("Failed to delete page", { id: toastId });
-      console.error(error);
+      toast.error("Failed to delete", { id: toastId });
+      console.error("Error: ", error);
     }
   };
 
@@ -216,26 +207,22 @@ export default function PageBuilder() {
     e.preventDefault();
     if (!formData.title || !formData.slug)
       return toast.error("Title & Slug are required!");
-
     setIsSaving(true);
-    const toastId = toast.loading("Saving...");
+    const toastId = toast.loading("Deploying changes...");
     try {
-      const payload = {
-        ...formData,
-        heroImage: heroImage,
-      };
+      const payload = { ...formData, heroImage: heroImage };
       if (editingId) {
         await api.put(`/pages/${editingId}`, payload);
-        toast.success("Page updated!", { id: toastId });
+        toast.success("Document updated!", { id: toastId });
       } else {
         await api.post("/pages", payload);
-        toast.success("Page published!", { id: toastId });
+        toast.success("Document published!", { id: toastId });
       }
       resetForm();
       fetchPages();
     } catch (error) {
-      console.error(error);
-      toast.error("Failed to save page", { id: toastId });
+      toast.error("Failed to deploy", { id: toastId });
+      console.error("Error: ", error);
     } finally {
       setIsSaving(false);
     }
@@ -243,14 +230,12 @@ export default function PageBuilder() {
 
   const handleImageUpload = async (file: File) => {
     if (!file) return;
-    if (!file.type.startsWith("image/")) {
-      return toast.error("Hanya file gambar yang diperbolehkan!");
-    }
-    if (file.size > 5 * 1024 * 1024) {
-      return toast.error("Ukuran gambar terlalu besar! Maksimal 5MB.");
-    }
+    if (!file.type.startsWith("image/"))
+      return toast.error("Invalid format. Use images only.");
+    if (file.size > 5 * 1024 * 1024)
+      return toast.error("File too large. Max 5MB.");
 
-    const toastId = toast.loading("Compressing image...");
+    const toastId = toast.loading("Compressing asset...");
     try {
       const compressedFile = await imageCompression(file, {
         maxSizeMB: 0.8,
@@ -258,90 +243,98 @@ export default function PageBuilder() {
         useWebWorker: true,
         initialQuality: 0.7,
       });
-      console.log(`Original: ${(file.size / 1024 / 1024).toFixed(2)} MB`);
-      console.log(
-        `Compressed: ${(compressedFile.size / 1024 / 1024).toFixed(2)} MB`,
-      );
-
       const reader = new FileReader();
       reader.onloadend = () => {
         setHeroImage(reader.result as string);
-        toast.success("Image optimized & uploaded!", { id: toastId });
+        toast.success("Asset optimized & loaded!", { id: toastId });
       };
       reader.readAsDataURL(compressedFile);
     } catch (error) {
-      console.error(error);
-      toast.error("Failed to compress image.", { id: toastId });
+      toast.error("Compression failed.", { id: toastId });
+      console.error("Error: ", error);
     }
   };
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start animate-in fade-in duration-500">
-      {/* Sidebar: Page List */}
+    <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start animate-in fade-in duration-500 pb-20">
+      {/* 🚀 LEFT: DOCUMENT REPOSITORY (Sidebar) */}
       <div className="lg:col-span-4 space-y-4">
-        <div className="bg-slate-50 border border-slate-200 rounded-2xl p-5 sticky top-24">
-          <div className="flex justify-between items-center mb-4">
-            <h3 className="text-xs font-bold text-slate-400 uppercase tracking-[0.2em]">
-              Your Pages
-            </h3>
+        <div className="bg-slate-50 border border-slate-200 rounded-[2rem] p-6 sticky top-24 shadow-sm">
+          <div className="flex justify-between items-end mb-6">
+            <div>
+              <h3 className="text-xl font-serif font-black text-slate-900 tracking-tight">
+                Repository
+              </h3>
+              <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-1">
+                Published Documents / Dokumen Publik
+              </p>
+            </div>
             {!editingId && (
               <button
                 onClick={resetForm}
-                className="text-xs font-bold text-daw-green hover:underline flex items-center gap-1"
+                className="text-xs font-bold text-daw-green bg-daw-green/10 px-3 py-2 rounded-xl hover:bg-daw-green hover:text-white transition-all flex items-center gap-1 shadow-sm"
               >
-                <Plus className="w-3 h-3" /> New
+                <Plus className="w-4 h-4" /> New
               </button>
             )}
           </div>
+
           {isLoading ? (
-            <div className="py-10 text-center animate-pulse text-slate-400 font-bold">
-              Loading...
+            <div className="py-12 text-center animate-pulse">
+              <div className="w-8 h-8 border-4 border-slate-200 border-t-daw-green rounded-full animate-spin mx-auto mb-3" />
+              <p className="text-[10px] text-slate-400 font-bold tracking-widest uppercase">
+                Fetching data...
+              </p>
             </div>
           ) : pages.length === 0 ? (
-            <div className="text-center py-12 px-6 bg-white border border-dashed border-slate-300 rounded-2xl">
+            <div className="text-center py-16 px-6 bg-white border border-dashed border-slate-300 rounded-[1.5rem]">
               <div className="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center mx-auto mb-4">
                 <FileText className="w-8 h-8 text-slate-300" />
               </div>
               <h4 className="text-sm font-bold text-slate-900 mb-1">
-                No Pages Created
+                No Documents Found
               </h4>
-              <p className="text-xs text-slate-500 mb-4">
-                Start building your website by creating your first editorial
-                page.
+              <p className="text-xs text-slate-400 font-medium mb-6">
+                Draft your first editorial piece to populate this repository.{" "}
+                <br />
+                <span className="italic text-[10px]">
+                  Buat artikel pertama Anda untuk mengisi repositori ini.
+                </span>
               </p>
               <button
                 onClick={resetForm}
-                className="text-xs font-bold text-daw-green bg-daw-green/5 px-4 py-2 rounded-lg hover:bg-daw-green hover:text-white transition-all"
+                className="text-xs font-bold text-white bg-daw-green px-5 py-2.5 rounded-xl hover:bg-[#003b1c] shadow-lg shadow-daw-green/20 transition-all"
               >
-                + Create Page
+                Compose New Page
               </button>
             </div>
           ) : (
-            <div className="space-y-3 max-h-[60vh] overflow-y-auto custom-scrollbar pr-2">
+            <div className="space-y-3 max-h-[65vh] overflow-y-auto custom-scrollbar pr-2">
               {pages.map((p) => (
                 <div
                   key={p.id}
-                  className={`p-4 rounded-xl border bg-white transition-all group ${editingId === p.id ? "border-daw-green ring-4 ring-daw-green/5 shadow-sm" : "border-slate-200"}`}
+                  className={`p-4 rounded-2xl border bg-white transition-all group cursor-pointer hover:border-daw-green/50 hover:shadow-md
+                  ${editingId === p.id ? "border-daw-green ring-4 ring-daw-green/10 shadow-sm" : "border-slate-200"}`}
+                  onClick={() => handleEdit(p)}
                 >
                   <div className="flex justify-between items-start">
-                    <div className="min-w-0">
-                      <h4 className="font-bold text-slate-900 text-sm truncate">
+                    <div className="min-w-0 pr-2">
+                      <h4
+                        className={`font-bold text-sm truncate ${editingId === p.id ? "text-daw-green" : "text-slate-900"}`}
+                      >
                         {p.title}
                       </h4>
-                      <p className="text-[10px] text-slate-400 font-mono mt-1">
-                        /page/{p.slug}
+                      <p className="text-[10px] text-slate-400 font-mono mt-1.5 flex items-center gap-1 truncate">
+                        <Globe className="w-3 h-3" /> /page/{p.slug}
                       </p>
                     </div>
                     <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                       <button
-                        onClick={() => handleEdit(p)}
-                        className="p-1.5 hover:bg-daw-green/10 text-slate-400 hover:text-daw-green rounded-md"
-                      >
-                        <Edit2 className="w-4 h-4" />
-                      </button>
-                      <button
-                        onClick={() => handleDelete(p.id, p.title)}
-                        className="p-1.5 hover:bg-red-50 text-slate-400 hover:text-red-500 rounded-md"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDelete(p.id, p.title);
+                        }}
+                        className="p-2 bg-slate-50 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
                       >
                         <Trash2 className="w-4 h-4" />
                       </button>
@@ -354,118 +347,150 @@ export default function PageBuilder() {
         </div>
       </div>
 
-      {/* Main: Page Editor */}
+      {/* 🚀 RIGHT: EDITORIAL WORKSPACE (Main Form) */}
       <div className="lg:col-span-8">
         <form
           onSubmit={handleSubmit}
-          className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden"
+          className="bg-white rounded-[2.5rem] border border-slate-200 shadow-xl shadow-slate-200/50 overflow-hidden"
         >
-          <div className="flex justify-between items-center p-6 border-b border-slate-100 bg-slate-50/30">
-            <div className="flex items-center gap-2 text-daw-green uppercase text-[10px] font-black tracking-widest">
-              <Sparkles className="w-4 h-4" />{" "}
-              {editingId ? "Edit Page" : "Create New Page"}
+          {/* Header Workspace */}
+          <div className="flex justify-between items-center p-8 border-b border-slate-100 bg-slate-50/50">
+            <div className="flex items-center gap-3">
+              <div className="w-12 h-12 bg-daw-green/10 rounded-2xl flex items-center justify-center text-daw-green">
+                {editingId ? (
+                  <PenTool className="w-6 h-6" />
+                ) : (
+                  <Sparkles className="w-6 h-6" />
+                )}
+              </div>
+              <div>
+                <h2 className="text-xl font-bold text-slate-900 tracking-tight">
+                  {editingId ? "Edit Document" : "Compose Document"}
+                </h2>
+                <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest mt-0.5">
+                  {editingId
+                    ? "Modify existing content / Ubah konten"
+                    : "Draft a new publication / Buat publikasi baru"}
+                </p>
+              </div>
             </div>
             {editingId && (
               <button
                 type="button"
                 onClick={resetForm}
-                className="text-xs font-bold text-slate-400 hover:text-red-500 flex items-center gap-1"
+                className="px-4 py-2 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-500 hover:text-red-500 hover:border-red-200 hover:bg-red-50 transition-all flex items-center gap-2 shadow-sm"
               >
-                <X className="w-3 h-3" /> Cancel Edit
+                <X className="w-4 h-4" /> Discard Edit
               </button>
             )}
           </div>
 
-          <div className="p-8 border-b border-slate-100">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div className="space-y-2">
-                <label className="text-xs font-bold text-slate-500 uppercase">
-                  Main Title *
-                </label>
-                <input
-                  type="text"
-                  required
-                  value={formData.title}
-                  onChange={handleTitleChange}
-                  className="w-full p-4 rounded-xl bg-slate-50 border border-slate-200 focus:bg-white focus:border-daw-green outline-none font-bold text-slate-800"
-                  placeholder="e.g. Company History"
-                />
+          <div className="p-8 space-y-10">
+            {/* 🌟 SECTION 1: CORE IDENTITY */}
+            <div className="space-y-6">
+              <div className="flex items-center gap-2 border-b border-slate-100 pb-2">
+                <LayoutTemplate className="w-4 h-4 text-slate-400" />
+                <h3 className="text-sm font-bold text-slate-900">
+                  Core Identity
+                </h3>
               </div>
-              <div className="space-y-2">
-                <label className="text-xs font-bold text-slate-500 uppercase">
-                  URL Slug *
-                </label>
-                <div className="flex items-center w-full rounded-xl bg-slate-50 border border-slate-200 focus-within:bg-white focus-within:border-daw-green overflow-hidden transition-colors">
-                  <div className="pl-4 pr-2 py-4 text-slate-400 flex items-center gap-2 border-r border-slate-200/50">
-                    <Globe className="w-4 h-4" />
-                    <span className="text-sm font-mono">/page/</span>
-                  </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">
+                    Main Title / Judul Utama *
+                  </label>
                   <input
                     type="text"
                     required
-                    value={formData.slug}
+                    value={formData.title}
+                    onChange={handleTitleChange}
+                    className="w-full px-5 py-4 rounded-2xl bg-slate-50 border border-slate-200 focus:bg-white focus:border-daw-green focus:ring-4 focus:ring-daw-green/10 outline-none font-bold text-slate-800 transition-all"
+                    placeholder="e.g. Corporate Sustainability Report"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">
+                    URL Slug / Tautan Permanen *
+                  </label>
+                  <div className="flex items-center w-full rounded-2xl bg-slate-50 border border-slate-200 focus-within:bg-white focus-within:border-daw-green focus-within:ring-4 focus-within:ring-daw-green/10 overflow-hidden transition-all">
+                    <div className="pl-5 pr-2 py-4 text-slate-400 flex items-center gap-2 border-r border-slate-200/50">
+                      <Globe className="w-4 h-4" />{" "}
+                      <span className="text-sm font-mono">/page/</span>
+                    </div>
+                    <input
+                      type="text"
+                      required
+                      value={formData.slug}
+                      onChange={(e) =>
+                        setFormData((prev) => ({
+                          ...prev,
+                          slug: e.target.value
+                            .toLowerCase()
+                            .replace(/[^a-z0-9-]+/g, ""),
+                        }))
+                      }
+                      className="w-full p-4 bg-transparent outline-none font-mono text-sm text-slate-600"
+                      placeholder="corporate-report"
+                    />
+                    {editingId && (
+                      <button
+                        type="button"
+                        onClick={syncSlugWithTitle}
+                        title="Sync Slug dengan Judul"
+                        className="pr-5 pl-3 text-slate-400 hover:text-daw-green transition-colors border-l border-slate-200/50"
+                      >
+                        <RefreshCw className="w-4 h-4" />
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                <div className="space-y-2 md:col-span-2">
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">
+                    Hero Subtitle / Subjudul Pendukung
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.subtitle}
                     onChange={(e) =>
                       setFormData((prev) => ({
                         ...prev,
-                        slug: e.target.value
-                          .toLowerCase()
-                          .replace(/[^a-z0-9-]+/g, ""),
+                        subtitle: e.target.value,
                       }))
                     }
-                    className="w-full p-4 bg-transparent outline-none font-mono text-sm text-slate-600"
-                    placeholder="company-history"
+                    className="w-full px-5 py-4 rounded-2xl bg-slate-50 border border-slate-200 focus:bg-white focus:border-daw-green focus:ring-4 focus:ring-daw-green/10 outline-none text-slate-600 transition-all"
+                    placeholder="Brief overview or engaging hook for the article..."
                   />
-                  {/* Sync Slug */}
-                  {editingId && (
-                    <button
-                      type="button"
-                      onClick={syncSlugWithTitle}
-                      title="Sync Slug dengan Judul"
-                      className="pr-4 pl-2 text-slate-400 hover:text-daw-green transition-colors"
-                    >
-                      <RefreshCw className="w-4 h-4" />
-                    </button>
-                  )}
                 </div>
               </div>
-              <div className="space-y-2 md:col-span-2">
-                <label className="text-xs font-bold text-slate-500 uppercase">
-                  Hero Subtitle
-                </label>
-                <input
-                  type="text"
-                  value={formData.subtitle}
-                  onChange={(e) =>
-                    setFormData((prev) => ({
-                      ...prev,
-                      subtitle: e.target.value,
-                    }))
-                  }
-                  className="w-full p-4 rounded-xl bg-slate-50 border border-slate-200 focus:bg-white focus:border-daw-green outline-none text-slate-600"
-                  placeholder="Small text under title..."
-                />
+            </div>
+
+            {/* 🌟 SECTION 2: VISUAL ASSET */}
+            <div className="space-y-6">
+              <div className="flex items-center gap-2 border-b border-slate-100 pb-2">
+                <ImagePlus className="w-4 h-4 text-slate-400" />
+                <h3 className="text-sm font-bold text-slate-900">
+                  Hero Background / Gambar Sampul
+                </h3>
               </div>
 
-              {/* Area Drag n Drop Image */}
-              <div className="space-y-2 md:col-span-2 mt-2">
-                <label className="text-xs font-bold text-slate-500 uppercase">
-                  Hero Background Image
-                </label>
-
+              <div className="mt-2">
                 {heroImage ? (
-                  <div className="relative w-full h-56 rounded-2xl overflow-hidden group border border-slate-200 shadow-sm">
+                  <div className="relative w-full h-[300px] rounded-3xl overflow-hidden group border border-slate-200 shadow-sm">
                     <img
                       src={heroImage}
                       alt="Hero Preview"
-                      className="w-full h-full object-cover"
+                      className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
                     />
                     <div className="absolute inset-0 bg-slate-900/60 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-center justify-center backdrop-blur-sm">
                       <button
                         type="button"
                         onClick={() => setHeroImage("")}
-                        className="bg-red-500 text-white px-5 py-2.5 rounded-xl flex items-center gap-2 font-bold text-sm hover:bg-red-600 transition-colors shadow-lg transform hover:scale-105"
+                        className="bg-red-500 text-white px-6 py-3 rounded-2xl flex items-center gap-2 font-bold shadow-lg transform hover:scale-105 transition-all"
                       >
-                        <Trash2 className="w-4 h-4" /> Remove Image
+                        <Trash2 className="w-5 h-5" /> Remove Asset
                       </button>
                     </div>
                   </div>
@@ -479,16 +504,11 @@ export default function PageBuilder() {
                     onDrop={(e) => {
                       e.preventDefault();
                       setIsDragging(false);
-                      if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+                      if (e.dataTransfer.files?.[0])
                         handleImageUpload(e.dataTransfer.files[0]);
-                      }
                     }}
-                    className={`relative border-2 border-dashed rounded-3xl p-12 flex flex-col items-center justify-center transition-all duration-300 group 
-                      ${
-                        isDragging
-                          ? "border-daw-green bg-daw-green/5 scale-[0.99] ring-4 ring-daw-green/10"
-                          : "border-slate-300 bg-slate-50 hover:border-daw-green hover:bg-slate-100/50"
-                      }`}
+                    className={`relative border-2 border-dashed rounded-3xl p-14 flex flex-col items-center justify-center transition-all duration-300 group 
+                      ${isDragging ? "border-daw-green bg-daw-green/5 scale-[0.99] ring-4 ring-daw-green/10" : "border-slate-300 bg-slate-50 hover:border-daw-green hover:bg-slate-50/80"}`}
                   >
                     <input
                       type="file"
@@ -505,96 +525,210 @@ export default function PageBuilder() {
                         className={`w-10 h-10 ${isDragging ? "animate-bounce" : ""}`}
                       />
                     </div>
-                    <div className="text-center space-y-1">
+                    <div className="text-center space-y-2">
                       <p className="text-base font-bold text-slate-700">
                         {isDragging
-                          ? "Drop to optimize"
-                          : "Drag & drop hero image"}
+                          ? "Drop asset here"
+                          : "Drag & Drop cover image"}
                       </p>
-                      <p className="text-sm text-slate-500 font-medium">
-                        or click to browse your workstation
+                      <p className="text-[11px] text-slate-500 font-medium">
+                        or browse from local workstation / atau pilih dari
+                        folder lokal
                       </p>
-                    </div>
-                    <div className="mt-6 flex gap-2">
-                      <span className="px-3 py-1 rounded-full bg-white border border-slate-200 text-[10px] font-bold text-slate-400 uppercase tracking-tighter">
-                        PNG, JPG, WEBP (Max 5MB)
-                      </span>
                     </div>
                   </div>
                 )}
               </div>
-              {/* 🚀 END AREA DRAG AND DROP */}
             </div>
-          </div>
 
-          <div className="p-8 border-b border-slate-100">
-            <label className="block text-xs font-bold text-slate-500 uppercase mb-4">
-              Select Template Layout
-            </label>
-            <div className="grid grid-cols-3 gap-4">
-              {(["classic", "modern", "split"] as const).map((type) => (
+            {/* 🌟 SECTION 3: WIDGET MANAGER */}
+            <div className="space-y-6">
+              <div className="flex justify-between items-center border-b border-slate-100 pb-2">
+                <div className="flex items-center gap-2">
+                  <LinkIcon className="w-4 h-4 text-slate-400" />
+                  <h3 className="text-sm font-bold text-slate-900">
+                    Supplementary Widget / Navigasi Samping
+                  </h3>
+                </div>
                 <button
-                  key={type}
                   type="button"
                   onClick={() =>
-                    setFormData({ ...formData, templateType: type })
+                    setFormData((prev) => ({
+                      ...prev,
+                      sidebarLinks: [
+                        ...prev.sidebarLinks,
+                        { label: "", url: "" },
+                      ],
+                    }))
                   }
-                  className={`p-6 border-2 rounded-2xl flex flex-col items-center gap-3 transition-all ${formData.templateType === type ? "border-daw-green bg-daw-green/5" : "border-slate-100 hover:border-slate-200"}`}
+                  className="text-[10px] font-black uppercase tracking-widest text-daw-green bg-daw-green/10 px-3 py-1.5 rounded-lg hover:bg-daw-green hover:text-white transition-all flex items-center gap-1"
                 >
-                  {type === "classic" && (
-                    <Monitor
-                      className={`w-6 h-6 ${formData.templateType === type ? "text-daw-green" : "text-slate-400"}`}
-                    />
-                  )}
-                  {type === "modern" && (
-                    <Layers
-                      className={`w-6 h-6 ${formData.templateType === type ? "text-daw-green" : "text-slate-400"}`}
-                    />
-                  )}
-                  {type === "split" && (
-                    <Layout
-                      className={`w-6 h-6 ${formData.templateType === type ? "text-daw-green" : "text-slate-400"}`}
-                    />
-                  )}
-                  <span className="text-xs font-bold capitalize">{type}</span>
+                  <Plus className="w-3 h-3" /> Insert Link
                 </button>
-              ))}
+              </div>
+
+              <div className="space-y-3 bg-slate-50 p-6 rounded-3xl border border-slate-100">
+                {formData.sidebarLinks.length === 0 ? (
+                  <p className="text-xs text-slate-400 italic text-center py-6">
+                    No supplementary links added. Sidebar will be hidden
+                    automatically.
+                    <br />
+                    <span className="text-[10px]">
+                      Belum ada tautan. Sidebar akan disembunyikan otomatis.
+                    </span>
+                  </p>
+                ) : (
+                  formData.sidebarLinks.map((link, index) => (
+                    <div
+                      key={index}
+                      className="flex gap-4 items-start bg-white p-4 rounded-2xl border border-slate-200 shadow-sm animate-in fade-in"
+                    >
+                      <div className="flex-1 space-y-3">
+                        <div>
+                          <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 mb-1 block">
+                            Destination Page / Halaman Tujuan
+                          </label>
+                          <select
+                            value={link.url}
+                            onChange={(e) => {
+                              const newLinks = [...formData.sidebarLinks];
+                              const selectedUrl = e.target.value;
+                              newLinks[index].url = selectedUrl;
+                              if (!newLinks[index].label && selectedUrl) {
+                                const staticPages = [
+                                  { url: "/", label: "Homepage" },
+                                  { url: "/about", label: "About Us" },
+                                  {
+                                    url: "/businesses",
+                                    label: "Our Businesses",
+                                  },
+                                ];
+                                const matchedStatic = staticPages.find(
+                                  (sp) => sp.url === selectedUrl,
+                                );
+                                if (matchedStatic)
+                                  newLinks[index].label = matchedStatic.label;
+                                else {
+                                  const matchedPage = pages.find(
+                                    (p) => `/page/${p.slug}` === selectedUrl,
+                                  );
+                                  if (matchedPage)
+                                    newLinks[index].label = matchedPage.title;
+                                }
+                              }
+                              setFormData((prev) => ({
+                                ...prev,
+                                sidebarLinks: newLinks,
+                              }));
+                            }}
+                            className="w-full text-sm p-3 bg-slate-50 outline-none font-bold text-daw-green border border-slate-200 rounded-xl focus:border-daw-green focus:ring-2 focus:ring-daw-green/10 cursor-pointer"
+                          >
+                            <option value="">-- Assign Destination --</option>
+                            <optgroup label="Main Pages">
+                              <option value="/">Homepage</option>{" "}
+                              <option value="/about">About Us</option>{" "}
+                              <option value="/businesses">
+                                Our Businesses
+                              </option>
+                            </optgroup>
+                            <optgroup label="Editorial Articles">
+                              {pages
+                                .filter((p) => p.id !== editingId)
+                                .map((p) => (
+                                  <option key={p.id} value={`/page/${p.slug}`}>
+                                    {p.title}
+                                  </option>
+                                ))}
+                            </optgroup>
+                          </select>
+                        </div>
+                        <div>
+                          <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 mb-1 block">
+                            Display Text / Label Teks
+                          </label>
+                          <input
+                            type="text"
+                            placeholder="Auto-filled if empty..."
+                            value={link.label}
+                            onChange={(e) => {
+                              const newLinks = [...formData.sidebarLinks];
+                              newLinks[index].label = e.target.value;
+                              setFormData((prev) => ({
+                                ...prev,
+                                sidebarLinks: newLinks,
+                              }));
+                            }}
+                            className="w-full text-sm p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:border-daw-green focus:bg-white text-slate-700 font-medium transition-colors"
+                          />
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const newLinks = formData.sidebarLinks.filter(
+                            (_, i) => i !== index,
+                          );
+                          setFormData((prev) => ({
+                            ...prev,
+                            sidebarLinks: newLinks,
+                          }));
+                        }}
+                        className="p-3 bg-slate-50 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-xl transition-colors mt-6 border border-slate-200 hover:border-red-200"
+                        title="Remove Link"
+                      >
+                        <Trash2 className="w-5 h-5" />
+                      </button>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+
+            {/* 🌟 SECTION 4: TEXT EDITOR */}
+            <div className="space-y-6">
+              <div className="flex items-center gap-2 border-b border-slate-100 pb-2">
+                <FileText className="w-4 h-4 text-slate-400" />
+                <h3 className="text-sm font-bold text-slate-900">
+                  Editorial Canvas / Konten Artikel
+                </h3>
+              </div>
+
+              <div className="rounded-[1.5rem] border border-slate-200 overflow-hidden bg-white shadow-sm focus-within:ring-4 focus-within:ring-daw-green/10 focus-within:border-daw-green transition-all">
+                <ReactQuill
+                  ref={quillRef}
+                  theme="snow"
+                  value={formData.content}
+                  onChange={(val) =>
+                    setFormData((prev) => ({ ...prev, content: val }))
+                  }
+                  modules={quillModules}
+                  className="min-h-[500px] flex flex-col [&_.ql-editor]:p-10 [&_.ql-editor]:text-slate-700 [&_.ql-editor]:text-lg [&_.ql-toolbar]:border-0 [&_.ql-toolbar]:border-b [&_.ql-toolbar]:bg-slate-50/80 [&_.ql-container]:border-0"
+                />
+              </div>
             </div>
           </div>
 
-          <div className="p-8">
-            <label className="block text-xs font-bold text-slate-500 uppercase mb-4">
-              Editorial Content
-            </label>
-            <div className="rounded-2xl border border-slate-200 overflow-hidden bg-white">
-              <ReactQuill
-                ref={quillRef}
-                theme="snow"
-                value={formData.content}
-                onChange={(val) =>
-                  setFormData((prev) => ({ ...prev, content: val }))
-                }
-                modules={quillModules}
-                className="min-h-[450px] flex flex-col [&_.ql-editor]:p-8 [&_.ql-editor]:text-slate-700 [&_.ql-editor]:text-lg [&_.ql-toolbar]:border-0 [&_.ql-toolbar]:border-b [&_.ql-container]:border-0"
-              />
+          {/* Footer Workspace (Action Buttons) */}
+          <div className="px-8 py-6 bg-slate-900 flex justify-between items-center mt-4">
+            <div>
+              <p className="text-[11px] text-slate-400 font-bold uppercase tracking-widest">
+                System Status
+              </p>
+              <p className="text-xs text-slate-300 italic mt-0.5">
+                Changes are live upon saving / Perubahan langsung tayang.
+              </p>
             </div>
-          </div>
-
-          <div className="px-8 py-6 bg-slate-50 flex justify-between items-center">
-            <p className="text-[10px] text-slate-400 font-bold uppercase italic">
-              Changes are live upon saving.
-            </p>
             <button
               type="submit"
               disabled={isSaving}
-              className="bg-daw-green hover:bg-[#003b1c] text-white px-10 py-3 rounded-xl font-bold shadow-lg shadow-daw-green/20 flex items-center gap-2 disabled:bg-slate-300"
+              className="bg-daw-green hover:bg-emerald-500 text-white px-10 py-4 rounded-2xl font-bold shadow-xl shadow-daw-green/20 flex items-center gap-2 disabled:bg-slate-700 transition-all transform hover:-translate-y-0.5"
             >
-              <Save className="w-5 h-5" />
+              <Save className="w-5 h-5" />{" "}
               {isSaving
-                ? "Saving..."
+                ? "Syncing..."
                 : editingId
-                  ? "Update Page"
-                  : "Publish Page"}
+                  ? "Update Publication"
+                  : "Publish Document"}
             </button>
           </div>
         </form>

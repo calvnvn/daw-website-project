@@ -36,6 +36,11 @@ const Page = sequelize.define("Page", {
     type: DataTypes.STRING,
     allowNull: true,
   },
+  sidebarLinks: {
+    type: DataTypes.JSON,
+    defaultValue: [],
+    allowNull: true,
+  },
 });
 
 module.exports = Page;

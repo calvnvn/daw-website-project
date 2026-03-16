@@ -23,7 +23,6 @@ const generateUniqueSlug = async (title, slug, id = null) => {
       : { slug: finalSlug };
 
     const existing = await Page.findOne({ where: whereClause });
-
     if (!existing) break;
 
     finalSlug = `${baseSlug}-${counter}`;
@@ -32,12 +31,13 @@ const generateUniqueSlug = async (title, slug, id = null) => {
   return finalSlug;
 };
 
-// Ambil semua page (Untuk pilihan di Admin Panel)
+// 1. Get All Pages (Untuk Sidebar List Admin)
 exports.getAllPages = async (req, res) => {
   try {
     const pages = await Page.findAll({
       order: [["createdAt", "DESC"]],
-      attributes: ["id", "title", "slug"], // Jangan tarik content HTML berat jika hanya untuk list
+      // 🚀 Tetap ringan, jangan tarik content & sidebarLinks untuk list
+      attributes: ["id", "title", "slug"],
     });
     res.status(200).json(pages);
   } catch (error) {
@@ -47,14 +47,12 @@ exports.getAllPages = async (req, res) => {
   }
 };
 
-// Ambil satu page spesifik beserta konten HTML-nya (Untuk Website Publik)
+// 2. Get Page By Slug (Untuk Publik & Load Detail Edit)
 exports.getPageBySlug = async (req, res) => {
   try {
     const { slug } = req.params;
     const page = await Page.findOne({ where: { slug } });
-
     if (!page) return res.status(404).json({ message: "Page not found" });
-
     res.status(200).json(page);
   } catch (error) {
     res
@@ -63,7 +61,7 @@ exports.getPageBySlug = async (req, res) => {
   }
 };
 
-// Admin CRUD
+// 3. Create Page
 exports.createPage = async (req, res) => {
   try {
     const {
@@ -74,13 +72,13 @@ exports.createPage = async (req, res) => {
       templateType,
       content,
       metaDescription,
+      sidebarLinks, // 🚀 1. TANGKAP DARI REQ.BODY
     } = req.body;
 
     const finalSlug = await generateUniqueSlug(title, slug);
     const sanitizedContent = dompurify.sanitize(content);
 
-    // 🚀 SEO AUTOMATION LIMIT BREAK
-    // Jika meta deskripsi kosong, ambil dari konten mentah sebanyak 150 karakter
+    // SEO Automation
     let finalMetaDesc = metaDescription;
     if (!finalMetaDesc || finalMetaDesc.trim() === "") {
       const cleanText = stripHtml(sanitizedContent);
@@ -92,11 +90,13 @@ exports.createPage = async (req, res) => {
       title,
       slug: finalSlug,
       subtitle,
-      heroImage, // State terpisah yang kita bahas tadi
-      templateType,
+      heroImage,
+      templateType: templateType || "split",
       content: sanitizedContent,
       metaDescription: finalMetaDesc,
+      sidebarLinks: sidebarLinks || [], // 🚀 2. SIMPAN KE DATABASE
     });
+
     res
       .status(201)
       .json({ message: "Page created successfully", page: newPage });
@@ -107,6 +107,7 @@ exports.createPage = async (req, res) => {
   }
 };
 
+// 4. Update Page
 exports.updatePage = async (req, res) => {
   try {
     const { id } = req.params;
@@ -118,6 +119,7 @@ exports.updatePage = async (req, res) => {
       templateType,
       content,
       metaDescription,
+      sidebarLinks, // 🚀 1. TANGKAP DARI REQ.BODY (Tadinya Abang lupa bagian ini)
     } = req.body;
 
     const page = await Page.findByPk(id);
@@ -126,20 +128,23 @@ exports.updatePage = async (req, res) => {
     const finalSlug = await generateUniqueSlug(title, slug, id);
     const sanitizedContent = dompurify.sanitize(content);
 
+    // SEO Automation
     let finalMetaDesc = metaDescription;
     if (!finalMetaDesc || finalMetaDesc.trim() === "") {
       const cleanText = stripHtml(sanitizedContent);
       finalMetaDesc =
         cleanText.substring(0, 150) + (cleanText.length > 150 ? "..." : "");
     }
+
     await page.update({
       title,
       slug: finalSlug,
       subtitle,
       heroImage,
-      templateType,
+      templateType: templateType || "split",
       content: sanitizedContent,
       metaDescription: finalMetaDesc,
+      sidebarLinks: sidebarLinks || [], // 🚀 2. UPDATE KE DATABASE
     });
 
     res.status(200).json({ message: "Page updated successfully" });
@@ -150,12 +155,12 @@ exports.updatePage = async (req, res) => {
   }
 };
 
+// 5. Delete Page
 exports.deletePage = async (req, res) => {
   try {
     const { id } = req.params;
     const page = await Page.findByPk(id);
     if (!page) return res.status(404).json({ message: "Page not found" });
-
     await page.destroy();
     res.status(200).json({ message: "Page deleted successfully" });
   } catch (error) {

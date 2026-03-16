@@ -15,6 +15,7 @@ interface PageData {
   heroImage: string | null;
   templateType: "classic" | "modern" | "split";
   metaDescription: string | null;
+  sidebarLinks?: { label: string; url: string }[];
 }
 
 interface TocItem {
@@ -227,7 +228,10 @@ export default function DynamicPage() {
       </div>
     );
   }
-
+  const safeSidebarLinks =
+    typeof pageData?.sidebarLinks === "string"
+      ? JSON.parse(pageData.sidebarLinks)
+      : pageData?.sidebarLinks || [];
   if (isError || !pageData) return null;
 
   return (
@@ -282,7 +286,7 @@ export default function DynamicPage() {
         <div className="container mx-auto px-6 max-w-[90rem]">
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 lg:gap-16 items-start">
             {/* Sidebar Navigation: Table of Contents */}
-            <aside className="hidden lg:block lg:col-span-3 sticky top-32 self-start w-full max-w-[280px]">
+            <aside className="hidden lg:block lg:col-span-3 sticky top-22 self-start w-full max-w-[280px]">
               {toc.length > 0 && (
                 <div className="pr-4 flex flex-col">
                   {/* Header ToC */}
@@ -337,30 +341,42 @@ export default function DynamicPage() {
                   className={`w-full text-left
                     /* 1. KUNCI ANTI OVERFLOW: Gunakan break-words sebagai jaring pengaman */
                     break-words
-                    
+                    [&>*:first-child]:mt-0
                     /* 2. PROSE CORE */ 
                     prose prose-slate prose-lg md:prose-xl max-w-none
+                    prose-p:leading-[1.8] prose-p:text-slate-600 prose-p:mb-10 
+                    prose-p:text-[1.125rem] md:prose-p:text-[1.2rem]
+                    prose-headings:font-serif prose-headings:text-slate-900 
                     
-                    /* 3. PARAGRAPH & MEDIA SAFETY: Pastikan gambar/iframe tidak meluber */
-                    [&_p]:leading-[1.6] [&_p]:text-slate-700 [&_p]:mb-8 [&_p]:text-[1.125rem] 
-                    [&_img]:max-w-full [&_img]:h-auto [&_img]:rounded-2xl
-                    [&_iframe]:max-w-full [&_iframe]:rounded-xl
+                    /* 3. HEADINGS - Serif Elegance */
+                    prose-h2:text-3xl md:prose-h2:text-5xl prose-h2:mt-20 prose-h2:mb-8
+                    prose-headings:tracking-tight prose-headings:font-bold
+                    prose-h3:text-2xl md:prose-h3:text-3xl prose-h3:mt-12
                     
-                    /* 4. JUDUL & DROP CAP */
-                    prose-headings:font-serif prose-headings:text-slate-900 prose-headings:tracking-tight
-                    prose-h2:text-3xl md:prose-h2:text-4xl prose-h2:font-bold prose-h2:mt-16 prose-h2:mb-6 prose-h2:scroll-mt-32
+                    /* 4. MEDIA - Round & Polished */
+                    [&_img]:rounded-[2rem] [&_img]:my-16
+                    [&_iframe]:rounded-[1.5rem] [&_iframe]:shadow-2xl [&_iframe]:my-12
                     
-                    prose-p:first-of-type:first-letter:text-[5.5rem] prose-p:first-of-type:first-letter:font-serif 
-                    prose-p:first-of-type:first-letter:font-black prose-p:first-of-type:first-letter:text-daw-green 
-                    prose-p:first-of-type:first-letter:mr-4 prose-p:first-of-type:first-letter:float-left 
-                    prose-p:first-of-type:first-letter:leading-[0.8] prose-p:first-of-type:first-letter:mt-1`}
+                    /* 5. DROP CAP - The "Vogue" Style */
+                    prose-p:first-of-type:first-letter:text-[6rem] 
+                    prose-p:first-of-type:first-letter:font-serif 
+                    prose-p:first-of-type:first-letter:font-black 
+                    prose-p:first-of-type:first-letter:text-daw-green 
+                    prose-p:first-of-type:first-letter:mr-5 
+                    prose-p:first-of-type:first-letter:float-left 
+                    prose-p:first-of-type:first-letter:leading-[0.7] 
+                    prose-p:first-of-type:first-letter:mt-3
+                    prose-p:first-of-type:first-letter:drop-shadow-sm
+
+                    /* 6. LISTS & BULLETS */
+                    prose-li:marker:text-daw-green prose-li:my-2`}
                   dangerouslySetInnerHTML={{ __html: parsedContent }}
-                />{" "}
+                />
               </div>
             </div>
 
-            {/* Supplementary Widget (Split Template Only) */}
-            {pageData.templateType === "split" ? (
+            {/* Supplementary Widget */}
+            {safeSidebarLinks.length > 0 ? (
               <aside className="hidden lg:block lg:col-span-3 sticky top-32">
                 <div className="p-8 bg-slate-50 rounded-[2rem] border border-slate-100 shadow-sm">
                   <h4 className="text-lg font-serif font-bold text-slate-900 mb-4 flex items-center gap-2">
@@ -368,33 +384,31 @@ export default function DynamicPage() {
                     Topic
                   </h4>
                   <p className="text-xs text-slate-500 leading-relaxed mb-6">
-                    Discover more about DAW Group's commitment to sustainability
-                    and resource development.
+                    Discover more about DAW Group's related initiatives and
+                    resources.
                   </p>
+
+                  {/* Looping Link Dinamis */}
                   <div className="flex flex-col gap-2">
-                    <Link
-                      to="/about"
-                      className="flex items-center justify-between p-4 bg-white rounded-xl border border-slate-200 hover:border-daw-green transition-all group"
-                    >
-                      <span className="text-xs font-bold uppercase tracking-wider text-slate-700">
-                        About Us
-                      </span>
-                      <ChevronRight className="w-4 h-4 text-slate-300 group-hover:text-daw-green" />
-                    </Link>
-                    <Link
-                      to="/businesses"
-                      className="flex items-center justify-between p-4 bg-white rounded-xl border border-slate-200 hover:border-daw-green transition-all group"
-                    >
-                      <span className="text-xs font-bold uppercase tracking-wider text-slate-700">
-                        Our Businesses
-                      </span>
-                      <ChevronRight className="w-4 h-4 text-slate-300 group-hover:text-daw-green" />
-                    </Link>
+                    {safeSidebarLinks.map(
+                      (link: { url: string; label: string }, index: number) => (
+                        <Link
+                          key={index}
+                          to={link.url}
+                          className="flex items-center justify-between p-4 bg-white rounded-xl border border-slate-200 hover:border-daw-green hover:shadow-md transition-all group"
+                        >
+                          <span className="text-xs font-bold uppercase tracking-wider text-slate-700 group-hover:text-daw-green transition-colors">
+                            {link.label}
+                          </span>
+                          <ChevronRight className="w-4 h-4 text-slate-300 group-hover:text-daw-green group-hover:translate-x-1 transition-transform" />
+                        </Link>
+                      ),
+                    )}
                   </div>
                 </div>
               </aside>
             ) : (
-              <div className="hidden lg:block lg:col-span-3" /> /* Ruang kosong penyeimbang */
+              <div className="hidden lg:block lg:col-span-3" />
             )}
           </div>
         </div>
