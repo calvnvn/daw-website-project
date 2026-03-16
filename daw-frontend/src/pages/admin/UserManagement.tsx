@@ -3,12 +3,11 @@ import {
   Search,
   UserPlus,
   Shield,
-  Edit,
   Key,
   ShieldAlert,
   ShieldCheck,
   X,
-  Trash2, // <-- Tambahan icon Trash2 untuk tombol delete
+  Trash2,
 } from "lucide-react";
 
 interface AdminUser {
@@ -48,21 +47,19 @@ export default function UserManagement() {
     fetchUsers();
   }, []);
 
-  // State untuk form tambah user baru
+  // 🚀 FIX: Role otomatis di-set (hardcoded) ke Editor
   const [formData, setFormData] = useState({
     name: "",
     email: "",
-    role: "Editor" as "Superadmin" | "Editor" | "Viewer",
+    role: "Editor",
   });
 
-  // Filter pencarian
   const filteredUsers = users.filter(
     (user) =>
       user.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       user.email.toLowerCase().includes(searchTerm.toLowerCase()),
   );
 
-  // FIX 1: Tambahkan keyword 'async' di sini
   const handleAddUser = async () => {
     if (!formData.name || !formData.email) {
       alert("Please fill in all required fields.");
@@ -83,9 +80,9 @@ export default function UserManagement() {
 
       if (response.ok) {
         alert(`Success! Temp Password: ${result.tempPassword}`);
-        fetchUsers(); // Refresh daftar user
+        fetchUsers();
         setIsModalOpen(false);
-        setFormData({ name: "", email: "", role: "Editor" });
+        setFormData({ name: "", email: "", role: "Editor" }); // Reset form
       } else {
         alert(result.message);
       }
@@ -94,7 +91,6 @@ export default function UserManagement() {
     }
   };
 
-  // Toggle Status (Active/Suspended)
   const toggleUserStatus = async (user: AdminUser) => {
     const newStatus = user.status === "Active" ? "Suspended" : "Active";
     try {
@@ -107,13 +103,12 @@ export default function UserManagement() {
         },
         body: JSON.stringify({ ...user, status: newStatus }),
       });
-      fetchUsers(); // Refresh UI
+      fetchUsers();
     } catch {
       console.error("Update status failed");
     }
   };
 
-  // Delete User (Akan dipakai di tombol Trash2)
   const handleDeleteUser = async (id: string) => {
     if (!confirm("Are you sure you want to delete this user?")) return;
     try {
@@ -129,7 +124,6 @@ export default function UserManagement() {
     }
   };
 
-  // Helper untuk warna Badge Role
   const getRoleBadgeColor = (role: string) => {
     switch (role) {
       case "Superadmin":
@@ -145,14 +139,14 @@ export default function UserManagement() {
 
   return (
     <div className="max-w-6xl mx-auto space-y-6 animate-in fade-in duration-500 pb-12">
-      {/* --- HEADER --- */}
+      {/* HEADER */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white p-6 rounded-xl border border-slate-200 shadow-sm top-0 z-20">
         <div>
           <h1 className="text-2xl font-serif font-bold text-slate-900">
             User Management
           </h1>
           <p className="text-sm text-slate-500 mt-1">
-            Manage admin accounts, roles, and system access permissions.
+            Manage admin accounts and system access permissions.
           </p>
         </div>
         <button
@@ -164,7 +158,7 @@ export default function UserManagement() {
         </button>
       </div>
 
-      {/* --- TOOLBAR (Search) --- */}
+      {/* TOOLBAR */}
       <div className="flex flex-col sm:flex-row gap-4">
         <div className="relative flex-1 max-w-md">
           <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
@@ -180,7 +174,7 @@ export default function UserManagement() {
         </div>
       </div>
 
-      {/* --- DATA TABLE SECTION --- */}
+      {/* DATA TABLE */}
       <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">
@@ -194,7 +188,6 @@ export default function UserManagement() {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {/* FIX 2: Tampilkan Loading State jika sedang fetch data */}
               {isLoading ? (
                 <tr>
                   <td colSpan={5} className="px-6 py-12 text-center">
@@ -255,27 +248,20 @@ export default function UserManagement() {
                     </td>
                     <td className="px-6 py-4 text-right">
                       <div className="flex items-center justify-end gap-3 opacity-0 group-hover:opacity-100 transition-opacity">
-                        {/* 1. Tombol Suspend / Activate */}
+                        {/* Action Buttons */}
                         <div className="relative flex items-center justify-center group/tooltip">
                           <button
                             onClick={() => toggleUserStatus(user)}
-                            className={`p-2 rounded-lg transition-colors ${
-                              user.status === "Active"
-                                ? "text-slate-400 hover:text-amber-600 hover:bg-amber-50"
-                                : "text-slate-400 hover:text-green-600 hover:bg-green-50"
-                            }`}
+                            className={`p-2 rounded-lg transition-colors ${user.status === "Active" ? "text-slate-400 hover:text-amber-600 hover:bg-amber-50" : "text-slate-400 hover:text-green-600 hover:bg-green-50"}`}
                           >
                             <ShieldAlert className="w-4 h-4" />
                           </button>
-                          {/* Tooltip text */}
                           <span className="absolute -top-8 scale-0 transition-all rounded bg-slate-800 p-2 text-xs text-white group-hover/tooltip:scale-100 z-10 whitespace-nowrap shadow-lg">
                             {user.status === "Active"
                               ? "Suspend User"
                               : "Reactivate User"}
                           </span>
                         </div>
-
-                        {/* 2. Tombol Reset Password */}
                         <div className="relative flex items-center justify-center group/tooltip">
                           <button className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors">
                             <Key className="w-4 h-4" />
@@ -284,18 +270,6 @@ export default function UserManagement() {
                             Reset Password
                           </span>
                         </div>
-
-                        {/* 3. Tombol Edit */}
-                        <div className="relative flex items-center justify-center group/tooltip">
-                          <button className="p-2 text-slate-400 hover:text-daw-green hover:bg-green-50 rounded-lg transition-colors">
-                            <Edit className="w-4 h-4" />
-                          </button>
-                          <span className="absolute -top-8 scale-0 transition-all rounded bg-slate-800 p-2 text-xs text-white group-hover/tooltip:scale-100 z-10 whitespace-nowrap shadow-lg">
-                            Edit User Data
-                          </span>
-                        </div>
-
-                        {/* 4. Tombol Delete */}
                         <div className="relative flex items-center justify-center group/tooltip">
                           <button
                             onClick={() => handleDeleteUser(user.id)}
@@ -325,11 +299,10 @@ export default function UserManagement() {
         </div>
       </div>
 
-      {/* --- ADD USER MODAL --- */}
+      {/* ADD USER MODAL */}
       {isModalOpen && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md flex flex-col overflow-hidden animate-in zoom-in-95 duration-200">
-            {/* Modal Header */}
             <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
               <h2 className="text-xl font-serif font-bold text-slate-800 flex items-center gap-2">
                 <UserPlus className="w-5 h-5 text-daw-green" /> Invite User
@@ -342,7 +315,6 @@ export default function UserManagement() {
               </button>
             </div>
 
-            {/* Modal Body */}
             <div className="p-6 space-y-5">
               <div>
                 <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">
@@ -374,29 +346,15 @@ export default function UserManagement() {
                 />
               </div>
 
+              {/* 🚀 FIX: Static Role Display alih-alih Dropdown */}
               <div>
                 <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">
                   System Role
                 </label>
-                <select
-                  className="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-daw-green/20 focus:border-daw-green transition-all cursor-pointer"
-                  value={formData.role}
-                  onChange={(e) =>
-                    setFormData({
-                      ...formData,
-                      role: e.target.value as
-                        | "Superadmin"
-                        | "Editor"
-                        | "Viewer",
-                    })
-                  }
-                >
-                  <option value="Superadmin">Superadmin (Full Access)</option>
-                  <option value="Editor">
-                    Editor (Manage Content & Projects)
-                  </option>
-                  <option value="Viewer">Viewer (Read Only & Inbox)</option>
-                </select>
+                <div className="w-full flex items-center gap-2 px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-slate-500 cursor-not-allowed">
+                  <Shield className="w-4 h-4 text-blue-500" />
+                  <span className="text-sm font-medium">Editor (Default)</span>
+                </div>
                 <p className="text-[11px] text-slate-400 mt-2 flex items-center gap-1.5">
                   <Key className="w-3.5 h-3.5" /> A secure temporary password
                   will be emailed to this user.
@@ -404,7 +362,6 @@ export default function UserManagement() {
               </div>
             </div>
 
-            {/* Modal Footer */}
             <div className="px-6 py-4 border-t border-slate-100 flex items-center justify-end gap-3 bg-slate-50/50">
               <button
                 onClick={() => setIsModalOpen(false)}

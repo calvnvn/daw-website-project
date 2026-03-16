@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Globe, FileText, Map } from "lucide-react";
+import { FileText, Map } from "lucide-react";
 import NavigationBuilder from "./content/NavigationBuilder";
 import PageBuilder from "./content/PageBuilder";
 
@@ -13,9 +13,6 @@ export default function ContentManager() {
       <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
         <div className="p-6 flex flex-col md:flex-row md:items-center justify-between gap-6">
           <div className="flex items-center gap-4">
-            <div className="p-3 bg-daw-green/10 rounded-xl">
-              <Globe className="w-6 h-6 text-daw-green" />
-            </div>
             <div>
               <h1 className="text-2xl font-serif font-bold text-slate-900">
                 Content Manager

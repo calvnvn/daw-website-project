@@ -4,6 +4,7 @@ import { Share2, ChevronRight } from "lucide-react";
 import { Helmet } from "react-helmet-async";
 import DOMPurify from "dompurify";
 import api from "@/lib/api";
+import ScrollReveal from "@/components/ScrollReveal";
 
 // Data structures for Page and Table of Contents
 interface PageData {
@@ -253,7 +254,7 @@ export default function DynamicPage() {
       <ScrollProgressBar />
 
       {/* Hero Section */}
-      <section className="relative h-[85vh] min-h-[600px] flex items-center justify-center overflow-hidden">
+      <section className="relative h-[85vh] flex items-center justify-center overflow-hidden">
         <div
           className="absolute inset-0 bg-cover bg-center transition-transform duration-700 hover:scale-105"
           style={{
@@ -265,19 +266,21 @@ export default function DynamicPage() {
         <div className="absolute inset-0 bg-gradient-to-b from-slate-900/60 via-slate-900/40 to-slate-900/80" />
 
         <div className="relative z-10 text-center px-6 max-w-5xl mt-16 animate-in fade-in slide-in-from-bottom-12 duration-1000">
-          {pageData.subtitle && (
-            <p className="text-emerald-400 font-bold tracking-[0.4em] uppercase text-[11px] mb-6 drop-shadow-md">
-              {pageData.subtitle}
-            </p>
-          )}
-          <h1 className="text-5xl md:text-7xl lg:text-8xl font-serif font-bold text-white mb-10 leading-[1.1] tracking-tight drop-shadow-lg">
-            {pageData.title}
-          </h1>
-          <div className="flex items-center justify-center gap-8">
-            <div className="h-px w-16 bg-white/30" />
-            <div className="w-3 h-3 border-2 border-daw-green rotate-45" />
-            <div className="h-px w-16 bg-white/30" />
-          </div>
+          <ScrollReveal direction="up" delay={0}>
+            {pageData.subtitle && (
+              <p className="text-emerald-400 font-bold tracking-[0.4em] uppercase text-[11px] mb-6 drop-shadow-md">
+                {pageData.subtitle}
+              </p>
+            )}
+            <h1 className="text-5xl md:text-7xl lg:text-8xl font-serif font-bold text-white mb-10 leading-[1.1] tracking-tight drop-shadow-lg">
+              {pageData.title}
+            </h1>
+            <div className="flex items-center justify-center gap-8">
+              <div className="h-px w-16 bg-white/30" />
+              <div className="w-3 h-3 border-2 border-daw-green rotate-45" />
+              <div className="h-px w-16 bg-white/30" />
+            </div>
+          </ScrollReveal>
         </div>
       </section>
 

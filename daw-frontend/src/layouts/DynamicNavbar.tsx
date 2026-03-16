@@ -24,7 +24,6 @@ export default function DynamicNavbar() {
   >({});
 
   const { t, i18n } = useTranslation();
-  const location = useLocation();
 
   // --- FETCH MENU TREE ---
   useEffect(() => {
