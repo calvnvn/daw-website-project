@@ -109,6 +109,25 @@ export default function DynamicPage() {
     // Initialize virtual DOM parser to manipulate content without triggering layout shifts
     const parser = new DOMParser();
     const virtualDoc = parser.parseFromString(cleanHtml, "text/html");
+
+    const walker = document.createTreeWalker(
+      virtualDoc.body,
+      NodeFilter.SHOW_TEXT,
+      null,
+    );
+    let currentNode = walker.nextNode();
+
+    while (currentNode) {
+      if (currentNode.textContent) {
+        // Regex: Cari "-" yang diapit oleh huruf/angka (compound words)
+        // Ubah menjadi Unicode \u2011 (Non-Breaking Hyphen)
+        currentNode.textContent = currentNode.textContent.replace(
+          /(\w)-(\w)/g,
+          "$1\u2011$2",
+        );
+      }
+      currentNode = walker.nextNode();
+    }
     const headings = Array.from(virtualDoc.querySelectorAll("h2, h3"));
 
     const items: TocItem[] = [];
@@ -138,7 +157,7 @@ export default function DynamicPage() {
     setParsedContent(virtualDoc.body.innerHTML);
 
     console.log("Pre-Parsing Selesai, ID Permanen Ditanam.");
-  }, [pageData?.content]); // Hanya jalan jika isi artikel dari database berubah
+  }, [pageData?.content]);
 
   /**
    * Effect 3: Intersection Observer & Deep Linking
@@ -259,38 +278,52 @@ export default function DynamicPage() {
       </section>
 
       {/* Main Layout Container */}
-      <div className="bg-white relative z-20 shadow-[0_-20px_40px_rgba(0,0,0,0.05)] pt-24 pb-32">
+      <div className="bg-white relative z-20 shadow-[0_-20px_40px_rgba(0,0,0,0.05)] pt-18 pb-32">
         <div className="container mx-auto px-6 max-w-[90rem]">
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 lg:gap-16 items-start">
             {/* Sidebar Navigation: Table of Contents */}
-            <aside className="hidden lg:block lg:col-span-3 sticky top-32 self-start">
+            <aside className="hidden lg:block lg:col-span-3 sticky top-32 self-start w-full max-w-[280px]">
               {toc.length > 0 && (
-                <div className="pr-6">
-                  <h4 className="text-[10px] font-black text-slate-400 tracking-[0.2em] mb-6 flex items-center gap-2">
-                    <span className="w-6 h-px bg-slate-300"></span> Daftar Isi
+                <div className="pr-4 flex flex-col">
+                  {/* Header ToC */}
+                  <h4 className="text-[10px] font-black uppercase text-slate-400 tracking-[0.25em] mb-8 flex items-center gap-3">
+                    <span className="w-8 h-[2px] bg-slate-200 rounded-full"></span>
+                    Table of Contents
                   </h4>
 
-                  <nav className="flex flex-col relative border-l-2 border-slate-100 ml-3">
-                    {toc.map((item) => (
-                      <button
-                        key={item.id}
-                        onClick={() => scrollToHeading(item.id)}
-                        className={`text-left text-xs leading-relaxed transition-all duration-300 py-2.5 pr-3 relative
-                          ${item.level === 3 ? "pl-8 opacity-70 text-[11px]" : "pl-5 font-bold tracking-tight"} 
-                          
-                          ${
-                            activeTocId === item.id
-                              ? "text-daw-green scale-105 origin-left"
-                              : "text-slate-400 hover:text-slate-800"
-                          }`}
-                      >
-                        {/* Indikator Titik Aktif yang meluncur di atas garis */}
-                        {activeTocId === item.id && (
-                          <span className="absolute left-[-2px] top-0 bottom-0 w-[2px] bg-daw-green rounded-full shadow-[0_0_8px_rgba(16,185,129,0.6)]" />
-                        )}
-                        {item.text}
-                      </button>
-                    ))}
+                  {/* Navigasi List */}
+                  <nav className="flex flex-col relative border-l-2 border-slate-100 ml-1">
+                    {toc.map((item) => {
+                      const isActive = activeTocId === item.id;
+
+                      return (
+                        <button
+                          key={item.id}
+                          onClick={() => scrollToHeading(item.id)}
+                          title={item.text}
+                          className={`group text-left py-3 pr-4 relative transition-all duration-300 ease-out flex items-center w-full
+                            /* Hierarki Indentasi & Tipografi */
+                            ${item.level === 3 ? "pl-8 text-[12px]" : "pl-5 text-[13px] font-bold"}
+                            
+                            /* Status Aktif vs Inaktif (Tanpa Scale!) */
+                            ${
+                              isActive
+                                ? "text-daw-green bg-gradient-to-r from-daw-green/[0.06] to-transparent"
+                                : "text-slate-400 hover:text-slate-700 hover:bg-slate-50/80"
+                            }`}
+                        >
+                          {/* Indikator Garis Aktif (Neon Glow) */}
+                          {isActive && (
+                            <span className="absolute left-[-2px] top-0 bottom-0 w-[2px] bg-daw-green rounded-full shadow-[0_0_10px_rgba(16,185,129,0.7)]" />
+                          )}
+
+                          {/* Text Constraint */}
+                          <span className="line-clamp-2 leading-[1.4] w-full tracking-tight">
+                            {item.text}
+                          </span>
+                        </button>
+                      );
+                    })}
                   </nav>
                 </div>
               )}
@@ -301,24 +334,26 @@ export default function DynamicPage() {
               <div className="max-w-[720px] mx-auto">
                 <article
                   ref={articleRef}
-                  className={`w-full break-words overflow-wrap-anywhere
-                    prose prose-slate prose-lg md:prose-xl max-w-full
-                    [&_p]:leading-[1.8] [&_p]:text-slate-600 [&_p]:mb-6 [&_p]:text-base md:[&_p]:text-lg
+                  className={`w-full text-left
+                    /* 1. RESET OVERRIDE */
+                    [text-wrap:wrap!important] [word-break:keep-all!important]
                     
-                    /* 🚀 FIX: scroll-mt-32 memastikan judul berhenti tepat di bawah Navbar */
+                    /* 2. PROSE CORE */ 
+                    prose prose-slate prose-lg md:prose-xl max-w-none
+                    
+                    /* 3. PARAGRAPH: Line height 1.6 adalah standar editorial premium */
+                    [&_p]:leading-[1.6] [&_p]:text-slate-700 [&_p]:mb-8 [&_p]:text-[1.125rem] 
+                    
+                    /* 4. JUDUL & DROP CAP */
                     prose-headings:font-serif prose-headings:text-slate-900 prose-headings:tracking-tight
-                    prose-h2:text-3xl prose-h2:mt-16 prose-h2:mb-6 prose-h2:scroll-mt-32
-                    prose-h3:text-2xl prose-h3:mt-10 prose-h3:mb-4 prose-h3:scroll-mt-32
+                    prose-h2:text-3xl md:prose-h2:text-4xl prose-h2:font-bold prose-h2:mt-16 prose-h2:mb-6 prose-h2:scroll-mt-32
                     
-                    prose-p:first-of-type:first-letter:text-6xl prose-p:first-of-type:first-letter:font-serif 
+                    prose-p:first-of-type:first-letter:text-[5.5rem] prose-p:first-of-type:first-letter:font-serif 
                     prose-p:first-of-type:first-letter:font-black prose-p:first-of-type:first-letter:text-daw-green 
-                    prose-p:first-of-type:first-letter:mr-3 prose-p:first-of-type:first-letter:float-left 
-                    prose-p:first-of-type:first-letter:leading-none prose-p:first-of-type:first-letter:mt-1
-                    
-                    [&_img]:max-w-full [&_img]:h-auto [&_img]:rounded-2xl [&_img]:shadow-lg
-                    prose-a:text-daw-green prose-a:font-bold prose-a:no-underline hover:prose-a:underline`}
+                    prose-p:first-of-type:first-letter:mr-4 prose-p:first-of-type:first-letter:float-left 
+                    prose-p:first-of-type:first-letter:leading-[0.8] prose-p:first-of-type:first-letter:mt-1`}
                   dangerouslySetInnerHTML={{ __html: parsedContent }}
-                />
+                />{" "}
               </div>
             </div>
 

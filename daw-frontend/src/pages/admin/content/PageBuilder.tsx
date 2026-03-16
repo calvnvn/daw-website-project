@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import ReactQuill from "react-quill-new";
 import "react-quill-new/dist/quill.snow.css";
 import { toast } from "sonner";
@@ -43,19 +43,64 @@ export default function PageBuilder() {
   });
 
   const [heroImage, setHeroImage] = useState<string>("");
+  const imageHandler = useCallback(() => {
+    const input = document.createElement("input");
+    input.setAttribute("type", "file");
+    input.setAttribute("accept", "image/*");
+    input.click();
 
+    input.onchange = async () => {
+      const file = input.files?.[0];
+      if (file) {
+        const toastId = toast.loading("Optimizing article image...");
+        try {
+          const options = {
+            maxSizeMB: 0.5, //  Kompres sampai di bawah 500KB
+            maxWidthOrHeight: 1200, // Ukuran ideal untuk artikel web
+            useWebWorker: true,
+          };
+          const compressedFile = await imageCompression(file, options);
+          const reader = new FileReader();
+          reader.onloadend = () => {
+            const base64data = reader.result as string;
+
+            // Masukkan ke posisi kursor di Quill
+            const quill = document.querySelector(".ql-editor") as any;
+            if (quill) {
+              const range = window.getSelection()?.getRangeAt(0);
+              const img = document.createElement("img");
+              img.src = base64data;
+              range?.insertNode(img);
+            }
+            toast.success("Image added & optimized!", { id: toastId });
+          };
+          reader.readAsDataURL(compressedFile);
+        } catch (error) {
+          toast.error("Failed to process image", { id: toastId });
+          console.error(error);
+        }
+      }
+    };
+  }, []);
+
+  // 2. Daftarkan imageHandler ke dalam Quill Modules
   const quillModules = useMemo(
     () => ({
-      toolbar: [
-        [{ header: [1, 2, 3, false] }],
-        ["bold", "italic", "underline", "strike", "blockquote"],
-        [{ list: "ordered" }, { list: "bullet" }],
-        [{ align: [] }, { color: [] }, { background: [] }],
-        ["link", "image", "video"],
-        ["clean"],
-      ],
+      toolbar: {
+        container: [
+          [{ header: [1, 2, 3, false] }],
+          ["bold", "italic", "underline", "strike", "blockquote"],
+          [{ list: "ordered" }, { list: "bullet" }],
+          [{ align: [] }, { color: [] }, { background: [] }],
+          ["link", "image", "video"],
+          ["clean"],
+        ],
+        handlers: {
+          image: imageHandler, //  Override fungsi upload gambar bawaan
+        },
+      },
     }),
-    [],
+    [imageHandler],
   );
 
   const fetchPages = async () => {
@@ -360,7 +405,7 @@ export default function PageBuilder() {
                 />
               </div>
 
-              {/* 🚀 AREA DRAG AND DROP HERO IMAGE */}
+              {/* Area Drag n Drop Image */}
               <div className="space-y-2 md:col-span-2 mt-2">
                 <label className="text-xs font-bold text-slate-500 uppercase">
                   Hero Background Image
@@ -500,7 +545,7 @@ export default function PageBuilder() {
               disabled={isSaving}
               className="bg-daw-green hover:bg-[#003b1c] text-white px-10 py-3 rounded-xl font-bold shadow-lg shadow-daw-green/20 flex items-center gap-2 disabled:bg-slate-300"
             >
-              <Save className="w-5 h-5" />{" "}
+              <Save className="w-5 h-5" />
               {isSaving
                 ? "Saving..."
                 : editingId

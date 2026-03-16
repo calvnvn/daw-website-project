@@ -9,17 +9,23 @@
   --font-serif: "Lora", serif;
 }
 
-.prose p:empty::before {
-  content: "";
-  display: inline-block;
-}
-
-.prose br {
-  display: block;
-  content: "";
-  margin-top: 1em;
-}
-
 .prose {
-  hyphens: none;
+  /* 1. Paksa rata kiri tanpa kompromi */
+  text-align: left !important;
+
+  /* 2. Matikan algoritma 'pretty' yang bikin newline aneh */
+  text-wrap: wrap !important;
+
+  /* 3. KUNCI: Jangan putus baris di tanda hubung (-) atau tengah kata */
+  word-break: keep-all !important;
+  overflow-wrap: break-word !important;
+
+  /* 4. Bersihkan perilaku sisa browser */
+  hyphens: none !important;
+  line-break: auto !important;
+}
+
+/* Pastikan paragraf tidak punya spasi aneh */
+.prose p {
+  white-space: normal !important;
 }
