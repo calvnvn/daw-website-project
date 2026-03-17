@@ -1,18 +1,25 @@
 import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { ArrowRight, ImageIcon } from "lucide-react";
+import api from "@/lib/api";
+import { getCleanImageUrl } from "@/lib/utils";
 
 export default function PublicProjects() {
   const [projects, setProjects] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    // Panggil API Publik yang tidak butuh token
-    fetch("http://localhost:5000/api/projects/public")
-      .then((res) => res.json())
-      .then((data) => setProjects(data))
-      .catch((err) => console.error(err))
-      .finally(() => setIsLoading(false));
+    const fetchProjects = async () => {
+      try {
+        const response = await api.get("/projects/public");
+        setProjects(response.data);
+      } catch (err) {
+        console.error("Gagal memuat projects:", err);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    fetchProjects();
   }, []);
 
   return (
@@ -47,7 +54,7 @@ export default function PublicProjects() {
               <div className="aspect-[4/3] w-full bg-slate-100 overflow-hidden relative">
                 {project.cover_image ? (
                   <img
-                    src={`http://localhost:5000/uploads/${project.cover_image}`}
+                    src={getCleanImageUrl(project.cover_image)}
                     alt={project.title}
                     className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                   />

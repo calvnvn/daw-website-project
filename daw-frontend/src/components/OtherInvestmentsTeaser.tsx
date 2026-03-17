@@ -3,15 +3,12 @@ import { Link } from "react-router-dom";
 import { ArrowRight } from "lucide-react";
 import { useInvestments } from "@/contexts/InvestmentContext";
 import ScrollReveal from "./ScrollReveal";
+import { getCleanImageUrl } from "@/lib/utils";
 
 export default function OtherInvestmentsTeaser() {
   const { t } = useTranslation();
 
   const { settings, companies } = useInvestments();
-  const getLogoUrl = (url: string | null) => {
-    if (!url) return "";
-    return `http://localhost:5000${url}`;
-  };
   const displayCompanies = companies.slice(0, 6);
 
   return (
@@ -61,7 +58,7 @@ export default function OtherInvestmentsTeaser() {
                 >
                   <div className="group aspect-[4/3] bg-white/[0.01] backdrop-blur-md border border-white/10 rounded-2xl flex items-center justify-center p-6 sm:p-8 hover:bg-white/[0.6] hover:border-white/20 transition-all duration-500 hover:-translate-y-2 hover:shadow-[0_10px_30px_rgba(0,166,81,0.1)] h-full">
                     <img
-                      src={getLogoUrl(company.logoUrl)} // 👈 Panggil fungsi getLogoUrl
+                      src={getCleanImageUrl(company.logoUrl)}
                       alt={company.name}
                       className="max-h-full max-w-full object-contain opacity-50 grayscale group-hover:grayscale-0 group-hover:opacity-100 transition-all duration-500 transform group-hover:scale-110 brightness-0 invert group-hover:brightness-100 group-hover:invert-0"
                       onError={(e) => {

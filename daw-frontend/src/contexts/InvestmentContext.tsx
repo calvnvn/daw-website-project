@@ -46,7 +46,6 @@ export function InvestmentProvider({ children }: { children: ReactNode }) {
 
   const fetchData = async () => {
     try {
-      // ✅ FIXED: Tanpa localhost
       const res = await api.get("/investment");
       setSettings(res.data.settings);
       setCompanies(res.data.companies);

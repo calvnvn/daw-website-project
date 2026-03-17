@@ -13,8 +13,9 @@ const verifyToken = (req, res, next) => {
       token = token.slice(7, token.length);
     }
 
-    // Gunakan kunci dari .env, kalau tidak ada pakai fallback agar tidak crash
-    const secretKey = process.env.JWT_SECRET || "rahasia_daw_2026";
+    const secretKey = process.env.JWT_SECRET;
+    if (!secretKey)
+      throw new Error("FATAL: JWT_SECRET is not defined in .env!");
 
     jwt.verify(token, secretKey, (err, decoded) => {
       if (err) {

@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 import ScrollReveal from "@/components/ScrollReveal";
 import ProjectDetailSkeleton from "@/components/ProjectDetailSkeleton";
+import api, { BASE_UPLOAD_URL } from "@/lib/api";
 
 // 1. Interface untuk menghilangkan warning 'any'
 interface ProjectData {
@@ -25,11 +26,18 @@ interface ProjectData {
   views: number;
 }
 
+// Image Normalization
+const getCleanImageUrl = (path: string | null) => {
+  if (!path) return "";
+  const cleanPath = path.replace("/uploads", "");
+  return `${BASE_UPLOAD_URL}${cleanPath}`;
+};
+
 export default function ProjectDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
 
-  // 2. Menggunakan interface yang sudah dikunci bentuknya
+  // Menggunakan interface yang sudah dikunci bentuknya
   const [project, setProject] = useState<ProjectData | null>(null);
   const [otherProjects, setOtherProjects] = useState<ProjectData[]>([]);
   const [galleryUrls, setGalleryUrls] = useState<string[]>([]);
@@ -59,46 +67,40 @@ export default function ProjectDetail() {
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
 
-  // 3. Menghindari "Calling State Synchronously"
+  // Menghindari "Calling State Synchronously"
   useEffect(() => {
     if (hasFetched.current === id) return;
 
-    // 2. Set loading dan scroll secara asinkron ringan (Cegah Cascading Render)
-    // Menggunakan setTimeout 0 melempar eksekusi ke antrean berikutnya,
-    // sehingga React menyelesaikan render saat ini dulu.
     const preparePage = setTimeout(() => {
       setIsLoading(true);
       window.scrollTo({ top: 0, behavior: "smooth" });
       setSelectedImageIndex(null);
     }, 0);
 
-    // Tandai bahwa ID ini sedang diproses
     hasFetched.current = id || null;
 
-    // 3. Fetch Data Utama
+    // Fetch Data Utama
     const fetchData = async () => {
       try {
-        const res = await fetch(
-          `http://localhost:5000/api/projects/public/${id}`,
-        );
-        if (!res.ok) throw new Error("Project not found");
+        const [projectRes, otherProjectsRes] = await Promise.all([
+          api.get(`/projects/public/${id}`),
+          api.get("/projects/public"),
+        ]);
 
-        const data: ProjectData = await res.json();
+        // Setup Project Utama
+        const data: ProjectData = projectRes.data;
         setProject(data);
 
+        // Setup Gallery dengan Path Normalization
         if (data.gallery) {
           const parsed = JSON.parse(data.gallery);
-          setGalleryUrls(
-            parsed.map((img: string) => `http://localhost:5000/uploads/${img}`),
-          );
+          setGalleryUrls(parsed.map((img: string) => getCleanImageUrl(img)));
         } else {
           setGalleryUrls([]);
         }
 
-        const resOther = await fetch(
-          `http://localhost:5000/api/projects/public`,
-        );
-        const otherData: ProjectData[] = await resOther.json();
+        // Setup Other Projects
+        const otherData: ProjectData[] = otherProjectsRes.data;
         const filtered = otherData.filter((p) => p.id !== id).slice(0, 4);
         setOtherProjects(filtered);
       } catch (err) {
@@ -149,10 +151,7 @@ export default function ProjectDetail() {
       </div>
     );
   }
-
-  const heroImage = project.cover_image
-    ? `http://localhost:5000/uploads/${project.cover_image}`
-    : "";
+  const heroImage = getCleanImageUrl(project.cover_image);
 
   return (
     <>
@@ -346,7 +345,7 @@ export default function ProjectDetail() {
                         <div className="w-16 h-16 md:w-20 md:h-20 rounded-xl overflow-hidden shrink-0 bg-white border border-slate-100 shadow-sm flex items-center justify-center relative">
                           {other.cover_image ? (
                             <img
-                              src={`http://localhost:5000/uploads/${other.cover_image}`}
+                              src={getCleanImageUrl(other.cover_image)}
                               alt={other.title}
                               className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
                             />

@@ -3,6 +3,8 @@ import { useTranslation } from "react-i18next";
 import { ArrowRight, ImageIcon } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import ScrollReveal from "./ScrollReveal";
+import api from "@/lib/api";
+import { getCleanImageUrl } from "@/lib/utils";
 
 type FilterOption = "All" | "Resources" | "Energy";
 
@@ -31,7 +33,6 @@ export default function BusinessGrid({
   const [projects, setProjects] = useState<ProjectData[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
-  // 👇 2. Pasang tipe data di state
   const [activeFilter, setActiveFilter] = useState<FilterOption>(filter);
   const [prevFilter, setPrevFilter] = useState<FilterOption>(filter);
 
@@ -43,7 +44,6 @@ export default function BusinessGrid({
   const [underlineStyle, setUnderlineStyle] = useState({ left: 0, width: 0 });
   const tabsRef = useRef<(HTMLButtonElement | null)[]>([]);
 
-  // 👇 3. Pasang tipe data di array useMemo
   const filters = useMemo<{ label: string; value: FilterOption }[]>(
     () => [
       { label: t("business.filterAll", "All Projects"), value: "All" },
@@ -54,11 +54,21 @@ export default function BusinessGrid({
   );
 
   useEffect(() => {
-    fetch("http://localhost:5000/api/projects/public")
-      .then((res) => res.json())
-      .then((data: ProjectData[]) => setProjects(data))
-      .catch((err) => console.error("Gagal memuat projects:", err))
-      .finally(() => setIsLoading(false));
+    const controller = new AbortController();
+
+    const fetchProjects = async () => {
+      try {
+        const response = await api.get("/projects/public");
+        setProjects(response.data);
+      } catch (err) {
+        console.error("Gagal memuat projects:", err);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchProjects();
+    return () => controller.abort();
   }, []);
 
   useEffect(() => {
@@ -126,17 +136,17 @@ export default function BusinessGrid({
         )}
 
         {isLoading ? (
-          <div className="text-center py-20 text-slate-500">
-            Loading projects...
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+            {[1, 2, 3].map((i) => (
+              <div
+                key={i}
+                className="w-full aspect-[3/2] bg-slate-100 animate-pulse rounded-lg"
+              />
+            ))}
           </div>
-        ) : (
+        ) : filteredProjects.length > 0 ? (
           <div className="flex flex-wrap justify-center gap-8">
             {filteredProjects.map((project, index) => {
-              // 👇 Excerpt
-              <p className="text-slate-500 text-[14px] font-light leading-relaxed mb-6 flex-1 line-clamp-3">
-                {project.excerpt || "No description available."}
-              </p>;
-
               return (
                 <ScrollReveal
                   key={project.id}
@@ -155,7 +165,7 @@ export default function BusinessGrid({
                     <div className="relative w-full aspect-[3/2] overflow-hidden bg-slate-100 flex items-center justify-center">
                       {project.cover_image ? (
                         <img
-                          src={`http://localhost:5000/uploads/${project.cover_image}`}
+                          src={getCleanImageUrl(project.cover_image)}
                           alt={project.title}
                           className="w-full h-full object-cover transition-transform duration-[800ms] ease-out group-hover:scale-105"
                         />
@@ -171,9 +181,11 @@ export default function BusinessGrid({
                       <h3 className="text-xl font-serif text-slate-900 mb-3 leading-snug group-hover:text-daw-green transition-colors duration-300 line-clamp-2">
                         {project.title}
                       </h3>
+
                       <p className="text-slate-500 text-[14px] font-light leading-relaxed mb-6 flex-1 line-clamp-3">
-                        {project.excerpt}
+                        {project.excerpt || "No description available."}
                       </p>
+
                       <div className="mt-auto inline-flex items-center gap-2 text-daw-green font-semibold text-[14px]">
                         <span>{t("business.readMore", "Read More")}</span>
                         <ArrowRight className="w-4 h-4 transform group-hover:translate-x-1.5 transition-transform duration-300" />
@@ -183,6 +195,13 @@ export default function BusinessGrid({
                 </ScrollReveal>
               );
             })}
+          </div>
+        ) : (
+          <div className="text-center py-20">
+            <ImageIcon className="w-12 h-12 text-slate-200 mx-auto mb-4" />
+            <p className="text-slate-500 italic">
+              No projects found in this category.
+            </p>
           </div>
         )}
       </div>

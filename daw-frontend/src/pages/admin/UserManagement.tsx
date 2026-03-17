@@ -62,8 +62,7 @@ export default function UserManagement() {
 
   const handleAddUser = async () => {
     if (!formData.name || !formData.email) {
-      alert("Please fill in all required fields.");
-      return;
+      toast.error("Please fill in all required fields.");
     }
     const loadingToast = toast.loading("Sending invitation...");
     try {

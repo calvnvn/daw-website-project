@@ -1,6 +1,7 @@
 import { useTranslation } from "react-i18next";
 import ScrollReveal from "../ScrollReveal";
 import { useAbout } from "@/contexts/AboutContext";
+import { getCleanImageUrl } from "@/lib/utils";
 
 export default function Management() {
   const { t } = useTranslation();
@@ -11,11 +12,6 @@ export default function Management() {
     const parts = name.split(" ");
     if (parts.length >= 2) return (parts[0][0] + parts[1][0]).toUpperCase();
     return name.substring(0, 2).toUpperCase();
-  };
-
-  const getImageUrl = (url: string | null) => {
-    if (!url) return "";
-    return `http://localhost:5000${url}`;
   };
 
   if (isLoading) {
@@ -63,7 +59,7 @@ export default function Management() {
                 <div className="md:col-span-5 lg:col-span-4">
                   <div className="aspect-[3/4] overflow-hidden rounded-xl border border-slate-100 shadow-lg group">
                     <img
-                      src={getImageUrl(chairman.photoUrl)}
+                      src={getCleanImageUrl(chairman.photoUrl)}
                       alt={chairman.name}
                       className="w-full h-full object-cover grayscale transition-all duration-700 transform group-hover:scale-105 group-hover:grayscale-0"
                     />
@@ -112,7 +108,7 @@ export default function Management() {
                     <div className="w-20 h-20 mb-8 rounded-full overflow-hidden border-[3px] border-slate-50 shadow-md flex-shrink-0 bg-daw-green/5 flex items-center justify-center relative">
                       {person.photoUrl ? (
                         <img
-                          src={getImageUrl(person.photoUrl)}
+                          src={getCleanImageUrl(person.photoUrl)}
                           alt={person.name}
                           className="w-full h-full object-cover grayscale group-hover:grayscale-0 transition-all duration-500"
                         />
@@ -164,7 +160,7 @@ export default function Management() {
                     <div className="w-16 h-16 mb-6 rounded-2xl overflow-hidden shadow-sm flex-shrink-0 bg-white border border-slate-100 flex items-center justify-center transform group-hover:-rotate-3 transition-transform duration-300">
                       {person.photoUrl ? (
                         <img
-                          src={getImageUrl(person.photoUrl)}
+                          src={getCleanImageUrl(person.photoUrl)}
                           alt={person.name}
                           className="w-full h-full object-cover grayscale group-hover:grayscale-0 transition-all duration-500"
                         />

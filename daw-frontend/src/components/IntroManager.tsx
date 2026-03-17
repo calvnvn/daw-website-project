@@ -2,41 +2,35 @@ import { useState, useEffect } from "react";
 import { useHome } from "@/contexts/HomeContext";
 import { Save, Lock, Unlock } from "lucide-react";
 import { toast } from "sonner";
+import api from "@/lib/api";
 
 export default function IntroManager() {
   const { settings: initialSettings, refreshData } = useHome();
   const [settings, setSettings] = useState({
-    introHeadline: "",
-    introBody: "",
+    introHeadline: initialSettings?.introHeadline || "",
+    introBody: initialSettings?.introBody || "",
   });
   const [isEditing, setIsEditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
-    if (initialSettings) setSettings(initialSettings);
+    if (initialSettings) {
+      setSettings({
+        introHeadline: initialSettings.introHeadline || "",
+        introBody: initialSettings.introBody || "",
+      });
+    }
   }, [initialSettings]);
 
   const handleSave = async () => {
     setIsSaving(true);
     const loadingToast = toast.loading("Saving intro text...");
-    const token = localStorage.getItem("daw_token");
     try {
-      const res = await fetch("http://localhost:5000/api/homepage/settings", {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify(settings),
-      });
+      await api.put("/homepage/settings", settings);
 
-      if (res.ok) {
-        await refreshData();
-        toast.success("Intro text saved successfully!", { id: loadingToast });
-        setIsEditing(false);
-      } else {
-        toast.error("Failed to save intro text.", { id: loadingToast });
-      }
+      await refreshData();
+      toast.success("Intro text saved successfully!", { id: loadingToast });
+      setIsEditing(false);
     } catch (error) {
       console.error(error);
       toast.error("Error saving data.", { id: loadingToast });

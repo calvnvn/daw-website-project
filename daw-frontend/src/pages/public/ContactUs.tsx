@@ -17,12 +17,13 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { useSettings } from "@/contexts/SettingsContext";
+import api from "@/lib/api";
+import { toast } from "sonner";
 
 export default function ContactUs() {
   const { t } = useTranslation();
   const [isSuccess, setIsSuccess] = useState(false);
   const { settings, isLoading } = useSettings();
-
   // Scroll Progress Logic
   const [scrollProgress, setScrollProgress] = useState(0);
 
@@ -67,40 +68,32 @@ export default function ContactUs() {
   } = useForm<ContactFormValues>({
     resolver: zodResolver(contactSchema),
     defaultValues: {
-      subject: "", // Default kosong agar user dipaksa memilih
+      subject: "",
     },
   });
 
   const onSubmit = async (data: ContactFormValues) => {
     try {
-      // 2. UPDATE PAYLOAD: Kirim company dan subject dinamis dari form
-      const response = await fetch("http://localhost:5000/api/inquiries", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name: data.name,
-          email: data.email,
-          phone: data.phone,
-          message: data.message,
-          company: data.company || "",
-          subject: data.subject,
-        }),
+      await api.post("/inquiries", {
+        ...data,
+        company: data.company || "", // Menjamin string kosong jika undefined
       });
 
-      if (!response.ok) throw new Error("Failed to send message");
-
       setIsSuccess(true);
-      reset();
+      reset(); // Bersihkan form
+      toast.success(
+        t("contactPage.form.success", "Message sent successfully!"),
+      );
+      // Reset status sukses setelah 5 detik agar notifikasi hilang
       setTimeout(() => setIsSuccess(false), 5000);
-    } catch (error) {
-      console.error(error);
-      alert("An error occurred while sending the message. Please try again.");
+    } catch (error: any) {
+      console.error("Submission error:", error);
+      // Feedback error yang lebih informatif
+      toast.error(
+        error.response?.data?.message ||
+          "An error occurred while sending the message. Please try again.",
+      );
     }
-  };
-
-  const contactData = {
-    phone: "+62 21 2966 1956",
-    website: "www.daw.co.id",
   };
 
   if (isLoading) {
@@ -215,10 +208,10 @@ export default function ContactUs() {
                           {t("contactPage.info.phoneTitle", "Phone")}
                         </h4>
                         <a
-                          href={`tel:${contactData.phone.replace(/\s+/g, "")}`}
+                          href={`tel:${settings?.phone ? settings.phone.replace(/\s+/g, "") : ""}`}
                           className="font-sans text-slate-600 text-sm hover:text-daw-green transition-colors"
                         >
-                          {settings?.phone}
+                          {settings?.phone || "+62 21 2966 1956"}
                         </a>
                       </div>
                     </div>
@@ -232,12 +225,16 @@ export default function ContactUs() {
                           {t("contactPage.info.websiteTitle", "Website")}
                         </h4>
                         <a
-                          href={`https://${contactData.website}`}
+                          href={
+                            settings?.website?.startsWith("http")
+                              ? settings.website
+                              : `https://${settings?.website || "www.daw.co.id"}`
+                          }
                           target="_blank"
                           rel="noopener noreferrer"
                           className="font-sans text-slate-600 text-sm hover:text-daw-green transition-colors"
                         >
-                          {settings?.website}
+                          {settings?.website || "www.daw.co.id"}
                         </a>
                       </div>
                     </div>

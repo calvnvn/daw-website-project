@@ -9,11 +9,11 @@ import {
 } from "lucide-react";
 import ScrollReveal from "@/components/ScrollReveal";
 import { useInvestments } from "@/contexts/InvestmentContext";
+import { getCleanImageUrl } from "@/lib/utils";
 
 export default function InvestmentsSection() {
   const { t } = useTranslation();
   const [hoveredCategory, setHoveredCategory] = useState<string | null>(null);
-
   const { settings, companies, isLoading } = useInvestments();
 
   const categories = [
@@ -23,22 +23,20 @@ export default function InvestmentsSection() {
     { id: "edu", icon: <GraduationCap className="w-5 h-5" />, key: "edu" },
   ];
 
-  const getLogoUrl = (url: string | null) => {
-    if (!url) return ""; // Bisa taruh gambar placeholder di sini
-    return `http://localhost:5000${url}`;
-  };
-
   if (isLoading)
     return (
-      <div className="h-96 flex justify-center items-center text-white">
-        Loading ecosystem...
+      <div className="h-96 flex flex-col justify-center items-center text-white gap-6">
+        <div className="w-12 h-12 border-4 border-emerald-500/20 border-t-emerald-500 rounded-full animate-spin"></div>
+        <p className="animate-pulse tracking-[0.3em] text-[10px] uppercase font-bold text-emerald-500/60">
+          Syncing Ecosystem
+        </p>
       </div>
     );
 
   return (
     <div className="relative w-full py-10">
       {/* --- BACKGROUND EFFECTS --- */}
-      {/* Efek jaring/grid halus khas teknologi */}
+      {/* Efek jaring/grid halus */}
       <div className="absolute inset-0 bg-[linear-gradient(to_right,#ffffff0a_1px,transparent_1px),linear-gradient(to_bottom,#ffffff0a_1px,transparent_1px)] bg-[size:4rem_4rem] [mask-image:radial-gradient(ellipse_60%_50%_at_50%_0%,#000_70%,transparent_100%)] pointer-events-none"></div>
       {/* Orb cahaya hijau samar di tengah */}
       <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-daw-green/20 rounded-full blur-[120px] pointer-events-none"></div>
@@ -136,9 +134,12 @@ export default function InvestmentsSection() {
                   >
                     <div className="w-16 h-16 mb-3 rounded-full bg-slate-300 flex items-center justify-center text-slate-500 text-xs text-center border border-white/10 font-bold overflow-hidden">
                       <img
-                        src={getLogoUrl(company.logoUrl)}
+                        src={getCleanImageUrl(company.logoUrl)}
                         alt={company.name}
                         className="w-full h-full object-contain p-2"
+                        onError={(e) => {
+                          e.currentTarget.style.display = "none";
+                        }}
                       />
                     </div>
 

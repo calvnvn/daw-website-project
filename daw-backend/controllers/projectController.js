@@ -29,7 +29,6 @@ exports.createProject = async (req, res) => {
       status,
       seo_title,
       meta_description,
-      existing_gallery,
     } = req.body;
     console.log("--- DATA MASUK ---");
     console.log("Judul:", title);
@@ -48,40 +47,26 @@ exports.createProject = async (req, res) => {
     const galleryJsonString = JSON.stringify(galleryImagesNames);
 
     // INSERT Raw Query
-    const query = `
-  INSERT INTO Projects (id, title, excerpt, content, category, status, author, cover_image, gallery, views, createdAt, updatedAt) 
-  VALUES (UUID(), :title, :excerpt, :content, :category, :status, :author, :cover_image, :gallery, 0, NOW(), NOW())
-`;
+    const insertQuery = `
+      INSERT INTO Projects (id, title, excerpt, content, category, status, cover_image, gallery, seo_title, meta_description, views, createdAt, updatedAt) 
+      VALUES (UUID(), :title, :excerpt, :content, :category, :status, :cover_image, :gallery, :seo_title, :meta_description, 0, NOW(), NOW())
+    `;
 
-    await sequelize.query(
-      `UPDATE Projects SET 
-      title = :title, 
-      excerpt = :excerpt, 
-      content = :content, 
-      category = :category,  -- 👈 Pastikan ini ada
-      status = :status, 
-      cover_image = :cover_image, 
-      gallery = :gallery,
-      seo_title = :seo_title,
-      meta_description = :meta_description,
-      updatedAt = NOW()
-    WHERE id = :id`,
-      {
-        replacements: {
-          id,
-          title,
-          excerpt: excerpt || "",
-          content,
-          category,
-          status,
-          cover_image: finalCover,
-          gallery: JSON.stringify(finalGallery),
-          seo_title: seo_title || title,
-          meta_description: meta_description || excerpt,
-        },
-        type: sequelize.QueryTypes.UPDATE,
+    await sequelize.query(insertQuery, {
+      replacements: {
+        title,
+        excerpt: excerpt || "",
+        content,
+        category,
+        status,
+        cover_image: coverImageName, // Gunakan variabel yang benar
+        gallery: JSON.stringify(galleryImagesNames), // Gunakan variabel yang benar
+        seo_title: seo_title || title,
+        meta_description: meta_description || excerpt,
       },
-    );
+      type: sequelize.QueryTypes.INSERT,
+    });
+
     res
       .status(201)
       .json({ message: "Project created successfully with images!" });
@@ -94,11 +79,10 @@ exports.createProject = async (req, res) => {
 exports.uploadInlineImage = async (req, res) => {
   try {
     if (!req.file) {
-      return res.status(400).json({ message: "No imiage file provided." });
+      return res.status(400).json({ message: "No image file provided." });
     }
-    const protocol = req.protocol; // http
-    const host = req.get("host"); // localhost:5000
-    const fileUrl = `${protocol}://${host}/uploads/${req.file.filename}`;
+
+    const fileUrl = `/uploads/${req.file.filename}`;
 
     res.status(200).json({
       message: "Image uploaded succesfully",
@@ -123,7 +107,7 @@ exports.deleteProject = async (req, res) => {
 
     const deleteFile = (fileName) => {
       if (!fileName) return;
-      const filePath = path.join(__dirname, "../uploads", fileName);
+      const filePath = path.join(process.cwd(), "public", "uploads", fileName);
       if (fs.existsSync(filePath)) {
         fs.unlinkSync(filePath);
       }
@@ -200,8 +184,9 @@ exports.updateProject = async (req, res) => {
     if (req.files && req.files["cover_image"]) {
       // Hapus file fisik lama jika ada
       const oldPath = path.join(
-        __dirname,
-        "../uploads",
+        process.cwd(),
+        "public",
+        "uploads",
         oldProject.cover_image,
       );
       if (oldProject.cover_image && fs.existsSync(oldPath))
@@ -220,7 +205,9 @@ exports.updateProject = async (req, res) => {
         category = :category, 
         status = :status, 
         cover_image = :cover_image,
-        gallery = :gallery, 
+        gallery = :gallery,
+        seo_title = :seo_title,              
+        meta_description = :meta_description,
         updatedAt = NOW()
       WHERE id = :id
     `;
@@ -235,10 +222,12 @@ exports.updateProject = async (req, res) => {
         status: status || oldProject.status,
         cover_image: coverImageName,
         gallery: JSON.stringify(finalGallery),
+        seo_title: req.body.seo_title || oldProject.seo_title, // 🚀 FIXED
+        meta_description:
+          req.body.meta_description || oldProject.meta_description, // 🚀 FIXED
       },
       type: sequelize.QueryTypes.UPDATE,
     });
-
     res.status(200).json({ message: "Project berhasil diupdate!" });
   } catch (error) {
     console.error("Error UPDATE Project:", error);
