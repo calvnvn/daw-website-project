@@ -23,7 +23,8 @@ import ForceChangePassword from "./pages/admin/ForceChangePassword";
 import ManageBusinesses from "./pages/admin/ManageBusinesses";
 import ContentManager from "./pages/admin/ContentManager";
 import DynamicPage from "./pages/public/DynamicPage";
-
+import ForgotPassword from "./pages/ForgotPassword";
+import ResetPassword from "./pages/ResetPassword";
 function App() {
   return (
     <>
@@ -51,6 +52,8 @@ function App() {
           path="/force-change-password"
           element={<ForceChangePassword />}
         />
+        <Route path="/forgot-password" element={<ForgotPassword />} />
+        <Route path="/reset-password/:token" element={<ResetPassword />} />
         {/* Admin Route */}
         <Route element={<ProtectedRoute />}>
           <Route path="/admin" element={<AdminLayout />}>

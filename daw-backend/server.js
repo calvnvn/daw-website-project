@@ -78,7 +78,7 @@ app.use("/uploads", express.static(uploadPath));
 
 // ROUTER REGISTRATION
 
-app.use("/api/auth", authRoutes); // Duplicate dihapus
+app.use("/api/auth", authRoutes);
 app.use("/api/users", userRoutes);
 app.use("/api/projects", projectRoutes);
 app.use("/api/settings", settingsRoutes);

@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import logoDaw from "@/assets/logo-daw.png";
 import bgImage from "@/assets/hero-bg.jpg";
 import api from "@/lib/api";
+import { Link } from "react-router-dom";
 
 export default function Login() {
   const navigate = useNavigate();
@@ -120,6 +121,7 @@ export default function Login() {
                 placeholder="••••••••"
                 className="w-full pl-11 pr-12 py-3 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-daw-green/20 focus:border-daw-green text-slate-900 transition-all font-medium font-sans tracking-wide text-sm"
               />
+
               <button
                 type="button"
                 onClick={() => setShowPassword(!showPassword)}
@@ -132,6 +134,14 @@ export default function Login() {
                 )}
               </button>
             </div>
+          </div>
+          <div className="flex justify-end mb-4">
+            <Link
+              to="/forgot-password"
+              className="text-xs font-bold text-emerald-700 hover:text-emerald-800 transition-colors"
+            >
+              Forgot Password?
+            </Link>
           </div>
 
           <div className="pt-4">
