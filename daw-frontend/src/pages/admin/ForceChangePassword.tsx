@@ -1,7 +1,8 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Key, Lock, Eye, EyeOff, ShieldCheck } from "lucide-react";
-import { toast } from "sonner"; // Pastikan sonner/react-hot-toast sudah sesuai dengan yang kamu pakai
+import { toast } from "sonner";
+import api from "@/lib/api";
 
 export default function ForceChangePassword() {
   const navigate = useNavigate();
@@ -29,36 +30,18 @@ export default function ForceChangePassword() {
 
     setIsLoading(true);
     try {
-      const token = localStorage.getItem("daw_token");
-
-      const response = await fetch(
-        "http://localhost:5000/api/auth/force-change-password",
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`, // Bawa token login tadi!
-          },
-          body: JSON.stringify({ newPassword }),
-        },
-      );
-
-      const data = await response.json();
-
-      if (response.ok) {
-        toast.success("Password Updated!", {
-          description: data.message || "Your account is now fully secured.",
-        });
-        // Selesai ganti password, arahkan ke Dashboard Admin
-        navigate("/admin");
-      } else {
-        toast.error("Update Failed", {
-          description: data.message || "Failed to update password.",
-        });
-      }
-    } catch (error) {
-      toast.error("Server Error", {
-        description: "Connection to backend failed. Please try again later.",
+      const response = await api.post("/auth/force-change-password", {
+        newPassword,
+      });
+      toast.success("Password Updated!", {
+        description:
+          response.data.message || "Your account is now fully secured.",
+      });
+      navigate("/admin");
+    } catch (error: any) {
+      toast.error("Update Failed", {
+        description:
+          error.response?.data?.message || "Connection to backend failed.",
       });
     } finally {
       setIsLoading(false);

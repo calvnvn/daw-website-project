@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { useInvestments } from "@/contexts/InvestmentContext";
+import api, { BASE_UPLOAD_URL } from "@/lib/api";
 
 interface LocalAffiliate {
   id: number | string;
@@ -61,16 +62,7 @@ export default function InvestmentsManager() {
   // LOGIKA TAB 1: CONTENT
   // ==========================================
   const handleSaveSettings = async () => {
-    const token = localStorage.getItem("daw_token");
-    const res = await fetch("http://localhost:5000/api/investment/settings", {
-      method: "PUT",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${token}`,
-      },
-      body: JSON.stringify(pageContent),
-    });
-    if (!res.ok) throw new Error("Failed to save text settings");
+    await api.put("/investment/settings", pageContent);
   };
 
   // ==========================================
@@ -104,18 +96,9 @@ export default function InvestmentsManager() {
 
     // Jika data lama, hapus dari Database
     try {
-      const token = localStorage.getItem("daw_token");
-      const res = await fetch(
-        `http://localhost:5000/api/investment/affiliate/${id}`,
-        {
-          method: "DELETE",
-          headers: { Authorization: `Bearer ${token}` },
-        },
-      );
-      if (res.ok) {
-        toast.success("Company deleted permanently!");
-        refreshData();
-      }
+      await api.delete(`/investment/affiliate/${id}`);
+      toast.success("Deleted permanently!");
+      refreshData();
     } catch (err) {
       toast.error("Failed to delete company.");
       console.log(err);
@@ -137,11 +120,8 @@ export default function InvestmentsManager() {
   };
 
   const handleSaveCompanies = async () => {
-    const token = localStorage.getItem("daw_token");
-
     // Looping semua perusahaan di layar, simpan satu per satu (Mass Save)
     const promises = localCompanies.map(async (comp) => {
-      // Abaikan jika namanya kosong
       if (!comp.name.trim()) return null;
 
       const formData = new FormData();
@@ -150,17 +130,11 @@ export default function InvestmentsManager() {
       formData.append("category", comp.category);
       if (comp.newLogoFile) formData.append("logo", comp.newLogoFile);
 
-      const url = comp.isNew
-        ? "http://localhost:5000/api/investment/affiliate"
-        : `http://localhost:5000/api/investment/affiliate/${comp.id}`;
-
-      const method = comp.isNew ? "POST" : "PUT";
-
-      return fetch(url, {
-        method,
-        headers: { Authorization: `Bearer ${token}` }, // Tanpa Content-Type karena FormData
-        body: formData,
-      });
+      if (comp.isNew) {
+        return api.post("/investment/affiliate", formData);
+      } else {
+        return api.put(`/investment/affiliate/${comp.id}`, formData);
+      }
     });
 
     await Promise.all(promises); // Tunggu semua selesai
@@ -191,8 +165,15 @@ export default function InvestmentsManager() {
 
   // Helper untuk Preview Gambar
   const getPreviewUrl = (comp: LocalAffiliate) => {
-    if (comp.newLogoFile) return URL.createObjectURL(comp.newLogoFile);
-    if (comp.logoUrl) return `http://localhost:5000${comp.logoUrl}`;
+    if (comp.newLogoFile) {
+      return URL.createObjectURL(comp.newLogoFile);
+    }
+
+    if (comp.logoUrl) {
+      const cleanPath = comp.logoUrl.replace("/uploads", "");
+      return `${BASE_UPLOAD_URL}${cleanPath}`;
+    }
+
     return null;
   };
 
@@ -389,8 +370,19 @@ export default function InvestmentsManager() {
                       {getPreviewUrl(company) ? (
                         <img
                           src={getPreviewUrl(company)!}
-                          alt="Logo"
+                          alt="Logo Affiliate"
                           className="w-full h-full object-contain p-1"
+                          onLoad={(e) => {
+                            if (company.newLogoFile) {
+                              URL.revokeObjectURL(
+                                (e.target as HTMLImageElement).src,
+                              );
+                            }
+                          }}
+                          onError={(e) => {
+                            (e.target as HTMLImageElement).src =
+                              "/placeholder-logo.png";
+                          }}
                         />
                       ) : (
                         <>

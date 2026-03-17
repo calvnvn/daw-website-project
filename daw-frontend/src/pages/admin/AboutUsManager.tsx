@@ -14,6 +14,7 @@ import {
   Unlock,
 } from "lucide-react";
 import { toast } from "sonner";
+import api, { BASE_UPLOAD_URL } from "@/lib/api";
 
 // Milestones History
 interface HistoryItem {
@@ -106,68 +107,55 @@ export default function AboutUsManager() {
   useEffect(() => {
     const fetchAllData = async () => {
       try {
-        const resAbout = await fetch("http://localhost:5000/api/about");
-        if (resAbout.ok) {
-          const data = await resAbout.json();
+        const [resAbout, resHistory, resManagement] = await Promise.all([
+          api.get("/about"),
+          api.get("/history"),
+          api.get("/management"),
+        ]);
 
-          // Masukkan data ke state Company Info
-          setCompanyInfo((prev) => ({
-            ...prev,
-            spiritText: data.spiritText || "",
-            missionText: data.missionText || "",
-            visionText: data.visionText || "",
-          }));
+        const aboutData = resAbout.data;
+        setCompanyInfo((prev) => ({
+          ...prev,
+          spiritText: aboutData.spiritText || "",
+          missionText: aboutData.missionText || "",
+          visionText: aboutData.visionText || "",
+        }));
+        setPhilosophy({
+          mainTitle: aboutData.philosophyTitle || "Our Philosophy",
+          pillars: aboutData.philosophyPillars || [],
+        });
 
-          // Masukkan data ke state Philosophy
-          setPhilosophy({
-            mainTitle: data.philosophyTitle || "Our Philosophy",
-            pillars: data.philosophyPillars || [],
-          });
-        }
-
-        const resHistory = await fetch("http://localhost:5000/api/history");
-        if (resHistory.ok) {
-          const dataHistory = await resHistory.json();
-          const formattedHistory: HistoryItem[] = dataHistory.map(
-            (item: { id: number; year: string; description: string }) => ({
-              id: item.id,
-              year: item.year,
-              text: item.description,
-            }),
-          );
-          setCompanyHistory(formattedHistory);
-        }
-
-        const resManagement = await fetch(
-          "http://localhost:5000/api/management",
+        setCompanyHistory(
+          resHistory.data.map((item: any) => ({
+            id: item.id,
+            year: item.year,
+            text: item.description,
+          })),
         );
-        if (resManagement.ok) {
-          const dataManagement = await resManagement.json();
-          setManagementTeam(dataManagement);
-        }
-      } catch {
-        toast.error("Failed to load About Us data from the server.");
+        setManagementTeam(resManagement.data);
+      } catch (err) {
+        toast.error("Failed to sync About Us data.");
+        console.error(err);
       } finally {
         setIsLoading(false);
       }
     };
-
     fetchAllData();
   }, []);
 
   // API SAVING
   const handleSave = async () => {
     setIsSaving(true);
-    const token = localStorage.getItem("daw_token");
-
     try {
       if (activeTab === "management") {
         toast.success("Management settings locked.");
         setIsEditing(false);
         return;
       }
+
+      const loadingToast = toast.loading("Saving changes...");
+
       if (activeTab === "info" || activeTab === "philosophy") {
-        const loadingToast = toast.loading("Saving About Us content...");
         const payload = {
           spiritText: companyInfo.spiritText,
           missionText: companyInfo.missionText,
@@ -175,49 +163,27 @@ export default function AboutUsManager() {
           philosophyTitle: philosophy.mainTitle,
           philosophyPillars: philosophy.pillars,
         };
-        const response = await fetch("http://localhost:5000/api/about", {
-          method: "PUT",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify(payload),
-        });
 
-        if (response.ok) {
-          toast.success("Content updated successfully!", { id: loadingToast });
-          setIsEditing(false);
-        }
+        await api.put("/about", payload);
+        toast.success("Content updated!", { id: loadingToast });
+        setIsEditing(false);
       } else if (activeTab === "history") {
-        // 👇 TAMBAHAN: Simpan khusus untuk Tab History
-        const loadingToast = toast.loading("Syncing Company Timeline...");
-        const response = await fetch("http://localhost:5000/api/history", {
-          method: "PUT",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify({ histories: companyHistory }), // Kirim seluruh array
-        });
+        await api.put("/history", { histories: companyHistory });
+        toast.success("Timeline updated!", { id: loadingToast });
+        setIsEditing(false);
 
-        if (response.ok) {
-          toast.success("Timeline updated successfully!", { id: loadingToast });
-          setIsEditing(false);
-
-          // Refresh data agar mendapatkan ID asli dari database (auto-increment)
-          const refreshRes = await fetch("http://localhost:5000/api/history");
-          const freshData: HistoryApiResponse[] = await refreshRes.json();
-          setCompanyHistory(
-            freshData.map((item) => ({
-              id: item.id,
-              year: item.year,
-              text: item.description,
-            })),
-          );
-        }
+        // Refresh data
+        const refreshRes = await api.get("/history");
+        setCompanyHistory(
+          refreshRes.data.map((item: any) => ({
+            id: item.id,
+            year: item.year,
+            text: item.description,
+          })),
+        );
       }
-    } catch (error) {
-      toast.error("Network Error.");
+    } catch (error: any) {
+      toast.error(error.response?.data?.message || "Network Error");
       console.log(error);
     } finally {
       setIsSaving(false);
@@ -260,10 +226,12 @@ export default function AboutUsManager() {
         level: person.level,
         order: person.order,
         photo: null,
-        removePhoto: false, // 👈 TAMBAH INI
+        removePhoto: false,
       });
+
+      const cleanPhotoPath = person.photoUrl?.replace("/uploads", "");
       setPhotoPreview(
-        person.photoUrl ? `http://localhost:5000${person.photoUrl}` : null,
+        person.photoUrl ? `${BASE_UPLOAD_URL}${cleanPhotoPath}` : null,
       );
     } else {
       setEditingPersonId(null);
@@ -302,9 +270,7 @@ export default function AboutUsManager() {
       return;
     }
 
-    const loadingToast = toast.loading("Saving person data...");
-
-    const token = localStorage.getItem("daw_token");
+    const loadingToast = toast.loading("Saving team member...");
 
     // 💡 THE MAGIC: Gunakan FormData, bukan JSON!
     const formData = new FormData();
@@ -321,47 +287,37 @@ export default function AboutUsManager() {
     }
 
     try {
-      const url = editingPersonId
-        ? `http://localhost:5000/api/management/${editingPersonId}`
-        : "http://localhost:5000/api/management";
-
-      const method = editingPersonId ? "PUT" : "POST";
-
-      const response = await fetch(url, {
-        method,
-        headers: { Authorization: `Bearer ${token}` },
-        body: formData,
-      });
-
-      if (response.ok) {
-        toast.success("Team member saved!", { id: loadingToast });
-        setIsPersonModalOpen(false);
-        // Refresh data table
-        const res = await fetch("http://localhost:5000/api/management");
-        setManagementTeam(await res.json());
+      if (editingPersonId) {
+        await api.put(`/management/${editingPersonId}`, formData);
       } else {
-        toast.error("Failed to save data.", { id: loadingToast });
+        await api.post("/management", formData);
       }
+
+      toast.success("Member saved!", { id: loadingToast });
+      setIsPersonModalOpen(false);
+
+      // Refresh
+      const res = await api.get("/management");
+      setManagementTeam(res.data);
     } catch (error) {
       const errorMessage =
         error instanceof Error ? error.message : "Network error.";
       toast.error(errorMessage, { id: loadingToast });
-      console.error(error);
     }
   };
 
   const deletePerson = async (id: number) => {
     if (!confirm("Are you sure you want to delete this person?")) return;
 
-    const token = localStorage.getItem("daw_token");
-    const response = await fetch(`http://localhost:5000/api/management/${id}`, {
-      method: "DELETE",
-      headers: { Authorization: `Bearer ${token}` },
-    });
-
-    if (response.ok) {
-      toast.success("Person deleted!");
-      setManagementTeam(managementTeam.filter((p) => p.id !== id));
+    const loadingToast = toast.loading("Deleting member...");
+    try {
+      await api.delete(`/management/${id}`);
+      toast.success("Person deleted!", { id: loadingToast });
+      setManagementTeam((prev) => prev.filter((p) => p.id !== id));
+    } catch (error: any) {
+      toast.error(error.response?.data?.message || "Delete failed", {
+        id: loadingToast,
+      });
     }
   };
 
@@ -780,9 +736,13 @@ export default function AboutUsManager() {
                         {person.photoUrl ? (
                           <div className="w-10 h-10 rounded-full overflow-hidden border border-slate-200">
                             <img
-                              src={`http://localhost:5000${person.photoUrl}`}
+                              src={`${BASE_UPLOAD_URL}${person.photoUrl?.replace("/uploads", "")}`}
                               alt={person.name}
                               className="w-full h-full object-cover"
+                              onError={(e) => {
+                                (e.target as HTMLImageElement).src =
+                                  "/placeholder-user.png";
+                              }}
                             />
                           </div>
                         ) : (

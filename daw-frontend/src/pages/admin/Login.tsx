@@ -1,18 +1,23 @@
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom"; // 🚀 Tambah useLocation
 import { Mail, Lock, Eye, EyeOff, ArrowRight, ShieldCheck } from "lucide-react";
 import { toast } from "sonner";
 import logoDaw from "@/assets/logo-daw.png";
 import bgImage from "@/assets/hero-bg.jpg";
+import api from "@/lib/api";
 
 export default function Login() {
   const navigate = useNavigate();
+  const location = useLocation(); // 🚀 Tangkap lokasi asal dari ProtectedRoute
+
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
 
-  // Simulasi proses autentikasi
+  // Ambil alamat asal, kalau tidak ada default ke /admin
+  const from = location.state?.from?.pathname || "/admin";
+
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -25,65 +30,43 @@ export default function Login() {
 
     setIsLoading(true);
     try {
-      const response = await fetch("http://localhost:5000/api/auth/login", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ email, password }),
-      });
-      const data = await response.json();
-      if (response.status === 403) {
-        toast.error("Access Denied", {
-          description: data.message || "Your account has been suspended.",
+      // ✅ FIXED: Standard API call
+      const response = await api.post("/auth/login", { email, password });
+      const data = response.data;
+
+      localStorage.setItem("daw_token", data.accessToken);
+      localStorage.setItem(
+        "daw_user",
+        JSON.stringify({
+          name: data.name,
+          email: data.email,
+          role: data.role,
+        }),
+      );
+
+      if (data.needsPasswordChange) {
+        toast.info("Security Check", {
+          description: "Please change your password.",
         });
-        return;
-      }
-
-      if (response.ok) {
-        localStorage.setItem("daw_token", data.accessToken);
-        localStorage.setItem(
-          "daw_user",
-          JSON.stringify({
-            name: data.name,
-            email: data.email,
-            role: data.role,
-          }),
-        );
-
-        // 🔐 2. CEK FIRST-TIME LOGIN (FORCE CHANGE PASSWORD)
-        if (data.needsPasswordChange) {
-          toast.info("Security Check", {
-            description: "Please change your temporary password to continue.",
-          });
-          // Arahkan ke halaman ganti password (pastikan rute ini nanti kamu buat di App.tsx)
-          navigate("/force-change-password");
-        } else {
-          // Jika normal, masuk ke dashboard
-          toast.success(`Welcome back, ${data.name}!`, {
-            description: "Successfully authenticated to DAW Admin Portal.",
-          });
-          navigate("/admin");
-        }
+        navigate("/force-change-password");
       } else {
-        toast.error("Authentication Failed", {
-          description: data.message || "Invalid email or password.",
-        });
+        toast.success(`Welcome, ${data.name}!`);
+        // 🚀 SMART REDIRECT: Balik ke halaman tujuan awal
+        navigate(from, { replace: true });
       }
-    } catch {
-      toast.error("Server Error", {
-        description: "Connection to backend failed. Please try again later.",
+    } catch (err: any) {
+      toast.error("Authentication Failed", {
+        description: err.response?.data?.message || "Invalid credentials",
       });
     } finally {
       setIsLoading(false);
     }
   };
 
+  // ✅ FIXED: Return sekarang berada di level atas komponen (bukan di dalam handleLogin)
   return (
     <div className="min-h-screen w-full flex bg-white animate-in fade-in duration-700">
-      {/* KOLOM KIRI: Form Login */}
       <div className="w-full lg:w-[480px] xl:w-[500px] flex flex-col justify-center px-8 sm:px-12 md:px-16 py-12 shrink-0 relative z-10 border-r border-slate-100 shadow-[20px_0_40px_-15px_rgba(0,0,0,0.05)]">
-        {/* Logo Area */}
         <div className="mb-16">
           <img
             src={logoDaw}
@@ -92,19 +75,16 @@ export default function Login() {
           />
         </div>
 
-        {/* Heading */}
         <div className="mb-10">
           <h1 className="text-2xl font-serif font-bold text-slate-900 mb-2">
             Admin Portal
           </h1>
           <p className="text-slate-500 text-sm">
-            Sign in to manage DAW Group content and configurations.
+            Sign in to manage DAW Group content.
           </p>
         </div>
 
-        {/* Form Area */}
         <form onSubmit={handleLogin} className="space-y-5">
-          {/* Email Input */}
           <div>
             <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">
               Email Address
@@ -124,13 +104,10 @@ export default function Login() {
             </div>
           </div>
 
-          {/* Password Input */}
           <div>
-            <div className="flex items-center justify-between mb-2">
-              <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider">
-                Password
-              </label>
-            </div>
+            <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">
+              Password
+            </label>
             <div className="relative">
               <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none">
                 <Lock className="w-5 h-5 text-slate-400" />
@@ -157,7 +134,6 @@ export default function Login() {
             </div>
           </div>
 
-          {/* Security Badge & Submit Button */}
           <div className="pt-4">
             <button
               type="submit"
@@ -173,27 +149,20 @@ export default function Login() {
                 </>
               )}
             </button>
-
             <div className="mt-6 flex items-center justify-center gap-2 text-[11px] font-bold uppercase tracking-wider text-slate-400">
-              <ShieldCheck className="w-3.5 h-3.5 text-slate-400" />
+              <ShieldCheck className="w-3.5 h-3.5" />
               <span>Restricted Access</span>
             </div>
           </div>
         </form>
       </div>
 
-      {/* KOLOM KANAN: Visual Image (Lebih Sepi, Lebih Mahal) */}
       <div className="hidden lg:flex flex-1 relative bg-[#081C15] overflow-hidden items-end p-12">
-        {/* Gambar Latar Belakang dari Aset Lokal */}
         <div
           className="absolute inset-0 w-full h-full bg-cover bg-center opacity-30 mix-blend-luminosity transform scale-105"
           style={{ backgroundImage: `url(${bgImage})` }}
         />
-
-        {/* Gradient Overlay untuk meredam gambar agar teks terbaca */}
         <div className="absolute inset-0 bg-gradient-to-t from-[#081C15] via-[#081C15]/40 to-transparent" />
-
-        {/* Content Overlay (Sangat Minimalis) */}
         <div className="relative z-10 w-full flex justify-between items-end border-t border-white/10 pt-6">
           <div>
             <h2 className="text-white/80 font-serif text-lg tracking-wide mb-1">
@@ -203,7 +172,6 @@ export default function Login() {
               PT Dharma Agung Wijaya
             </p>
           </div>
-
           <div className="text-right text-white/40 text-xs font-mono">
             {new Date().getFullYear()} © DAW Group
           </div>

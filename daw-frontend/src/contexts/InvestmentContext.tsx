@@ -6,6 +6,7 @@ import {
   useEffect,
   type ReactNode,
 } from "react";
+import api from "@/lib/api";
 
 // 1. Definisikan Struktur Data
 export interface InvestmentSettings {
@@ -45,12 +46,10 @@ export function InvestmentProvider({ children }: { children: ReactNode }) {
 
   const fetchData = async () => {
     try {
-      const res = await fetch("http://localhost:5000/api/investment");
-      if (res.ok) {
-        const data = await res.json();
-        setSettings(data.settings);
-        setCompanies(data.companies);
-      }
+      // ✅ FIXED: Tanpa localhost
+      const res = await api.get("/investment");
+      setSettings(res.data.settings);
+      setCompanies(res.data.companies);
     } catch (err) {
       console.error("Failed to fetch investment data:", err);
     } finally {

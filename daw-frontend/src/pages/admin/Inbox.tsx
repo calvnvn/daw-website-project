@@ -11,6 +11,8 @@ import {
   CheckSquare,
   X,
 } from "lucide-react";
+import api from "@/lib/api";
+import { toast } from "sonner";
 
 interface Inquiry {
   id: number;
@@ -40,17 +42,15 @@ export default function Inbox() {
     const fetchInquiries = async () => {
       setIsLoading(true);
       try {
-        const token = localStorage.getItem("daw_token");
-        const res = await fetch("http://localhost:5000/api/inquiries", {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        const data = await res.json();
+        const response = await api.get("/inquiries");
+        const data = response.data;
         setInquiries(data);
         if (data.length > 0 && !selectedInquiryId) {
           setSelectedInquiryId(data[0].id);
         }
       } catch (error) {
         console.error("Failed to fetch inquiries", error);
+        toast.error("Session expired or server error");
       } finally {
         setIsLoading(false);
       }
@@ -70,7 +70,6 @@ export default function Inbox() {
 
   const handleSelectAll = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.checked) {
-      // Centang semua pesan yang SEDANG TAMPIL (difilter)
       setSelectedMails(filteredInquiries.map((inq) => inq.id));
     } else {
       setSelectedMails([]);
@@ -85,29 +84,48 @@ export default function Inbox() {
     );
   };
 
-  const bulkDelete = async () => {
-    if (
-      !confirm(
-        `Are you sure you want to delete ${selectedMails.length} messages?`,
-      )
-    )
-      return;
+  const bulkDelete = () => {
+    if (selectedMails.length === 0) return;
+
+    toast("Confirm Bulk Deletion", {
+      description: `Are you sure you want to delete ${selectedMails.length} messages?`,
+      action: {
+        label: "Yes, Delete",
+        onClick: () => executeBulkDelete(), // Jalankan eksekusi jika diklik
+      },
+      cancel: {
+        label: "Cancel",
+        onClick: () => {}, // Tutup toast tanpa aksi
+      },
+    });
+  };
+
+  // Fungsi Eksekutor: Menangani API Call (Ghost-Free)
+  const executeBulkDelete = async () => {
+    const loadingToast = toast.loading(
+      `Deleting ${selectedMails.length} messages...`,
+    );
 
     try {
-      const token = localStorage.getItem("daw_token");
-      for (const id of selectedMails) {
-        await fetch(`http://localhost:5000/api/inquiries/${id}`, {
-          method: "DELETE",
-          headers: { Authorization: `Bearer ${token}` },
-        });
-      }
+      // Eksekusi paralel lewat instance 'api'
+      const deletePromises = selectedMails.map((id) =>
+        api.delete(`/inquiries/${id}`),
+      );
+      await Promise.all(deletePromises);
+
+      // Update state lokal
       setInquiries((prev) =>
         prev.filter((inq) => !selectedMails.includes(inq.id)),
       );
+
+      toast.success("Messages deleted permanently!", { id: loadingToast });
       setSelectedMails([]); // Reset centangan
       setSelectedInquiryId(null);
-    } catch (err) {
+    } catch (err: any) {
       console.error("Bulk delete error", err);
+      toast.error(err.response?.data?.message || "Failed to delete messages.", {
+        id: loadingToast,
+      });
     }
   };
 
@@ -116,40 +134,54 @@ export default function Inbox() {
 
   const markAsRead = async (id: number) => {
     try {
-      const token = localStorage.getItem("daw_token");
-      await fetch(`http://localhost:5000/api/inquiries/${id}/read`, {
-        method: "PUT",
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      setInquiries(
-        inquiries.map((inq) =>
-          inq.id === id ? { ...inq, isRead: true } : inq,
-        ),
+      await api.put(`/inquiries/${id}/read`);
+      setInquiries((prev) =>
+        prev.map((inq) => (inq.id === id ? { ...inq, isRead: true } : inq)),
       );
     } catch (error) {
-      console.error(error);
+      console.error("Failed to update read status", error);
     }
   };
 
-  const deleteInquiry = async (id: number) => {
-    if (!confirm("Are you sure you want to delete this message?")) return;
+  const deleteInquiry = (id: number) => {
+    // Langsung panggil toast konfirmasi dari Sonner
+    toast("Delete Message", {
+      description: "Are you sure you want to delete this message permanently?",
+      action: {
+        label: "Yes, Delete",
+        onClick: () => executeDelete(id), // Lempar ID ke eksekutor
+      },
+      cancel: {
+        label: "Cancel",
+        onClick: () => {},
+      },
+    });
+  };
+
+  // 2. Fungsi Eksekutor (The Logic)
+  const executeDelete = async (id: number) => {
+    const loadingToast = toast.loading("Deleting message...");
+
     try {
-      const token = localStorage.getItem("daw_token");
-      await fetch(`http://localhost:5000/api/inquiries/${id}`, {
-        method: "DELETE",
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      await api.delete(`/inquiries/${id}`);
+
       const newInquiries = inquiries.filter((inq) => inq.id !== id);
       setInquiries(newInquiries);
-      if (selectedInquiryId === id)
+
+      if (selectedInquiryId === id) {
         setSelectedInquiryId(
           newInquiries.length > 0 ? newInquiries[0].id : null,
         );
-    } catch (error) {
-      console.error(error);
+      }
+
+      toast.success("Message deleted!", { id: loadingToast });
+    } catch (error: any) {
+      console.error("Delete error:", error);
+      toast.error(error.response?.data?.message || "Failed to delete message", {
+        id: loadingToast,
+      });
     }
   };
-
   const handleSelectInquiry = (id: number) => {
     setSelectedInquiryId(id);
     const inq = inquiries.find((i) => i.id === id);
@@ -188,7 +220,6 @@ export default function Inbox() {
       {/* SPLIT PANE LAYOUT */}
       <div className="flex-1 bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden flex flex-col md:flex-row min-h-[500px] h-[calc(100vh-200px)] max-h-[700px]">
         {/* LEFT: LIST */}
-        {/* LEFT: LIST */}
         <div className="w-full md:w-[350px] lg:w-[400px] border-r border-slate-200 flex flex-col shrink-0 bg-white">
           {/* SEARCH & BULK ACTION BAR */}
           <div className="p-4 border-b border-slate-100 bg-slate-50/50">
@@ -226,7 +257,25 @@ export default function Inbox() {
             </div>
           </div>
 
-          {/* BULK ACTION PANEL (Muncul jika ada yang dicentang) */}
+          {/* SELECT ALL BAR */}
+          <div className="px-4 py-2 border-b border-slate-100 flex items-center bg-white sticky top-0 z-10">
+            <div className="flex items-center gap-3">
+              <input
+                type="checkbox"
+                className="w-4 h-4 text-daw-green rounded border-slate-300 focus:ring-daw-green cursor-pointer"
+                onChange={handleSelectAll}
+                checked={
+                  filteredInquiries.length > 0 &&
+                  selectedMails.length === filteredInquiries.length
+                }
+              />
+              <span className="text-[11px] font-bold text-slate-400 uppercase tracking-widest">
+                Select All Messages
+              </span>
+            </div>
+          </div>
+
+          {/* BULK ACTION PANEL */}
           {selectedMails.length > 0 && (
             <div className="bg-daw-green/10 px-4 py-3 flex justify-between items-center border-b border-daw-green/20 animate-in slide-in-from-top-2">
               <span className="text-xs font-bold text-daw-green">

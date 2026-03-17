@@ -7,6 +7,8 @@ import {
   type ReactNode,
 } from "react";
 
+import api from "@/lib/api";
+
 interface PhilosophyPillar {
   id: string;
   title: string;
@@ -58,18 +60,24 @@ export function AboutProvider({ children }: { children: ReactNode }) {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    Promise.all([
-      fetch("http://localhost:5000/api/about").then((res) => res.json()),
-      fetch("http://localhost:5000/api/history").then((res) => res.json()),
-      fetch("http://localhost:5000/api/management").then((res) => res.json()),
-    ])
-      .then(([about, history, management]) => {
-        setAboutData(about);
-        setCompanyHistory(history);
-        setManagementTeam(management);
-      })
-      .catch((err) => console.error("Error fetching data:", err))
-      .finally(() => setIsLoading(false));
+    const fetchData = async () => {
+      try {
+        const [resAbout, resHistory, resManagement] = await Promise.all([
+          api.get("/about"),
+          api.get("/history"),
+          api.get("/management"),
+        ]);
+
+        setAboutData(resAbout.data);
+        setCompanyHistory(resHistory.data);
+        setManagementTeam(resManagement.data);
+      } catch (err) {
+        console.error("Error fetching About data:", err);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    fetchData();
   }, []);
 
   return (
@@ -81,7 +89,6 @@ export function AboutProvider({ children }: { children: ReactNode }) {
   );
 }
 
-// 4. Custom Hook
 export function useAbout() {
   return useContext(AboutContext);
 }

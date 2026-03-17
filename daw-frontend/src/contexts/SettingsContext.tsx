@@ -6,6 +6,7 @@ import {
   useEffect,
   type ReactNode,
 } from "react";
+import api from "@/lib/api";
 
 interface SettingsData {
   companyName: string;
@@ -31,11 +32,17 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    fetch("http://localhost:5000/api/settings")
-      .then((res) => res.json())
-      .then((data) => setSettings(data))
-      .catch((err) => console.error("Failed to fetch settings:", err))
-      .finally(() => setIsLoading(false));
+    const fetchSettings = async () => {
+      try {
+        const res = await api.get("/settings");
+        setSettings(res.data);
+      } catch (err) {
+        console.error("Failed to fetch settings:", err);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    fetchSettings();
   }, []);
 
   return (

@@ -3,6 +3,7 @@ import { useHome, type ImpactStat } from "@/contexts/HomeContext";
 import { Save, Plus, Trash2, Lock, Unlock } from "lucide-react";
 import * as Icons from "lucide-react";
 import { toast } from "sonner";
+import api from "@/lib/api";
 
 const AVAILABLE_ICONS = [
   { name: "Map", label: "Map / Area" },
@@ -42,12 +43,16 @@ export default function StatsManager() {
 
   const removeStat = async (id: string | number) => {
     if (!confirm("Are you sure?")) return;
+
     if (typeof id === "number") {
-      const token = localStorage.getItem("daw_token");
-      await fetch(`http://localhost:5000/api/homepage/stats/${id}`, {
-        method: "DELETE",
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      try {
+        await api.delete(`/homepage/stats/${id}`);
+        toast.success("Stat deleted from server");
+      } catch (err) {
+        console.error("Delete error:", err);
+        toast.error("Failed to delete from server");
+        return;
+      }
     }
     setStats(stats.filter((s) => s.id !== id));
   };
@@ -55,31 +60,30 @@ export default function StatsManager() {
   const handleSave = async () => {
     setIsSaving(true);
     const loadingToast = toast.loading("Saving statistics...");
-    const token = localStorage.getItem("daw_token");
 
     try {
+      // Mapping promises menggunakan api instance
       const promises = stats.map((stat) => {
         const isNew = typeof stat.id === "string" && stat.id.startsWith("new-");
-        const url = isNew
-          ? "http://localhost:5000/api/homepage/stats"
-          : `http://localhost:5000/api/homepage/stats/${stat.id}`;
-        return fetch(url, {
-          method: isNew ? "POST" : "PUT",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify(stat),
-        });
+        const url = isNew ? "/homepage/stats" : `/homepage/stats/${stat.id}`;
+
+        if (isNew) {
+          return api.post(url, stat);
+        } else {
+          return api.put(url, stat);
+        }
       });
 
       await Promise.all(promises);
+
       await refreshData();
       toast.success("Statistics saved successfully!", { id: loadingToast });
       setIsEditing(false);
-    } catch (error) {
+    } catch (error: any) {
       console.error(error);
-      toast.error("Error saving statistics.", { id: loadingToast });
+      toast.error(error.response?.data?.message || "Error saving statistics.", {
+        id: loadingToast,
+      });
     } finally {
       setIsSaving(false);
     }

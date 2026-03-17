@@ -7,6 +7,7 @@ import {
   type ReactNode,
 } from "react";
 
+import api from "@/lib/api";
 // 1. Definisikan Struktur Data (Sesuai dengan Model Database)
 export interface HeroSlide {
   id: number | string;
@@ -55,15 +56,14 @@ export function HomeProvider({ children }: { children: ReactNode }) {
   const [isLoading, setIsLoading] = useState(true);
 
   const fetchData = async () => {
+    setIsLoading(true); // Pastikan loading aktif saat refresh
     try {
-      // MEGA-GET
-      const res = await fetch("http://localhost:5000/api/homepage");
-      if (res.ok) {
-        const data = await res.json();
-        setSlides(data.slides);
-        setStats(data.stats);
-        setSettings(data.settings);
-      }
+      const res = await api.get("/homepage");
+      const data = res.data;
+
+      setSlides(data.slides);
+      setStats(data.stats);
+      setSettings(data.settings);
     } catch (err) {
       console.error("Failed to fetch homepage data:", err);
     } finally {

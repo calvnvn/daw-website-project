@@ -9,6 +9,8 @@ import {
   X,
   Trash2,
 } from "lucide-react";
+import api from "@/lib/api";
+import { toast } from "sonner";
 
 interface AdminUser {
   id: string;
@@ -30,14 +32,12 @@ export default function UserManagement() {
   const fetchUsers = async () => {
     setIsLoading(true);
     try {
-      const token = localStorage.getItem("daw_token");
-      const response = await fetch("http://localhost:5000/api/users", {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      const data = await response.json();
-      setUsers(data);
+      // Api instance (Token otomatis terbawa)
+      const response = await api.get("/users");
+      setUsers(response.data);
     } catch (error) {
       console.error("Error fetching users:", error);
+      toast.error("Gagal memuat daftar user.");
     } finally {
       setIsLoading(false);
     }
@@ -47,7 +47,7 @@ export default function UserManagement() {
     fetchUsers();
   }, []);
 
-  // 🚀 FIX: Role otomatis di-set (hardcoded) ke Editor
+  // Role otomatis di-set (hardcoded) ke Editor
   const [formData, setFormData] = useState({
     name: "",
     email: "",
@@ -65,65 +65,59 @@ export default function UserManagement() {
       alert("Please fill in all required fields.");
       return;
     }
+    const loadingToast = toast.loading("Sending invitation...");
     try {
-      const token = localStorage.getItem("daw_token");
-      const response = await fetch("http://localhost:5000/api/users", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify(formData),
+      const response = await api.post("/users", formData);
+      const result = response.data;
+
+      // Tampilkan password sementara
+      toast.success("User invited successfully!", {
+        id: loadingToast,
+        description: `Temp Password: ${result.tempPassword}`,
+        duration: 10000,
       });
 
-      const result = await response.json();
-
-      if (response.ok) {
-        alert(`Success! Temp Password: ${result.tempPassword}`);
-        fetchUsers();
-        setIsModalOpen(false);
-        setFormData({ name: "", email: "", role: "Editor" }); // Reset form
-      } else {
-        alert(result.message);
-      }
-    } catch {
-      console.error("Failed to invite user");
+      fetchUsers();
+      setIsModalOpen(false);
+      setFormData({ name: "", email: "", role: "Editor" });
+    } catch (error: any) {
+      toast.error(error.response?.data?.message || "Failed to invite User.", {
+        id: loadingToast,
+      });
     }
   };
 
   const toggleUserStatus = async (user: AdminUser) => {
     const newStatus = user.status === "Active" ? "Suspended" : "Active";
+    const actionText = newStatus === "Active" ? "mengaktifkan" : "menangguhkan";
+
     try {
-      const token = localStorage.getItem("daw_token");
-      await fetch(`http://localhost:5000/api/users/${user.id}`, {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({ ...user, status: newStatus }),
-      });
+      await api.put(`/users/${user.id}`, { ...user, status: newStatus });
+      toast.success(`Berhasil ${actionText} user.`);
       fetchUsers();
-    } catch {
-      console.error("Update status failed");
+    } catch (error) {
+      toast.error("Gagal mengubah status user.");
+      console.error(error);
     }
   };
 
   const handleDeleteUser = async (id: string) => {
     if (!confirm("Are you sure you want to delete this user?")) return;
+
+    const loadingToast = toast.loading("Menghapus user...");
     try {
-      const token = localStorage.getItem("daw_token");
-      const res = await fetch(`http://localhost:5000/api/users/${id}`, {
-        method: "DELETE",
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (res.ok) fetchUsers();
-      else alert("Cannot delete Superadmin or action not permitted.");
-    } catch {
-      console.error("Delete failed");
+      await api.delete(`/users/${id}`);
+      toast.success("User deleted successfully.", { id: loadingToast });
+      fetchUsers();
+    } catch (error: any) {
+      toast.error(
+        error.response?.data?.message || "Cannot delete Superadmin.",
+        {
+          id: loadingToast,
+        },
+      );
     }
   };
-
   const getRoleBadgeColor = (role: string) => {
     switch (role) {
       case "Superadmin":

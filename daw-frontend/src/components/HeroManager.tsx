@@ -9,7 +9,8 @@ import {
   Lock,
   Unlock,
 } from "lucide-react";
-import { toast } from "sonner"; // Pastikan sonner terinstall
+import { toast } from "sonner";
+import api, { BASE_UPLOAD_URL } from "@/lib/api";
 
 interface EditableSlide extends Omit<HeroSlide, "id"> {
   id: string | number;
@@ -48,14 +49,13 @@ export default function HeroManager() {
     if (!confirm("Are you sure you want to delete this slide?")) return;
 
     if (typeof id === "number") {
-      const token = localStorage.getItem("daw_token");
       try {
-        await fetch(`http://localhost:5000/api/homepage/hero/${id}`, {
-          method: "DELETE",
-          headers: { Authorization: `Bearer ${token}` },
-        });
+        await api.delete(`/homepage/hero/${id}`);
+        toast.success("Slide deleted from database");
       } catch (err) {
-        console.error("Failed to delete slide from DB:", err);
+        console.error("Delete error: ", err);
+        toast.error("Failed to delete from server");
+        return;
       }
     }
     setSlides(slides.filter((s) => s.id !== id));
@@ -71,45 +71,46 @@ export default function HeroManager() {
 
   const getDisplayImageUrl = (slide: EditableSlide) => {
     if (slide.previewUrl) return slide.previewUrl;
-    if (slide.imageUrl) return `http://localhost:5000${slide.imageUrl}`;
+    if (slide.imageUrl) {
+      const cleanPath = slide.imageUrl.replace("/uploads", "");
+      return `${BASE_UPLOAD_URL}${cleanPath}`;
+    }
     return null;
   };
 
   const handleSave = async () => {
     setIsSaving(true);
-    const loadingToast = toast.loading("Saving slides...");
-    const token = localStorage.getItem("daw_token");
+    const loadingToast = toast.loading("Saving all slides...");
 
     try {
-      for (const slide of slides) {
+      const promises = slides.map(async (slide) => {
         const isNew =
           typeof slide.id === "string" && slide.id.startsWith("new-");
-        const url = isNew
-          ? "http://localhost:5000/api/homepage/hero"
-          : `http://localhost:5000/api/homepage/hero/${slide.id}`;
-
         const formData = new FormData();
         formData.append("title", slide.title);
         formData.append("subtitle", slide.subtitle);
         formData.append("order", slide.order.toString());
+        if (slide.file) formData.append("image", slide.file);
 
-        if (slide.file) {
-          formData.append("image", slide.file);
+        if (isNew) {
+          return api.post("/homepage/hero", formData);
+        } else {
+          return api.put(`/homepage/hero/${slide.id}`, formData);
         }
+      });
 
-        await fetch(url, {
-          method: isNew ? "POST" : "PUT",
-          headers: { Authorization: `Bearer ${token}` },
-          body: formData,
-        });
-      }
-
+      await Promise.all(promises);
       await refreshData();
-      toast.success("Hero slides saved successfully!", { id: loadingToast });
+      toast.success("All slides saved successfully!", { id: loadingToast });
       setIsEditing(false);
-    } catch (error) {
-      console.error(error);
-      toast.error("Error saving hero slides.", { id: loadingToast });
+    } catch (error: any) {
+      console.error("Save error details: ", error);
+      toast.error(
+        error.response?.data?.message || "Failed to save some slides.",
+        {
+          id: loadingToast,
+        },
+      );
     } finally {
       setIsSaving(false);
     }
@@ -202,7 +203,14 @@ export default function HeroManager() {
                       <img
                         src={displayImage}
                         alt="Preview"
-                        className="absolute inset-0 w-full h-full object-cover transition-transform group-hover:scale-105"
+                        className="absolute inset-0 w-full h-full object-cover"
+                        onLoad={(e) => {
+                          if (slide.previewUrl) {
+                            URL.revokeObjectURL(
+                              (e.target as HTMLImageElement).src,
+                            );
+                          }
+                        }}
                       />
                       {isEditing && (
                         <div className="absolute inset-0 bg-black/40 opacity-0 hover:opacity-100 transition-opacity flex flex-col items-center justify-center text-white">

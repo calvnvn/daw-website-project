@@ -12,6 +12,7 @@ import {
   Unlock,
 } from "lucide-react";
 import { toast } from "sonner";
+import api from "@/lib/api";
 
 export default function GlobalSettings() {
   const [formData, setFormData] = useState({
@@ -32,23 +33,20 @@ export default function GlobalSettings() {
   useEffect(() => {
     const fetchSettings = async () => {
       try {
-        const response = await fetch("http://localhost:5000/api/settings");
-        if (response.ok) {
-          const data = await response.json();
-          setFormData({
-            companyName: data.companyName || "",
-            address: data.address || "",
-            phone: data.phone || "",
-            email: data.email || "",
-            website: data.website || "",
-            googleMapsUrl: data.googleMapsUrl || "",
-            linkedinUrl: data.linkedinUrl || "",
-          });
-        } else {
-          toast.error("Gagal memuat pengaturan global.");
-        }
+        const response = await api.get("/settings");
+        const data = response.data;
+
+        setFormData({
+          companyName: data.companyName || "",
+          address: data.address || "",
+          phone: data.phone || "",
+          email: data.email || "",
+          website: data.website || "",
+          googleMapsUrl: data.googleMapsUrl || "",
+          linkedinUrl: data.linkedinUrl || "",
+        });
       } catch {
-        toast.error("Koneksi ke server gagal.");
+        toast.error("The connection to the server failed.");
       } finally {
         setIsLoading(false);
       }
@@ -60,28 +58,14 @@ export default function GlobalSettings() {
     setIsSaving(true);
     const loadingToast = toast.loading("Saving global settings...");
     try {
-      const token = localStorage.getItem("daw_token");
-      const response = await fetch("http://localhost:5000/api/settings", {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify(formData),
+      await api.put("/settings", formData);
+      toast.success("Settings updated successfully!", { id: loadingToast });
+      setIsEditing(false);
+    } catch (error: any) {
+      toast.error("Update Failed", {
+        description: error.response?.data?.message || "Check your connection",
+        id: loadingToast,
       });
-
-      if (response.ok) {
-        toast.success("Settings updated successfully!", { id: loadingToast });
-        setIsEditing(false);
-      } else {
-        const errorData = await response.json();
-        toast.error("Update Failed", {
-          description: errorData.message,
-          id: loadingToast,
-        });
-      }
-    } catch {
-      toast.error("Network Error", { id: loadingToast });
     } finally {
       setIsSaving(false);
     }

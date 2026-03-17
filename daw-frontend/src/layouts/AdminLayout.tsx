@@ -18,10 +18,9 @@ import {
   ChevronRight,
   MessageSquare,
   Building2,
-  Menu as MenuIcon,
   FileText,
 } from "lucide-react";
-
+import api from "@/lib/api";
 import logoDaw from "../assets/logo-daw.png";
 
 export default function AdminLayout() {
@@ -38,18 +37,13 @@ export default function AdminLayout() {
   useEffect(() => {
     const fetchUnreadInquiries = async () => {
       try {
-        const token = localStorage.getItem("daw_token");
-        const res = await fetch("http://localhost:5000/api/inquiries", {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        if (res.ok) {
-          const data = await res.json();
-          const unread = data.filter((item: any) => !item.isRead);
+        const response = await api.get("/inquiries");
+        if (response.data) {
+          const unread = response.data.filter((item: any) => !item.isRead);
           setUnreadInquiries(unread);
         }
-      } catch (error) {
-        console.error("Failed to fetch notifications");
-        console.log(error);
+      } catch (error: any) {
+        console.error("Failed to fetch notifications:", error.message);
       }
     };
 
@@ -89,7 +83,7 @@ export default function AdminLayout() {
 
   return (
     // Warna dasar background untuk seluruh area Admin Panel
-    <div className="min-h-screen bg-slate-50 flex font-sans text-slate-900">
+    <div className="h-[100dvh] bg-slate-50 flex font-sans text-slate-900 overflow-hidden">
       {/* --- 1. OVERLAY UNTUK MOBILE --- */}
       {isMobileMenuOpen && (
         <div
@@ -97,14 +91,12 @@ export default function AdminLayout() {
           onClick={() => setIsMobileMenuOpen(false)}
         />
       )}
-
       {/* --- 2. SIDEBAR  --- */}
       <aside
         className={`
-        fixed inset-y-0 left-0 z-50 bg-white border-r border-slate-200 transform transition-transform duration-300 ease-in-out
-        flex flex-col /* <--- INI KUNCI UTAMANYA */
+        fixed inset-y-0 left-0 z-50 bg-white border-r border-slate-200 transform transition-transform duration-300 ease-in-out flex flex-col h-full
         ${isMobileMenuOpen ? "translate-x-0" : "-translate-x-full"}
-        md:relative md:translate-x-0 ${isDesktopCollapsed ? "md:w-[84px]" : "md:w-[260px] w-[260px]"}
+        md:relative md:translate-x-0 ${isDesktopCollapsed ? "md:w-[84px]" : "md:w-[260px]"}
       `}
       >
         {/* AREA LOGO (Warna Asli) */}
@@ -343,7 +335,6 @@ export default function AdminLayout() {
           </div>
         </main>
       </div>
-
       {isLogoutModalOpen && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm flex flex-col overflow-hidden animate-in zoom-in-95 duration-200">
