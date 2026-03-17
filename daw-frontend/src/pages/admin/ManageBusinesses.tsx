@@ -51,7 +51,9 @@ export default function ManageBusinesses() {
           title: currentSection.title || "",
           htmlContent: currentSection.htmlContent || "",
           // KUNCI 1: Paksa konversi angka 1/0 jadi boolean true/false
-          hasMap: currentSection.hasMap === true || currentSection.hasMap === 1,
+          hasMap:
+            currentSection.hasMap === true ||
+            Number(currentSection.hasMap) === 1,
           mapMarkers: currentSection.mapMarkers || [],
         });
       } else {

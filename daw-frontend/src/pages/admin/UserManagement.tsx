@@ -425,10 +425,8 @@ export default function UserManagement() {
                       description: "You can now paste it securely to the user.",
                     });
 
-                    // Tutup modal & bersihkan sisa data
-                    setIsModalOpen(false);
-                    setTempCredentials(null);
-                    setFormData({ name: "", email: "", role: "Editor" });
+                    // ✅ Panggil fungsi ini daripada nulis manual lagi
+                    handleCloseModal();
                   }}
                   className="w-full flex items-center justify-center gap-2 py-3.5 bg-daw-green hover:bg-[#003b1c] text-white rounded-xl font-bold transition-colors shadow-md"
                 >
@@ -442,14 +440,11 @@ export default function UserManagement() {
                     <UserPlus className="w-5 h-5 text-daw-green" /> Invite User
                   </h2>
                   <button
-                    onClick={() => {
-                      setIsModalOpen(false);
-                      setFormData({ name: "", email: "", role: "Editor" }); // Reset form saat cancel
-                    }}
+                    onClick={handleCloseModal}
                     className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-full transition-colors"
                   >
                     <X className="w-5 h-5" />
-                  </button>
+                  </button>{" "}
                 </div>
 
                 <div className="p-6 space-y-5">
@@ -502,10 +497,7 @@ export default function UserManagement() {
 
                 <div className="px-6 py-4 border-t border-slate-100 flex items-center justify-end gap-3 bg-slate-50/50">
                   <button
-                    onClick={() => {
-                      setIsModalOpen(false);
-                      setFormData({ name: "", email: "", role: "Editor" }); // Reset form saat cancel
-                    }}
+                    onClick={handleCloseModal}
                     className="px-5 py-2.5 text-sm font-bold text-slate-600 hover:text-slate-900 hover:bg-slate-200 rounded-lg transition-colors"
                   >
                     Cancel

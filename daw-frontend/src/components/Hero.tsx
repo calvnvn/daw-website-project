@@ -74,8 +74,6 @@ export default function Hero() {
     <section
       className="relative h-screen min-h-[600px] w-full overflow-hidden bg-slate-900 group"
       // 🚀 5. Pause auto-slide saat mouse di area Hero
-      onMouseEnter={() => setIsPaused(true)}
-      onMouseLeave={() => setIsPaused(false)}
     >
       {/* --- PRELOADER HACK --- */}
       {/* Memaksa browser download gambar pertama secepat mungkin */}

@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Link, useLocation } from "react-router-dom";
+import { Link } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { Menu, X, Globe, ChevronDown } from "lucide-react";
 import logoDaw from "@/assets/logo-daw.png";

@@ -16,13 +16,6 @@ import {
 import { toast } from "sonner";
 import api, { BASE_UPLOAD_URL } from "@/lib/api";
 
-// Milestones History
-interface HistoryItem {
-  id: number;
-  year: string;
-  text: string;
-}
-
 // Philosophy Pillar
 interface PhilosophyPillar {
   id: string;
@@ -39,12 +32,6 @@ interface ManagementMember {
   level: string; // atau "chairman" | "director" | "division"
   order: number;
   photoUrl: string | null;
-}
-
-interface HistoryApiResponse {
-  id: number;
-  year: string;
-  description: string;
 }
 
 export default function AboutUsManager() {
