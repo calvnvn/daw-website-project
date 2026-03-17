@@ -119,34 +119,60 @@ export default function UserManagement() {
   };
 
   const handleDeleteUser = async (id: string) => {
-    if (!confirm("Are you sure you want to delete this user?")) return;
-    const loadingToast = toast.loading("Menghapus user...");
-    const targetUser = users.find((u) => u.id === id);
-
-    // 🛡️ Guard: Jangan hapus diri sendiri atau Superadmin
-    if (id === currentUserId) {
-      return toast.error("Action Denied", {
-        description: "Suicide prevention active: You cannot delete yourself.",
+    // 🛡️ Guard 1: Suicide Prevention (Cegah hapus diri sendiri)
+    if (String(id) === String(currentUserId)) {
+      return toast.error("Safety Breach", {
+        description:
+          "You cannot delete your own account to prevent system lockout.",
       });
     }
+
+    const targetUser = users.find((u) => String(u.id) === String(id));
+
+    // 🛡️ Guard 2: Superadmin Protection
     if (targetUser?.role === "Superadmin") {
       return toast.error("Action Denied", {
         description: "Superadmin accounts are immutable and cannot be deleted.",
       });
     }
-    try {
-      await api.delete(`/users/${id}`);
-      toast.success("User deleted successfully.", { id: loadingToast });
-      fetchUsers();
-    } catch (error: any) {
-      toast.error(
-        error.response?.data?.message || "Cannot delete Superadmin.",
-        {
-          id: loadingToast,
+
+    // 🚀 TAHAP 1: Konfirmasi menggunakan Sonner Toast Action
+    toast("Confirm Deletion", {
+      description: `Are you sure you want to permanently delete ${targetUser?.name}?`,
+      duration: Infinity, // Agar toast tidak hilang sampai user memilih
+      action: {
+        label: "Delete User",
+        onClick: async () => {
+          // 🚀 TAHAP 2: Jalankan proses hapus setelah dikonfirmasi
+          const loadingToast = toast.loading(
+            `Terminating ${targetUser?.name}...`,
+          );
+
+          try {
+            await api.delete(`/users/${id}`);
+
+            toast.success("User Terminated", {
+              id: loadingToast,
+              description: `${targetUser?.name} has been removed from the DAW database.`,
+            });
+
+            fetchUsers(); // Refresh data
+          } catch (error: any) {
+            toast.error("Operation Failed", {
+              id: loadingToast,
+              description:
+                error.response?.data?.message || "Internal Server Error",
+            });
+          }
         },
-      );
-    }
+      },
+      cancel: {
+        label: "Cancel",
+        onClick: () => toast.dismiss(),
+      },
+    });
   };
+
   const getRoleBadgeColor = (role: string) => {
     switch (role) {
       case "Superadmin":
@@ -225,9 +251,8 @@ export default function UserManagement() {
                 /* --- DATA ITERATION --- */
                 filteredUsers.map((user) => {
                   // 🛡️ LOGIKA PROTEKSI (Dihitung per baris user)
-                  const isSelf = user.id === currentUserId;
+                  const isSelf = String(user.id) === String(currentUserId);
                   const isSuperadmin = user.role === "Superadmin";
-
                   return (
                     <tr
                       key={user.id}
@@ -305,15 +330,6 @@ export default function UserManagement() {
                                   : "Reactivate User"}
                             </span>
                           </div>
-                          {/* 2. RESET PASSWORD BUTTON */}
-                          <div className="relative flex items-center justify-center group/tooltip">
-                            <button className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors">
-                              <Key className="w-4 h-4" />
-                            </button>
-                            <span className="absolute -top-8 scale-0 transition-all rounded bg-slate-800 p-2 text-[10px] text-white group-hover/tooltip:scale-100 z-10 whitespace-nowrap shadow-lg">
-                              Reset Password
-                            </span>
-                          </div>
                           {/* 3. DELETE BUTTON */}
                           <div className="relative flex items-center justify-center group/tooltip">
                             <button
@@ -325,15 +341,16 @@ export default function UserManagement() {
                               disabled={isSelf || isSuperadmin}
                               className={`p-2 rounded-lg transition-colors ${
                                 isSelf || isSuperadmin
-                                  ? "opacity-20 cursor-not-allowed text-slate-300"
+                                  ? "opacity-20 cursor-not-allowed text-slate-300 bg-slate-100"
                                   : "text-slate-400 hover:text-red-600 hover:bg-red-50"
                               }`}
                             >
                               <Trash2 className="w-4 h-4" />
                             </button>
+                            {/* Tooltip yang lebih informatif */}
                             <span className="absolute -top-8 scale-0 transition-all rounded bg-slate-800 p-2 text-[10px] text-white group-hover/tooltip:scale-100 z-10 whitespace-nowrap shadow-lg">
                               {isSelf
-                                ? "Cannot delete yourself"
+                                ? "You cannot delete yourself"
                                 : isSuperadmin
                                   ? "Superadmin is protected"
                                   : "Delete User"}

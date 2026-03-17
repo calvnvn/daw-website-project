@@ -77,20 +77,37 @@ exports.updateUser = async (req, res) => {
 // DELETE User
 exports.deleteUser = async (req, res) => {
   try {
-    const { id } = req.params;
+    const { id } = req.params; // ID user yang mau dihapus
+    const currentAdminId = req.userId; // ID admin yang sedang login (dari token)
+    const targetId = req.params.id;
+
+    // 🛡️ GUARD 1: Anti-Self-Destruct (Cegah hapus diri sendiri)
+    if (String(currentAdminId) === String(targetId)) {
+      return res.status(403).json({ message: "You cannot delete yourself." });
+    }
+
     const user = await User.findByPk(id);
 
+    // Cek apakah user ada
     if (!user) return res.status(404).json({ message: "User not found" });
 
+    // 🛡️ GUARD 2: Proteksi Superadmin (Immutable)
     if (user.role === "Superadmin") {
       return res.status(403).json({
-        message: "Superadmin accounts cannot be deleted for safety reasons.",
+        message:
+          "Superadmin accounts are immutable and cannot be deleted via this panel.",
       });
     }
 
+    // Eksekusi penghapusan
     await user.destroy();
-    res.json({ success: true, message: "User account deleted permanentely" });
+
+    res.json({
+      success: true,
+      message: `User ${user.name} has been deleted permanently.`,
+    });
   } catch (error) {
-    res.status(500).json({ message: "Delete failed" });
+    console.error("Delete User Error:", error);
+    res.status(500).json({ message: "Internal server error during deletion." });
   }
 };

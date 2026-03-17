@@ -50,7 +50,10 @@ export default function Philosophy() {
       <ScrollReveal direction="up" delay={50}>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 lg:gap-8">
           {pillarsToRender.map((pillar) => (
-            <div className="p-8 border border-slate-100 bg-slate-50/50 rounded-2xl hover:shadow-[0_8px_30px_rgba(0,0,0,0.04)] hover:border-daw-green/20 hover:bg-white transition-all duration-500 h-full">
+            <div
+              key={pillar.id}
+              className="p-8 border border-slate-100 bg-slate-50/50 rounded-2xl hover:shadow-[0_8px_30px_rgba(0,0,0,0.04)] hover:border-daw-green/20 hover:bg-white transition-all duration-500 h-full"
+            >
               <div className="w-12 h-12 flex items-center justify-center rounded-full bg-daw-green/10 text-daw-green mb-6">
                 {getIconForPillar(pillar.id)}
               </div>

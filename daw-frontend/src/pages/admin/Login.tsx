@@ -36,9 +36,11 @@ export default function Login() {
       const data = response.data;
 
       localStorage.setItem("daw_token", data.accessToken);
+      localStorage.setItem("userId", data.id);
       localStorage.setItem(
         "daw_user",
         JSON.stringify({
+          id: data.id,
           name: data.name,
           email: data.email,
           role: data.role,
