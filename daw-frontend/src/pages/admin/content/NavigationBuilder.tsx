@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { toast } from "sonner";
 import {
   Edit2,
@@ -41,6 +41,7 @@ export default function NavigationBuilder() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [draggedMenuId, setDraggedMenuId] = useState<string | null>(null);
   const [dragOverMenuId, setDragOverMenuId] = useState<string | null>(null);
+  const MAX_ALLOWED_DEPTH = 1; // 0 = Root only, 1 = Root + 1 Level Dropdown
 
   const [formData, setFormData] = useState({
     label: "",
@@ -50,6 +51,25 @@ export default function NavigationBuilder() {
     parentId: "",
     isActive: true,
   });
+
+  const getMaxDepth = (menu: Menu): number => {
+    if (!menu.children || menu.children.length === 0) return 0;
+    return 1 + Math.max(0, ...menu.children.map(getMaxDepth));
+  };
+
+  const getCurrentDepth = (
+    parentId: string | null,
+    allMenus: Menu[],
+  ): number => {
+    let depth = 0;
+    let currentId = parentId;
+    while (currentId !== null) {
+      depth++;
+      const parent = allMenus.find((m) => m.id === currentId);
+      currentId = parent ? parent.parentId : null;
+    }
+    return depth;
+  };
 
   const fetchData = async () => {
     setIsLoading(true);
@@ -121,18 +141,29 @@ export default function NavigationBuilder() {
     ) {
       return toast.error("Hierarchy error: Infinite loop detected.");
     }
+
     setIsSaving(true);
     const toastId = toast.loading("Saving configuration...");
+
     try {
-      const payload = {
-        ...formData,
-        pageId: formData.type === "page" ? formData.pageId || null : null,
-        externalLink:
-          formData.type === "external" ? formData.externalLink || null : null,
+      const payload: any = {
+        label: formData.label,
+        type: formData.type,
         parentId: formData.parentId || null,
+        isActive: formData.isActive,
       };
+
+      if (formData.type === "page") {
+        payload.pageId = formData.pageId || null;
+        payload.externalLink = null;
+      } else {
+        payload.externalLink = formData.externalLink || null;
+        payload.pageId = null;
+      }
+
       if (editingId) await api.put(`/menus/${editingId}`, payload);
       else await api.post("/menus", payload);
+
       toast.success("Structure updated!", { id: toastId });
       resetForm();
       fetchData();
@@ -159,7 +190,7 @@ export default function NavigationBuilder() {
     }
   };
 
-  // 🚀 DRAG LOGIC (Simplified for UX)
+  // DRAG LOGIC (Simplified for UX)
   const handleDragStart = (e: React.DragEvent, id: string) => {
     e.dataTransfer.setData("text/plain", id);
     setDraggedMenuId(id);
@@ -172,6 +203,7 @@ export default function NavigationBuilder() {
   ) => {
     e.preventDefault();
     setDragOverMenuId(null);
+
     const sourceId = e.dataTransfer.getData("text/plain");
     if (!sourceId || sourceId === targetMenu.id) {
       setDraggedMenuId(null);
@@ -179,6 +211,7 @@ export default function NavigationBuilder() {
     }
 
     const newParentId = mode === "child" ? targetMenu.id : targetMenu.parentId;
+
     if (isCircularMove(sourceId, newParentId, flatMenus)) {
       setDraggedMenuId(null);
       return toast.error(
@@ -186,11 +219,20 @@ export default function NavigationBuilder() {
       );
     }
 
+    const sourceMenu = flatMenus.find((m) => m.id === sourceId);
+    const movingSubtreeDepth = sourceMenu ? getMaxDepth(sourceMenu) : 0;
+    const newTargetDepth = getCurrentDepth(newParentId, flatMenus);
+
+    if (newTargetDepth + movingSubtreeDepth > MAX_ALLOWED_DEPTH) {
+      setDraggedMenuId(null);
+      return toast.error(
+        `Hierarchy too deep. Navbar design limits depth to ${MAX_ALLOWED_DEPTH} level(s).`,
+      );
+    }
+
     const toastId = toast.loading("Reordering structure...");
     try {
-      const sourceMenu = flatMenus.find((m) => m.id === sourceId);
       if (!sourceMenu) throw new Error("Source missing.");
-
       const siblings = flatMenus
         .filter((m) => m.parentId === newParentId && m.id !== sourceId)
         .sort((a, b) => a.orderIndex - b.orderIndex);
@@ -224,6 +266,26 @@ export default function NavigationBuilder() {
     }
   };
 
+  // MEMOIZATION UNTUK PERFORMA
+  // Ketikan user di form (formData) TIDAK akan memicu kalkulasi ulang.
+  const validParentOptions = useMemo(() => {
+    return flatMenus.filter((m) => {
+      if (!editingId) {
+        return getCurrentDepth(m.id, flatMenus) < MAX_ALLOWED_DEPTH + 1;
+      }
+
+      const movingMenu = flatMenus.find((f) => f.id === editingId);
+      const movingMenuSubtreeDepth = movingMenu ? getMaxDepth(movingMenu) : 0;
+      const targetDepth = getCurrentDepth(m.id, flatMenus);
+
+      return (
+        m.id !== editingId && // Bukan dirinya sendiri
+        !isCircularMove(editingId, m.id, flatMenus) && // Bukan anaknya sendiri
+        targetDepth + 1 + movingMenuSubtreeDepth <= MAX_ALLOWED_DEPTH + 1 // Kedalaman aman
+      );
+    });
+  }, [flatMenus, editingId]); // 👈 Kunci performanya ada di dependency array ini
+
   const renderMenuTree = (menuList: Menu[], depth = 0) => {
     return menuList.map((menu) => (
       <div key={menu.id} className="relative">
@@ -233,6 +295,7 @@ export default function NavigationBuilder() {
             e.preventDefault();
             setDragOverMenuId(`${menu.id}-top`);
           }}
+          onDragLeave={() => setDragOverMenuId(null)}
           onDrop={(e) => handleDrop(e, menu, "sibling")}
           className={`h-1.5 transition-all mx-4 rounded-full ${dragOverMenuId === `${menu.id}-top` ? "bg-emerald-500 my-2" : "bg-transparent"}`}
         />
@@ -240,10 +303,15 @@ export default function NavigationBuilder() {
         <div
           draggable
           onDragStart={(e) => handleDragStart(e, menu.id)}
+          onDragEnd={() => {
+            setDraggedMenuId(null);
+            setDragOverMenuId(null);
+          }}
           onDragOver={(e) => {
             e.preventDefault();
             setDragOverMenuId(`${menu.id}-child`);
           }}
+          onDragLeave={() => setDragOverMenuId(null)}
           onDrop={(e) => handleDrop(e, menu, "child")}
           className={`group relative flex items-center justify-between p-4 rounded-2xl border transition-all duration-300
             ${dragOverMenuId === `${menu.id}-child` ? "border-emerald-500 bg-emerald-50/50 shadow-inner" : "border-slate-200 bg-white"}
@@ -289,13 +357,37 @@ export default function NavigationBuilder() {
             </div>
           </div>
 
-          <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-all transform translate-x-2 group-hover:translate-x-0">
+          <div
+            className="flex items-center gap-1 
+            /* Di Mobile (default): Selalu terlihat dan di tempatnya */
+            opacity-100 translate-x-0
+            /* Di Desktop (lg): Sembunyi, tunggu di-hover, dan geser ke kanan sedikit */
+            lg:opacity-0 lg:translate-x-2 
+            lg:group-hover:opacity-100 lg:group-hover:translate-x-0 
+            transition-all duration-300"
+          >
             <button
               onClick={() => {
-                setFormData({ ...formData, parentId: menu.id });
+                if (depth >= MAX_ALLOWED_DEPTH) {
+                  return toast.error("Maximum menu depth reached.");
+                }
                 setEditingId(null);
+                setFormData({
+                  label: "",
+                  type: "page",
+                  pageId: "",
+                  externalLink: "",
+                  parentId: menu.id,
+                  isActive: true,
+                });
+                toast.info(`Adding sub-menu under "${menu.label}"`);
               }}
-              className="p-2 text-slate-400 hover:text-emerald-500 hover:bg-emerald-50 rounded-lg transition-all"
+              disabled={depth >= MAX_ALLOWED_DEPTH}
+              className={`p-2 transition-all ${
+                depth >= MAX_ALLOWED_DEPTH
+                  ? "opacity-20 cursor-not-allowed text-slate-300"
+                  : "text-slate-400 hover:text-emerald-500 hover:bg-emerald-50 rounded-lg"
+              }`}
               title="Add Sub-menu"
             >
               <Plus className="w-4 h-4" />
@@ -303,12 +395,14 @@ export default function NavigationBuilder() {
             <button
               onClick={() => handleEdit(menu)}
               className="p-2 text-slate-400 hover:text-blue-500 hover:bg-blue-50 rounded-lg transition-all"
+              title="Edit Menu"
             >
               <Edit2 className="w-4 h-4" />
             </button>
             <button
               onClick={() => handleDelete(menu.id)}
               className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all"
+              title="Delete Menu"
             >
               <Trash2 className="w-4 h-4" />
             </button>
@@ -488,20 +582,12 @@ export default function NavigationBuilder() {
                 }
                 className="w-full px-5 py-4 rounded-2xl bg-slate-50 border border-slate-100 outline-none text-sm font-bold text-slate-600"
               >
-                <option value="">-- Set as Root (Main Menu) --</option>
-                {flatMenus
-                  .filter((m) => {
-                    if (!editingId) return true;
-                    return (
-                      m.id !== editingId &&
-                      !isCircularMove(editingId, m.id, flatMenus)
-                    );
-                  })
-                  .map((m) => (
-                    <option key={m.id} value={m.id}>
-                      Sub of: {m.label}
-                    </option>
-                  ))}
+                <option value=""> Set as Root (Main Menu) </option>
+                {validParentOptions.map((m) => (
+                  <option key={m.id} value={m.id}>
+                    Sub of: {m.label}
+                  </option>
+                ))}
               </select>
               <p className="text-[10px] text-slate-400 italic ml-1">
                 Nest this item under a parent / Letakkan di bawah menu lain.

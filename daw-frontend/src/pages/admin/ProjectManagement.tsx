@@ -72,34 +72,38 @@ export default function ProjectManagement() {
   const handleDeleteRequest = (id: string, title: string) => {
     toast.warning("Confirm Deletion", {
       description: `Are you sure you want to delete "${title}"?`,
-      duration: Infinity, // Toast tidak akan hilang sampai user memilih
       action: {
-        label: "Yes, Delete",
+        label: "Delete",
         onClick: () => executeDelete(id),
       },
       cancel: {
         label: "Cancel",
-        onClick: () => toast.dismiss(),
+        onClick: () => {},
       },
     });
   };
 
   const executeDelete = async (id: string) => {
-    const loadingToast = toast.loading("Processing deletion...");
+    // Kita gunakan toast.promise agar loading bar dan status tersinkronisasi
+    toast.promise(
+      async () => {
+        // A. Panggil API Backend (yang sudah kita pasangi logic hapus file fisik)
+        const response = await api.delete(`/projects/${id}`);
 
-    try {
-      const response = await api.delete(`/projects/${id}`);
-
-      if (response.data && response.data.success) {
-        toast.success("Project removed successfully", { id: loadingToast });
+        // B. Cek apakah backend berhasil (biasanya status 200)
         setProjects((prev) => prev.filter((p) => p.id !== id));
-      }
-    } catch (error: any) {
-      toast.error("Deletion failed", {
-        id: loadingToast,
-        description: error.response?.data?.message || "Server error occurred.",
-      });
-    }
+
+        return response.data;
+      },
+      {
+        loading: "Deleting project and cleaning up storage...",
+        success: "Project successfully removed!",
+        error: (err) => {
+          console.error("Delete Error:", err);
+          return err.response?.data?.message || "Failed to delete project.";
+        },
+      },
+    );
   };
 
   return (

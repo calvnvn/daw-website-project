@@ -82,7 +82,9 @@ exports.uploadInlineImage = async (req, res) => {
       return res.status(400).json({ message: "No image file provided." });
     }
 
-    const fileUrl = `/uploads/${req.file.filename}`;
+    const fileUrl = `${req.protocol}://${req.get("host")}/uploads/${req.file.filename}`;
+
+    console.log("🚀 Inline Upload Success:", fileUrl);
 
     res.status(200).json({
       message: "Image uploaded succesfully",
@@ -98,36 +100,71 @@ exports.deleteProject = async (req, res) => {
   try {
     const { id } = req.params;
 
+    // 1. Ambil data lengkap (termasuk content untuk cek gambar inline)
     const [project] = await sequelize.query(
-      `SELECT cover_image, gallery FROM Projects WHERE id = :id`,
+      `SELECT cover_image, gallery, content FROM Projects WHERE id = :id`,
       { replacements: { id }, type: sequelize.QueryTypes.SELECT },
     );
 
     if (!project) return res.status(404).json({ message: "Project not found" });
 
+    // --- HELPER DELETE FILE ---
     const deleteFile = (fileName) => {
       if (!fileName) return;
-      const filePath = path.join(process.cwd(), "public", "uploads", fileName);
+      // Ambil nama filenya saja jika yang tersimpan adalah URL lengkap
+      const baseName = path.basename(fileName);
+      const filePath = path.join(process.cwd(), "public", "uploads", baseName);
+
       if (fs.existsSync(filePath)) {
-        fs.unlinkSync(filePath);
+        try {
+          fs.unlinkSync(filePath);
+          console.log(`Successfully deleted: ${baseName}`);
+        } catch (e) {
+          console.error(`Failed to delete file: ${baseName}`, e);
+        }
       }
     };
 
-    // Delete Cover Image
+    // A. Hapus Cover Image
     deleteFile(project.cover_image);
 
-    // Delete Image Gallery
+    // B. Hapus Image Gallery (Dengan Safety Check)
     if (project.gallery) {
-      const galleryFiles = JSON.parse(project.gallery);
-      galleryFiles.forEach((file) => deleteFile(file));
+      try {
+        const galleryFiles =
+          typeof project.gallery === "string"
+            ? JSON.parse(project.gallery)
+            : project.gallery;
+        if (Array.isArray(galleryFiles)) {
+          galleryFiles.forEach((file) => deleteFile(file));
+        }
+      } catch (e) {
+        console.warn("Gallery format invalid, skipping gallery cleanup.");
+      }
     }
 
-    // Delete from SQL
+    // C. Hapus Gambar di dalam Content (React Quill)
+    // Mencari semua nama file di dalam tag <img src="...">
+    if (project.content) {
+      const imgRegex = /src="[^"]*\/uploads\/([^"]+)"/g;
+      let match;
+      while ((match = imgRegex.exec(project.content)) !== null) {
+        deleteFile(match[1]); // match[1] adalah nama filenya
+      }
+    }
+
+    // 2. Delete dari Database
     await sequelize.query(`DELETE FROM Projects WHERE id = :id`, {
       replacements: { id },
       type: sequelize.QueryTypes.DELETE,
     });
-    res.status(200).json({ message: "Project and associated files deleted." });
+
+    res
+      .status(200)
+      .json({
+        message:
+          "Project and all associated files (including inline images) deleted successfully.",
+      });
   } catch (error) {
     console.error("Error DELETE Project:", error);
     res.status(500).json({ message: "Failed to Delete Project." });
@@ -158,8 +195,16 @@ exports.getProjectById = async (req, res) => {
 exports.updateProject = async (req, res) => {
   try {
     const { id } = req.params;
-    const { title, excerpt, content, category, status, existing_gallery } =
-      req.body;
+    const {
+      title,
+      excerpt,
+      content,
+      category,
+      status,
+      existing_gallery,
+      seo_title,
+      meta_description,
+    } = req.body;
 
     // 1. Ambil data lama untuk pengecekan file (opsional tapi disarankan)
     const [oldProject] = await sequelize.query(
@@ -167,31 +212,27 @@ exports.updateProject = async (req, res) => {
       { replacements: { id }, type: sequelize.QueryTypes.SELECT },
     );
     if (!oldProject)
-      return res.status(404).json({ message: "Project tidak ditemukan" });
+      return res.status(404).json({ message: "Project not found" });
 
     // 2. Olah Gallery (Merge lama & baru)
     let finalGallery = [];
     if (existing_gallery) {
-      finalGallery = JSON.parse(existing_gallery);
+      try {
+        finalGallery = JSON.parse(existing_gallery);
+      } catch (e) {
+        console.error("Gagal parse gallery lama:", existing_gallery);
+        finalGallery = [];
+      }
     }
+
     if (req.files && req.files["gallery"]) {
       const newImages = req.files["gallery"].map((file) => file.filename);
       finalGallery = [...finalGallery, ...newImages];
     }
 
     // 3. Olah Cover Image
-    let coverImageName = oldProject.cover_image; // Default pakai yang lama
+    let coverImageName = oldProject.cover_image;
     if (req.files && req.files["cover_image"]) {
-      // Hapus file fisik lama jika ada
-      const oldPath = path.join(
-        process.cwd(),
-        "public",
-        "uploads",
-        oldProject.cover_image,
-      );
-      if (oldProject.cover_image && fs.existsSync(oldPath))
-        fs.unlinkSync(oldPath);
-
       coverImageName = req.files["cover_image"][0].filename;
     }
 
@@ -222,9 +263,8 @@ exports.updateProject = async (req, res) => {
         status: status || oldProject.status,
         cover_image: coverImageName,
         gallery: JSON.stringify(finalGallery),
-        seo_title: req.body.seo_title || oldProject.seo_title, // 🚀 FIXED
-        meta_description:
-          req.body.meta_description || oldProject.meta_description, // 🚀 FIXED
+        seo_title: seo_title || oldProject.seo_title || "",
+        meta_description: meta_description || oldProject.meta_description || "",
       },
       type: sequelize.QueryTypes.UPDATE,
     });

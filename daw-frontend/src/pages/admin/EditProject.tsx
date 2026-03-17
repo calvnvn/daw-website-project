@@ -128,14 +128,15 @@ export default function EditProject() {
           category: data.category || "Resources",
           status: data.status || "Draft",
           cover_image: data.cover_image || "",
-          gallery: data.gallery || "[]",
+          gallery:
+            typeof data.gallery === "string"
+              ? data.gallery
+              : JSON.stringify(data.gallery || []),
           seo_title: data.seo_title || "",
           meta_description: data.meta_description || "",
         });
-      } catch (err: any) {
-        toast.error("Gagal memuat data", {
-          description: err.response?.data?.message,
-        });
+      } catch {
+        toast.error("Gagal memuat data");
         navigate("/admin/projects");
       } finally {
         setIsFetching(false);
@@ -144,7 +145,6 @@ export default function EditProject() {
     fetchProject();
   }, [id, navigate]);
 
-  // 🚀 FIXED: Bunuh Ghost Fetch di imageHandler
   const imageHandler = useCallback(() => {
     const input = document.createElement("input");
     input.setAttribute("type", "file");
@@ -200,13 +200,11 @@ export default function EditProject() {
     try {
       const payload = new FormData();
 
-      // 🚀 Optimasi Cover Baru (jika ada)
       if (coverFile) {
         const optimizedCover = await compressImage(coverFile);
         payload.append("cover_image", optimizedCover);
       }
 
-      // 🚀 Optimasi Gallery Baru (jika ada)
       for (const file of galleryFiles) {
         const optimizedFile = await compressImage(file);
         payload.append("gallery", optimizedFile);
@@ -218,13 +216,15 @@ export default function EditProject() {
       payload.append("content", formData.content);
       payload.append("category", formData.category);
       payload.append("status", targetStatus);
-      payload.append("existing_gallery", formData.gallery); // Kirim gallery lama yang tersisa
+      payload.append("existing_gallery", formData.gallery);
+      payload.append("seo_title", formData.seo_title);
+      payload.append("meta_description", formData.meta_description);
 
       await api.put(`/projects/${id}`, payload);
 
       toast.success("Project updated!", { id: loadingToast });
       navigate("/admin/projects");
-    } catch (err: any) {
+    } catch (err) {
       toast.error("Update failed", { id: loadingToast });
       console.error(err);
     } finally {

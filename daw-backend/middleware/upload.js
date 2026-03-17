@@ -6,25 +6,42 @@ const storage = multer.diskStorage({
     cb(null, "./public/uploads/");
   },
   filename: (req, file, cb) => {
-    // FIX: Hanya panggil SATU KALI cb()
+    // Membuat nama file yang unik dan aman
     const uniqueSuffix = Date.now() + "-" + Math.round(Math.random() * 1e9);
-    const safeName =
-      file.fieldname + "-" + uniqueSuffix + path.extname(file.originalname);
-    cb(null, safeName);
+    // Kita bersihkan nama field agar tidak ada karakter aneh
+    const safeFieldName = file.fieldname.replace(/[^a-zA-Z0-9]/g, "");
+    const ext = path.extname(file.originalname);
+
+    cb(null, `${safeFieldName}-${uniqueSuffix}${ext}`);
   },
 });
 
 const fileFilter = (req, file, cb) => {
-  // FIX: Hapus deklarasi ganda, gunakan satu logika filter yang solid
-  if (file.mimetype.startsWith("image/")) {
+  // 1. Cek tipe file (Mime-type)
+  if (!file.mimetype.startsWith("image/")) {
+    // Gunakan Error biasa untuk masalah tipe file.
+    return cb(
+      new Error("Hanya file gambar (JPG, PNG, dll) yang diizinkan!"),
+      false,
+    );
+  }
+
+  // 2. Filter nama field (Opsional tapi Pro)
+  // Memastikan hanya field yang kita kenal yang boleh masuk
+  const allowedFields = [
+    "cover_image",
+    "gallery",
+    "inline_image",
+    "teaser_image",
+    "logo",
+    "photo",
+  ];
+
+  if (allowedFields.includes(file.fieldname)) {
     cb(null, true);
   } else {
-    cb(
-      new multer.MulterError(
-        "LIMIT_UNEXPECTED_FILE",
-        "Only image files are allowed!",
-      ),
-    );
+    // Jika ada field aneh mencoba upload, baru kita keluarkan MulterError
+    cb(new multer.MulterError("LIMIT_UNEXPECTED_FILE"), false);
   }
 };
 
@@ -32,7 +49,8 @@ const upload = multer({
   storage: storage,
   fileFilter: fileFilter,
   limits: {
-    fileSize: 10 * 1024 * 1024, // Maksimal 10MB PER GAMBAR
+    // 🚀 Kita naikkan sedikit ke 15MB karena file kamera modern seringkali besar
+    fileSize: 15 * 1024 * 1024,
   },
 });
 

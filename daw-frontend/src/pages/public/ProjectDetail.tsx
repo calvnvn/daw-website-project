@@ -10,7 +10,9 @@ import {
 } from "lucide-react";
 import ScrollReveal from "@/components/ScrollReveal";
 import ProjectDetailSkeleton from "@/components/ProjectDetailSkeleton";
-import api, { BASE_UPLOAD_URL } from "@/lib/api";
+import api from "@/lib/api";
+import { getCleanImageUrl } from "@/lib/utils";
+import DOMPurify from "dompurify";
 
 // 1. Interface untuk menghilangkan warning 'any'
 interface ProjectData {
@@ -25,13 +27,6 @@ interface ProjectData {
   updatedAt: string;
   views: number;
 }
-
-// Image Normalization
-const getCleanImageUrl = (path: string | null) => {
-  if (!path) return "";
-  const cleanPath = path.replace("/uploads", "");
-  return `${BASE_UPLOAD_URL}${cleanPath}`;
-};
 
 export default function ProjectDetail() {
   const { id } = useParams<{ id: string }>();
@@ -291,11 +286,20 @@ export default function ProjectDetail() {
               {/* TEXT CONTENT */}
               <ScrollReveal direction="up" delay={150}>
                 <div
-                  className="font-sans prose prose-lg max-w-full prose-slate text-slate-600 md:text-[17px] leading-[1.8] tracking-normal whitespace-pre-line prose-headings:font-serif prose-headings:text-slate-900 prose-p:my-4 prose-a:text-daw-green prose-a:font-semibold hover:prose-a:text-[#003b1c] prose-a:underline-offset-4 prose-img:rounded-xl prose-img:shadow-md prose-img:w-full prose-img:my-8 [&_table]:block [&_table]:overflow-x-auto [&_table]:w-full [&_table]:whitespace-nowrap [&_table]:border-collapse [&_td]:border [&_td]:border-slate-200 [&_td]:p-3 [&_th]:border [&_th]:border-slate-200 [&_th]:p-3 [&_th]:bg-slate-50 [&_pre]:whitespace-pre-wrap [&_pre]:break-words text-justify break-normal [word-break:normal] [overflow-wrap:break-word] overflow-hidden"
-                  dangerouslySetInnerHTML={{ __html: project.content }}
+                  className="
+      daw-editorial-content
+      max-w-none 
+      text-slate-600 
+      leading-relaxed 
+      text-lg md:text-[1.125rem] 
+      tracking-[-0.01em]
+    "
+                  dangerouslySetInnerHTML={{
+                    // 🚀 WAJIB PAKAI DOMPURIFY DI PRODUCTION!
+                    __html: DOMPurify.sanitize(project.content),
+                  }}
                 />
               </ScrollReveal>
-
               {/* IMAGE GALLERY DENGAN ONCLICK LIGHTBOX */}
               {galleryUrls.length > 0 && (
                 <ScrollReveal direction="up" delay={300}>

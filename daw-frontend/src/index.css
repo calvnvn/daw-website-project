@@ -28,3 +28,101 @@
   margin-top: -1.5rem !important; /* Tarik teks lebih dekat ke gambar */
   margin-bottom: 2rem !important;
 }
+
+/* --- DAW EDITORIAL STYLING FOR QUILL OUTPUT --- */
+.daw-editorial-content {
+  font-family: "Inter", system-ui, sans-serif;
+  text-align: left;
+  overflow-wrap: break-word;
+  word-break: normal;
+  hyphens: none;
+  display: block;
+  width: 100%;
+}
+/* Typography Spacing */
+.daw-editorial-content p {
+  margin-bottom: 1.75em;
+  color: #475569; /* slate-600 */
+}
+
+.daw-editorial-content h1,
+.daw-editorial-content h2,
+.daw-editorial-content h3 {
+  font-family: "Playfair Display", serif; /* Font serif mewah DAW */
+  color: #0f172a; /* slate-900 */
+  margin-top: 2em;
+  margin-bottom: 0.75em;
+  line-height: 1.3;
+  font-weight: 700;
+}
+
+.daw-editorial-content h2 {
+  font-size: clamp(1.5rem, 4vw, 2rem);
+}
+.daw-editorial-content h3 {
+  font-size: 1.5rem;
+}
+
+/* Elegant Links */
+.daw-editorial-content a {
+  color: #00a651; /* daw-green */
+  text-decoration: none;
+  border-bottom: 2px solid rgba(0, 166, 81, 0.2);
+  transition: all 0.3s ease;
+  font-weight: 600;
+}
+.daw-editorial-content a:hover {
+  border-bottom-color: #00a651;
+  background-color: rgba(0, 166, 81, 0.05);
+}
+
+/* Premium Blockquotes (Pull-Quotes) */
+.daw-editorial-content blockquote {
+  border-left: 4px solid #00a651;
+  background: linear-gradient(to right, rgba(0, 166, 81, 0.05), transparent);
+  padding: 1.5rem 2rem;
+  margin: 2.5rem 0;
+  border-radius: 0 1rem 1rem 0;
+  font-style: italic;
+  font-size: 1.25rem;
+  color: #1e293b; /* slate-800 */
+}
+
+/* Image Handling (Cinematic Feel) */
+.daw-editorial-content img {
+  border-radius: 1rem;
+  width: 100%;
+  height: auto;
+  margin: 3rem 0;
+  box-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.1);
+  transition: transform 0.3s ease;
+}
+.daw-editorial-content img:hover {
+  transform: scale(1.01);
+}
+
+/* Quill Native Alignment Overrides */
+.daw-editorial-content .ql-align-center {
+  text-align: center;
+}
+.daw-editorial-content .ql-align-right {
+  text-align: right;
+}
+.daw-editorial-content .ql-align-justify {
+  text-align: justify;
+}
+
+/* Beautiful Lists */
+.daw-editorial-content ul,
+.daw-editorial-content ol {
+  margin-bottom: 1.5rem;
+  padding-left: 1.5rem;
+}
+.daw-editorial-content ul li {
+  list-style-type: disc;
+  margin-bottom: 0.5rem;
+  padding-left: 0.5rem;
+}
+.daw-editorial-content ul li::marker {
+  color: #00a651; /* Bullet point warna hijau DAW */
+}

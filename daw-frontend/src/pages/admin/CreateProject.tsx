@@ -123,19 +123,27 @@ export default function CreateProject() {
             "/projects/upload-inline",
             uploadData,
           );
-          const quill = quillRef.current?.getEditor();
-          const range = quill?.getSelection();
-          const imageUrl = response.data.url.startsWith("http")
-            ? response.data.url
-            : `${BASE_UPLOAD_URL}/${response.data.url}`;
 
-          quill?.insertEmbed(range?.index || 0, "image", response.data.url);
+          const quill = quillRef.current?.getEditor();
+          if (!quill) {
+            throw new Error("Quill editor is not ready");
+          }
+
+          const range = quill.getSelection(true);
+          const index = range ? range.index : quill.getLength();
+
+          const imageUrl = response.data.url;
+
+          quill.insertEmbed(index, "image", imageUrl);
+          quill.setSelection(index + 1);
+
           toast.success("Image added to content", { id: toastId });
         } catch (err: any) {
+          console.error("Upload Error detail:", err.response?.data);
+
           toast.error("Upload failed", {
             id: toastId,
-            description:
-              err.response?.data?.message || "Check server connection.",
+            description: err.response?.data?.message || "Check backend console",
           });
         }
       }

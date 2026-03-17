@@ -2,7 +2,7 @@ import { useEffect, useState, useRef } from "react";
 import { useTranslation } from "react-i18next";
 import * as Icons from "lucide-react"; // 👈 IMPORT SEMUA ICON
 import ScrollReveal from "./ScrollReveal";
-import { useHome } from "@/contexts/HomeContext"; // 👈 IMPORT CONTEXT
+import { useHome } from "@/contexts/HomeContext";
 
 // --- CountUp Animation Function ---
 function AnimatedNumber({ text, locale }: { text: string; locale: string }) {

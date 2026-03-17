@@ -82,27 +82,53 @@ export default function InvestmentsManager() {
     ]);
   };
 
-  const removeCompany = async (id: number | string) => {
-    if (!confirm("Are you sure you want to remove this affiliated company?"))
-      return;
-
+  const removeCompany = (id: number | string) => {
     const target = localCompanies.find((c) => c.id === id);
+    if (!target) return;
 
-    // Jika data baru (belum disave ke DB), langsung hapus dari UI
-    if (target?.isNew) {
-      setLocalCompanies(localCompanies.filter((c) => c.id !== id));
-      return;
-    }
+    // 1. Tampilkan konfirmasi menggunakan Sonner
+    toast.warning(`Remove ${target.name || "Company"}?`, {
+      description: "This action will remove the affiliate from the grid.",
+      action: {
+        label: "Remove",
+        onClick: async () => {
+          // --- LOGIKA A: Jika data baru (Belum di-save ke DB) ---
+          if (target.isNew) {
+            setLocalCompanies((prev) => prev.filter((c) => c.id !== id));
+            toast.success("Removed from list");
+            return;
+          }
 
-    // Jika data lama, hapus dari Database
-    try {
-      await api.delete(`/investment/affiliate/${id}`);
-      toast.success("Deleted permanently!");
-      refreshData();
-    } catch (err) {
-      toast.error("Failed to delete company.");
-      console.log(err);
-    }
+          // --- LOGIKA B: Jika data lama (Hapus permanen dari DB) ---
+          toast.promise(
+            async () => {
+              // Panggil API Backend
+              await api.delete(`/investment/affiliate/${id}`);
+
+              // Update state UI agar baris langsung hilang
+              setLocalCompanies((prev) => prev.filter((c) => c.id !== id));
+
+              // Sync data context agar dashboard utama terupdate
+              refreshData();
+            },
+            {
+              loading: `Deleting ${target.name}...`,
+              success: "Company permanently deleted.",
+              error: (err) => {
+                console.error("Delete Error:", err);
+                return (
+                  err.response?.data?.message || "Failed to delete from server"
+                );
+              },
+            },
+          );
+        },
+      },
+      cancel: {
+        label: "Cancel",
+        onClick: () => {},
+      },
+    });
   };
 
   const updateCompany = (
@@ -120,24 +146,35 @@ export default function InvestmentsManager() {
   };
 
   const handleSaveCompanies = async () => {
-    // Looping semua perusahaan di layar, simpan satu per satu (Mass Save)
-    const promises = localCompanies.map(async (comp) => {
-      if (!comp.name.trim()) return null;
+    const loadingToast = toast.loading("Saving companies one by one...");
 
-      const formData = new FormData();
-      formData.append("name", comp.name);
-      formData.append("desc", comp.desc || "");
-      formData.append("category", comp.category);
-      if (comp.newLogoFile) formData.append("logo", comp.newLogoFile);
+    try {
+      for (const comp of localCompanies) {
+        if (!comp.name.trim()) continue;
 
-      if (comp.isNew) {
-        return api.post("/investment/affiliate", formData);
-      } else {
-        return api.put(`/investment/affiliate/${comp.id}`, formData);
+        const formData = new FormData();
+        formData.append("name", comp.name);
+        formData.append("desc", comp.desc || "");
+        formData.append("category", comp.category);
+
+        if (comp.newLogoFile) {
+          formData.append("logo", comp.newLogoFile);
+        }
+
+        // Update status loading per item (Opsional tapi Pro)
+        toast.loading(`Saving ${comp.name}...`, { id: loadingToast });
+
+        if (comp.isNew) {
+          await api.post("/investment/affiliate", formData);
+        } else {
+          await api.put(`/investment/affiliate/${comp.id}`, formData);
+        }
       }
-    });
-
-    await Promise.all(promises); // Tunggu semua selesai
+      toast.success("All companies synced!", { id: loadingToast });
+    } catch (err) {
+      console.error("Failed item:", err);
+      throw err; // Lempar ke handleSave utama
+    }
   };
 
   // ==========================================

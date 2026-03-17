@@ -46,19 +46,39 @@ export default function HeroManager() {
   };
 
   const removeSlide = async (id: string | number) => {
-    if (!confirm("Are you sure you want to delete this slide?")) return;
+    toast("Delete Slide?", {
+      description: "This action cannot be undone. Are you sure?",
+      action: {
+        label: "Delete",
+        onClick: async () => {
+          toast.promise(
+            async () => {
+              // Jika ID adalah number (data dari database)
+              if (typeof id === "number") {
+                await api.delete(`/homepage/hero/${id}`);
+              }
 
-    if (typeof id === "number") {
-      try {
-        await api.delete(`/homepage/hero/${id}`);
-        toast.success("Slide deleted from database");
-      } catch (err) {
-        console.error("Delete error: ", err);
-        toast.error("Failed to delete from server");
-        return;
-      }
-    }
-    setSlides(slides.filter((s) => s.id !== id));
+              // Update state di frontend setelah berhasil hapus di backend
+              setSlides((prev) => prev.filter((s) => s.id !== id));
+            },
+            {
+              loading: "Deleting slide from server...",
+              success: "Slide has been removed successfully!",
+              error: (err) => {
+                console.error("Delete error: ", err);
+                return (
+                  err.response?.data?.message || "Failed to delete from server"
+                );
+              },
+            },
+          );
+        },
+      },
+      cancel: {
+        label: "Cancel",
+        onClick: () => console.log("Delete cancelled"),
+      },
+    });
   };
 
   const handleImageChange = (id: string | number, file: File) => {

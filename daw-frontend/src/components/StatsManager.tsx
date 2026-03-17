@@ -42,19 +42,42 @@ export default function StatsManager() {
   };
 
   const removeStat = async (id: string | number) => {
-    if (!confirm("Are you sure?")) return;
+    // 1. Tampilkan toast konfirmasi terlebih dahulu
+    toast("Delete this statistic?", {
+      description:
+        "This action will permanently remove the data from the dashboard.",
+      action: {
+        label: "Delete",
+        onClick: () => {
+          // 2. Jika user klik 'Delete', jalankan proses penghapusan dengan promise
+          toast.promise(
+            async () => {
+              // Hanya panggil API jika ID adalah number (data sudah ada di DB)
+              if (typeof id === "number") {
+                await api.delete(`/homepage/stats/${id}`);
+              }
 
-    if (typeof id === "number") {
-      try {
-        await api.delete(`/homepage/stats/${id}`);
-        toast.success("Stat deleted from server");
-      } catch (err) {
-        console.error("Delete error:", err);
-        toast.error("Failed to delete from server");
-        return;
-      }
-    }
-    setStats(stats.filter((s) => s.id !== id));
+              // Update state di frontend
+              setStats((prev) => prev.filter((s) => s.id !== id));
+            },
+            {
+              loading: "Processing deletion...",
+              success: "Statistic has been successfully deleted!",
+              error: (err) => {
+                console.error("Delete error:", err);
+                return (
+                  err.response?.data?.message || "Could not delete statistic."
+                );
+              },
+            },
+          );
+        },
+      },
+      cancel: {
+        label: "Cancel",
+        onClick: () => console.log("Deletion cancelled"),
+      },
+    });
   };
 
   const handleSave = async () => {

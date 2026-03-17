@@ -45,6 +45,14 @@ const Project = sequelize.define(
       type: DataTypes.INTEGER,
       defaultValue: 0,
     },
+    seo_title: {
+      type: DataTypes.STRING,
+      allowNull: true,
+    },
+    meta_description: {
+      type: DataTypes.TEXT,
+      allowNull: true,
+    },
   },
   {
     timestamps: true,
