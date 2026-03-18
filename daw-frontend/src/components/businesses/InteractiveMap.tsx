@@ -27,9 +27,7 @@ export default function InteractiveMap({ markers }: InteractiveMapProps) {
     return () => window.removeEventListener("resize", checkMobile);
   }, []);
 
-  // ==========================================
   // PHYSICS COLLISION ENGINE V3: THE SHIELD
-  // ==========================================
   const smartMarkers = useMemo(() => {
     if (!markers || markers.length === 0) return [];
 
@@ -40,16 +38,14 @@ export default function InteractiveMap({ markers }: InteractiveMapProps) {
         ...m,
         dX,
         dY,
-        // Posisi awal kotak didorong ke atas (12%) agar tidak menutupi titik
         bX: dX,
         bY: dY - 12,
       };
     });
 
-    // Simulasi Fisika (Dijalankan 60 kali agar posisinya stabil dan sempurna)
     for (let i = 0; i < 60; i++) {
       for (let j = 0; j < nodes.length; j++) {
-        // 1. KOTAK VS KOTAK (Saling Menghindar)
+        // Box vs Box Dodge each other
         for (let k = j + 1; k < nodes.length; k++) {
           const n1 = nodes[j];
           const n2 = nodes[k];
@@ -58,7 +54,6 @@ export default function InteractiveMap({ markers }: InteractiveMapProps) {
           const dist = Math.sqrt(dx * dx + dy * dy) || 0.1;
 
           if (dist < 14) {
-            // Jarak minimal antar kotak adalah 14% layar
             const force = (14 - dist) * 0.5;
             n1.bX += (dx / dist) * force;
             n1.bY += (dy / dist) * force;
@@ -67,7 +62,7 @@ export default function InteractiveMap({ markers }: InteractiveMapProps) {
           }
         }
 
-        // 2. KOTAK VS TITIK DOT (Anti-Gerhana / Tidak Boleh Menutupi Titik)
+        // Box VS Dot Anti-Eclipse
         const n = nodes[j];
         nodes.forEach((dotNode) => {
           const dx = n.bX - dotNode.dX;
@@ -75,25 +70,24 @@ export default function InteractiveMap({ markers }: InteractiveMapProps) {
           const dist = Math.sqrt(dx * dx + dy * dy) || 0.1;
 
           if (dist < 9) {
-            // Kotak harus berada minimal 9% dari TITIK MANAPUN
-            const force = (9 - dist) * 0.8; // Gaya pentalannya sangat kuat
+            // The box must be at least 9% away from any point
+            const force = (9 - dist) * 0.8;
             n.bX += (dx / dist) * force;
             n.bY += (dy / dist) * force;
           }
         });
 
-        // 3. GRAVITASI (Tarik kotak kembali ke arah titik asalnya agar tidak hilang)
+        // 3. Gravity (Drag the box back toward its starting point so it doesn’t disappear)
         const anchorDx = n.dX - n.bX;
         const anchorDy = n.dY - n.bY;
         const anchorDist = Math.sqrt(anchorDx * anchorDx + anchorDy * anchorDy);
 
         if (anchorDist > 18) {
-          // Jika kotak terpental terlalu jauh (>18%), tarik pelan-pelan
           n.bX += anchorDx * 0.05;
           n.bY += anchorDy * 0.05;
         }
 
-        // 4. BATAS LAYAR PETA
+        // 4. Maximum Map Screen
         n.bX = Math.max(5, Math.min(95, n.bX));
         n.bY = Math.max(5, Math.min(90, n.bY));
       }
