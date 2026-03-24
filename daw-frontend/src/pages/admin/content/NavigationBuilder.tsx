@@ -74,22 +74,27 @@ export default function NavigationBuilder() {
   const fetchData = async () => {
     setIsLoading(true);
     try {
-      const [treeRes, flatRes, pagesRes] = await Promise.all([
-        api.get("/menus/tree"),
-        api.get("/menus/flat"),
-        api.get("/pages"),
-      ]);
-      setMenus(treeRes.data);
-      setFlatMenus(flatRes.data);
-      setPages(pagesRes.data);
-    } catch (error) {
-      toast.error("Failed to sync navigation data.");
-      console.error("Error: ", error);
+      await toast.promise(
+        Promise.all([
+          api.get("/menus/tree"),
+          api.get("/menus/flat"),
+          api.get("/pages"),
+        ]),
+        {
+          loading: "Synchronizing navigation data...",
+          success: (data) => {
+            setMenus(data[0].data);
+            setFlatMenus(data[1].data);
+            setPages(data[2].data);
+            return "Navigation synchronized!";
+          },
+          error: "Failed to fetch structure.",
+        },
+      );
     } finally {
       setIsLoading(false);
     }
   };
-
   useEffect(() => {
     fetchData();
   }, []);
@@ -143,7 +148,9 @@ export default function NavigationBuilder() {
     }
 
     setIsSaving(true);
-    const toastId = toast.loading("Saving configuration...");
+    const toastId = toast.loading(
+      editingId ? "Updating node..." : "Deploying new node...",
+    );
 
     try {
       const payload: any = {
@@ -151,25 +158,25 @@ export default function NavigationBuilder() {
         type: formData.type,
         parentId: formData.parentId || null,
         isActive: formData.isActive,
+        pageId: formData.type === "page" ? formData.pageId || null : null,
+        externalLink:
+          formData.type === "external" ? formData.externalLink || null : null,
       };
-
-      if (formData.type === "page") {
-        payload.pageId = formData.pageId || null;
-        payload.externalLink = null;
-      } else {
-        payload.externalLink = formData.externalLink || null;
-        payload.pageId = null;
-      }
 
       if (editingId) await api.put(`/menus/${editingId}`, payload);
       else await api.post("/menus", payload);
 
-      toast.success("Structure updated!", { id: toastId });
+      // UPDATE TOAST BERDASARKAN ID
+      toast.success("Structure updated successfully!", { id: toastId });
+
       resetForm();
       fetchData();
-    } catch (error) {
-      toast.error("Failed to save changes", { id: toastId });
-      console.error("Error: ", error);
+    } catch (error: any) {
+      // UPDATE TOAST JADI ERROR
+      toast.error(
+        error.response?.data?.message || "Failed to save configuration.",
+        { id: toastId },
+      );
     } finally {
       setIsSaving(false);
     }
@@ -178,15 +185,17 @@ export default function NavigationBuilder() {
   const handleDelete = async (id: string) => {
     if (!confirm("Are you sure? All child menus will be detached or deleted."))
       return;
-    const toastId = toast.loading("Processing...");
+    const toastId = toast.loading("Removing node from repository...");
     try {
       await api.delete(`/menus/${id}`);
-      toast.success("Node removed", { id: toastId });
+
+      toast.success("Node removed successfully.", { id: toastId });
+
       fetchData();
       if (editingId === id) resetForm();
     } catch (error) {
-      toast.error("System failure");
-      console.error("Error: ", error);
+      toast.error("System failure: Could not remove node.", { id: toastId });
+      console.error(error);
     }
   };
 
@@ -420,7 +429,7 @@ export default function NavigationBuilder() {
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 items-start p-2">
-      {/* 🚀 LEFT: NAVIGATION TREE */}
+      {/* LEFT: NAVIGATION TREE */}
       <div className="lg:col-span-7">
         <div className="flex items-center justify-between mb-8">
           <div>
@@ -451,7 +460,7 @@ export default function NavigationBuilder() {
         )}
       </div>
 
-      {/* 🚀 RIGHT: PROPERTY PANEL */}
+      {/* RIGHT: PROPERTY PANEL */}
       <div className="lg:col-span-5 sticky top-24">
         <div className="bg-white rounded-[2.5rem] border border-slate-200 shadow-xl shadow-slate-200/50 overflow-hidden">
           <div className="p-8 border-b border-slate-50 bg-slate-50/30">
