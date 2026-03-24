@@ -22,9 +22,21 @@ export default function StatsManager() {
   const [isEditing, setIsEditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
 
+  const updateStatField = (
+    id: string | number,
+    field: keyof ImpactStat,
+    value: string,
+  ) => {
+    setStats((prevStats) =>
+      prevStats.map((s) => (s.id === id ? { ...s, [field]: value } : s)),
+    );
+  };
+
   useEffect(() => {
-    if (initialStats) setStats(initialStats);
-  }, [initialStats]);
+    if (initialStats && !isEditing) {
+      setStats(initialStats);
+    }
+  }, [initialStats, isEditing]);
 
   const addStat = () => {
     if (stats.length >= 4) return;
@@ -203,13 +215,7 @@ export default function StatsManager() {
                       value={stat.value}
                       disabled={!isEditing}
                       onChange={(e) =>
-                        setStats(
-                          stats.map((s) =>
-                            s.id === stat.id
-                              ? { ...s, value: e.target.value }
-                              : s,
-                          ),
-                        )
+                        updateStatField(stat.id, "value", e.target.value)
                       }
                       className={`w-full px-3 py-1.5 text-sm font-bold transition-all rounded-md ${isEditing ? "bg-white border border-slate-300" : "bg-slate-100/50 border-transparent text-slate-500"}`}
                     />
@@ -222,13 +228,7 @@ export default function StatsManager() {
                       value={stat.icon}
                       disabled={!isEditing}
                       onChange={(e) =>
-                        setStats(
-                          stats.map((s) =>
-                            s.id === stat.id
-                              ? { ...s, icon: e.target.value }
-                              : s,
-                          ),
-                        )
+                        updateStatField(stat.id, "icon", e.target.value)
                       }
                       className={`w-full px-2 py-1.5 text-xs transition-all rounded-md appearance-none ${isEditing ? "bg-white border border-slate-300" : "bg-slate-100/50 border-transparent text-slate-500"}`}
                     >
@@ -250,13 +250,7 @@ export default function StatsManager() {
                     value={stat.label}
                     disabled={!isEditing}
                     onChange={(e) =>
-                      setStats(
-                        stats.map((s) =>
-                          s.id === stat.id
-                            ? { ...s, label: e.target.value }
-                            : s,
-                        ),
-                      )
+                      updateStatField(stat.id, "label", e.target.value)
                     }
                     className={`w-full px-3 py-1.5 text-xs font-bold uppercase transition-all rounded-md ${isEditing ? "bg-white border border-slate-300" : "bg-slate-100/50 border-transparent text-slate-500"}`}
                   />
@@ -270,11 +264,7 @@ export default function StatsManager() {
                     value={stat.desc}
                     disabled={!isEditing}
                     onChange={(e) =>
-                      setStats(
-                        stats.map((s) =>
-                          s.id === stat.id ? { ...s, desc: e.target.value } : s,
-                        ),
-                      )
+                      updateStatField(stat.id, "desc", e.target.value)
                     }
                     className={`w-full px-3 py-1.5 text-xs transition-all rounded-md ${isEditing ? "bg-white border border-slate-300" : "bg-slate-100/50 border-transparent text-slate-500"}`}
                   />
