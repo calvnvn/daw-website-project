@@ -223,9 +223,7 @@ export default function NavigationBuilder() {
 
     if (isCircularMove(sourceId, newParentId, flatMenus)) {
       setDraggedMenuId(null);
-      return toast.error(
-        "Hierarchy violation: Cannot move ancestor to its child.",
-      );
+      return toast.error("Kesalahan struktur menu.");
     }
 
     const sourceMenu = flatMenus.find((m) => m.id === sourceId);
@@ -239,7 +237,7 @@ export default function NavigationBuilder() {
       );
     }
 
-    const toastId = toast.loading("Reordering structure...");
+    const toastId = toast.loading("Sedang mengatur ulang urutan menu...");
     try {
       if (!sourceMenu) throw new Error("Source missing.");
       const siblings = flatMenus
@@ -359,8 +357,8 @@ export default function NavigationBuilder() {
                 </span>
                 <span className="text-[10px] text-slate-400 font-medium italic">
                   {menu.type === "page"
-                    ? "Internal link / Terhubung halaman"
-                    : "Outbound link / Tautan luar"}
+                    ? "Tautan halaman internal"
+                    : "Tautan halaman eksternal"}
                 </span>
               </div>
             </div>
@@ -437,13 +435,12 @@ export default function NavigationBuilder() {
               Navigation Architect
             </h2>
             <p className="text-xs text-slate-500 font-medium mt-1">
-              Organize your site's structural integrity / Atur struktur menu
-              navigasi Anda.
+              Kelola susunan dan hirarki menu navigasi situs Anda.
             </p>
           </div>
           <div className="flex gap-2">
             <div className="px-3 py-1.5 bg-slate-100 rounded-lg text-[10px] font-bold text-slate-500 uppercase flex items-center gap-2">
-              <LayoutGrid className="w-3 h-3" /> {flatMenus.length} Nodes
+              <LayoutGrid className="w-3 h-3" /> {flatMenus.length} Item Menu
             </div>
           </div>
         </div>
@@ -452,7 +449,7 @@ export default function NavigationBuilder() {
           <div className="bg-white border border-slate-200 rounded-3xl p-20 text-center">
             <div className="w-12 h-12 border-4 border-slate-200 border-t-emerald-500 rounded-full animate-spin mx-auto mb-4" />
             <p className="text-sm font-bold text-slate-400 uppercase tracking-widest">
-              Synchronizing Database...
+              Sedang menyelaraskan data menu...
             </p>
           </div>
         ) : (
@@ -470,12 +467,12 @@ export default function NavigationBuilder() {
               </div>
               <div>
                 <h3 className="text-lg font-bold text-slate-900 leading-none">
-                  {editingId ? "Node Properties" : "New Navigation Node"}
+                  {editingId ? "Detail Item Menu" : "Navigasi Menu Baru"}
                 </h3>
                 <p className="text-[10px] text-slate-400 uppercase font-black tracking-widest mt-1">
                   {editingId
-                    ? "Modify existing entry / Ubah data"
-                    : "Create new entry / Buat baru"}
+                    ? "Perbarui detail menu yang sudah ada."
+                    : "Membuat menu baru"}
                 </p>
               </div>
             </div>
@@ -484,7 +481,7 @@ export default function NavigationBuilder() {
           <form onSubmit={handleSubmit} className="p-8 space-y-6">
             <div className="space-y-2">
               <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">
-                Label Name
+                Nama Label
               </label>
               <input
                 type="text"
@@ -497,7 +494,7 @@ export default function NavigationBuilder() {
                 placeholder="e.g. Services / Layanan"
               />
               <p className="text-[10px] text-slate-400 italic ml-1">
-                Appearance text in navbar / Teks yang muncul di menu.
+                Nama menu yang akan muncul di navigasi website.
               </p>
             </div>
 
@@ -541,7 +538,7 @@ export default function NavigationBuilder() {
             {formData.type === "page" ? (
               <div className="space-y-2 animate-in slide-in-from-top-2 duration-300">
                 <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">
-                  Linked Content
+                  Konten Terhubung
                 </label>
                 <select
                   required
@@ -582,7 +579,7 @@ export default function NavigationBuilder() {
 
             <div className="space-y-2">
               <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">
-                Placement Hierarchy
+                Posisi Hirarki
               </label>
               <select
                 value={formData.parentId}
@@ -591,7 +588,7 @@ export default function NavigationBuilder() {
                 }
                 className="w-full px-5 py-4 rounded-2xl bg-slate-50 border border-slate-100 outline-none text-sm font-bold text-slate-600"
               >
-                <option value=""> Set as Root (Main Menu) </option>
+                <option value=""> Atur sebagai Menu Utama </option>
                 {validParentOptions.map((m) => (
                   <option key={m.id} value={m.id}>
                     Sub of: {m.label}
@@ -599,7 +596,7 @@ export default function NavigationBuilder() {
                 ))}
               </select>
               <p className="text-[10px] text-slate-400 italic ml-1">
-                Nest this item under a parent / Letakkan di bawah menu lain.
+                Letakkan menu ini di dalam menu lain (Sub-menu).
               </p>
             </div>
 
@@ -610,7 +607,7 @@ export default function NavigationBuilder() {
                 className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white py-4 rounded-2xl font-bold shadow-lg shadow-emerald-200 transition-all flex items-center justify-center gap-2"
               >
                 <Plus className="w-5 h-5" />{" "}
-                {editingId ? "Update Configuration" : "Deploy to Navbar"}
+                {editingId ? "Simpan Perubahan" : "Terapkan ke Menu"}
               </button>
               {editingId && (
                 <button

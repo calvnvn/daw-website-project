@@ -265,7 +265,7 @@ export default function EditProject() {
   if (isFetching) {
     return (
       <div className="p-12 text-center text-slate-500">
-        Loading project data...
+        Sedang memuat data proyek...
       </div>
     );
   }
@@ -280,7 +280,7 @@ export default function EditProject() {
           >
             <ArrowLeft className="w-5 h-5 text-slate-500" />
           </button>
-          <h1 className="text-2xl font-serif font-bold">Edit Project</h1>
+          <h1 className="text-2xl font-serif font-bold">Edit Proyek</h1>
         </div>
         <div className="flex gap-3">
           <button
@@ -288,7 +288,7 @@ export default function EditProject() {
             disabled={isLoading}
             className="px-5 py-2.5 bg-white border border-slate-200 rounded-lg flex items-center gap-2"
           >
-            <Save className="w-4 h-4" /> Save as Draft
+            <Save className="w-4 h-4" /> Simpan sebagai Draf
           </button>
           <button
             onClick={() => handleUpdate("Published")}
@@ -306,7 +306,7 @@ export default function EditProject() {
           <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden flex flex-col min-h-[600px]">
             <input
               type="text"
-              placeholder="Project Title..."
+              placeholder="Masukkan Judul Proyek..."
               className="p-6 text-3xl font-serif font-bold border-b border-slate-100 focus:outline-none"
               value={formData.title}
               onChange={(e) =>
@@ -314,7 +314,7 @@ export default function EditProject() {
               }
             />
             <textarea
-              placeholder="Short description for homepage..."
+              placeholder="Ringkasan singkat untuk tampilan beranda (Maks. 150 karakter)."
               maxLength={150}
               rows={2}
               className="w-full p-6 text-slate-500 text-lg border-b border-slate-100 focus:outline-none resize-none bg-slate-50/50"
@@ -336,17 +336,18 @@ export default function EditProject() {
             {/* --- SEO & METADATA ENGINE --- */}
             <div className="bg-slate-50/50 rounded-2xl border border-slate-200 p-8 mt-12 space-y-6 shadow-inner">
               <h3 className="text-xs font-black uppercase tracking-widest flex items-center gap-2 text-slate-800">
-                <Search className="w-4 h-4 text-blue-500" /> SEO Configuration
+                <Search className="w-4 h-4 text-blue-500" /> Pengaturan
+                Pencarian (SEO)
               </h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                 <div className="space-y-4">
                   <div>
                     <label className="text-[10px] font-black text-slate-500 uppercase block mb-2">
-                      Meta Title Override
+                      Judul Custom Pencarian Google
                     </label>
                     <input
                       type="text"
-                      placeholder="Leave blank to use Project Title"
+                      placeholder="Kosongkan jika ingin menggunakan judul proyek di atas."
                       className="w-full p-3 bg-white border border-slate-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-500/20"
                       value={formData.seo_title}
                       onChange={(e) =>
@@ -356,10 +357,10 @@ export default function EditProject() {
                   </div>
                   <div>
                     <label className="text-[10px] font-black text-slate-500 uppercase block mb-2">
-                      Meta Description
+                      Deskripsi Pencarian (SEO)
                     </label>
                     <textarea
-                      placeholder="Recommended: Under 160 characters"
+                      placeholder="Disarankan: Kurang dari 160 karakter"
                       className="w-full p-3 bg-white border border-slate-200 rounded-xl text-sm h-24 resize-none outline-none focus:ring-2 focus:ring-blue-500/20"
                       value={formData.meta_description}
                       onChange={(e) =>
@@ -375,7 +376,7 @@ export default function EditProject() {
                 {/* Live Google Snippet Preview */}
                 <div className="bg-white p-5 rounded-xl border border-slate-100 shadow-sm flex flex-col justify-center">
                   <p className="text-[10px] font-black text-slate-300 uppercase mb-3">
-                    Google Snippet Preview
+                    Pratinjau Tampilan Google
                   </p>
                   <p className="text-[#1a0dab] text-lg font-medium truncate">
                     {formData.seo_title || formData.title || "Untitled Project"}
@@ -386,7 +387,7 @@ export default function EditProject() {
                   <p className="text-[#545454] text-xs line-clamp-2 leading-relaxed">
                     {formData.meta_description ||
                       formData.excerpt ||
-                      "Please set a meta description for SEO magic..."}
+                      "Masukkan deskripsi untuk membantu performa pencarian Google."}
                   </p>
                 </div>
               </div>
@@ -415,7 +416,8 @@ export default function EditProject() {
           </div>
           <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm">
             <h3 className="font-bold mb-3 flex items-center gap-2">
-              <ImageIcon className="w-4 h-4 text-daw-green" /> Primary Visual
+              <ImageIcon className="w-4 h-4 text-daw-green" /> Gambar Sampul
+              Utama
             </h3>
             <div
               {...getRootCoverProps()}
@@ -451,7 +453,7 @@ export default function EditProject() {
                 <div className="text-center p-4">
                   <ImageIcon className="w-8 h-8 text-slate-200 mx-auto mb-2" />
                   <p className="text-[10px] font-bold text-slate-400 uppercase">
-                    No Image Found
+                    Gambar belum dipilih
                   </p>
                 </div>
               )}
@@ -528,11 +530,11 @@ export default function EditProject() {
               />
               <p className="text-[11px] font-bold text-slate-600 uppercase tracking-tight">
                 {isGalleryDragActive
-                  ? "Drop them here!"
-                  : "Add or Replace Gallery"}
+                  ? "Lepaskan gambar di sini!"
+                  : "Tambah atau Ganti Foto Galeri"}
               </p>
               <p className="text-[10px] text-slate-400">
-                Drag multiple images here
+                Tarik beberapa gambar ke sini atau klik untuk memilih file.
               </p>
             </div>
           </div>

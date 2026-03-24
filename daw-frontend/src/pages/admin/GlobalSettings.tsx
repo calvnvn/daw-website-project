@@ -46,7 +46,9 @@ export default function GlobalSettings() {
           linkedinUrl: data.linkedinUrl || "",
         });
       } catch {
-        toast.error("The connection to the server failed.");
+        toast.error(
+          "Gagal terhubung ke server. Silakan coba beberapa saat lagi.",
+        );
       } finally {
         setIsLoading(false);
       }
@@ -56,14 +58,15 @@ export default function GlobalSettings() {
 
   const handleSave = async () => {
     setIsSaving(true);
-    const loadingToast = toast.loading("Saving global settings...");
+    const loadingToast = toast.loading("Sedang menyimpan pengaturan global...");
     try {
       await api.put("/settings", formData);
-      toast.success("Settings updated successfully!", { id: loadingToast });
+      toast.success("Pengaturan berhasil diperbarui!", { id: loadingToast });
       setIsEditing(false);
     } catch (error: any) {
-      toast.error("Update Failed", {
-        description: error.response?.data?.message || "Check your connection",
+      toast.error("Gagal Memperbarui Data", {
+        description:
+          error.response?.data?.message || "Periksa koneksi internet Anda",
         id: loadingToast,
       });
     } finally {
@@ -83,7 +86,7 @@ export default function GlobalSettings() {
   if (isLoading) {
     return (
       <div className="p-12 text-center text-slate-500">
-        Loading settings data...
+        Memuat data pengaturan...
       </div>
     );
   }
@@ -97,7 +100,8 @@ export default function GlobalSettings() {
             Global Settings
           </h1>
           <p className="text-sm text-slate-500 mt-1">
-            Manage corporate identity, contact info, and website footer.
+            Kelola identitas, informasi kontak resmi, dan pengaturan bagian kaki
+            (footer) website.
           </p>
         </div>
         <div className="flex items-center gap-3">
@@ -135,7 +139,7 @@ export default function GlobalSettings() {
           <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
             <div className="px-5 py-4 border-b border-slate-100 bg-slate-50/50 flex items-center gap-2">
               <Building2 className="w-5 h-5 text-daw-green" />
-              <h2 className="font-bold text-slate-800">Corporate Identity</h2>
+              <h2 className="font-bold text-slate-800">Identitas Perusahaan</h2>
             </div>
             <div className="p-5 space-y-4">
               <div>
@@ -159,7 +163,7 @@ export default function GlobalSettings() {
           <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
             <div className="px-5 py-4 border-b border-slate-100 bg-slate-50/50 flex items-center gap-2">
               <Share2 className="w-5 h-5 text-daw-green" />
-              <h2 className="font-bold text-slate-800">Social Links</h2>
+              <h2 className="font-bold text-slate-800">Tautan Media Sosial</h2>
             </div>
             <div className="p-5 space-y-4">
               <div>
@@ -178,7 +182,7 @@ export default function GlobalSettings() {
               </div>
               <div>
                 <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">
-                  Main Website
+                  Situs Utama (URL)
                 </label>
                 <div className="relative">
                   <Globe className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
@@ -203,13 +207,13 @@ export default function GlobalSettings() {
             <div className="px-5 py-4 border-b border-slate-100 bg-slate-50/50 flex items-center gap-2">
               <Phone className="w-5 h-5 text-daw-green" />
               <h2 className="font-bold text-slate-800">
-                Primary Contact Information
+                Informasi Kontak Utama
               </h2>
             </div>
             <div className="p-5 space-y-5">
               <div>
                 <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2 flex items-center gap-1.5">
-                  <MapPin className="w-3.5 h-3.5" /> Head Office Address
+                  <MapPin className="w-3.5 h-3.5" /> Alamat Kantor Pusat
                 </label>
                 <textarea
                   name="address"
@@ -220,8 +224,9 @@ export default function GlobalSettings() {
                   className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-daw-green/20 focus:border-daw-green text-slate-700 resize-none transition-colors leading-relaxed disabled:bg-slate-100 disabled:text-slate-400 disabled:cursor-not-allowed"
                 />
                 <p className="text-[11px] text-slate-400 mt-1.5">
-                  This address will be displayed on the Contact Us page and
-                  Footer.
+                  Alamat ini akan ditampilkan pada halaman 'Hubungi Kami' dan
+                  bagian bawah (footer) website. Menjelaskan keterkaitan data
+                  dengan tampilan publik.
                 </p>
               </div>
 
@@ -262,14 +267,14 @@ export default function GlobalSettings() {
               <div className="flex items-center gap-2">
                 <Map className="w-5 h-5 text-daw-green" />
                 <h2 className="font-bold text-slate-800">
-                  Google Maps Integration
+                  Integrasi Google Maps
                 </h2>
               </div>
             </div>
             <div className="p-5 space-y-4">
               <div>
                 <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">
-                  Maps Embed URL (Iframe Source)
+                  Tautan Peta Digital (Source URL)
                 </label>
                 <input
                   type="text"
@@ -281,8 +286,8 @@ export default function GlobalSettings() {
                   className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-daw-green/20 focus:border-daw-green text-slate-700 transition-colors font-mono text-sm disabled:bg-slate-100 disabled:text-slate-400 disabled:cursor-not-allowed"
                 />
                 <p className="text-[11px] text-slate-400 mt-2">
-                  Go to Google Maps &gt; Share &gt; Embed a map &gt; Copy the
-                  URL inside the <code>src="..."</code> attribute.
+                  Buka Google Maps &gt; Bagikan &gt; Sematkan peta &gt; Salin
+                  URL yang ada di dalam atribut <code>src="..."</code>.
                 </p>
               </div>
             </div>

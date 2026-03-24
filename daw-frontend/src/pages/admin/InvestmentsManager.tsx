@@ -223,8 +223,8 @@ export default function InvestmentsManager() {
             Investments Manager
           </h1>
           <p className="text-sm text-slate-500 mt-1">
-            Manage diversified ecosystem, text content, and affiliated company
-            logos.
+            Kelola ekosistem investasi, konten teks promosi, dan logo perusahaan
+            afiliasi secara terpusat.
           </p>
         </div>
         <div className="flex items-center gap-3">
@@ -286,7 +286,7 @@ export default function InvestmentsManager() {
           <div className="space-y-8 animate-in fade-in duration-300">
             <div className="bg-slate-50 p-6 rounded-xl border border-slate-200">
               <h3 className="text-base font-bold text-slate-900 mb-4 border-b border-slate-200 pb-2">
-                Home Page Teaser
+                Home Page Teaser Content
               </h3>
               <div className="space-y-4">
                 <div>

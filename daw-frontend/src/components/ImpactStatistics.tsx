@@ -1,6 +1,6 @@
 import { useEffect, useState, useRef } from "react";
 import { useTranslation } from "react-i18next";
-import * as Icons from "lucide-react"; // 👈 IMPORT SEMUA ICON
+import * as Icons from "lucide-react";
 import ScrollReveal from "./ScrollReveal";
 import { useHome } from "@/contexts/HomeContext";
 

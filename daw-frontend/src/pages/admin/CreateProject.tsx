@@ -117,7 +117,7 @@ export default function CreateProject() {
         const uploadData = new FormData();
         uploadData.append("inline_image", file);
 
-        const toastId = toast.loading("Uploading image...");
+        const toastId = toast.loading("Sedang mengunggah gambar...");
         try {
           const response = await api.post(
             "/projects/upload-inline",
@@ -137,7 +137,9 @@ export default function CreateProject() {
           quill.insertEmbed(index, "image", imageUrl);
           quill.setSelection(index + 1);
 
-          toast.success("Image added to content", { id: toastId });
+          toast.success("Gambar berhasil disisipkan ke dalam isi artikel.", {
+            id: toastId,
+          });
         } catch (err: any) {
           console.error("Upload Error detail:", err.response?.data);
 
@@ -168,14 +170,17 @@ export default function CreateProject() {
 
   const handlePublish = async (targetStatus: string) => {
     // Validations
-    if (!formData.title.trim()) return toast.error("Title required");
+    if (!formData.title.trim())
+      return toast.error("Mohon masukkan judul proyek sebelum melanjutkan.");
     if (!formData.content || formData.content === "<p><br></p>")
-      return toast.error("Content is empty");
+      return toast.error("Isi artikel tidak boleh kosong");
     if (targetStatus === "Published" && !coverFile)
-      return toast.error("Cover image required for publishing");
+      return toast.error("Gambar sampul wajib diunggah untuk publikasi resmi.");
 
     setIsLoading(true);
-    const loadingToast = toast.loading("Optimizing and Publishing...");
+    const loadingToast = toast.loading(
+      "Sedang mengoptimalkan gambar dan menerbitkan...",
+    );
 
     try {
       const payload = new FormData();
@@ -227,6 +232,7 @@ export default function CreateProject() {
           const percent = Math.round((p.loaded * 100) / (p.total || 1));
           toast.loading(`Uploading: ${percent}%...`, { id: loadingToast });
         },
+        Project,
       });
 
       if (response.status === 201 || response.status === 200) {
@@ -238,7 +244,9 @@ export default function CreateProject() {
       }
     } catch (err: any) {
       toast.error("Error", {
-        description: err.response?.data?.message || "Sync failed.",
+        description:
+          err.response?.data?.message ||
+          "Terjadi kendala saat menyambungkan ke server.",
         id: loadingToast,
       });
     } finally {
@@ -317,7 +325,7 @@ export default function CreateProject() {
             {/* INPUT JUDUL */}
             <input
               type="text"
-              placeholder="Start with a compelling title..."
+              placeholder="Masukkan judul proyek yang menarik..."
               className="w-full p-0 text-3xl font-serif font-bold border-none focus:ring-0 placeholder:text-slate-200 transition-all"
               value={formData.title}
               onChange={(e) =>
@@ -328,7 +336,7 @@ export default function CreateProject() {
             {/* INPUT EXCERPT */}
             <div className="space-y-2">
               <label className="flex justify-between text-[10px] font-black text-slate-400 uppercase tracking-widest">
-                <span>Summary (Excerpt)</span>
+                <span>Ringkasan Konten</span>
                 <span
                   className={
                     formData.excerpt.length >= 145 ? "text-red-500" : ""
@@ -338,7 +346,7 @@ export default function CreateProject() {
                 </span>
               </label>
               <textarea
-                placeholder="Write a brief summary for preview cards..."
+                placeholder="Tulis ringkasan singkat untuk tampilan kartu di halaman depan..."
                 maxLength={150}
                 rows={2}
                 className="w-full p-4 bg-slate-50 border border-slate-100 rounded-xl outline-none text-slate-600 text-sm h-[80px] resize-none focus:ring-2 focus:ring-daw-green/5"
@@ -352,7 +360,7 @@ export default function CreateProject() {
             {/* WYSIWYG EDITOR */}
             <div className="space-y-2">
               <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
-                Main Content
+                Isi Artikel Utama
               </label>
               <div className="min-h-[400px] border border-slate-100 rounded-xl overflow-hidden shadow-inner">
                 <ReactQuill
@@ -368,13 +376,14 @@ export default function CreateProject() {
             {/* SEO SECTION */}
             <div className="bg-slate-50/50 rounded-2xl border border-slate-200 p-8 space-y-6 shadow-inner">
               <h3 className="text-xs font-black uppercase tracking-widest flex items-center gap-2 text-slate-800">
-                <Search className="w-4 h-4 text-blue-500" /> SEO Configuration
+                <Search className="w-4 h-4 text-blue-500" /> Pengaturan
+                Pencarian (SEO)
               </h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                 <div className="space-y-4">
                   <input
                     type="text"
-                    placeholder="Custom Meta Title"
+                    placeholder="Judul Khusus Tampilan Google"
                     className="w-full p-3 bg-white border border-slate-200 rounded-xl text-sm"
                     value={formData.seo_title}
                     onChange={(e) =>
@@ -382,7 +391,7 @@ export default function CreateProject() {
                     }
                   />
                   <textarea
-                    placeholder="Custom Meta Description"
+                    placeholder="Deskripsi Khusus Tampilan Google"
                     className="w-full p-3 bg-white border border-slate-200 rounded-xl text-sm h-24 resize-none"
                     value={formData.meta_description}
                     onChange={(e) =>
@@ -395,7 +404,7 @@ export default function CreateProject() {
                 </div>
                 <div className="bg-white p-5 rounded-xl border border-slate-100 shadow-sm flex flex-col justify-center">
                   <p className="text-[10px] font-black text-slate-300 uppercase mb-3">
-                    Google Snippet
+                    Pratinjau Tampilan Google
                   </p>
                   <p className="text-[#1a0dab] text-lg font-medium truncate">
                     {formData.seo_title || formData.title || "Untitled"}
@@ -406,7 +415,7 @@ export default function CreateProject() {
                   <p className="text-[#545454] text-xs line-clamp-2 leading-relaxed">
                     {formData.meta_description ||
                       formData.excerpt ||
-                      "No description set..."}
+                      "Deskripsi belum diatur..."}
                   </p>
                 </div>
               </div>
@@ -418,7 +427,7 @@ export default function CreateProject() {
         <div className="space-y-6">
           <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm">
             <h3 className="text-xs font-black uppercase tracking-widest text-slate-800 mb-4">
-              Classification
+              Kategori Proyek
             </h3>
             <select
               className="w-full p-3 bg-slate-50 border border-slate-100 rounded-xl font-bold text-slate-700 outline-none"
@@ -434,7 +443,8 @@ export default function CreateProject() {
 
           <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm">
             <h3 className="text-xs font-black uppercase tracking-widest mb-4 flex items-center gap-2">
-              <ImageIcon className="w-4 h-4 text-daw-green" /> Primary Visual
+              <ImageIcon className="w-4 h-4 text-daw-green" /> Visual Utama
+              (Sampul)
             </h3>
             <div
               {...getRootCoverProps()}
@@ -483,7 +493,7 @@ export default function CreateProject() {
             >
               <input {...getInputGalleryProps()} />
               <p className="text-[10px] font-black text-slate-400 uppercase">
-                Add Assets
+                Tambah Foto Galeri
               </p>
             </div>
           </div>

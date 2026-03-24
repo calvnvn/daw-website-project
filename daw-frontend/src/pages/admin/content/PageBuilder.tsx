@@ -232,7 +232,7 @@ export default function PageBuilder() {
     if (!formData.title || !formData.slug)
       return toast.error("Title & Slug are required!");
     setIsSaving(true);
-    const toastId = toast.loading("Deploying changes...");
+    const toastId = toast.loading("Sedang memproses perubahan...");
     try {
       const payload = { ...formData, heroImage: heroImage };
       if (editingId) {
@@ -288,10 +288,10 @@ export default function PageBuilder() {
             <div className="flex justify-between items-end mb-6">
               <div>
                 <h3 className="text-xl font-serif font-black text-slate-900 tracking-tight">
-                  Repository
+                  Daftar Halaman
                 </h3>
                 <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-1">
-                  Published Documents / Dokumen Publik
+                  Halaman Terpublikasi
                 </p>
               </div>
               {!editingId && (
@@ -299,7 +299,7 @@ export default function PageBuilder() {
                   onClick={resetForm}
                   className="text-xs font-bold text-daw-green bg-daw-green/10 px-3 py-2 rounded-xl hover:bg-daw-green hover:text-white transition-all flex items-center gap-1 shadow-sm"
                 >
-                  <Plus className="w-4 h-4" /> New
+                  <Plus className="w-4 h-4" /> Buat Halaman Baru
                 </button>
               )}
             </div>
@@ -320,7 +320,7 @@ export default function PageBuilder() {
                   No Documents Found
                 </h4>
                 <p className="text-xs text-slate-400 font-medium mb-6">
-                  Draft your first editorial piece to populate this repository.{" "}
+                  Mulai susun konten pertama Anda untuk mengisi daftar ini.{" "}
                   <br />
                   <span className="italic text-[10px]">
                     Buat artikel pertama Anda untuk mengisi repositori ini.
@@ -330,7 +330,7 @@ export default function PageBuilder() {
                   onClick={resetForm}
                   className="text-xs font-bold text-white bg-daw-green px-5 py-2.5 rounded-xl hover:bg-[#003b1c] shadow-lg shadow-daw-green/20 transition-all"
                 >
-                  Compose New Page
+                  Buat Halaman
                 </button>
               </div>
             ) : (
@@ -393,12 +393,12 @@ export default function PageBuilder() {
               </div>
               <div>
                 <h2 className="text-xl font-bold text-slate-900 tracking-tight">
-                  {editingId ? "Edit Document" : "Compose Document"}
+                  {editingId ? "Edit Document" : "Create Document"}
                 </h2>
                 <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest mt-0.5">
                   {editingId
-                    ? "Modify existing content / Ubah konten"
-                    : "Draft a new publication / Buat publikasi baru"}
+                    ? "Perbarui isi konten yang sudah ada"
+                    : "Mulai menyusun publikasi baru"}
                 </p>
               </div>
             </div>
@@ -426,7 +426,7 @@ export default function PageBuilder() {
                   onClick={resetForm}
                   className="px-4 py-2 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-500 hover:text-red-500 hover:border-red-200 hover:bg-red-50 transition-all flex items-center gap-2 shadow-sm"
                 >
-                  <X className="w-4 h-4" /> Discard Edit
+                  <X className="w-4 h-4" /> Batalkan Perubahan
                 </button>
               )}
             </div>
@@ -441,13 +441,13 @@ export default function PageBuilder() {
               <div className="flex items-center gap-2 border-b border-slate-100 pb-2">
                 <LayoutTemplate className="w-4 h-4 text-slate-400" />
                 <h3 className="text-sm font-bold text-slate-900">
-                  Core Identity
+                  Informasi Utama Halaman
                 </h3>
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="space-y-2">
                   <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">
-                    Main Title *
+                    Judul Utama *
                   </label>
                   <input
                     type="text"
@@ -461,7 +461,7 @@ export default function PageBuilder() {
 
                 <div className="space-y-2">
                   <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">
-                    URL Slug / Tautan Permanen *
+                    Tautan Alamat (URL)
                   </label>
                   <div className="flex items-center w-full rounded-2xl bg-slate-50 border border-slate-200 focus-within:bg-white focus-within:border-daw-green focus-within:ring-4 focus-within:ring-daw-green/10 overflow-hidden transition-all">
                     <div className="pl-5 pr-2 py-4 text-slate-400 flex items-center gap-2 border-r border-slate-200/50">
@@ -498,7 +498,7 @@ export default function PageBuilder() {
 
                 <div className="space-y-2 md:col-span-2">
                   <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">
-                    Hero Subtitle / Subjudul Pendukung
+                    Subjudul Pendukung (Header)
                   </label>
                   <input
                     type="text"
@@ -617,7 +617,7 @@ export default function PageBuilder() {
               <div className="flex items-center gap-2 border-b border-slate-100 pb-2">
                 <ImagePlus className="w-4 h-4 text-slate-400" />
                 <h3 className="text-sm font-bold text-slate-900">
-                  Hero Background
+                  Gambar Latar Utama
                 </h3>
               </div>
 
@@ -691,7 +691,7 @@ export default function PageBuilder() {
                 <div className="flex items-center gap-2">
                   <LinkIcon className="w-4 h-4 text-slate-400" />
                   <h3 className="text-sm font-bold text-slate-900">
-                    Supplementary Widget / Navigasi Samping
+                    Tautan Terkait
                   </h3>
                 </div>
                 <button
@@ -714,12 +714,10 @@ export default function PageBuilder() {
               <div className="space-y-3 bg-slate-50 p-6 rounded-3xl border border-slate-100">
                 {formData.sidebarLinks.length === 0 ? (
                   <p className="text-xs text-slate-400 italic text-center py-6">
-                    No supplementary links added. Sidebar will be hidden
-                    automatically.
+                    Belum ada tautan tambahan. Gunakan bagian ini jika Anda
+                    ingin menampilkan referensi halaman lain di sisi samping
+                    artikel.
                     <br />
-                    <span className="text-[10px]">
-                      Belum ada tautan. Sidebar akan disembunyikan otomatis.
-                    </span>
                   </p>
                 ) : (
                   formData.sidebarLinks.map((link, index) => (
@@ -832,7 +830,7 @@ export default function PageBuilder() {
               <div className="flex items-center gap-2 border-b border-slate-100 pb-2">
                 <FileText className="w-4 h-4 text-slate-400" />
                 <h3 className="text-sm font-bold text-slate-900">
-                  Editorial Canvas / Konten Artikel
+                  Area Penulisan Konten
                 </h3>
               </div>
 

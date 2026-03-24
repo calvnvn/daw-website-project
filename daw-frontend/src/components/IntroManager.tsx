@@ -24,16 +24,19 @@ export default function IntroManager() {
 
   const handleSave = async () => {
     setIsSaving(true);
-    const loadingToast = toast.loading("Saving intro text...");
+    const loadingToast = toast.loading("Sedang memperbarui teks sambutan...");
     try {
       await api.put("/homepage/settings", settings);
 
       await refreshData();
-      toast.success("Intro text saved successfully!", { id: loadingToast });
+      toast.success("Teks sambutan berhasil diperbarui!", { id: loadingToast });
       setIsEditing(false);
     } catch (error) {
       console.error(error);
-      toast.error("Error saving data.", { id: loadingToast });
+      toast.error(
+        "Gagal menyimpan data. Silakan periksa koneksi atau coba lagi.",
+        { id: loadingToast },
+      );
     } finally {
       setIsSaving(false);
     }
@@ -44,10 +47,11 @@ export default function IntroManager() {
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 border-b border-slate-100 pb-4 gap-4">
         <div>
           <h3 className="text-lg font-bold text-slate-900">
-            Transformation Intro
+            Welcome Introduction
           </h3>
           <p className="text-sm text-slate-500">
-            The main welcoming text directly below the hero banner.
+            Teks sambutan utama yang muncul tepat di bawah spanduk (hero banner)
+            halaman depan.
           </p>
         </div>
         <div className="flex gap-3">
@@ -94,7 +98,7 @@ export default function IntroManager() {
           </div>
           <div>
             <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-2">
-              Body Text
+              Body Content
             </label>
             <textarea
               rows={5}

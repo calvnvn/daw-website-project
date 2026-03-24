@@ -170,7 +170,7 @@ export default function HeroManager() {
 
   const handleSave = async () => {
     setIsSaving(true);
-    const loadingToast = toast.loading("Saving all slides...");
+    const loadingToast = toast.loading("Sedang menyimpan semua perubahan...");
 
     try {
       const promises = slides.map(async (slide) => {
@@ -191,12 +191,14 @@ export default function HeroManager() {
 
       await Promise.all(promises);
       await refreshData();
-      toast.success("All slides saved successfully!", { id: loadingToast });
+      toast.success("Semua slide telah berhasil disimpan!", {
+        id: loadingToast,
+      });
       setIsEditing(false);
     } catch (error: any) {
       console.error("Save error details: ", error);
       toast.error(
-        error.response?.data?.message || "Failed to save some slides.",
+        error.response?.data?.message || "Gagal menyimpan beberapa slide",
         {
           id: loadingToast,
         },
@@ -211,10 +213,11 @@ export default function HeroManager() {
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-4 border-b border-slate-100 pb-4 gap-4">
         <div>
           <h3 className="text-lg font-bold text-slate-900">
-            Hero Banner Slides
+            Slide Banner Utama
           </h3>
           <p className="text-sm text-slate-500">
-            Upload high-quality images and catchy headlines.
+            Unggah gambar berkualitas tinggi dan tuliskan judul yang menarik
+            untuk spanduk depan.
           </p>
         </div>
         <div className="flex gap-3">
@@ -239,7 +242,7 @@ export default function HeroManager() {
               onClick={addSlide}
               className="flex items-center gap-1.5 px-4 py-2 bg-daw-green/10 hover:bg-daw-green hover:text-white text-daw-green rounded-lg text-sm font-bold transition-colors"
             >
-              <Plus className="w-4 h-4" /> Add Slide
+              <Plus className="w-4 h-4" /> Tambah Slide Baru
             </button>
           )}
 
@@ -248,7 +251,7 @@ export default function HeroManager() {
             disabled={isSaving || !isEditing}
             className="flex items-center gap-2 bg-daw-green hover:bg-[#003b1c] disabled:bg-slate-300 disabled:cursor-not-allowed text-white px-5 py-2 rounded-lg font-medium transition-colors shadow-sm"
           >
-            <Save className="w-4 h-4" /> {isSaving ? "Saving..." : "Save"}
+            <Save className="w-4 h-4" /> {isSaving ? "Menyimpan.." : "Save"}
           </button>
         </div>
       </div>
@@ -279,7 +282,7 @@ export default function HeroManager() {
               {isEditing && (
                 <div
                   className="flex flex-row md:flex-col items-center justify-center gap-1 border-b md:border-b-0 md:border-r border-slate-100 pb-4 md:pb-0 md:pr-4 shrink-0 cursor-grab active:cursor-grabbing"
-                  title="Drag to reorder"
+                  title="Tarik untuk atur urutan"
                 >
                   {/* Tombol Chevron Up & Down biarkan saja untuk fallback (aksesibilitas) */}
                   <button
@@ -306,7 +309,7 @@ export default function HeroManager() {
               {/* IMAGE UPLOAD */}
               <div className="md:w-1/3 shrink-0 flex flex-col gap-2 relative">
                 <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block text-center mb-1">
-                  Background Image
+                  Gambar Latar
                 </label>
                 <input
                   type="file"
@@ -348,7 +351,7 @@ export default function HeroManager() {
                         <div className="absolute inset-0 bg-black/40 opacity-0 hover:opacity-100 transition-opacity flex flex-col items-center justify-center text-white">
                           <UploadCloud className="w-6 h-6 mb-1" />
                           <span className="text-xs font-bold">
-                            Change Image
+                            Ganti Gambar
                           </span>
                         </div>
                       )}
@@ -361,7 +364,7 @@ export default function HeroManager() {
                       <span
                         className={`text-xs font-bold ${isEditing ? "text-slate-500" : "text-slate-400"}`}
                       >
-                        Click to Upload
+                        Klik untuk Upload
                       </span>
                     </>
                   )}
@@ -386,7 +389,7 @@ export default function HeroManager() {
                 </div>
                 <div>
                   <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">
-                    Headline
+                    Judul Utama
                   </label>
                   <input
                     type="text"
@@ -406,7 +409,7 @@ export default function HeroManager() {
                 </div>
                 <div>
                   <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">
-                    Subtitle
+                    Sub-judul
                   </label>
                   <textarea
                     rows={2}
@@ -430,7 +433,8 @@ export default function HeroManager() {
         })}
         {slides.length === 0 && (
           <div className="text-center py-10 text-slate-500 italic">
-            No slides available. Click "Add Slide" to start.
+            Tidak ada slide yang tersedia. Klik “Tambahkan Slide Baru” untuk
+            memulai.
           </div>
         )}
       </div>

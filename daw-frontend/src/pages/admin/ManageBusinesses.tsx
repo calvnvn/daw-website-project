@@ -163,7 +163,7 @@ export default function ManageBusinesses() {
           <h1 className="text-2xl font-serif font-bold text-slate-900">
             Businesses Manager
           </h1>
-          <p className="text-sm text-slate-500 mt-1"> Manage Businesses Page</p>
+          <p className="text-sm text-slate-500 mt-1"> Kelola Halaman Bisnis.</p>
         </div>
         <div className="flex items-center gap-3">
           <button

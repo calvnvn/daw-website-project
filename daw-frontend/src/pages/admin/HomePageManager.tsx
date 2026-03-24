@@ -17,7 +17,8 @@ export default function HomepageManager() {
           Homepage Manager
         </h1>
         <p className="text-sm text-slate-500 mt-1">
-          Manage hero banner, welcome text, and impact statistics modularly.
+          Kelola spanduk utama, teks sambutan, dan statistik pencapaian
+          perusahaan secara terpadu.
         </p>
       </div>
 

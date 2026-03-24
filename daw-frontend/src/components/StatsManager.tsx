@@ -81,9 +81,9 @@ export default function StatsManager() {
 
   const removeStat = async (id: string | number) => {
     // 1. Tampilkan toast konfirmasi terlebih dahulu
-    toast("Delete this statistic?", {
+    toast("Hapus data statistik ini?", {
       description:
-        "This action will permanently remove the data from the dashboard.",
+        "Tindakan ini akan menghilangkan angka pencapaian tersebut dari tampilan website publik secara permanen.",
       action: {
         label: "Delete",
         onClick: () => {
@@ -158,7 +158,8 @@ export default function StatsManager() {
             Impact Statistics
           </h3>
           <p className="text-sm text-slate-500">
-            Highlight key numbers (Maximum 4 items).
+            Tampilkan angka-angka kunci yang merepresentasikan skala operasional
+            dan pencapaian perusahaan (Maksimal 4 item).
           </p>
         </div>
         <div className="flex gap-3">

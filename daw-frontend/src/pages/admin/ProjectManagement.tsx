@@ -70,8 +70,8 @@ export default function ProjectManagement() {
   }, []);
 
   const handleDeleteRequest = (id: string, title: string) => {
-    toast.warning("Confirm Deletion", {
-      description: `Are you sure you want to delete "${title}"?`,
+    toast.warning("Konfirmasi Penghapusan", {
+      description: `Apakah Anda yakin ingin menghapus "${title}"? Tindakan ini tidak dapat dibatalkan.`,
       action: {
         label: "Delete",
         onClick: () => executeDelete(id),
@@ -96,8 +96,8 @@ export default function ProjectManagement() {
         return response.data;
       },
       {
-        loading: "Deleting project and cleaning up storage...",
-        success: "Project successfully removed!",
+        loading: "Menghapus proyek dan membersihkan data terkait...",
+        success: "Proyek berhasil dihapus dari sistem.",
         error: (err) => {
           console.error("Delete Error:", err);
           return err.response?.data?.message || "Failed to delete project.";
@@ -115,7 +115,7 @@ export default function ProjectManagement() {
             Project Management
           </h1>
           <p className="text-sm text-slate-500 mt-1">
-            Manage portfolios, articles, and operating assets.
+            Kelola portofolio, artikel berita, dan aset operasional perusahaan.
           </p>
         </div>
         <Link to="/admin/projects/create">
@@ -123,7 +123,7 @@ export default function ProjectManagement() {
           {/* Pastikan path ini benar ada slash di depan */}
           <button className="flex items-center gap-2 bg-daw-green hover:bg-[#003b1c] text-white px-5 py-2.5 rounded-lg font-medium transition-colors shadow-sm shadow-daw-green/20">
             <Plus className="w-5 h-5" />
-            <span>Add New Project</span>
+            <span>Tambah Proyek Baru</span>
           </button>
         </Link>
       </div>
@@ -137,7 +137,7 @@ export default function ProjectManagement() {
           </div>
           <input
             type="text"
-            placeholder="Search projects by title..."
+            placeholder="Cari proyek berdasarkan judul..."
             className="w-full pl-10 pr-4 py-2.5 bg-white border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-daw-green/20 focus:border-daw-green transition-all"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
@@ -158,7 +158,7 @@ export default function ProjectManagement() {
               )
             }
           >
-            <option value="All">All Categories</option>
+            <option value="All">Semua Kategori</option>
             <option value="Resources">Resources</option>
             <option value="Energy">Energy</option>
           </select>
@@ -174,7 +174,7 @@ export default function ProjectManagement() {
                 <th className="px-6 py-4">Project Title</th>
                 <th className="px-6 py-4">Category</th>
                 <th className="px-6 py-4">Status</th>
-                <th className="px-6 py-4">Last Modified</th>
+                <th className="px-6 py-4">Date</th>
                 <th className="px-6 py-4 text-right">Actions</th>
               </tr>
             </thead>
@@ -205,7 +205,7 @@ export default function ProjectManagement() {
                             {project.title}
                           </p>
                           <p className="text-xs text-slate-500 mt-0.5">
-                            By {project.author}
+                            Penulis: {project.author}
                           </p>
                         </div>
                       </div>
@@ -239,7 +239,7 @@ export default function ProjectManagement() {
                         )}
                       </p>
                       <p className="text-xs text-slate-400 mt-0.5">
-                        {project.views || 0} views
+                        Dilihat {project.views || 0} kali
                       </p>
                     </td>
                     <td className="px-6 py-4 text-right">
@@ -288,10 +288,11 @@ export default function ProjectManagement() {
                         <Search className="w-8 h-8 text-slate-300" />
                       </div>
                       <h3 className="text-lg font-bold text-slate-900 mb-1">
-                        No projects found
+                        Proyek tidak ditemukan
                       </h3>
                       <p className="text-sm text-slate-500">
-                        We couldn't find anything matching your search criteria.
+                        Kami tidak menemukan data yang sesuai dengan pencarian
+                        Anda.
                       </p>
                     </div>
                   </td>

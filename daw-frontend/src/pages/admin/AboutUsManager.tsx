@@ -135,7 +135,7 @@ export default function AboutUsManager() {
     setIsSaving(true);
     try {
       if (activeTab === "management") {
-        toast.success("Management settings locked.");
+        toast.success("Management settings Mode Baca.");
         setIsEditing(false);
         return;
       }
@@ -311,7 +311,7 @@ export default function AboutUsManager() {
   if (isLoading) {
     return (
       <div className="p-12 text-center text-slate-500">
-        Loading company information...
+        Memuat Informasi Perusahaan...
       </div>
     );
   }
@@ -325,7 +325,8 @@ export default function AboutUsManager() {
             About Us Manager
           </h1>
           <p className="text-sm text-slate-500 mt-1">
-            Manage company history, vision, mission, and leadership team.
+            Kelola profil perusahaan, sejarah, visi misi, serta jajaran
+            kepemimpinan.
           </p>
         </div>
         <div className="flex items-center gap-3">
@@ -343,7 +344,7 @@ export default function AboutUsManager() {
             ) : (
               <Lock className="w-4 h-4" />
             )}
-            <span>{isEditing ? "Editing Mode" : "Locked"}</span>
+            <span>{isEditing ? "Mode Ubah" : "Mode Baca"}</span>
           </button>
 
           <button
@@ -408,13 +409,13 @@ export default function AboutUsManager() {
         {activeTab === "info" && (
           <div className="space-y-6 animate-in fade-in duration-300">
             <h3 className="text-lg font-bold text-slate-900 mb-4 border-b border-slate-100 pb-2">
-              Core Identity
+              Identitas Utama
             </h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               {/* Founders Spirit */}
               <div className="md:col-span-2 bg-slate-50 p-5 rounded-xl border border-slate-200">
                 <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">
-                  Spirit Title (Locked)
+                  Spirit Title (Mode Baca)
                 </label>
                 <input
                   type="text"
@@ -448,7 +449,7 @@ export default function AboutUsManager() {
               {/* Mission */}
               <div className="bg-slate-50 p-5 rounded-xl border border-slate-200">
                 <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">
-                  Mission Title (Locked)
+                  Mission Title (Mode Baca)
                 </label>
                 <input
                   type="text"
@@ -480,7 +481,7 @@ export default function AboutUsManager() {
               {/* Vision */}
               <div className="bg-slate-50 p-5 rounded-xl border border-slate-200">
                 <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">
-                  Vision Title (Locked)
+                  Vision Title (Mode Baca)
                 </label>
                 <input
                   type="text"
@@ -529,7 +530,7 @@ export default function AboutUsManager() {
                   onClick={addHistory}
                   className="flex items-center gap-1.5 px-4 py-2 bg-daw-green/10 hover:bg-daw-green hover:text-white text-daw-green rounded-lg text-sm font-bold transition-colors"
                 >
-                  <Plus className="w-4 h-4" /> Add Milestone
+                  <Plus className="w-4 h-4" /> Tambah Jejak Sejarah
                 </button>
               )}
             </div>
@@ -666,11 +667,11 @@ export default function AboutUsManager() {
                         }`}
                       />
                       <p className="text-[10px] text-slate-400 mt-1 italic">
-                        Tip: Press{" "}
+                        Petunjuk: Tekan{" "}
                         <kbd className="bg-slate-100 border border-slate-200 px-1 rounded">
                           Enter
                         </kbd>{" "}
-                        to create a new bullet point.
+                        untuk menambah poin baru.
                       </p>
                     </div>
                   </div>
@@ -689,7 +690,7 @@ export default function AboutUsManager() {
                   Board of Directors & Management
                 </h3>
                 <p className="text-sm text-slate-500">
-                  Manage executives, roles, and profile pictures.
+                  Atur data direksi, jabatan, serta foto profil resmi.
                 </p>
               </div>
               {isEditing && (
@@ -767,7 +768,7 @@ export default function AboutUsManager() {
                           </div>
                         ) : (
                           <span className="text-xs text-slate-400 italic">
-                            Locked
+                            Mode Baca
                           </span>
                         )}
                       </td>
@@ -844,7 +845,7 @@ export default function AboutUsManager() {
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
                       <div>
                         <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">
-                          Hierarchy Level
+                          Tingkat Jabatan
                         </label>
                         <select
                           value={personForm.level}
@@ -863,7 +864,7 @@ export default function AboutUsManager() {
                       </div>
                       <div>
                         <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">
-                          Display Order (1 = Top)
+                          Urutan Tampilan
                         </label>
                         <input
                           required

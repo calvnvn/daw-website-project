@@ -209,7 +209,7 @@ export default function Inbox() {
             Contact Inquiries
           </h1>
           <p className="text-sm text-slate-500 mt-1">
-            Manage messages received from the public Contact Us form.
+            Kelola pesan yang diterima melalui formulir Hubungi Kami.
           </p>
         </div>
         <div className="bg-daw-green/10 text-daw-green px-4 py-2 rounded-lg font-bold text-sm flex items-center gap-2">

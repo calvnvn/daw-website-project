@@ -18,7 +18,7 @@ export default function ContentManager() {
                 Content Manager
               </h1>
               <p className="text-sm text-slate-500">
-                Manage your website's pages and navigation structure.
+                Kelola halaman dan struktur navigasi situs web.
               </p>
             </div>
           </div>

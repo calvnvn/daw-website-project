@@ -195,7 +195,7 @@ export default function UserManagement() {
             User Management
           </h1>
           <p className="text-sm text-slate-500 mt-1">
-            Manage admin accounts and system access permissions.
+            Kelola akun admin dan izin akses sistem.
           </p>
         </div>
         <button
