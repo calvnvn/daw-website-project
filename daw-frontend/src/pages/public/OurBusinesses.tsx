@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useLocation } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { ChevronRight } from "lucide-react"; // Ikon tambahan untuk dekorasi hero
 import bannerImg from "@/assets/about-banner.jpg"; // Ganti dengan gambar spesifik bisnis jika ada
@@ -11,15 +12,28 @@ import ScrollReveal from "@/components/ScrollReveal";
 
 export default function OurBusinesses() {
   const { t } = useTranslation();
+  const { hash } = useLocation();
 
   const [activeSection, setActiveSection] = useState("resources");
   const [pageData, setPageData] = useState<SectionData[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
-  // 1. STATE UNTUK SCROLL PROGRESS BAR (Sama seperti Dynamic Page)
+  useEffect(() => {
+    if (!isLoading && hash) {
+      const targetId = hash.replace("#", "");
+
+      const timeoutId = setTimeout(() => {
+        scrollToSection(targetId);
+      }, 300);
+
+      return () => clearTimeout(timeoutId);
+    }
+  }, [isLoading, hash]); // Trigger jalan saat data selesai load atau hash berubah
+
+  // STATE UNTUK SCROLL PROGRESS BAR (Sama seperti Dynamic Page)
   const [scrollProgress, setScrollProgress] = useState(0);
 
-  // 2. FETCH DATA DARI API PUBLIC
+  // FETCH DATA DARI API PUBLIC
   useEffect(() => {
     const fetchPublicData = async () => {
       try {
@@ -70,8 +84,17 @@ export default function OurBusinesses() {
   const scrollToSection = (id: string) => {
     const element = document.getElementById(id);
     if (element) {
-      const y = element.getBoundingClientRect().top + window.scrollY - 100;
-      window.scrollTo({ top: y, behavior: "smooth" });
+      // Offset 100-120px biasanya pas untuk mengimbangi sticky navbar
+      const offset = 120;
+      const bodyRect = document.body.getBoundingClientRect().top;
+      const elementRect = element.getBoundingClientRect().top;
+      const elementPosition = elementRect - bodyRect;
+      const offsetPosition = elementPosition - offset;
+
+      window.scrollTo({
+        top: offsetPosition,
+        behavior: "smooth",
+      });
     }
   };
 

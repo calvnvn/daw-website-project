@@ -93,7 +93,7 @@ export default function Dashboard() {
       <div className="h-[60vh] flex flex-col items-center justify-center text-slate-500 gap-3">
         <Loader2 className="w-8 h-8 animate-spin text-daw-green" />
         <p className="text-sm font-medium animate-pulse">
-          Syncing Mission Control...
+          Memuat informasi dashboard...
         </p>
       </div>
     );
@@ -118,7 +118,8 @@ export default function Dashboard() {
             Welcome back, {firstName}!
           </h1>
           <p className="text-sm text-slate-500 mt-1">
-            Here is your operational overview for PT Dharma Agung Wijaya.
+            Berikut adalah ringkasan operasional PT Dharma Agung Wijaya hari
+            ini.
           </p>
         </div>
         <div className="text-right hidden sm:block">
@@ -148,11 +149,9 @@ export default function Dashboard() {
             >
               {stats.unreadInquiries}
             </h3>
-            <p className="text-sm font-semibold text-slate-700">
-              Unread Messages
-            </p>
+            <p className="text-sm font-semibold text-slate-700">Pesan Baru</p>
             <p className="text-xs text-slate-400 mt-1">
-              Awaiting your response
+              Menunggu tanggapan Anda
             </p>
           </div>
         </Link>
@@ -174,11 +173,9 @@ export default function Dashboard() {
             >
               {stats.draftProjects}
             </h3>
-            <p className="text-sm font-semibold text-slate-700">
-              Pending Drafts
-            </p>
+            <p className="text-sm font-semibold text-slate-700">Draf Proyek</p>
             <p className="text-xs text-slate-400 mt-1">
-              Content not yet published
+              Konten yang belum diterbitkan
             </p>
           </div>
         </Link>
@@ -196,10 +193,10 @@ export default function Dashboard() {
               {stats.totalViews.toLocaleString("id-ID")}
             </h3>
             <p className="text-sm font-semibold text-slate-700">
-              Portfolio Views
+              Kunjungan Portofolio
             </p>
             <p className="text-xs text-slate-400 mt-1">
-              Total public impressions
+              Total dilihat oleh publik
             </p>
           </div>
         </div>
@@ -210,13 +207,13 @@ export default function Dashboard() {
         <div className="lg:col-span-2 bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden flex flex-col">
           <div className="px-6 py-5 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
             <h3 className="text-sm font-bold text-slate-800 flex items-center gap-2 uppercase tracking-wider">
-              <Mail className="w-4 h-4 text-amber-500" /> Needs Attention
+              <Mail className="w-4 h-4 text-amber-500" /> Pesan Terbaru
             </h3>
             <Link
               to="/admin/inbox"
               className="text-xs font-bold text-daw-green hover:underline flex items-center gap-1"
             >
-              Go to Inbox <ArrowRight className="w-3 h-3" />
+              Lihat Semua Pesan <ArrowRight className="w-3 h-3" />
             </Link>
           </div>
 
@@ -259,10 +256,10 @@ export default function Dashboard() {
                   <CheckCircle2 className="w-8 h-8 text-slate-300" />
                 </div>
                 <h3 className="text-sm font-bold text-slate-900 mb-1">
-                  Inbox is Clear!
+                  Kotak Masuk Bersih
                 </h3>
                 <p className="text-xs text-slate-500">
-                  You have no unread messages to respond to.
+                  Tidak ada pesan baru yang perlu dibalas.
                 </p>
               </div>
             )}
@@ -289,7 +286,7 @@ export default function Dashboard() {
 
           <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6">
             <h3 className="text-xs font-bold text-slate-400 mb-4 uppercase tracking-widest">
-              Quick Commands
+              Akses Cepat
             </h3>
             <div className="space-y-3">
               <Link
@@ -301,7 +298,7 @@ export default function Dashboard() {
                     <Plus className="w-4 h-4" />
                   </div>
                   <span className="text-sm font-bold text-slate-700 group-hover:text-daw-green transition-colors">
-                    Write New Project
+                    Buat Proyek Baru
                   </span>
                 </div>
                 <ArrowRight className="w-4 h-4 text-slate-400 group-hover:text-daw-green transition-all transform group-hover:translate-x-1" />
@@ -316,7 +313,7 @@ export default function Dashboard() {
                     <Users className="w-4 h-4" />
                   </div>
                   <span className="text-sm font-bold text-slate-700 group-hover:text-blue-600 transition-colors">
-                    Manage Users
+                    Kelola Pengguna
                   </span>
                 </div>
                 <ArrowRight className="w-4 h-4 text-slate-400 group-hover:text-blue-600 transition-all transform group-hover:translate-x-1" />

@@ -246,13 +246,13 @@ export default function DynamicNavbar() {
           </nav>
 
           <div className="flex items-center gap-5">
-            <button
+            {/* <button
               onClick={toggleLanguage}
               className={`flex items-center gap-1.5 text-[13px] tracking-wide font-bold transition-colors ${textClass}`}
             >
               <Globe className="h-4 w-4" />
               {i18n.language === "en" ? "EN" : "ID"}
-            </button>
+            </button> */}
             <Link
               to="/contact-us"
               className="hidden md:flex items-center justify-center bg-daw-green hover:bg-[#003b1c] text-white rounded-full px-6 py-3 text-[13px] tracking-wide font-bold shadow-md transition-transform hover:scale-105 border-0"
