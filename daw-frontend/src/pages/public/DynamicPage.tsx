@@ -16,6 +16,7 @@ interface PageData {
   heroImage: string | null;
   templateType: "classic" | "modern" | "split";
   metaDescription: string | null;
+  showDropCap: boolean;
   sidebarLinks?: { label: string; url: string }[];
 }
 
@@ -361,15 +362,19 @@ export default function DynamicPage() {
                     [&_iframe]:rounded-[1.5rem] [&_iframe]:shadow-2xl [&_iframe]:my-12
                     
                     /* 5. DROP CAP - The "Vogue" Style */
-                    prose-p:first-of-type:first-letter:text-[6rem] 
-                    prose-p:first-of-type:first-letter:font-serif 
-                    prose-p:first-of-type:first-letter:font-black 
-                    prose-p:first-of-type:first-letter:text-daw-green 
-                    prose-p:first-of-type:first-letter:mr-5 
-                    prose-p:first-of-type:first-letter:float-left 
-                    prose-p:first-of-type:first-letter:leading-[0.7] 
-                    prose-p:first-of-type:first-letter:mt-3
-                    prose-p:first-of-type:first-letter:drop-shadow-sm
+                    ${
+                      pageData.showDropCap
+                        ? `prose-p:first-of-type:first-letter:text-[6rem] 
+                         prose-p:first-of-type:first-letter:font-serif 
+                         prose-p:first-of-type:first-letter:font-black 
+                         prose-p:first-of-type:first-letter:text-daw-green 
+                         prose-p:first-of-type:first-letter:mr-5 
+                         prose-p:first-of-type:first-letter:float-left 
+                         prose-p:first-of-type:first-letter:leading-[0.7] 
+                         prose-p:first-of-type:first-letter:mt-3
+                         prose-p:first-of-type:first-letter:drop-shadow-sm`
+                        : ""
+                    }
 
                     /* 6. LISTS & BULLETS */
                     prose-li:marker:text-daw-green prose-li:my-2`}

@@ -41,6 +41,10 @@ const Page = sequelize.define("Page", {
     defaultValue: [],
     allowNull: true,
   },
+  showDropCap: {
+    type: DataTypes.BOOLEAN,
+    defaultValue: true,
+  },
 });
 
 module.exports = Page;

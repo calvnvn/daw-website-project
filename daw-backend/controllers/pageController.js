@@ -72,6 +72,7 @@ exports.createPage = async (req, res) => {
       templateType,
       content,
       metaDescription,
+      showDropCap,
       sidebarLinks, // 🚀 1. TANGKAP DARI REQ.BODY
     } = req.body;
 
@@ -94,7 +95,8 @@ exports.createPage = async (req, res) => {
       templateType: templateType || "split",
       content: sanitizedContent,
       metaDescription: finalMetaDesc,
-      sidebarLinks: sidebarLinks || [], // 🚀 2. SIMPAN KE DATABASE
+      showDropCap,
+      sidebarLinks: sidebarLinks || [],
     });
 
     res
@@ -119,6 +121,7 @@ exports.updatePage = async (req, res) => {
       templateType,
       content,
       metaDescription,
+      showDropCap,
       sidebarLinks, // 🚀 1. TANGKAP DARI REQ.BODY (Tadinya Abang lupa bagian ini)
     } = req.body;
 
@@ -144,6 +147,7 @@ exports.updatePage = async (req, res) => {
       templateType: templateType || "split",
       content: sanitizedContent,
       metaDescription: finalMetaDesc,
+      showDropCap,
       sidebarLinks: sidebarLinks || [], // 🚀 2. UPDATE KE DATABASE
     });
 

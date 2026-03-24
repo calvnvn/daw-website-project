@@ -28,6 +28,7 @@ interface Page {
   heroImage?: string | null;
   templateType: "classic" | "modern" | "split";
   content: string;
+  showDropCap: boolean;
   sidebarLinks?: { label: string; url: string }[];
 }
 
@@ -37,12 +38,14 @@ export default function PageBuilder() {
   const [isSaving, setIsSaving] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [isDragging, setIsDragging] = useState(false);
+  const [isPreviewMode, setIsPreviewMode] = useState(false);
   const [formData, setFormData] = useState({
     title: "",
     slug: "",
     subtitle: "",
     templateType: "classic",
     content: "",
+    showDropCap: true,
     sidebarLinks: [] as { label: string; url: string }[],
   });
 
@@ -157,6 +160,7 @@ export default function PageBuilder() {
       subtitle: "",
       templateType: "classic",
       content: "",
+      showDropCap: true,
       sidebarLinks: [],
     });
   };
@@ -177,6 +181,7 @@ export default function PageBuilder() {
         subtitle: exactData.subtitle || "",
         templateType: exactData.templateType || "classic",
         content: exactData.content || "",
+        showDropCap: exactData.showDropCap ?? true,
         sidebarLinks:
           typeof exactData.sidebarLinks === "string"
             ? JSON.parse(exactData.sidebarLinks)
@@ -258,97 +263,101 @@ export default function PageBuilder() {
   return (
     <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start animate-in fade-in duration-500 pb-20">
       {/* 🚀 LEFT: DOCUMENT REPOSITORY (Sidebar) */}
-      <div className="lg:col-span-4 space-y-4">
-        <div className="bg-slate-50 border border-slate-200 rounded-[2rem] p-6 sticky top-24 shadow-sm">
-          <div className="flex justify-between items-end mb-6">
-            <div>
-              <h3 className="text-xl font-serif font-black text-slate-900 tracking-tight">
-                Repository
-              </h3>
-              <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-1">
-                Published Documents / Dokumen Publik
-              </p>
-            </div>
-            {!editingId && (
-              <button
-                onClick={resetForm}
-                className="text-xs font-bold text-daw-green bg-daw-green/10 px-3 py-2 rounded-xl hover:bg-daw-green hover:text-white transition-all flex items-center gap-1 shadow-sm"
-              >
-                <Plus className="w-4 h-4" /> New
-              </button>
-            )}
-          </div>
-
-          {isLoading ? (
-            <div className="py-12 text-center animate-pulse">
-              <div className="w-8 h-8 border-4 border-slate-200 border-t-daw-green rounded-full animate-spin mx-auto mb-3" />
-              <p className="text-[10px] text-slate-400 font-bold tracking-widest uppercase">
-                Fetching data...
-              </p>
-            </div>
-          ) : pages.length === 0 ? (
-            <div className="text-center py-16 px-6 bg-white border border-dashed border-slate-300 rounded-[1.5rem]">
-              <div className="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center mx-auto mb-4">
-                <FileText className="w-8 h-8 text-slate-300" />
+      {!isPreviewMode && (
+        <div className="lg:col-span-4 space-y-4">
+          <div className="bg-slate-50 border border-slate-200 rounded-[2rem] p-6 sticky top-24 shadow-sm">
+            <div className="flex justify-between items-end mb-6">
+              <div>
+                <h3 className="text-xl font-serif font-black text-slate-900 tracking-tight">
+                  Repository
+                </h3>
+                <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-1">
+                  Published Documents / Dokumen Publik
+                </p>
               </div>
-              <h4 className="text-sm font-bold text-slate-900 mb-1">
-                No Documents Found
-              </h4>
-              <p className="text-xs text-slate-400 font-medium mb-6">
-                Draft your first editorial piece to populate this repository.{" "}
-                <br />
-                <span className="italic text-[10px]">
-                  Buat artikel pertama Anda untuk mengisi repositori ini.
-                </span>
-              </p>
-              <button
-                onClick={resetForm}
-                className="text-xs font-bold text-white bg-daw-green px-5 py-2.5 rounded-xl hover:bg-[#003b1c] shadow-lg shadow-daw-green/20 transition-all"
-              >
-                Compose New Page
-              </button>
-            </div>
-          ) : (
-            <div className="space-y-3 max-h-[65vh] overflow-y-auto custom-scrollbar pr-2">
-              {pages.map((p) => (
-                <div
-                  key={p.id}
-                  className={`p-4 rounded-2xl border bg-white transition-all group cursor-pointer hover:border-daw-green/50 hover:shadow-md
-                  ${editingId === p.id ? "border-daw-green ring-4 ring-daw-green/10 shadow-sm" : "border-slate-200"}`}
-                  onClick={() => handleEdit(p)}
+              {!editingId && (
+                <button
+                  onClick={resetForm}
+                  className="text-xs font-bold text-daw-green bg-daw-green/10 px-3 py-2 rounded-xl hover:bg-daw-green hover:text-white transition-all flex items-center gap-1 shadow-sm"
                 >
-                  <div className="flex justify-between items-start">
-                    <div className="min-w-0 pr-2">
-                      <h4
-                        className={`font-bold text-sm truncate ${editingId === p.id ? "text-daw-green" : "text-slate-900"}`}
-                      >
-                        {p.title}
-                      </h4>
-                      <p className="text-[10px] text-slate-400 font-mono mt-1.5 flex items-center gap-1 truncate">
-                        <Globe className="w-3 h-3" /> /page/{p.slug}
-                      </p>
-                    </div>
-                    <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleDelete(p.id, p.title);
-                        }}
-                        className="p-2 bg-slate-50 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
+                  <Plus className="w-4 h-4" /> New
+                </button>
+              )}
+            </div>
+
+            {isLoading ? (
+              <div className="py-12 text-center animate-pulse">
+                <div className="w-8 h-8 border-4 border-slate-200 border-t-daw-green rounded-full animate-spin mx-auto mb-3" />
+                <p className="text-[10px] text-slate-400 font-bold tracking-widest uppercase">
+                  Fetching data...
+                </p>
+              </div>
+            ) : pages.length === 0 ? (
+              <div className="text-center py-16 px-6 bg-white border border-dashed border-slate-300 rounded-[1.5rem]">
+                <div className="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <FileText className="w-8 h-8 text-slate-300" />
+                </div>
+                <h4 className="text-sm font-bold text-slate-900 mb-1">
+                  No Documents Found
+                </h4>
+                <p className="text-xs text-slate-400 font-medium mb-6">
+                  Draft your first editorial piece to populate this repository.{" "}
+                  <br />
+                  <span className="italic text-[10px]">
+                    Buat artikel pertama Anda untuk mengisi repositori ini.
+                  </span>
+                </p>
+                <button
+                  onClick={resetForm}
+                  className="text-xs font-bold text-white bg-daw-green px-5 py-2.5 rounded-xl hover:bg-[#003b1c] shadow-lg shadow-daw-green/20 transition-all"
+                >
+                  Compose New Page
+                </button>
+              </div>
+            ) : (
+              <div className="space-y-3 max-h-[65vh] overflow-y-auto custom-scrollbar pr-2">
+                {pages.map((p) => (
+                  <div
+                    key={p.id}
+                    className={`p-4 rounded-2xl border bg-white transition-all group cursor-pointer hover:border-daw-green/50 hover:shadow-md
+                  ${editingId === p.id ? "border-daw-green ring-4 ring-daw-green/10 shadow-sm" : "border-slate-200"}`}
+                    onClick={() => handleEdit(p)}
+                  >
+                    <div className="flex justify-between items-start">
+                      <div className="min-w-0 pr-2">
+                        <h4
+                          className={`font-bold text-sm truncate ${editingId === p.id ? "text-daw-green" : "text-slate-900"}`}
+                        >
+                          {p.title}
+                        </h4>
+                        <p className="text-[10px] text-slate-400 font-mono mt-1.5 flex items-center gap-1 truncate">
+                          <Globe className="w-3 h-3" /> /page/{p.slug}
+                        </p>
+                      </div>
+                      <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDelete(p.id, p.title);
+                          }}
+                          className="p-2 bg-slate-50 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
                     </div>
                   </div>
-                </div>
-              ))}
-            </div>
-          )}
+                ))}
+              </div>
+            )}
+          </div>
         </div>
-      </div>
+      )}
 
       {/* 🚀 RIGHT: EDITORIAL WORKSPACE (Main Form) */}
-      <div className="lg:col-span-8">
+      <div
+        className={`${isPreviewMode ? "lg:col-span-12 transition-all duration-500" : "lg:col-span-8 transition-all duration-500"}`}
+      >
         <form
           onSubmit={handleSubmit}
           className="bg-white rounded-[2.5rem] border border-slate-200 shadow-xl shadow-slate-200/50 overflow-hidden"
@@ -374,31 +383,52 @@ export default function PageBuilder() {
                 </p>
               </div>
             </div>
-            {editingId && (
+
+            <div className="flex items-center gap-2">
               <button
                 type="button"
-                onClick={resetForm}
-                className="px-4 py-2 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-500 hover:text-red-500 hover:border-red-200 hover:bg-red-50 transition-all flex items-center gap-2 shadow-sm"
+                onClick={() => setIsPreviewMode(!isPreviewMode)}
+                className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 shadow-sm border ${
+                  isPreviewMode
+                    ? "bg-slate-900 text-white border-slate-900"
+                    : "bg-white text-slate-600 border-slate-200 hover:border-daw-green"
+                }`}
               >
-                <X className="w-4 h-4" /> Discard Edit
+                {isPreviewMode ? (
+                  <PenTool className="w-4 h-4" />
+                ) : (
+                  <Sparkles className="w-4 h-4" />
+                )}
+                {isPreviewMode ? "Back to Editor" : "Live Preview"}
               </button>
-            )}
+              {editingId && (
+                <button
+                  type="button"
+                  onClick={resetForm}
+                  className="px-4 py-2 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-500 hover:text-red-500 hover:border-red-200 hover:bg-red-50 transition-all flex items-center gap-2 shadow-sm"
+                >
+                  <X className="w-4 h-4" /> Discard Edit
+                </button>
+              )}
+            </div>
           </div>
 
-          <div className="p-8 space-y-10">
-            {/* 🌟 SECTION 1: CORE IDENTITY */}
-            <div className="space-y-6">
+          {/* DYNAMIC WORKSPACE CONTENT */}
+          <div
+            className={`p-8 ${isPreviewMode ? "grid grid-cols-1 lg:grid-cols-2 gap-8 items-start" : "space-y-10"}`}
+          >
+            {/* SECTION 1: CORE IDENTITY */}
+            <div className="space-y-10">
               <div className="flex items-center gap-2 border-b border-slate-100 pb-2">
                 <LayoutTemplate className="w-4 h-4 text-slate-400" />
                 <h3 className="text-sm font-bold text-slate-900">
                   Core Identity
                 </h3>
               </div>
-
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="space-y-2">
                   <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">
-                    Main Title / Judul Utama *
+                    Main Title *
                   </label>
                   <input
                     type="text"
@@ -464,15 +494,111 @@ export default function PageBuilder() {
                     placeholder="Brief overview or engaging hook for the article..."
                   />
                 </div>
+                <div className="flex items-center gap-3 bg-white p-4 rounded-2xl border border-slate-200 shadow-sm mt-4">
+                  <div
+                    className={`w-10 h-10 rounded-xl flex items-center justify-center transition-colors ${formData.showDropCap ? "bg-daw-green/10 text-daw-green" : "bg-slate-100 text-slate-400"}`}
+                  >
+                    <span className="text-xl font-serif font-black">A</span>
+                  </div>
+                  <div className="flex-1">
+                    <p className="text-xs font-bold text-slate-700">
+                      Drop Cap Typography
+                    </p>
+                    <p className="text-[10px] text-slate-500 uppercase font-medium">
+                      Huruf besar di awal paragraf
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setFormData((prev) => ({
+                        ...prev,
+                        showDropCap: !prev.showDropCap,
+                      }))
+                    }
+                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none ${formData.showDropCap ? "bg-daw-green" : "bg-slate-300"}`}
+                  >
+                    <span
+                      className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${formData.showDropCap ? "translate-x-6" : "translate-x-1"}`}
+                    />
+                  </button>
+                </div>
               </div>
             </div>
 
-            {/* 🌟 SECTION 2: VISUAL ASSET */}
+            {isPreviewMode && (
+              <div className="sticky top-24 h-[80vh] overflow-y-auto rounded-[2rem] border-4 border-slate-900 bg-white shadow-2xl custom-scrollbar">
+                <div className="bg-slate-900 p-3 flex justify-center gap-1.5 border-b border-slate-800">
+                  <div className="w-2 h-2 rounded-full bg-red-500" />
+                  <div className="w-2 h-2 rounded-full bg-amber-500" />
+                  <div className="w-2 h-2 rounded-full bg-green-500" />
+                </div>
+
+                {/* MINI RENDERER (1:1 Mirror dari DynamicPage.tsx) */}
+                <div className="p-8 md:p-10">
+                  {/* Subtitle Rendering dengan Fallback */}
+                  {(formData.subtitle || !editingId) && (
+                    <p className="text-daw-green font-bold tracking-[0.3em] uppercase text-[10px] mb-5 drop-shadow-sm">
+                      {formData.subtitle || "ENTER SUBTITLE HERE"}
+                    </p>
+                  )}
+
+                  {/* Title Rendering dengan Fallback */}
+                  <h1 className="text-3xl md:text-4xl font-serif font-bold text-slate-900 mb-8 leading-[1.15] tracking-tight">
+                    {formData.title || "Untitled Document"}
+                  </h1>
+
+                  <hr className="mb-8 border-slate-200" />
+
+                  {/* 🚀 Bagian Content: Sinkronisasi 100% dengan DynamicPage.tsx */}
+                  <article
+                    className={`w-full text-left break-words [&>*:first-child]:mt-0
+                      /* Core Prose */
+                      prose prose-slate max-w-none
+                      prose-p:leading-[1.8] prose-p:text-slate-600 prose-p:mb-8 prose-p:text-[1.05rem]
+                      
+                      /* Headings */
+                      prose-headings:font-serif prose-headings:text-slate-900 prose-headings:tracking-tight prose-headings:font-bold
+                      prose-h2:text-2xl prose-h2:mt-12 prose-h2:mb-6 
+                      prose-h3:text-xl prose-h3:mt-8
+                      
+                      /* Media Styling (Images & iFrames) */
+                      [&_img]:rounded-[1.5rem] [&_img]:my-10 [&_img]:shadow-sm
+                      [&_iframe]:rounded-[1rem] [&_iframe]:shadow-lg [&_iframe]:my-8
+                      
+                      /* Lists */
+                      prose-li:marker:text-daw-green prose-li:my-1.5
+                      
+                      /* Conditional Drop Cap (Disesuaikan proporsinya untuk layar split) */
+                      ${
+                        formData.showDropCap
+                          ? `prose-p:first-of-type:first-letter:text-[4.5rem] 
+                             prose-p:first-of-type:first-letter:font-serif 
+                             prose-p:first-of-type:first-letter:font-black 
+                             prose-p:first-of-type:first-letter:text-daw-green 
+                             prose-p:first-of-type:first-letter:mr-4 
+                             prose-p:first-of-type:first-letter:float-left 
+                             prose-p:first-of-type:first-letter:leading-[0.8] 
+                             prose-p:first-of-type:first-letter:mt-2 
+                             prose-p:first-of-type:first-letter:drop-shadow-sm`
+                          : ""
+                      }`}
+                    dangerouslySetInnerHTML={{
+                      __html:
+                        formData.content ||
+                        "<p class='text-slate-400 italic font-sans'>Start drafting your content to see the preview here...</p>",
+                    }}
+                  />
+                </div>
+              </div>
+            )}
+
+            {/* SECTION 2: VISUAL ASSET */}
             <div className="space-y-6">
               <div className="flex items-center gap-2 border-b border-slate-100 pb-2">
                 <ImagePlus className="w-4 h-4 text-slate-400" />
                 <h3 className="text-sm font-bold text-slate-900">
-                  Hero Background / Gambar Sampul
+                  Hero Background
                 </h3>
               </div>
 
@@ -540,7 +666,6 @@ export default function PageBuilder() {
                 )}
               </div>
             </div>
-
             {/* 🌟 SECTION 3: WIDGET MANAGER */}
             <div className="space-y-6">
               <div className="flex justify-between items-center border-b border-slate-100 pb-2">
@@ -683,7 +808,6 @@ export default function PageBuilder() {
                 )}
               </div>
             </div>
-
             {/* 🌟 SECTION 4: TEXT EDITOR */}
             <div className="space-y-6">
               <div className="flex items-center gap-2 border-b border-slate-100 pb-2">
