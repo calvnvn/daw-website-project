@@ -21,6 +21,32 @@ export default function StatsManager() {
   const [stats, setStats] = useState<ImpactStat[]>([]);
   const [isEditing, setIsEditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
+  const reorderStats = (startIndex: number, endIndex: number) => {
+    const result = Array.from(stats);
+    const [removed] = result.splice(startIndex, 1);
+    result.splice(endIndex, 0, removed);
+
+    const finalResult = result.map((item, index) => ({
+      ...item,
+      order: index,
+    }));
+
+    setStats(finalResult);
+  };
+  const handleDragStart = (index: number) => {
+    setDraggedIndex(index);
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+  };
+
+  const handleDrop = (index: number) => {
+    if (draggedIndex === null) return;
+    reorderStats(draggedIndex, index);
+    setDraggedIndex(null);
+  };
 
   const updateStatField = (
     id: string | number,
@@ -174,11 +200,45 @@ export default function StatsManager() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {stats.map((stat, index) => {
           const IconComponent = (Icons as any)[stat.icon] || Icons.HelpCircle;
+          const isDragging = draggedIndex === index;
           return (
             <div
               key={stat.id}
-              className="flex gap-4 items-start bg-slate-50 p-5 rounded-xl border border-slate-200"
+              draggable={isEditing}
+              onDragStart={() => handleDragStart(index)}
+              onDragOver={handleDragOver}
+              onDrop={() => handleDrop(index)}
+              onDragEnd={() => setDraggedIndex(null)}
+              className={`flex gap-4 items-start p-5 rounded-xl border transition-all duration-300 ${
+                isEditing
+                  ? "bg-white border-slate-200 shadow-sm cursor-grab active:cursor-grabbing"
+                  : "bg-slate-50 border-slate-100"
+              } ${isDragging ? "opacity-40 scale-95 border-daw-green border-dashed" : "opacity-100"}`}
             >
+              {/* Orders Control */}
+              {isEditing && (
+                <div className="flex flex-col items-center gap-1 pr-2 border-r border-slate-100">
+                  <button
+                    onClick={() => index > 0 && reorderStats(index, index - 1)}
+                    disabled={index === 0}
+                    className="p-1 hover:bg-slate-100 rounded disabled:opacity-20"
+                  >
+                    <Icons.ChevronUp className="w-4 h-4 text-slate-500" />
+                  </button>
+
+                  <Icons.GripVertical className="w-4 h-4 text-slate-300" />
+
+                  <button
+                    onClick={() =>
+                      index < stats.length - 1 && reorderStats(index, index + 1)
+                    }
+                    disabled={index === stats.length - 1}
+                    className="p-1 hover:bg-slate-100 rounded disabled:opacity-20"
+                  >
+                    <Icons.ChevronDown className="w-4 h-4 text-slate-500" />
+                  </button>
+                </div>
+              )}
               {/* ICON PREVIEW AREA */}
               <div className="w-20 shrink-0">
                 <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-2 text-center">
