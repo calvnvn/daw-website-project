@@ -194,18 +194,37 @@ export default function PageBuilder() {
     }
   };
 
-  const handleDelete = async (id: string, title: string) => {
-    if (!confirm(`Delete "${title}"? This cannot be undone.`)) return;
-    const toastId = toast.loading("Removing document...");
-    try {
-      await api.delete(`/pages/${id}`);
-      toast.success("Document removed", { id: toastId });
-      fetchPages();
-      if (editingId === id) resetForm();
-    } catch (error) {
-      toast.error("Failed to delete", { id: toastId });
-      console.error("Error: ", error);
-    }
+  const handleDelete = (id: string, title: string) => {
+    toast(`Delete "${title}"?`, {
+      description: "This action is permanent and cannot be undone.",
+      action: {
+        label: "Delete",
+        onClick: async () => {
+          const toastId = toast.loading("Removing document from repository...");
+
+          try {
+            await api.delete(`/pages/${id}`);
+
+            toast.success("Document removed successfully", { id: toastId });
+
+            fetchPages();
+            if (editingId === id) resetForm();
+          } catch (error: any) {
+            toast.error(
+              error.response?.data?.message || "Failed to delete document",
+              { id: toastId },
+            );
+            console.error("Delete Error: ", error);
+          }
+        },
+      },
+      cancel: {
+        label: "Cancel",
+        onClick: () => {
+          console.log("Delete cancelled");
+        },
+      },
+    });
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
