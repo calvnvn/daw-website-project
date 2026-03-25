@@ -17,7 +17,7 @@ export default function ForceChangePassword() {
     // Validasi dasar
     if (newPassword.length < 6) {
       toast.warning("Password Terlalu Pendek", {
-        description: "Password baru harus memiliki minimal 6 karakter.",
+        description: "Password baru harus memiliki setidaknya 6 karakter.",
       });
       return;
     }
@@ -34,14 +34,14 @@ export default function ForceChangePassword() {
         newPassword,
       });
       toast.success("Password Updated!", {
-        description:
-          response.data.message || "Your account is now fully secured.",
+        description: response.data.message || "Akun Anda kini sepenuhnya aman.",
       });
       navigate("/admin");
     } catch (error: any) {
       toast.error("Update Failed", {
         description:
-          error.response?.data?.message || "Connection to backend failed.",
+          error.response?.data?.message ||
+          "Gagal menghubungkan ke server. Silakan coba lagi",
       });
     } finally {
       setIsLoading(false);
@@ -62,8 +62,8 @@ export default function ForceChangePassword() {
           Secure Your Account
         </h2>
         <p className="mt-2 text-center text-sm text-slate-600">
-          This is your first time logging in. For security reasons, please
-          change your temporary password.
+          Ini adalah kali pertama Anda login. Silakan ubah kata sandi sementara
+          Anda.
         </p>
       </div>
 
