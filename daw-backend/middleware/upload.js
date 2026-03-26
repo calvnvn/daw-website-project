@@ -32,6 +32,7 @@ const fileFilter = (req, file, cb) => {
     "cover_image",
     "gallery",
     "inline_image",
+    "heroImage",
     "teaser_image",
     "logo",
     "photo",

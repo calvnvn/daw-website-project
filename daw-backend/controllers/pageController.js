@@ -68,16 +68,17 @@ exports.createPage = async (req, res) => {
       title,
       slug,
       subtitle,
-      heroImage,
       templateType,
       content,
       metaDescription,
       showDropCap,
-      sidebarLinks, // 🚀 1. TANGKAP DARI REQ.BODY
+      sidebarLinks,
     } = req.body;
 
     const finalSlug = await generateUniqueSlug(title, slug);
     const sanitizedContent = dompurify.sanitize(content);
+
+    const heroImage = req.file ? req.file.filename : null;
 
     // SEO Automation
     let finalMetaDesc = metaDescription;
@@ -95,8 +96,11 @@ exports.createPage = async (req, res) => {
       templateType: templateType || "split",
       content: sanitizedContent,
       metaDescription: finalMetaDesc,
-      showDropCap,
-      sidebarLinks: sidebarLinks || [],
+      showDropCap: showDropCap === "true",
+      sidebarLinks:
+        typeof sidebarLinks === "string"
+          ? JSON.parse(sidebarLinks)
+          : sidebarLinks || [],
     });
 
     res
@@ -122,7 +126,7 @@ exports.updatePage = async (req, res) => {
       content,
       metaDescription,
       showDropCap,
-      sidebarLinks, // 🚀 1. TANGKAP DARI REQ.BODY (Tadinya Abang lupa bagian ini)
+      sidebarLinks,
     } = req.body;
 
     const page = await Page.findByPk(id);
@@ -130,6 +134,22 @@ exports.updatePage = async (req, res) => {
 
     const finalSlug = await generateUniqueSlug(title, slug, id);
     const sanitizedContent = dompurify.sanitize(content);
+    let heroImageName = page.heroImage; // Default pakai gambar lama
+    if (req.file) {
+      // 1. Jika ada file baru, hapus gambar lama dari folder uploads (Cleanup)
+      // if (page.heroImage) {
+      //   const oldImagePath = path.join(
+      //     __dirname,
+      //     "../../public/uploads/",
+      //     page.heroImage,
+      //   );
+      //   if (fs.existsSync(oldImagePath)) {
+      //     fs.unlinkSync(oldImagePath);
+      //   }
+      // }
+      // 2. Set nama file baru dari Multer
+      heroImageName = req.file.filename;
+    }
 
     // SEO Automation
     let finalMetaDesc = metaDescription;
@@ -143,12 +163,15 @@ exports.updatePage = async (req, res) => {
       title,
       slug: finalSlug,
       subtitle,
-      heroImage,
+      heroImage: heroImageName,
       templateType: templateType || "split",
       content: sanitizedContent,
       metaDescription: finalMetaDesc,
-      showDropCap,
-      sidebarLinks: sidebarLinks || [], // 🚀 2. UPDATE KE DATABASE
+      showDropCap: showDropCap === "true",
+      sidebarLinks:
+        typeof sidebarLinks === "string"
+          ? JSON.parse(sidebarLinks)
+          : sidebarLinks || [],
     });
 
     res.status(200).json({ message: "Page updated successfully" });

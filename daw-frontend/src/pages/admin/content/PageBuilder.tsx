@@ -17,7 +17,8 @@ import {
   ImagePlus,
   PenTool,
 } from "lucide-react";
-import api from "@/lib/api";
+// Tambahkan BASE_UPLOAD_URL
+import api, { BASE_UPLOAD_URL } from "@/lib/api";
 import imageCompression from "browser-image-compression";
 
 interface Page {
@@ -48,7 +49,7 @@ export default function PageBuilder() {
     showDropCap: true,
     sidebarLinks: [] as { label: string; url: string }[],
   });
-
+  const [heroFile, setHeroFile] = useState<File | null>(null);
   const [heroImage, setHeroImage] = useState<string>("");
   const quillRef = useRef<ReactQuill>(null);
 
@@ -230,22 +231,38 @@ export default function PageBuilder() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.title || !formData.slug)
-      return toast.error("Title & Slug are required!");
+      return toast.error("Judul & Slug wajib diisi!");
     setIsSaving(true);
     const toastId = toast.loading("Sedang memproses perubahan...");
     try {
-      const payload = { ...formData, heroImage: heroImage };
+      // GUNAKAN FORMDATA
+      const payload = new FormData();
+      // Masukkan data teks
+      payload.append("title", formData.title);
+      payload.append("slug", formData.slug);
+      payload.append("subtitle", formData.subtitle || "");
+      payload.append("templateType", formData.templateType);
+      payload.append("content", formData.content);
+      payload.append("showDropCap", String(formData.showDropCap));
+
+      // Array harus di-stringified karena FormData hanya menerima string/blob
+      payload.append("sidebarLinks", JSON.stringify(formData.sidebarLinks));
+      if (heroFile) {
+        payload.append("heroImage", heroFile);
+      }
+
       if (editingId) {
         await api.put(`/pages/${editingId}`, payload);
-        toast.success("Document updated!", { id: toastId });
+        toast.success("Halaman berhasil diperbarui!", { id: toastId });
       } else {
         await api.post("/pages", payload);
-        toast.success("Document published!", { id: toastId });
+        toast.success("Halaman berhasil diterbitkan!", { id: toastId });
       }
       resetForm();
+      setHeroFile(null); // Reset file setelah sukses
       fetchPages();
     } catch (error) {
-      toast.error("Failed to deploy", { id: toastId });
+      toast.error("Gagal menyimpan ke server.", { id: toastId });
       console.error("Error: ", error);
     } finally {
       setIsSaving(false);
@@ -267,6 +284,7 @@ export default function PageBuilder() {
         useWebWorker: true,
         initialQuality: 0.7,
       });
+      setHeroFile(compressedFile);
       const reader = new FileReader();
       reader.onloadend = () => {
         setHeroImage(reader.result as string);
@@ -625,7 +643,11 @@ export default function PageBuilder() {
                 {heroImage ? (
                   <div className="relative w-full h-[300px] rounded-3xl overflow-hidden group border border-slate-200 shadow-sm">
                     <img
-                      src={heroImage}
+                      src={
+                        heroImage.startsWith("data:")
+                          ? heroImage
+                          : `${BASE_UPLOAD_URL}/${heroImage}`
+                      }
                       alt="Hero Preview"
                       className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
                     />

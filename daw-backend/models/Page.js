@@ -16,7 +16,7 @@ const Page = sequelize.define("Page", {
     allowNull: true,
   },
   heroImage: {
-    type: DataTypes.TEXT("long"),
+    type: DataTypes.STRING,
     allowNull: true,
   },
   templateType: {
