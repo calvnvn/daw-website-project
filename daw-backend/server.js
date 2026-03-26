@@ -48,8 +48,6 @@ app.use(express.urlencoded({ limit: "50mb", extended: true }));
 // 2. File Uploads Directory Setup
 // Menggunakan process.cwd() agar path selalu stabil tidak peduli dari mana script di-run
 const uploadPath = path.join(process.cwd(), "public", "uploads");
-
-// Auto-create folder uploads jika belum ada (Best practice untuk deployment baru)
 if (!fs.existsSync(uploadPath)) {
   console.warn(
     "⚠️ Folder uploads tidak ditemukan. Membuat folder baru di:",
