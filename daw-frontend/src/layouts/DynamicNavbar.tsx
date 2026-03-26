@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { useTranslation } from "react-i18next";
-import { Menu, X, Globe, ChevronDown } from "lucide-react";
+import { Menu, X, ChevronDown } from "lucide-react";
 import logoDaw from "@/assets/logo-daw.png";
 import api from "@/lib/api";
 
@@ -23,7 +23,7 @@ export default function DynamicNavbar() {
     Record<string, boolean>
   >({});
 
-  const { t, i18n } = useTranslation();
+  const { t } = useTranslation();
 
   // --- FETCH MENU TREE ---
   useEffect(() => {
@@ -38,10 +38,10 @@ export default function DynamicNavbar() {
     fetchMenus();
   }, []);
 
-  const toggleLanguage = () => {
-    const newLang = i18n.language === "en" ? "id" : "en";
-    i18n.changeLanguage(newLang);
-  };
+  // const toggleLanguage = () => {
+  //   const newLang = i18n.language === "en" ? "id" : "en";
+  //   i18n.changeLanguage(newLang);
+  // };
 
   const closeMenu = () => {
     setIsMobileMenuOpen(false);

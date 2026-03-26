@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { useTranslation } from "react-i18next";
-import { Menu, X, Globe, ChevronDown } from "lucide-react";
+import { Menu, X, ChevronDown } from "lucide-react";
 import logoDaw from "@/assets/logo-daw.png";
 
 export default function Navbar() {
@@ -12,12 +12,12 @@ export default function Navbar() {
   const [isMobileAboutOpen, setIsMobileAboutOpen] = useState(false);
   const [isMobileBusinessOpen, setIsMobileBusinessOpen] = useState(false);
 
-  const { t, i18n } = useTranslation();
+  const { t } = useTranslation();
 
-  const toggleLanguage = () => {
-    const newLang = i18n.language === "en" ? "id" : "en";
-    i18n.changeLanguage(newLang);
-  };
+  // const toggleLanguage = () => {
+  //   const newLang = i18n.language === "en" ? "id" : "en";
+  //   i18n.changeLanguage(newLang);
+  // };
 
   const closeMenu = () => {
     setIsMobileMenuOpen(false);
