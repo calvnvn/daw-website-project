@@ -29,6 +29,7 @@ const menuRoutes = require("./routes/menuRoutes");
 require("./models/User");
 require("./models/Project");
 require("./models/Management");
+require("./models/Settings");
 const HeroSlide = require("./models/HeroSlide");
 const HomeSetting = require("./models/HomeSetting");
 const ImpactStat = require("./models/ImpactStat");
