@@ -21,7 +21,7 @@ const Menu = sequelize.define("Menu", {
     defaultValue: 0, // Drag & Drop order
   },
   type: {
-    type: DataTypes.ENUM("page", "external"),
+    type: DataTypes.ENUM("page", "external", "folder"),
     defaultValue: "page",
   },
   pageId: {

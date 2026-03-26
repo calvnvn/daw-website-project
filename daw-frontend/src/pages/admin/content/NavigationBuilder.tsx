@@ -12,6 +12,7 @@ import {
   Globe,
   ExternalLink,
   LayoutGrid,
+  Folder, // 🚀 TAMBAHAN IKON FOLDER
 } from "lucide-react";
 import api from "@/lib/api";
 
@@ -20,12 +21,13 @@ interface PageOption {
   title: string;
   slug?: string;
 }
+
 interface Menu {
   id: string;
   label: string;
   parentId: string | null;
   orderIndex: number;
-  type: "page" | "external";
+  type: "page" | "external" | "folder"; // 🚀 TAMBAH TIPE FOLDER
   pageId: string | null;
   externalLink: string | null;
   isActive: boolean;
@@ -45,7 +47,7 @@ export default function NavigationBuilder() {
 
   const [formData, setFormData] = useState({
     label: "",
-    type: "page",
+    type: "page" as "page" | "external" | "folder",
     pageId: "",
     externalLink: "",
     parentId: "",
@@ -81,20 +83,21 @@ export default function NavigationBuilder() {
           api.get("/pages"),
         ]),
         {
-          loading: "Synchronizing navigation data...",
+          loading: "Menyelaraskan data menu...",
           success: (data) => {
             setMenus(data[0].data);
             setFlatMenus(data[1].data);
             setPages(data[2].data);
-            return "Navigation synchronized!";
+            return "Data menu berhasil diselaraskan!";
           },
-          error: "Failed to fetch structure.",
+          error: "Gagal menarik struktur menu.",
         },
       );
     } finally {
       setIsLoading(false);
     }
   };
+
   useEffect(() => {
     fetchData();
   }, []);
@@ -139,24 +142,32 @@ export default function NavigationBuilder() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    // Validasi Circular Move
     if (
       editingId &&
       formData.parentId &&
       isCircularMove(editingId, formData.parentId, flatMenus)
     ) {
-      return toast.error("Hierarchy error: Infinite loop detected.");
+      return toast.error(
+        "Kesalahan Hirarki: Menu tidak bisa diletakkan di dalam anak menunya sendiri.",
+      );
     }
+
+    // 🚀 VALIDASI FOLDER: Jika folder, paksa parentId jadi kosong (Root)
+    const finalParentId =
+      formData.type === "folder" ? null : formData.parentId || null;
 
     setIsSaving(true);
     const toastId = toast.loading(
-      editingId ? "Updating node..." : "Deploying new node...",
+      editingId ? "Menyimpan perubahan menu..." : "Menerapkan menu baru...",
     );
 
     try {
-      const payload: any = {
+      const payload: Record<string, unknown> = {
         label: formData.label,
         type: formData.type,
-        parentId: formData.parentId || null,
+        parentId: finalParentId,
         isActive: formData.isActive,
         pageId: formData.type === "page" ? formData.pageId || null : null,
         externalLink:
@@ -166,15 +177,13 @@ export default function NavigationBuilder() {
       if (editingId) await api.put(`/menus/${editingId}`, payload);
       else await api.post("/menus", payload);
 
-      // UPDATE TOAST BERDASARKAN ID
-      toast.success("Structure updated successfully!", { id: toastId });
-
+      toast.success("Struktur menu berhasil diperbarui!", { id: toastId });
       resetForm();
       fetchData();
-    } catch (error: any) {
-      // UPDATE TOAST JADI ERROR
+    } catch (error: unknown) {
+      const err = error as { response?: { data?: { message?: string } } };
       toast.error(
-        error.response?.data?.message || "Failed to save configuration.",
+        err.response?.data?.message || "Gagal menyimpan konfigurasi menu.",
         { id: toastId },
       );
     } finally {
@@ -183,23 +192,25 @@ export default function NavigationBuilder() {
   };
 
   const handleDelete = async (id: string) => {
-    if (!confirm("Are you sure? All child menus will be detached or deleted."))
+    if (
+      !confirm(
+        "Hapus menu ini? Semua sub-menu di bawahnya juga akan ikut terhapus.",
+      )
+    )
       return;
-    const toastId = toast.loading("Removing node from repository...");
+    const toastId = toast.loading("Sedang menghapus item menu...");
     try {
       await api.delete(`/menus/${id}`);
-
-      toast.success("Node removed successfully.", { id: toastId });
-
+      toast.success("Menu berhasil dihapus.", { id: toastId });
       fetchData();
       if (editingId === id) resetForm();
     } catch (error) {
-      toast.error("System failure: Could not remove node.", { id: toastId });
+      toast.error("Gagal menghapus menu. Silakan coba lagi.", { id: toastId });
       console.error(error);
     }
   };
 
-  // DRAG LOGIC (Simplified for UX)
+  // DRAG LOGIC
   const handleDragStart = (e: React.DragEvent, id: string) => {
     e.dataTransfer.setData("text/plain", id);
     setDraggedMenuId(id);
@@ -220,20 +231,30 @@ export default function NavigationBuilder() {
     }
 
     const newParentId = mode === "child" ? targetMenu.id : targetMenu.parentId;
+    const sourceMenu = flatMenus.find((m) => m.id === sourceId);
+
+    // 🚀 VALIDASI KHUSUS FOLDER: Folder tidak boleh punya parent!
+    if (sourceMenu?.type === "folder" && newParentId !== null) {
+      setDraggedMenuId(null);
+      return toast.error(
+        "Menu Folder hanya bisa diletakkan di posisi paling luar (Menu Utama).",
+      );
+    }
 
     if (isCircularMove(sourceId, newParentId, flatMenus)) {
       setDraggedMenuId(null);
-      return toast.error("Kesalahan struktur menu.");
+      return toast.error(
+        "Kesalahan struktur: Menu tidak bisa digeser ke dalam cabangnya sendiri.",
+      );
     }
 
-    const sourceMenu = flatMenus.find((m) => m.id === sourceId);
     const movingSubtreeDepth = sourceMenu ? getMaxDepth(sourceMenu) : 0;
     const newTargetDepth = getCurrentDepth(newParentId, flatMenus);
 
     if (newTargetDepth + movingSubtreeDepth > MAX_ALLOWED_DEPTH) {
       setDraggedMenuId(null);
       return toast.error(
-        `Hierarchy too deep. Navbar design limits depth to ${MAX_ALLOWED_DEPTH} level(s).`,
+        `Struktur terlalu dalam. Maksimal sub-menu adalah ${MAX_ALLOWED_DEPTH} tingkat.`,
       );
     }
 
@@ -263,24 +284,21 @@ export default function NavigationBuilder() {
         orderIndex: i,
       }));
       await api.put("/menus/reorder", { updatedMenus: updatedPayload });
-      toast.success("Order synchronized.", { id: toastId });
+      toast.success("Urutan berhasil diperbarui.", { id: toastId });
       fetchData();
     } catch (error) {
-      toast.error("Reorder failed.");
+      toast.error("Gagal mengatur ulang urutan.");
       console.error("Error: ", error);
     } finally {
       setDraggedMenuId(null);
     }
   };
 
-  // MEMOIZATION UNTUK PERFORMA
-  // Ketikan user di form (formData) TIDAK akan memicu kalkulasi ulang.
   const validParentOptions = useMemo(() => {
     return flatMenus.filter((m) => {
       if (!editingId) {
         return getCurrentDepth(m.id, flatMenus) < MAX_ALLOWED_DEPTH + 1;
       }
-
       const movingMenu = flatMenus.find((f) => f.id === editingId);
       const movingMenuSubtreeDepth = movingMenu ? getMaxDepth(movingMenu) : 0;
       const targetDepth = getCurrentDepth(m.id, flatMenus);
@@ -291,12 +309,11 @@ export default function NavigationBuilder() {
         targetDepth + 1 + movingMenuSubtreeDepth <= MAX_ALLOWED_DEPTH + 1 // Kedalaman aman
       );
     });
-  }, [flatMenus, editingId]); // 👈 Kunci performanya ada di dependency array ini
+  }, [flatMenus, editingId]);
 
   const renderMenuTree = (menuList: Menu[], depth = 0) => {
     return menuList.map((menu) => (
       <div key={menu.id} className="relative">
-        {/* Drop Zone for Sibling (Top) */}
         <div
           onDragOver={(e) => {
             e.preventDefault();
@@ -326,7 +343,6 @@ export default function NavigationBuilder() {
           `}
           style={{ marginLeft: `${depth * 1.5}rem` }}
         >
-          {/* Branch Lines Visual */}
           {depth > 0 && (
             <div className="absolute -left-4 top-1/2 -translate-y-1/2 w-4 h-[2px] bg-slate-200" />
           )}
@@ -334,14 +350,15 @@ export default function NavigationBuilder() {
           <div className="flex items-center gap-4">
             <GripVertical className="w-4 h-4 text-slate-300 cursor-grab active:cursor-grabbing group-hover:text-slate-400" />
 
+            {/* 🚀 LOGIKA WARNA & IKON */}
             <div
               className={`w-10 h-10 rounded-xl flex items-center justify-center transition-colors
-              ${menu.type === "page" ? "bg-blue-50 text-blue-500" : "bg-amber-50 text-amber-500"}`}
+              ${menu.type === "page" ? "bg-blue-50 text-blue-500" : menu.type === "folder" ? "bg-daw-green/10 text-daw-green" : "bg-amber-50 text-amber-500"}`}
             >
-              {menu.type === "page" ? (
-                <FileText className="w-5 h-5" />
-              ) : (
-                <LinkIcon className="w-5 h-5" />
+              {menu.type === "page" && <FileText className="w-5 h-5" />}
+              {menu.type === "external" && <LinkIcon className="w-5 h-5" />}
+              {menu.type === "folder" && (
+                <Folder className="w-5 h-5 fill-daw-green/20" />
               )}
             </div>
 
@@ -356,27 +373,19 @@ export default function NavigationBuilder() {
                   {menu.type}
                 </span>
                 <span className="text-[10px] text-slate-400 font-medium italic">
-                  {menu.type === "page"
-                    ? "Tautan halaman internal"
-                    : "Tautan halaman eksternal"}
+                  {menu.type === "page" && "Tautan halaman internal"}
+                  {menu.type === "external" && "Tautan halaman luar"}
+                  {menu.type === "folder" && "Dropdown pembuka sub-menu"}
                 </span>
               </div>
             </div>
           </div>
 
-          <div
-            className="flex items-center gap-1 
-            /* Di Mobile (default): Selalu terlihat dan di tempatnya */
-            opacity-100 translate-x-0
-            /* Di Desktop (lg): Sembunyi, tunggu di-hover, dan geser ke kanan sedikit */
-            lg:opacity-0 lg:translate-x-2 
-            lg:group-hover:opacity-100 lg:group-hover:translate-x-0 
-            transition-all duration-300"
-          >
+          <div className="flex items-center gap-1 opacity-100 translate-x-0 lg:opacity-0 lg:translate-x-2 lg:group-hover:opacity-100 lg:group-hover:translate-x-0 transition-all duration-300">
             <button
               onClick={() => {
                 if (depth >= MAX_ALLOWED_DEPTH) {
-                  return toast.error("Maximum menu depth reached.");
+                  return toast.error("Maksimal sub-menu telah tercapai.");
                 }
                 setEditingId(null);
                 setFormData({
@@ -387,15 +396,15 @@ export default function NavigationBuilder() {
                   parentId: menu.id,
                   isActive: true,
                 });
-                toast.info(`Adding sub-menu under "${menu.label}"`);
+                toast.info(`Menambahkan sub-menu di bawah "${menu.label}"`);
               }}
               disabled={depth >= MAX_ALLOWED_DEPTH}
               className={`p-2 transition-all ${
                 depth >= MAX_ALLOWED_DEPTH
                   ? "opacity-20 cursor-not-allowed text-slate-300"
-                  : "text-slate-400 hover:text-emerald-500 hover:bg-emerald-50 rounded-lg"
+                  : "text-slate-400 hover:text-daw-green hover:bg-daw-green/10 rounded-lg"
               }`}
-              title="Add Sub-menu"
+              title="Tambah Sub-menu"
             >
               <Plus className="w-4 h-4" />
             </button>
@@ -409,7 +418,7 @@ export default function NavigationBuilder() {
             <button
               onClick={() => handleDelete(menu.id)}
               className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all"
-              title="Delete Menu"
+              title="Hapus Menu"
             >
               <Trash2 className="w-4 h-4" />
             </button>
@@ -447,7 +456,7 @@ export default function NavigationBuilder() {
 
         {isLoading ? (
           <div className="bg-white border border-slate-200 rounded-3xl p-20 text-center">
-            <div className="w-12 h-12 border-4 border-slate-200 border-t-emerald-500 rounded-full animate-spin mx-auto mb-4" />
+            <div className="w-12 h-12 border-4 border-slate-200 border-t-daw-green rounded-full animate-spin mx-auto mb-4" />
             <p className="text-sm font-bold text-slate-400 uppercase tracking-widest">
               Sedang menyelaraskan data menu...
             </p>
@@ -490,7 +499,7 @@ export default function NavigationBuilder() {
                 onChange={(e) =>
                   setFormData({ ...formData, label: e.target.value })
                 }
-                className="w-full px-5 py-4 rounded-2xl bg-slate-50 border border-slate-100 focus:bg-white focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/5 outline-none transition-all font-bold text-slate-700"
+                className="w-full px-5 py-4 rounded-2xl bg-slate-50 border border-slate-100 focus:bg-white focus:border-daw-green focus:ring-4 focus:ring-daw-green/5 outline-none transition-all font-bold text-slate-700"
                 placeholder="e.g. Services / Layanan"
               />
               <p className="text-[10px] text-slate-400 italic ml-1">
@@ -498,20 +507,21 @@ export default function NavigationBuilder() {
               </p>
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
+            {/* 🚀 GRID BUTTON DIUBAH MENJADI 3 KOLOM */}
+            <div className="grid grid-cols-3 gap-3">
               <button
                 type="button"
                 onClick={() =>
                   setFormData({ ...formData, type: "page", externalLink: "" })
                 }
-                className={`p-4 rounded-2xl border-2 flex flex-col items-center gap-2 transition-all
-                    ${formData.type === "page" ? "border-emerald-500 bg-emerald-50/30" : "border-slate-100 hover:border-slate-200"}`}
+                className={`p-3 rounded-xl border-2 flex flex-col items-center gap-1.5 transition-all text-center
+                    ${formData.type === "page" ? "border-blue-500 bg-blue-50/30" : "border-slate-100 hover:border-slate-200"}`}
               >
                 <FileText
-                  className={`w-5 h-5 ${formData.type === "page" ? "text-emerald-500" : "text-slate-400"}`}
+                  className={`w-5 h-5 ${formData.type === "page" ? "text-blue-500" : "text-slate-400"}`}
                 />
                 <span
-                  className={`text-[10px] font-black uppercase ${formData.type === "page" ? "text-emerald-700" : "text-slate-400"}`}
+                  className={`text-[9px] font-black uppercase ${formData.type === "page" ? "text-blue-700" : "text-slate-400"}`}
                 >
                   Internal Page
                 </span>
@@ -521,21 +531,46 @@ export default function NavigationBuilder() {
                 onClick={() =>
                   setFormData({ ...formData, type: "external", pageId: "" })
                 }
-                className={`p-4 rounded-2xl border-2 flex flex-col items-center gap-2 transition-all
-                    ${formData.type === "external" ? "border-emerald-500 bg-emerald-50/30" : "border-slate-100 hover:border-slate-200"}`}
+                className={`p-3 rounded-xl border-2 flex flex-col items-center gap-1.5 transition-all text-center
+                    ${formData.type === "external" ? "border-amber-500 bg-amber-50/30" : "border-slate-100 hover:border-slate-200"}`}
               >
                 <Globe
-                  className={`w-5 h-5 ${formData.type === "external" ? "text-emerald-500" : "text-slate-400"}`}
+                  className={`w-5 h-5 ${formData.type === "external" ? "text-amber-500" : "text-slate-400"}`}
                 />
                 <span
-                  className={`text-[10px] font-black uppercase ${formData.type === "external" ? "text-emerald-700" : "text-slate-400"}`}
+                  className={`text-[9px] font-black uppercase ${formData.type === "external" ? "text-amber-700" : "text-slate-400"}`}
                 >
                   External Link
                 </span>
               </button>
+              {/* 🚀 TOMBOL BARU: FOLDER */}
+              <button
+                type="button"
+                onClick={() =>
+                  setFormData({
+                    ...formData,
+                    type: "folder",
+                    pageId: "",
+                    externalLink: "",
+                    parentId: "",
+                  })
+                }
+                className={`p-3 rounded-xl border-2 flex flex-col items-center gap-1.5 transition-all text-center
+                    ${formData.type === "folder" ? "border-daw-green bg-daw-green/5" : "border-slate-100 hover:border-slate-200"}`}
+              >
+                <Folder
+                  className={`w-5 h-5 ${formData.type === "folder" ? "text-daw-green fill-daw-green/20" : "text-slate-400"}`}
+                />
+                <span
+                  className={`text-[9px] font-black uppercase ${formData.type === "folder" ? "text-daw-green" : "text-slate-400"}`}
+                >
+                  Dropdown Folder
+                </span>
+              </button>
             </div>
 
-            {formData.type === "page" ? (
+            {/* 🚀 KONDISIONAL INPUT: HILANG JIKA TIPE ADALAH FOLDER */}
+            {formData.type === "page" && (
               <div className="space-y-2 animate-in slide-in-from-top-2 duration-300">
                 <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">
                   Konten Terhubung
@@ -548,7 +583,7 @@ export default function NavigationBuilder() {
                   }
                   className="w-full px-5 py-4 rounded-2xl bg-slate-50 border border-slate-100 outline-none font-bold text-slate-700 appearance-none"
                 >
-                  <option value="">-- Choose Page / Pilih Halaman --</option>
+                  <option value="">-- Pilih Halaman --</option>
                   {pages.map((p) => (
                     <option key={p.id} value={p.id}>
                       {p.title}
@@ -556,15 +591,17 @@ export default function NavigationBuilder() {
                   ))}
                 </select>
               </div>
-            ) : (
+            )}
+
+            {formData.type === "external" && (
               <div className="space-y-2 animate-in slide-in-from-top-2 duration-300">
                 <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">
-                  Destination URL
+                  URL Tujuan (Luar Situs)
                 </label>
                 <div className="relative">
                   <ExternalLink className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-300" />
                   <input
-                    type="text"
+                    type="url"
                     required
                     value={formData.externalLink}
                     onChange={(e) =>
@@ -577,6 +614,16 @@ export default function NavigationBuilder() {
               </div>
             )}
 
+            {formData.type === "folder" && (
+              <div className="p-4 bg-daw-green/5 border border-daw-green/20 rounded-2xl animate-in fade-in">
+                <p className="text-xs text-daw-green font-medium leading-relaxed">
+                  💡 <strong>Info:</strong> Menu tipe Folder tidak dapat diklik
+                  oleh pengunjung. Tipe ini hanya berfungsi sebagai wadah
+                  (Dropdown) untuk membuka sub-menu di bawahnya.
+                </p>
+              </div>
+            )}
+
             <div className="space-y-2">
               <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">
                 Posisi Hirarki
@@ -586,17 +633,21 @@ export default function NavigationBuilder() {
                 onChange={(e) =>
                   setFormData({ ...formData, parentId: e.target.value })
                 }
-                className="w-full px-5 py-4 rounded-2xl bg-slate-50 border border-slate-100 outline-none text-sm font-bold text-slate-600"
+                // 🚀 JIKA FOLDER, DISABLE SELECT INI
+                disabled={formData.type === "folder"}
+                className="w-full px-5 py-4 rounded-2xl bg-slate-50 border border-slate-100 outline-none text-sm font-bold text-slate-600 disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                <option value=""> Atur sebagai Menu Utama </option>
+                <option value=""> Atur sebagai Menu Utama (Root) </option>
                 {validParentOptions.map((m) => (
                   <option key={m.id} value={m.id}>
-                    Sub of: {m.label}
+                    Sub dari: {m.label}
                   </option>
                 ))}
               </select>
               <p className="text-[10px] text-slate-400 italic ml-1">
-                Letakkan menu ini di dalam menu lain (Sub-menu).
+                {formData.type === "folder"
+                  ? "Tipe Folder wajib berada di posisi Menu Utama."
+                  : "Letakkan menu ini di dalam menu lain (Sub-menu)."}
               </p>
             </div>
 
@@ -604,7 +655,7 @@ export default function NavigationBuilder() {
               <button
                 type="submit"
                 disabled={isSaving}
-                className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white py-4 rounded-2xl font-bold shadow-lg shadow-emerald-200 transition-all flex items-center justify-center gap-2"
+                className="flex-1 bg-daw-green hover:bg-[#003b1c] text-white py-4 rounded-2xl font-bold shadow-lg shadow-daw-green/20 transition-all flex items-center justify-center gap-2"
               >
                 <Plus className="w-5 h-5" />{" "}
                 {editingId ? "Simpan Perubahan" : "Terapkan ke Menu"}

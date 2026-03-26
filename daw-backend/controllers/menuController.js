@@ -76,7 +76,13 @@ exports.getAllMenusFlat = async (req, res) => {
 
 exports.createMenu = async (req, res) => {
   try {
-    const { label, parentId, type, pageId, externalLink, isActive } = req.body;
+    let { label, parentId, type, pageId, externalLink, isActive } = req.body;
+
+    if (type === "folder") {
+      parentId = null; // Paksa jadi root menu
+      pageId = null; // Bersihkan data sampah
+      externalLink = null; // Bersihkan data sampah
+    }
 
     // Auto hitung orderIndex (taruh di paling bawah)
     const lastMenu = await Menu.findOne({
@@ -87,10 +93,10 @@ exports.createMenu = async (req, res) => {
 
     const newMenu = await Menu.create({
       label,
-      parentId,
+      parentId: parentId || null,
       type,
-      pageId,
-      externalLink,
+      pageId: type === "page" ? pageId : null,
+      externalLink: type === "external" ? externalLink : null,
       isActive,
       orderIndex: nextOrderIndex,
     });
@@ -106,17 +112,23 @@ exports.createMenu = async (req, res) => {
 exports.updateMenu = async (req, res) => {
   try {
     const { id } = req.params;
-    const { label, parentId, type, pageId, externalLink, isActive } = req.body;
+    let { label, parentId, type, pageId, externalLink, isActive } = req.body;
 
     const menu = await Menu.findByPk(id);
     if (!menu) return res.status(404).json({ message: "Menu not found" });
 
+    if (type === "folder") {
+      parentId = null;
+      pageId = null;
+      externalLink = null;
+    }
+
     await menu.update({
       label,
-      parentId,
+      parentId: parentId || null,
       type,
-      pageId,
-      externalLink,
+      pageId: type === "page" ? pageId : null,
+      externalLink: type === "external" ? externalLink : null,
       isActive,
     });
     res.status(200).json({ message: "Menu updated" });
