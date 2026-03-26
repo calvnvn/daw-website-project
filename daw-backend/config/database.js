@@ -1,5 +1,5 @@
 const { Sequelize } = require("sequelize");
-require("dotenv").config();
+// require("dotenv").config();
 
 const sequelize = new Sequelize(
   process.env.DB_NAME,
@@ -8,8 +8,8 @@ const sequelize = new Sequelize(
   {
     host: process.env.DB_HOST,
     dialect: "mysql",
-    port: 3306,
-    logging: false, // Ubah ke true nanti jika ingin melihat raw query SQL yang dieksekusi di terminal
+    port: process.env.DB_PORT || 3306,
+    logging: false, // Ubah ke true nanti saat raw query SQL yang tereksekusi di terminal
   },
 );
 
