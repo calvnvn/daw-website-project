@@ -232,7 +232,6 @@ export default function CreateProject() {
           const percent = Math.round((p.loaded * 100) / (p.total || 1));
           toast.loading(`Uploading: ${percent}%...`, { id: loadingToast });
         },
-        Project,
       });
 
       if (response.status === 201 || response.status === 200) {
