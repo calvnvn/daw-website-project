@@ -1,7 +1,7 @@
 // daw-backend/cleanup.js
 const fs = require("fs");
 const path = require("path");
-const sequelize = require("./config/database");
+const sequelize = require("../config/database");
 
 async function runCleanup() {
   try {
