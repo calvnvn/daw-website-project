@@ -76,23 +76,18 @@ export default function NavigationBuilder() {
   const fetchData = async () => {
     setIsLoading(true);
     try {
-      await toast.promise(
-        Promise.all([
-          api.get("/menus/tree"),
-          api.get("/menus/flat"),
-          api.get("/pages"),
-        ]),
-        {
-          loading: "Menyelaraskan data menu...",
-          success: (data) => {
-            setMenus(data[0].data);
-            setFlatMenus(data[1].data);
-            setPages(data[2].data);
-            return "Data menu berhasil diselaraskan!";
-          },
-          error: "Gagal menarik struktur menu.",
-        },
-      );
+      const [treeRes, flatRes, pagesRes] = await Promise.all([
+        api.get("/menus/tree"),
+        api.get("/menus/flat"),
+        api.get("/pages"),
+      ]);
+
+      setMenus(treeRes.data);
+      setFlatMenus(flatRes.data);
+      setPages(pagesRes.data);
+    } catch (error) {
+      console.error("Gagal menarik data menu:", error);
+      toast.error("Gagal menarik struktur menu.");
     } finally {
       setIsLoading(false);
     }
