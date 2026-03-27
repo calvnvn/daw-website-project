@@ -3,8 +3,9 @@ import { useParams, Link } from "react-router-dom";
 import { Share2, ChevronRight } from "lucide-react";
 import { Helmet } from "react-helmet-async";
 import DOMPurify from "dompurify";
-import api from "@/lib/api";
+import api, { API_URL } from "@/lib/api"; // <-- KUNCI 1: Import API_URL
 import ScrollReveal from "@/components/ScrollReveal";
+import { getCleanImageUrl } from "@/lib/utils"; // <-- KUNCI 2: Pastikan ini di-import
 
 // Data structures for Page and Table of Contents
 interface PageData {
@@ -259,7 +260,11 @@ export default function DynamicPage() {
         <div
           className="absolute inset-0 bg-cover bg-center transition-transform duration-700 hover:scale-105"
           style={{
-            backgroundImage: `url(${pageData.heroImage || "/placeholder.jpg"})`,
+            backgroundImage: `url(${
+              pageData.heroImage
+                ? getCleanImageUrl(pageData.heroImage)
+                : "/placeholder.jpg"
+            })`,
             backgroundAttachment: "fixed",
           }}
         />
