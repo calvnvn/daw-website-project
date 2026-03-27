@@ -15,7 +15,6 @@ export default function ForgotPassword() {
 
     setIsLoading(true);
     try {
-      // ✅ FIX: Gunakan prefix /auth/ agar tidak 404
       await api.post("/auth/forgot-password", { email });
       setIsSuccess(true);
       toast.success("Recovery email sent!");

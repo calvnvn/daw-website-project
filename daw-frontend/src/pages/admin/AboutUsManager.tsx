@@ -135,7 +135,7 @@ export default function AboutUsManager() {
     setIsSaving(true);
     try {
       if (activeTab === "management") {
-        toast.success("Management settings Mode Baca.");
+        toast.success("Management settings Locked.");
         setIsEditing(false);
         return;
       }
@@ -344,7 +344,7 @@ export default function AboutUsManager() {
             ) : (
               <Lock className="w-4 h-4" />
             )}
-            <span>{isEditing ? "Mode Ubah" : "Mode Baca"}</span>
+            <span>{isEditing ? "Editing" : "Locked"}</span>
           </button>
 
           <button
@@ -415,7 +415,7 @@ export default function AboutUsManager() {
               {/* Founders Spirit */}
               <div className="md:col-span-2 bg-slate-50 p-5 rounded-xl border border-slate-200">
                 <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">
-                  Spirit Title (Mode Baca)
+                  Spirit Title (Locked)
                 </label>
                 <input
                   type="text"
@@ -449,7 +449,7 @@ export default function AboutUsManager() {
               {/* Mission */}
               <div className="bg-slate-50 p-5 rounded-xl border border-slate-200">
                 <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">
-                  Mission Title (Mode Baca)
+                  Mission Title (Locked)
                 </label>
                 <input
                   type="text"
@@ -481,7 +481,7 @@ export default function AboutUsManager() {
               {/* Vision */}
               <div className="bg-slate-50 p-5 rounded-xl border border-slate-200">
                 <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">
-                  Vision Title (Mode Baca)
+                  Vision Title (Locked)
                 </label>
                 <input
                   type="text"
@@ -768,7 +768,7 @@ export default function AboutUsManager() {
                           </div>
                         ) : (
                           <span className="text-xs text-slate-400 italic">
-                            Mode Baca
+                            Locked
                           </span>
                         )}
                       </td>
