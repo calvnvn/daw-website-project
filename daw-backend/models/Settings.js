@@ -1,47 +1,28 @@
 const { DataTypes } = require("sequelize");
 const sequelize = require("../config/database");
 
-const Setting = sequelize.define(
-  "Setting",
+const Settings = sequelize.define(
+  "Settings",
   {
     id: {
       type: DataTypes.INTEGER,
       primaryKey: true,
       autoIncrement: true,
+      defaultValue: 1,
     },
-    companyName: {
-      type: DataTypes.STRING(255),
-      allowNull: true,
-    },
-    address: {
-      type: DataTypes.TEXT,
-      allowNull: true,
-    },
-    phone: {
-      type: DataTypes.STRING(50),
-      allowNull: true,
-    },
-    email: {
-      type: DataTypes.STRING(100),
-      allowNull: true,
-    },
-    website: {
-      type: DataTypes.STRING(100),
-      allowNull: true,
-    },
-    googleMapsUrl: {
-      type: DataTypes.TEXT,
-      allowNull: true,
-    },
-    linkedinUrl: {
-      type: DataTypes.STRING(255),
-      allowNull: true,
-    },
+    companyName: { type: DataTypes.STRING(255) },
+    address: { type: DataTypes.TEXT },
+    phone: { type: DataTypes.STRING(50) },
+    email: { type: DataTypes.STRING(100) },
+    website: { type: DataTypes.STRING(100) },
+    googleMapsUrl: { type: DataTypes.TEXT },
+    linkedinUrl: { type: DataTypes.STRING(255) },
   },
   {
-    tableName: "settings",
+    tableName: "Settings",
+    freezeTableName: true,
     timestamps: true,
   },
 );
 
-module.exports = Setting;
+module.exports = Settings;

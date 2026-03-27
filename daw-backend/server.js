@@ -30,13 +30,18 @@ require("./models/User");
 require("./models/Project");
 require("./models/Management");
 require("./models/Settings");
-const HeroSlide = require("./models/HeroSlide");
-const HomeSetting = require("./models/HomeSetting");
-const ImpactStat = require("./models/ImpactStat");
+require("./models/AboutInfo");
+require("./models/History");
+require("./models/HeroSlide");
+require("./models/HomeSetting");
+require("./models/ImpactStat");
 const BusinessSection = require("./models/BusinessSection");
 const BusinessMapMarker = require("./models/BusinessMapMarker");
-const Page = require("./models/Page");
-const Menu = require("./models/Menu");
+require("./models/Page");
+require("./models/Menu");
+require("./models/Affiliate");
+require("./models/Inquiry");
+require("./models/InvestmentSettings");
 
 const app = express();
 
@@ -51,7 +56,7 @@ app.use(express.urlencoded({ limit: "50mb", extended: true }));
 const uploadPath = path.join(process.cwd(), "public", "uploads");
 if (!fs.existsSync(uploadPath)) {
   console.warn(
-    "⚠️ Folder uploads tidak ditemukan. Membuat folder baru di:",
+    "Folder uploads tidak ditemukan. Membuat folder baru di:",
     uploadPath,
   );
   fs.mkdirSync(uploadPath, { recursive: true });
@@ -64,19 +69,17 @@ if (!fs.existsSync(uploadPath)) {
 app.use("/uploads", (req, res, next) => {
   if (req.url.toLocaleLowerCase().endsWith(".jpeg")) {
     const altPath = req.url.replace(/\.jpeg$/i, ".jpg");
-    // Cek apakah file .jpg nya ada
     if (fs.existsSync(path.join(uploadPath, altPath))) {
-      return res.redirect(3.01, `/uploads${altPath}`); // 301 Permanent Redirect
+      return res.redirect(3.01, `/uploads${altPath}`);
     }
   }
-  next(); // Lanjut ke middleware berikutnya jika bukan .jpeg
+  next();
 });
 
 // 4. Static File Server (Hanya melayani file jika file-nya ada)
 app.use("/uploads", express.static(uploadPath));
 
 // ROUTER REGISTRATION
-
 app.use("/api/auth", authRoutes);
 app.use("/api/users", userRoutes);
 app.use("/api/projects", projectRoutes);
