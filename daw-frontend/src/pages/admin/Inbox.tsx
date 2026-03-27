@@ -36,6 +36,10 @@ export default function Inbox() {
   const [isLoading, setIsLoading] = useState(true);
   const [filterSubject, setFilterSubject] = useState("All");
   const [selectedMails, setSelectedMails] = useState<number[]>([]);
+  const copyEmailToClipboard = (email: string) => {
+    navigator.clipboard.writeText(email);
+    toast.success("Alamat email berhasil disalin!");
+  };
 
   // FETCH DATA DARI DATABASE
   useEffect(() => {
@@ -489,13 +493,22 @@ export default function Inbox() {
                     </p>
                   </div>
 
-                  <div className="mt-8">
+                  <div className="mt-8 flex flex-wrap items-center gap-3">
                     <a
                       href={`mailto:${selectedInquiry.email}?subject=Reply from PT Dharma Agung Wijaya`}
                       className="inline-flex items-center gap-2 bg-slate-900 hover:bg-slate-800 text-white px-6 py-3 rounded-lg font-medium transition-colors shadow-sm"
                     >
                       <Mail className="w-4 h-4" /> Reply via Email Client
                     </a>
+                    {/* Tombol Copy Alternatif */}
+                    <button
+                      onClick={() =>
+                        copyEmailToClipboard(selectedInquiry.email)
+                      }
+                      className="inline-flex items-center gap-2 bg-white border border-slate-200 hover:border-daw-green hover:bg-daw-green/5 text-slate-700 hover:text-daw-green px-6 py-3 rounded-lg font-medium transition-colors shadow-sm"
+                    >
+                      Copy Email Address
+                    </button>
                   </div>
                 </div>
               </div>

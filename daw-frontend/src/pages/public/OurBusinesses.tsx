@@ -99,7 +99,7 @@ export default function OurBusinesses() {
   };
 
   return (
-    <div className="bg-white min-h-screen selection:bg-daw-green selection:text-white">
+    <div className="bg-white min-h-screen selection:bg-daw-green selection:text-white overflow-x-hidden">
       {/* PROGRESS BAR DARI DYNAMIC PAGE */}
       <div
         className="fixed top-0 left-0 h-1.5 bg-gradient-to-r from-daw-green via-emerald-400 to-daw-green z-[100] transition-all duration-150 ease-out shadow-[0_0_10px_rgba(16,185,129,0.5)]"

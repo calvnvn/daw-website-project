@@ -28,7 +28,7 @@ export default function ResetPassword() {
       });
 
       toast.success("Password secured! You can now login.");
-      navigate("/admin/login");
+      navigate("/admin/login", { replace: true });
     } catch (error: any) {
       toast.error(error.response?.data?.message || "Invalid or expired token.");
     } finally {

@@ -46,11 +46,12 @@ export default function ForgotPassword() {
               </p>
             </div>
             <Link
-              to="/login"
+              to="/admin/login"
+              replace={true} // <-- TAMBAHKAN INI
               className="inline-block mt-4 text-sm font-bold text-emerald-600 hover:text-emerald-700 transition-colors"
             >
               &larr; Back to Login
-            </Link>
+            </Link>{" "}
           </div>
         ) : (
           <div className="space-y-6">
