@@ -67,6 +67,19 @@ export default function ManageBusinesses() {
     }
   }, [activeTab, sections]);
 
+  // --- Mencegah Tab Ditutup Tanpa Save ---
+  useEffect(() => {
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (isEditing) {
+        e.preventDefault();
+        e.returnValue = ""; // Standar browser modern untuk memunculkan pop-up warning
+      }
+    };
+
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    return () => window.removeEventListener("beforeunload", handleBeforeUnload);
+  }, [isEditing]);
+
   // --- THE UX GUARD (Limit Break Fitur) ---
   const handleTabChange = (targetTab: "resources" | "energy") => {
     if (isEditing) {
@@ -304,11 +317,11 @@ export default function ManageBusinesses() {
               {formData.hasMap && (
                 <div className="space-y-4">
                   <div className="relative">
-                    <div className="w-full bg-white rounded-xl border border-slate-200 overflow-hidden relative">
+                    <div className="w-full aspect-[16/9] bg-white rounded-xl border border-slate-200 overflow-hidden relative">
                       <img
                         src={mapBase}
                         alt="Map"
-                        className="w-full h-auto opacity-70"
+                        className="absolute inset-0 w-full h-full object-contain opacity-70"
                       />
                       {formData.mapMarkers.map((m, idx) => (
                         <div
@@ -420,12 +433,12 @@ export default function ManageBusinesses() {
             <div className="flex-1 overflow-auto bg-[#e5e7eb] flex items-center justify-center p-4">
               <div
                 onClick={handleMapClick}
-                className="relative w-full max-w-4xl bg-white shadow-xl cursor-crosshair border-2 border-transparent hover:border-daw-green transition-colors rounded-xl overflow-hidden"
+                className="relative w-full max-w-4xl aspect-[16/9] bg-white shadow-xl cursor-crosshair border-2 border-transparent hover:border-daw-green transition-colors rounded-xl overflow-hidden"
               >
                 <img
                   src={mapBase}
                   alt="Map of Indonesia"
-                  className="w-full h-auto pointer-events-none"
+                  className="absolute inset-0 w-full h-full object-contain pointer-events-none"
                 />
                 {formData.mapMarkers.map((m, idx) => (
                   <div

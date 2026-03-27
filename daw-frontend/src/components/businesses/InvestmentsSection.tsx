@@ -63,11 +63,11 @@ export default function InvestmentsSection() {
                   key={cat.id}
                   onMouseEnter={() => setHoveredCategory(cat.id)}
                   onMouseLeave={() => setHoveredCategory(null)}
-                  className={`group relative flex items-center gap-6 p-4 rounded-2xl cursor-pointer transition-all duration-500 overflow-hidden ${
+                  className={`group relative flex items-center gap-6 p-4 rounded-2xl cursor-pointer transition-all duration-500 overflow-hidden border ${
                     hoveredCategory === cat.id
                       ? "bg-white/10 border-white/20 shadow-[0_0_30px_rgba(0,255,128,0.1)]"
-                      : "bg-transparent border-transparent hover:bg-white/5"
-                  } border`}
+                      : "bg-white/5 border-white/10 lg:bg-transparent lg:border-transparent lg:hover:bg-white/5"
+                  }`}
                 >
                   {/* Indikator Garis Kiri Aktif */}
                   <div

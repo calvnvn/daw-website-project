@@ -43,7 +43,7 @@ export default function InteractiveMap({ markers }: InteractiveMapProps) {
       };
     });
 
-    for (let i = 0; i < 60; i++) {
+    for (let i = 0; i < 25; i++) {
       for (let j = 0; j < nodes.length; j++) {
         // Box vs Box Dodge each other
         for (let k = j + 1; k < nodes.length; k++) {
@@ -122,13 +122,12 @@ export default function InteractiveMap({ markers }: InteractiveMapProps) {
       </div>
 
       {/* Area Peta Utama */}
-      <div className="relative w-full h-auto flex items-center justify-center">
+      <div className="relative w-full aspect-[16/9] flex items-center justify-center overflow-hidden">
         <img
           src={mapBase}
           alt="Map of Indonesia"
-          className="w-full h-auto opacity-80 pointer-events-none"
+          className="absolute inset-0 w-full h-full object-contain opacity-80 pointer-events-none"
         />
-
         {/* LAYER GARIS PENGHUBUNG (Hanya muncul di Desktop) */}
         {!isMobile && (
           <svg className="absolute inset-0 w-full h-full pointer-events-none z-10 overflow-visible">
@@ -151,7 +150,6 @@ export default function InteractiveMap({ markers }: InteractiveMapProps) {
             })}
           </svg>
         )}
-
         {/* LAYER TITIK & KOTAK */}
         {smartMarkers.map((m) => {
           const isActive = activeId === m.id;
