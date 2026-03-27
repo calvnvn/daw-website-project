@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, memo } from "react";
 import mapBase from "@/assets/map-indonesia-base.svg";
 
 export interface MapMarker {
@@ -16,7 +16,9 @@ interface InteractiveMapProps {
   markers: MapMarker[];
 }
 
-export default function InteractiveMap({ markers }: InteractiveMapProps) {
+const InteractiveMap = memo(function InteractiveMap({
+  markers,
+}: InteractiveMapProps) {
   const [activeId, setActiveId] = useState<string | null>(null);
   const [isMobile, setIsMobile] = useState(false);
 
@@ -226,4 +228,6 @@ export default function InteractiveMap({ markers }: InteractiveMapProps) {
       </div>
     </div>
   );
-}
+});
+
+export default InteractiveMap;

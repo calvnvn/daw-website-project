@@ -56,27 +56,40 @@ export default function OurBusinesses() {
 
   // 3. EVENT LISTENER SCROLL (Untuk Navigasi & Progress Bar)
   useEffect(() => {
-    const handleScroll = () => {
-      // Hitung Progress Bar
-      const totalHeight =
-        document.documentElement.scrollHeight - window.innerHeight;
-      const progress = (window.scrollY / totalHeight) * 100;
-      setScrollProgress(progress);
+    let requestRunning = false; // Flag sebagai "penjaga pintu"
 
-      // Hitung Active Section untuk Sticky Nav
-      const sections = ["resources", "energy", "investments"];
-      const scrollPosition = window.scrollY + 200;
-      for (const section of sections) {
-        const element = document.getElementById(section);
-        if (
-          element &&
-          element.offsetTop <= scrollPosition &&
-          element.offsetTop + element.offsetHeight > scrollPosition
-        ) {
-          setActiveSection(section);
+    const handleScroll = () => {
+      // Jika browser masih sibuk menghitung scroll sebelumnya, abaikan scroll yang baru masuk
+      if (requestRunning) return;
+      requestRunning = true;
+
+      // requestAnimationFrame memastikan hitungan ini jalan sinkron dengan refresh rate monitor (60fps)
+      requestAnimationFrame(() => {
+        // Hitung Progress Bar
+        const totalHeight =
+          document.documentElement.scrollHeight - window.innerHeight;
+        const progress = (window.scrollY / totalHeight) * 100;
+        setScrollProgress(progress);
+
+        // Hitung Active Section untuk Sticky Nav
+        const sections = ["resources", "energy", "investments"];
+        const scrollPosition = window.scrollY + 200;
+        for (const section of sections) {
+          const element = document.getElementById(section);
+          if (
+            element &&
+            element.offsetTop <= scrollPosition &&
+            element.offsetTop + element.offsetHeight > scrollPosition
+          ) {
+            setActiveSection(section);
+          }
         }
-      }
+
+        // Setelah selesai render, buka pintu lagi untuk scroll berikutnya
+        requestRunning = false;
+      });
     };
+
     window.addEventListener("scroll", handleScroll);
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);

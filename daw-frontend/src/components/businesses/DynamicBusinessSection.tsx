@@ -1,7 +1,7 @@
 import ScrollReveal from "@/components/ScrollReveal";
 import BusinessGrid from "@/components/BusinessGrid";
 import InteractiveMap, { type MapMarker } from "./InteractiveMap";
-
+import { memo } from "react"; // <-- Tambahkan memo
 export interface SectionData {
   id: string;
   category: "Resources" | "Energy";
@@ -10,8 +10,7 @@ export interface SectionData {
   hasMap: boolean;
   mapMarkers?: MapMarker[];
 }
-
-export default function DynamicBusinessSection({
+const DynamicBusinessSection = memo(function DynamicBusinessSection({
   data,
 }: {
   data: SectionData;
@@ -113,4 +112,6 @@ export default function DynamicBusinessSection({
       </div>
     </div>
   );
-}
+});
+
+export default DynamicBusinessSection; // <-- Export-nya pindah ke bawah sini
