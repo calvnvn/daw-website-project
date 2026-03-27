@@ -27,6 +27,13 @@ interface TocItem {
   level: number;
 }
 
+// Security configuration for DOMPurify
+const sanitizeConfig = {
+  ADD_TAGS: ["iframe"],
+  ADD_ATTR: ["allow", "allowfullscreen", "frameborder", "scrolling", "id"],
+  FORBID_ATTR: ["onerror", "onload", "onclick"],
+};
+
 /**
  * @component ScrollProgressBar
  * Isolated component to manage scroll state independently.
@@ -67,13 +74,7 @@ export default function DynamicPage() {
   const [parsedContent, setParsedContent] = useState<string>("");
 
   const articleRef = useRef<HTMLElement>(null);
-
-  // Security configuration for DOMPurify
-  const sanitizeConfig = {
-    ADD_TAGS: ["iframe"],
-    ADD_ATTR: ["allow", "allowfullscreen", "frameborder", "scrolling", "id"],
-    FORBID_ATTR: ["onerror", "onload", "onclick"],
-  };
+  const isManualScrolling = useRef(false);
 
   // Effect 1: Data Acquisition. Fetches page data based on the URL slug and resets scroll position.
   useEffect(() => {
@@ -158,48 +159,79 @@ export default function DynamicPage() {
       items.push({ id: baseId, text, level: heading.tagName === "H2" ? 2 : 3 });
     });
     setToc(items);
-    setParsedContent(virtualDoc.body.innerHTML);
+    let backendBaseUrl = "";
+    try {
+      backendBaseUrl = new URL(API_URL).origin;
+    } catch (e) {
+      console.error("CRITICAL: Format API_URL di .env tidak valid!", e);
+    }
+    // Cari SEMUA gambar di dalam artikel
+    const contentImages = virtualDoc.querySelectorAll("img");
+    contentImages.forEach((img) => {
+      const src = img.getAttribute("src");
+      // Jika src-nya relatif (berawalan /uploads), gabungkan dengan URL Backend
+      if (src && src.startsWith("/uploads")) {
+        img.src = `${backendBaseUrl}${src}`;
+      }
+    });
+    // ==========================================
 
-    console.log("Pre-Parsing Selesai, ID Permanen Ditanam.");
+    // Baris terakhir di Effect 2 (tetap seperti ini):
+    setParsedContent(virtualDoc.body.innerHTML);
+    console.log("Pre-Parsing Selesai, ID Permanen & URL Gambar Ditanam.");
   }, [pageData?.content]);
 
   /**
-   * Effect 3: Intersection Observer & Deep Linking
+   * Effect 3: Intersection Observer & Deep Linking (SUPERCHARGED 🚀)
    * Monitors user scroll position to highlight active ToC items and handles initial anchor links.
    */
   useEffect(() => {
     if (toc.length === 0 || !parsedContent || !articleRef.current) return;
 
-    const observerOptions = {
-      rootMargin: "-120px 0px -50% 0px", // Offset for top header and mid-viewport detection
-      threshold: 0,
-    };
+    // KUNCI 1: Beri jeda 100ms untuk memastikan dangerouslySetInnerHTML selesai mencetak elemen HTML ke layar
+    const timer = setTimeout(() => {
+      if (!articleRef.current) return;
 
-    const observer = new IntersectionObserver((entries) => {
-      entries.forEach((entry) => {
-        if (entry.isIntersecting && entry.target.id) {
-          console.log("🎯 Aktif:", entry.target.id);
-          setActiveTocId(entry.target.id);
-        }
-      });
-    }, observerOptions);
+      const headingElements = articleRef.current.querySelectorAll("h2, h3");
+      console.log(`🔍 Satpam siap menjaga ${headingElements.length} Heading!`); // Cek apakah heading benar-benar terdeteksi
 
-    const headingElements = articleRef.current.querySelectorAll("h2, h3");
-    headingElements.forEach((el) => observer.observe(el));
+      const observerOptions = {
+        root: null,
+        rootMargin: "-120px 0px -70% 0px",
+        threshold: 0,
+      };
 
-    // Handle initial deep linking from URL hash
-    if (window.location.hash) {
-      const hashId = window.location.hash.substring(1);
-      setTimeout(() => {
-        const element = document.getElementById(hashId);
-        if (element) {
-          element.scrollIntoView({ behavior: "smooth", block: "start" });
-          setActiveTocId(hashId);
-        }
-      }, 100);
-    }
+      const observer = new IntersectionObserver((entries) => {
+        // FASE 3 (ANTI-FLICKER): Kalau bendera ToC lagi diangkat, Satpam tutup mata!
+        if (isManualScrolling.current) return;
 
-    return () => observer.disconnect();
+        entries.forEach((entry) => {
+          if (entry.isIntersecting && entry.target.id) {
+            console.log("🎯 Aktif saat Scroll:", entry.target.id);
+            setActiveTocId(entry.target.id);
+          }
+        });
+      }, observerOptions);
+
+      headingElements.forEach((el) => observer.observe(el));
+
+      // Handle initial deep linking from URL hash
+      if (window.location.hash) {
+        const hashId = window.location.hash.substring(1);
+        setTimeout(() => {
+          const element = document.getElementById(hashId);
+          if (element) {
+            element.scrollIntoView({ behavior: "smooth", block: "start" });
+            setActiveTocId(hashId);
+          }
+        }, 100);
+      }
+
+      // Cleanup
+      return () => observer.disconnect();
+    }, 100);
+
+    return () => clearTimeout(timer);
   }, [toc, parsedContent]);
 
   /**
@@ -209,14 +241,20 @@ export default function DynamicPage() {
   const scrollToHeading = (id: string) => {
     const element = document.getElementById(id);
     if (element) {
-      console.log("🖱️ Mencoba scroll ke:", id);
-      element.scrollIntoView({ behavior: "smooth", block: "start" });
+      console.log("Mencoba scroll ke:", id);
+
+      isManualScrolling.current = true;
       setActiveTocId(id);
 
+      element.scrollIntoView({ behavior: "smooth", block: "start" });
       // Update browser history without triggering page reload
       window.history.pushState(null, "", `#${id}`);
+
+      setTimeout(() => {
+        isManualScrolling.current = false;
+      }, 800);
     } else {
-      console.error("❌ Elemen tidak ditemukan untuk ID:", id);
+      console.error("Elemen tidak ditemukan untuk ID:", id);
     }
   };
 
@@ -314,6 +352,7 @@ export default function DynamicPage() {
                           key={item.id}
                           onClick={() => scrollToHeading(item.id)}
                           title={item.text}
+                          aria-current={isActive ? "true" : "false"}
                           className={`group text-left py-3 pr-4 relative transition-all duration-300 ease-out flex items-center w-full
                             /* Hierarki Indentasi & Tipografi */
                             ${item.level === 3 ? "pl-8 text-[12px]" : "pl-5 text-[13px] font-bold"}
@@ -355,7 +394,7 @@ export default function DynamicPage() {
                     prose prose-slate prose-lg md:prose-xl max-w-none
                     prose-p:leading-[1.8] prose-p:text-slate-600 prose-p:mb-10 
                     prose-p:text-[1.125rem] md:prose-p:text-[1.2rem]
-                    prose-headings:font-serif prose-headings:text-slate-900 
+                    prose-headings:font-serif prose-headings:text-slate-900 prose-headings:scroll-mt-32 
                     
                     /* 3. HEADINGS - Serif Elegance */
                     prose-h2:text-3xl md:prose-h2:text-5xl prose-h2:mt-20 prose-h2:mb-8
