@@ -20,7 +20,7 @@ interface AdminProject {
   category: string;
   status: string;
   author: string;
-  createdAt: string; // Di DB kita namanya createdAt, bukan lastModified
+  createdAt: string;
   views: number;
 }
 
@@ -49,7 +49,7 @@ export default function ProjectManagement() {
       try {
         const response = await api.get("/projects");
 
-        // Handle double nesting dari backend DAW Group
+        // Handle double nesting dari backend DAW
         if (response.data && response.data.success) {
           setProjects(response.data.data);
         } else if (Array.isArray(response.data)) {
