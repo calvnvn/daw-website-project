@@ -1,7 +1,7 @@
 const express = require("express");
 const router = express.Router();
 const userController = require("../controllers/userController");
-const { verifyToken, authorizeRoles } = require("../middleware/authJwt"); // Pastikan path benar
+const { verifyToken, authorizeRoles } = require("../middleware/authJwt");
 
 // Semua route di bawah ini butuh login
 router.use(verifyToken);
