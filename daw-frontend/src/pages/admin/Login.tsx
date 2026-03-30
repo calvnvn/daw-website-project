@@ -61,8 +61,17 @@ export default function Login() {
         navigate("/force-change-password");
       } else {
         // Gunakan userData.name yang sudah diproteksi fallback
-        toast.success(`Welcome, ${userData.name}!`);
-        navigate(from, { replace: true });
+        if (data.accessToken && data.name) {
+          // Pastikan name ada
+          localStorage.setItem("daw_token", data.accessToken);
+          localStorage.setItem("daw_user", JSON.stringify(data));
+          toast.success(`Welcome, ${data.name}!`);
+          navigate(from, { replace: true });
+        } else {
+          // Kalau name atau token gak ada, refuse masuk!
+          console.error("Data user tidak lengkap:", data);
+          toast.error("Data user tidak lengkap dari server.");
+        }
       }
     } catch (err: any) {
       toast.error("Authentication Failed", {
