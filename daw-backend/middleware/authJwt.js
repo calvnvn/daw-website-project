@@ -2,35 +2,51 @@ const jwt = require("jsonwebtoken");
 
 const verifyToken = (req, res, next) => {
   try {
-    let token = req.headers["x-access-token"] || req.headers["authorization"];
+    // 1. Ambil header (Standardisasi: prioritaskan Authorization)
+    const authHeader =
+      req.headers["authorization"] || req.headers["x-access-token"];
 
-    if (!token) {
-      return res.status(403).send({ message: "No token provided!" });
+    if (!authHeader) {
+      return res.status(403).json({ message: "No token provided!" });
     }
 
-    // // Jika formatnya "Bearer <token>"
-    // if (token.startsWith("Bearer ")) {
-    //   token = token.slice(7, token.length);
-    // }
+    // 2. Ekstraksi token yang lebih cerdas (Handle case-insensitive "bearer")
+    let token = authHeader;
+    if (authHeader.toLowerCase().startsWith("bearer ")) {
+      token = authHeader.split(" ")[1]; // Ambil kata kedua setelah spasi
+    }
 
-    if (token.toLowerCase().startsWith("bearer ")) {
-      token = token.split(" ")[1]; // Ambil kata kedua setelah spasi
+    // 3. Pastikan token tidak kosong atau string "undefined"
+    if (!token || token === "undefined" || token === "null") {
+      return res.status(401).json({ message: "Invalid token format!" });
     }
 
     const secretKey = process.env.JWT_SECRET;
-    if (!secretKey)
-      throw new Error("FATAL: JWT_SECRET is not defined in .env!");
-    console.log("🛠️ Token yang akan diverifikasi:", `"${token}"`);
+    if (!secretKey) {
+      console.error("[FATAL ERROR]: JWT_SECRET is missing!");
+      return res.status(500).json({ message: "Server configuration error" });
+    }
 
+    // 4. Verifikasi
     jwt.verify(token, secretKey, (err, decoded) => {
       if (err) {
-        console.error("[JWT ERROR]", err.message); // Agar muncul di terminal backend
-        return res
-          .status(401)
-          .send({ message: "Unauthorized! Token invalid or expired." });
+        // Bedakan log antara expired dan malformed buat mempermudah debugging
+        const errorType =
+          err.name === "TokenExpiredError" ? "EXPIRED" : "INVALID/MALFORMED";
+        console.error(`[JWT ERROR] ${errorType}:`, err.message);
+
+        return res.status(401).json({
+          message: `Unauthorized! Token is ${err.name === "TokenExpiredError" ? "expired" : "invalid"}.`,
+        });
       }
 
-      // Pastikan payload token saat LOGIN mengandung 'id' dan 'role'
+      // 5. Validasi isi payload (Jangan langsung percaya decoded)
+      if (!decoded.id || !decoded.role) {
+        return res
+          .status(401)
+          .json({ message: "Unauthorized! Token payload is incomplete." });
+      }
+
       req.userId = decoded.id;
       req.userRole = decoded.role;
       next();
@@ -39,7 +55,7 @@ const verifyToken = (req, res, next) => {
     console.error("[MIDDLEWARE CRASH]", error);
     return res
       .status(500)
-      .send({ message: "Internal Server Error in Middleware" });
+      .json({ message: "Internal Server Error in Middleware" });
   }
 };
 

@@ -51,16 +51,15 @@ const User = sequelize.define(
   {
     timestamps: true,
     hooks: {
-      // Hook ini otomatis mengenkripsi password sebelum user baru dibuat
       beforeCreate: async (user) => {
-        if (user.password) {
+        if (user.password && !user.password.startsWith("$2")) {
+          // Hanya hash jika belum berbentuk hash
           const salt = await bcrypt.genSalt(10);
           user.password = await bcrypt.hash(user.password, salt);
         }
       },
-      // Hook ini untuk enkripsi jika admin mereset password
       beforeUpdate: async (user) => {
-        if (user.changed("password")) {
+        if (user.changed("password") && !user.password.startsWith("$2")) {
           const salt = await bcrypt.genSalt(10);
           user.password = await bcrypt.hash(user.password, salt);
         }

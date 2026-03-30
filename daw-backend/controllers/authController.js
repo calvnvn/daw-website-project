@@ -10,8 +10,11 @@ const transporter = require("../utils/mailer");
 exports.login = async (req, res) => {
   try {
     const { email, password } = req.body;
-
+    console.log("📥 Password yang diketik user:", password); // <--- TAMBAHKAN INI
+    // Di authController.js fungsi login
     const user = await User.findOne({ where: { email } });
+    console.log("👤 User Ditemukan:", user ? user.email : "TIDAK ADA");
+    console.log("🔑 Password di DB:", user ? user.password : "N/A");
     if (!user) {
       return res.status(404).json({ message: "User not found." });
     }
