@@ -1,11 +1,11 @@
-const sequelize = require("../config/database");
+const Project = require("../models/Project");
 const fs = require("fs");
 const path = require("path");
 
 // GET Project Function
 exports.getAllProjects = async (req, res) => {
   try {
-    const query = `SELECT * FROM projects ORDER BY createdAt DESC`;
+    const query = `SELECT * FROM Projects ORDER BY createdAt DESC`;
 
     const projects = await sequelize.query(query, {
       type: sequelize.QueryTypes.SELECT,
@@ -159,12 +159,10 @@ exports.deleteProject = async (req, res) => {
       type: sequelize.QueryTypes.DELETE,
     });
 
-    res
-      .status(200)
-      .json({
-        message:
-          "Project and all associated files (including inline images) deleted successfully.",
-      });
+    res.status(200).json({
+      message:
+        "Project and all associated files (including inline images) deleted successfully.",
+    });
   } catch (error) {
     console.error("Error DELETE Project:", error);
     res.status(500).json({ message: "Failed to Delete Project." });
@@ -174,7 +172,7 @@ exports.deleteProject = async (req, res) => {
 exports.getProjectById = async (req, res) => {
   try {
     const { id } = req.params;
-    const query = `SELECT * FROM projects WHERE id = :id LIMIT 1`;
+    const query = `SELECT * FROM Projects WHERE id = :id LIMIT 1`;
 
     const projects = await sequelize.query(query, {
       replacements: { id },
