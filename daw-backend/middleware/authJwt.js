@@ -8,14 +8,19 @@ const verifyToken = (req, res, next) => {
       return res.status(403).send({ message: "No token provided!" });
     }
 
-    // Jika formatnya "Bearer <token>"
-    if (token.startsWith("Bearer ")) {
-      token = token.slice(7, token.length);
+    // // Jika formatnya "Bearer <token>"
+    // if (token.startsWith("Bearer ")) {
+    //   token = token.slice(7, token.length);
+    // }
+
+    if (token.toLowerCase().startsWith("bearer ")) {
+      token = token.split(" ")[1]; // Ambil kata kedua setelah spasi
     }
 
     const secretKey = process.env.JWT_SECRET;
     if (!secretKey)
       throw new Error("FATAL: JWT_SECRET is not defined in .env!");
+    console.log("🛠️ Token yang akan diverifikasi:", `"${token}"`);
 
     jwt.verify(token, secretKey, (err, decoded) => {
       if (err) {
