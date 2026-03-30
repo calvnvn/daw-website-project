@@ -31,21 +31,28 @@ export default function Login() {
 
     setIsLoading(true);
     try {
-      // ✅ FIXED: Standard API call
       const response = await api.post("/auth/login", { email, password });
       const data = response.data;
 
+      // 🕵️ DEBUG: Minta Pak Rama liat ini di Console Browser (F12)
+      console.log("🔥 [DEBUG LOGIN] Data dari Server:", data);
+
+      if (!data || !data.accessToken) {
+        throw new Error("Token tidak diterima dari server.");
+      }
+
+      // Simpan satu per satu dengan aman
       localStorage.setItem("daw_token", data.accessToken);
-      localStorage.setItem("userId", data.id);
-      localStorage.setItem(
-        "daw_user",
-        JSON.stringify({
-          id: data.id,
-          name: data.name,
-          email: data.email,
-          role: data.role,
-        }),
-      );
+      localStorage.setItem("userId", data.id || "");
+
+      // Simpan User Info dengan Fallback (Cadangan)
+      const userData = {
+        id: data.id,
+        name: data.name || "Admin DAW", // Kalau name undefined, kasih nama default
+        email: data.email,
+        role: data.role,
+      };
+      localStorage.setItem("daw_user", JSON.stringify(userData));
 
       if (data.needsPasswordChange) {
         toast.info("Security Check", {
@@ -53,8 +60,8 @@ export default function Login() {
         });
         navigate("/force-change-password");
       } else {
-        toast.success(`Welcome, ${data.name}!`);
-        //  SMART REDIRECT: Balik ke halaman tujuan awal
+        // Gunakan userData.name yang sudah diproteksi fallback
+        toast.success(`Welcome, ${userData.name}!`);
         navigate(from, { replace: true });
       }
     } catch (err: any) {

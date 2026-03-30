@@ -6,6 +6,9 @@ const verifyToken = (req, res, next) => {
     const authHeader =
       req.headers["authorization"] || req.headers["x-access-token"];
 
+    // DEBUG 1: Liat apa yang dikirim Frontend
+    console.log("📥📥📥📥📥📥📥📥[DEBUG] Header Masuk:", authHeader);
+
     if (!authHeader) {
       return res.status(403).json({ message: "No token provided!" });
     }
@@ -16,8 +19,14 @@ const verifyToken = (req, res, next) => {
       token = authHeader.split(" ")[1]; // Ambil kata kedua setelah spasi
     }
 
+    // DEBUG 2: Liat token setelah dibersihin
+    console.log("✂️✂️✂️✂️✂️✂️✂️✂️[DEBUG] Token Terproses:", `"${token}"`);
+
     // 3. Pastikan token tidak kosong atau string "undefined"
     if (!token || token === "undefined" || token === "null") {
+      console.error(
+        "❌❌❌❌❌ [ERROR] Token formatnya sampah (undefined/null/empty)",
+      );
       return res.status(401).json({ message: "Invalid token format!" });
     }
 
