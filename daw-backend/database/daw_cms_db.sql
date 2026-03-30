@@ -1,5 +1,3 @@
-CREATE DATABASE  IF NOT EXISTS `daw_cms_db` /*!40100 DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci */ /*!80016 DEFAULT ENCRYPTION='N' */;
-USE `daw_cms_db`;
 -- MySQL dump 10.13  Distrib 8.0.45, for Win64 (x86_64)
 --
 -- Host: localhost    Database: daw_cms_db
@@ -48,6 +46,34 @@ INSERT INTO `aboutinfo` VALUES (1,'Success is born through honesty, persistence,
 UNLOCK TABLES;
 
 --
+-- Table structure for table `affiliate`
+--
+
+DROP TABLE IF EXISTS `affiliate`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `affiliate` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `name` varchar(255) NOT NULL,
+  `desc` varchar(255) DEFAULT NULL,
+  `category` enum('fnb','steel','finance','edu') DEFAULT 'fnb',
+  `logoUrl` varchar(255) DEFAULT NULL,
+  `createdAt` datetime NOT NULL,
+  `updatedAt` datetime NOT NULL,
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Dumping data for table `affiliate`
+--
+
+LOCK TABLES `affiliate` WRITE;
+/*!40000 ALTER TABLE `affiliate` DISABLE KEYS */;
+/*!40000 ALTER TABLE `affiliate` ENABLE KEYS */;
+UNLOCK TABLES;
+
+--
 -- Table structure for table `affiliates`
 --
 
@@ -63,7 +89,7 @@ CREATE TABLE `affiliates` (
   `createdAt` datetime NOT NULL,
   `updatedAt` datetime NOT NULL,
   PRIMARY KEY (`id`)
-) ENGINE=InnoDB AUTO_INCREMENT=8 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=9 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -72,8 +98,42 @@ CREATE TABLE `affiliates` (
 
 LOCK TABLES `affiliates` WRITE;
 /*!40000 ALTER TABLE `affiliates` DISABLE KEYS */;
-INSERT INTO `affiliates` VALUES (1,'Suntory Garuda','','fnb','/uploads/management-1773282900972.png','2026-03-12 02:35:00','2026-03-12 02:35:00'),(2,'SNS','','fnb','/uploads/1773282900970-191407272.png','2026-03-12 02:35:00','2026-03-12 02:35:00'),(3,'Bank Maju','','finance','/uploads/1773282900974-199647141.png','2026-03-12 02:35:00','2026-03-12 02:35:00'),(4,'Global Sevilla','','edu','/uploads/1773282900978-466053072.png','2026-03-12 02:35:00','2026-03-12 02:35:00'),(5,'Garuda Food','','fnb','/uploads/1773282900968-374085108.png','2026-03-12 02:35:00','2026-03-12 02:35:00'),(6,'PT. BNM','','steel','/uploads/management-1773282900973.png','2026-03-12 02:35:01','2026-03-12 02:35:01');
+INSERT INTO `affiliates` VALUES (1,'Suntory Garuda','','fnb','/uploads/management-1773282900972.png','2026-03-12 02:35:00','2026-03-27 06:27:08'),(2,'SNS','','fnb','/uploads/1773282900970-191407272.png','2026-03-12 02:35:00','2026-03-12 02:35:00'),(3,'Bank Maju','','finance','/uploads/1773282900974-199647141.png','2026-03-12 02:35:00','2026-03-12 02:35:00'),(4,'Global Sevilla','','edu','/uploads/1773282900978-466053072.png','2026-03-12 02:35:00','2026-03-12 02:35:00'),(5,'Garuda Food','','fnb','/uploads/1773282900968-374085108.png','2026-03-12 02:35:00','2026-03-12 02:35:00'),(6,'PT. BNM','','steel','/uploads/management-1773282900973.png','2026-03-12 02:35:01','2026-03-12 02:35:01');
 /*!40000 ALTER TABLE `affiliates` ENABLE KEYS */;
+UNLOCK TABLES;
+
+--
+-- Table structure for table `businessmapmarker`
+--
+
+DROP TABLE IF EXISTS `businessmapmarker`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `businessmapmarker` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `title` varchar(255) NOT NULL,
+  `desc` varchar(255) DEFAULT NULL,
+  `type` enum('direct','tudung') NOT NULL,
+  `dotX` varchar(255) NOT NULL,
+  `dotY` varchar(255) NOT NULL,
+  `boxX` varchar(255) NOT NULL,
+  `boxY` varchar(255) NOT NULL,
+  `createdAt` datetime NOT NULL,
+  `updatedAt` datetime NOT NULL,
+  `sectionId` varchar(255) DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  KEY `sectionId` (`sectionId`),
+  CONSTRAINT `businessmapmarker_ibfk_1` FOREIGN KEY (`sectionId`) REFERENCES `businesssection` (`id`) ON DELETE CASCADE ON UPDATE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Dumping data for table `businessmapmarker`
+--
+
+LOCK TABLES `businessmapmarker` WRITE;
+/*!40000 ALTER TABLE `businessmapmarker` DISABLE KEYS */;
+/*!40000 ALTER TABLE `businessmapmarker` ENABLE KEYS */;
 UNLOCK TABLES;
 
 --
@@ -121,6 +181,34 @@ INSERT INTO `businessmapmarkers` VALUES (22,'Hydropower Kualu','15 MW','direct',
 UNLOCK TABLES;
 
 --
+-- Table structure for table `businesssection`
+--
+
+DROP TABLE IF EXISTS `businesssection`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `businesssection` (
+  `id` varchar(255) NOT NULL,
+  `category` varchar(255) NOT NULL,
+  `title` varchar(255) NOT NULL,
+  `htmlContent` longtext NOT NULL,
+  `hasMap` tinyint(1) DEFAULT '0',
+  `createdAt` datetime NOT NULL,
+  `updatedAt` datetime NOT NULL,
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Dumping data for table `businesssection`
+--
+
+LOCK TABLES `businesssection` WRITE;
+/*!40000 ALTER TABLE `businesssection` DISABLE KEYS */;
+/*!40000 ALTER TABLE `businesssection` ENABLE KEYS */;
+UNLOCK TABLES;
+
+--
 -- Table structure for table `businesssections`
 --
 
@@ -147,6 +235,34 @@ LOCK TABLES `businesssections` WRITE;
 /*!40000 ALTER TABLE `businesssections` DISABLE KEYS */;
 INSERT INTO `businesssections` VALUES ('energy','Energy','Energy Focus.','<p><span style=\"color: oklch(0.208 0.042 265.755);\">DAW&nbsp;Group&nbsp;</span><strong style=\"color: oklch(0.208 0.042 265.755);\">Energy&nbsp;Division</strong><span style=\"color: oklch(0.208 0.042 265.755);\">&nbsp;focuses&nbsp;within&nbsp;the&nbsp;renewable&nbsp;energy&nbsp;sector.&nbsp;</span><strong style=\"color: oklch(0.208 0.042 265.755);\">In&nbsp;2014</strong><span style=\"color: oklch(0.208 0.042 265.755);\">,&nbsp;we&nbsp;obtained&nbsp;one&nbsp;hydropower&nbsp;project&nbsp;in&nbsp;North&nbsp;Sumatera&nbsp;(Toba&nbsp;Samosir&nbsp;Region),&nbsp;with&nbsp;a&nbsp;capacity&nbsp;of&nbsp;</span><strong style=\"color: oklch(0.208 0.042 265.755);\">15&nbsp;Megawatts</strong><span style=\"color: oklch(0.208 0.042 265.755);\">.&nbsp;We&nbsp;believe&nbsp;hydropower&nbsp;in&nbsp;Indonesia&nbsp;is&nbsp;really&nbsp;important&nbsp;in&nbsp;contributing&nbsp;to&nbsp;the&nbsp;country’s&nbsp;heavy&nbsp;need&nbsp;of&nbsp;power&nbsp;generation.</span></p><p><strong style=\"color: oklch(0.208 0.042 265.755);\">In&nbsp;2011,</strong><span style=\"color: oklch(0.208 0.042 265.755);\">&nbsp;we&nbsp;entered&nbsp;into&nbsp;</span><strong style=\"color: oklch(0.208 0.042 265.755);\">Operation&nbsp;and&nbsp;Maintenance&nbsp;services</strong><span style=\"color: oklch(0.208 0.042 265.755);\">&nbsp;for&nbsp;</span><strong style=\"color: oklch(0.208 0.042 265.755);\">Indonesia&nbsp;state&nbsp;owned</strong><span style=\"color: oklch(0.208 0.042 265.755);\">&nbsp;</span><strong style=\"color: oklch(0.208 0.042 265.755);\">electricity&nbsp;company&nbsp;(PLN)</strong><span style=\"color: oklch(0.208 0.042 265.755);\">,&nbsp;focusing&nbsp;mainly&nbsp;in&nbsp;the&nbsp;coal&nbsp;fired&nbsp;power&nbsp;plants.&nbsp;Currently,&nbsp;we&nbsp;are&nbsp;serving&nbsp;five&nbsp;PLN&nbsp;power&nbsp;plants&nbsp;ranging&nbsp;from&nbsp;Sumatera,&nbsp;Kalimantan,&nbsp;and&nbsp;Sulawesi.</span></p><blockquote><span style=\"color: oklch(0.208 0.042 265.755);\">We&nbsp;provide&nbsp;solutions&nbsp;to&nbsp;clients&nbsp;in&nbsp;various&nbsp;industries&nbsp;such&nbsp;as:&nbsp;</span><strong style=\"color: oklch(0.208 0.042 265.755);\">food&nbsp;and&nbsp;beverage</strong><span style=\"color: oklch(0.208 0.042 265.755);\">,&nbsp;</span><strong style=\"color: oklch(0.208 0.042 265.755);\">textile</strong><span style=\"color: oklch(0.208 0.042 265.755);\">,&nbsp;</span><strong style=\"color: oklch(0.208 0.042 265.755);\">chemical</strong><span style=\"color: oklch(0.208 0.042 265.755);\">,&nbsp;and&nbsp;</span><strong style=\"color: oklch(0.208 0.042 265.755);\">steel</strong><span style=\"color: oklch(0.208 0.042 265.755);\">,&nbsp;to&nbsp;get&nbsp;maximum&nbsp;energy&nbsp;efficiency.</span></blockquote>',1,'2026-03-13 10:38:23','2026-03-13 04:44:46'),('resources','Resources','Resource Focus.','<p><span style=\"color: oklch(0.208 0.042 265.755);\">DAW&nbsp;Group&nbsp;Resources&nbsp;division&nbsp;focuses&nbsp;is&nbsp;in&nbsp;the&nbsp;Palm&nbsp;Oil&nbsp;business.&nbsp;Our&nbsp;palm&nbsp;oil&nbsp;plantation&nbsp;is&nbsp;located&nbsp;in&nbsp;East&nbsp;Kalimantan&nbsp;with&nbsp;total&nbsp;plantable&nbsp;area&nbsp;of&nbsp;</span><strong style=\"color: oklch(0.208 0.042 265.755);\">10,000&nbsp;hectares</strong><span style=\"color: oklch(0.208 0.042 265.755);\">.&nbsp;In&nbsp;the&nbsp;</span><strong style=\"color: oklch(0.208 0.042 265.755);\">downstream&nbsp;sector</strong><span style=\"color: oklch(0.208 0.042 265.755);\">,&nbsp;DAW&nbsp;Group&nbsp;currently&nbsp;have&nbsp;</span><strong style=\"color: oklch(0.208 0.042 265.755);\">four&nbsp;CPO&nbsp;Mills</strong><span style=\"color: oklch(0.208 0.042 265.755);\">&nbsp;in&nbsp;operation.&nbsp;</span><strong style=\"color: oklch(0.208 0.042 265.755);\">Two&nbsp;CPO&nbsp;Mills</strong><span style=\"color: oklch(0.208 0.042 265.755);\">&nbsp;that&nbsp;are&nbsp;directly&nbsp;</span><strong style=\"color: oklch(0.208 0.042 265.755);\">owned&nbsp;by&nbsp;DAW</strong><span style=\"color: oklch(0.208 0.042 265.755);\">&nbsp;are&nbsp;located&nbsp;in&nbsp;</span><strong style=\"color: oklch(0.208 0.042 265.755);\">East&nbsp;Kalimantan</strong><span style=\"color: oklch(0.208 0.042 265.755);\">&nbsp;and&nbsp;</span><strong style=\"color: oklch(0.208 0.042 265.755);\">Jambi&nbsp;Province</strong><span style=\"color: oklch(0.208 0.042 265.755);\">;&nbsp;and&nbsp;two&nbsp;other&nbsp;</span><strong style=\"color: oklch(0.208 0.042 265.755);\">CPO&nbsp;Mills&nbsp;in&nbsp;Lampung&nbsp;</strong><span style=\"color: oklch(0.208 0.042 265.755);\">and&nbsp;</span><strong style=\"color: oklch(0.208 0.042 265.755);\">Jambi&nbsp;Province</strong><span style=\"color: oklch(0.208 0.042 265.755);\">&nbsp;are&nbsp;owned&nbsp;through&nbsp;</span><strong style=\"color: oklch(0.208 0.042 265.755);\">Tudung&nbsp;Group</strong><span style=\"color: oklch(0.208 0.042 265.755);\">.</span></p><p><span style=\"color: oklch(0.208 0.042 265.755);\">Below&nbsp;are&nbsp;the&nbsp;locations&nbsp;of&nbsp;our&nbsp;operating&nbsp;Palm&nbsp;Oil&nbsp;Plantations&nbsp;and&nbsp;Palm&nbsp;Oil&nbsp;Mills.</span></p>',1,'2026-03-13 10:38:23','2026-03-13 06:09:16');
 /*!40000 ALTER TABLE `businesssections` ENABLE KEYS */;
+UNLOCK TABLES;
+
+--
+-- Table structure for table `heroslide`
+--
+
+DROP TABLE IF EXISTS `heroslide`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `heroslide` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `title` varchar(255) NOT NULL,
+  `subtitle` text,
+  `imageUrl` varchar(255) DEFAULT NULL,
+  `order` int DEFAULT '0',
+  `createdAt` datetime NOT NULL,
+  `updatedAt` datetime NOT NULL,
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Dumping data for table `heroslide`
+--
+
+LOCK TABLES `heroslide` WRITE;
+/*!40000 ALTER TABLE `heroslide` DISABLE KEYS */;
+/*!40000 ALTER TABLE `heroslide` ENABLE KEYS */;
 UNLOCK TABLES;
 
 --
@@ -206,6 +322,32 @@ INSERT INTO `histories` VALUES (1,'2005','DAW Group was founded in 2005 as an in
 UNLOCK TABLES;
 
 --
+-- Table structure for table `homesetting`
+--
+
+DROP TABLE IF EXISTS `homesetting`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `homesetting` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `introHeadline` varchar(255) DEFAULT NULL,
+  `introBody` text,
+  `createdAt` datetime NOT NULL,
+  `updatedAt` datetime NOT NULL,
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Dumping data for table `homesetting`
+--
+
+LOCK TABLES `homesetting` WRITE;
+/*!40000 ALTER TABLE `homesetting` DISABLE KEYS */;
+/*!40000 ALTER TABLE `homesetting` ENABLE KEYS */;
+UNLOCK TABLES;
+
+--
 -- Table structure for table `homesettings`
 --
 
@@ -230,6 +372,35 @@ LOCK TABLES `homesettings` WRITE;
 /*!40000 ALTER TABLE `homesettings` DISABLE KEYS */;
 INSERT INTO `homesettings` VALUES (1,'A Leading Operating Holding Company.','PT Dharma Agung Wijaya (DAW Group) focuses on two core pillars: Renewable Energy and Resources. We are committed to operational excellence and living in harmony with Mother Nature, integrating our businesses from upstream to downstream to create sustainable value for society.','2026-03-12 02:00:34','2026-03-17 04:31:11');
 /*!40000 ALTER TABLE `homesettings` ENABLE KEYS */;
+UNLOCK TABLES;
+
+--
+-- Table structure for table `impactstat`
+--
+
+DROP TABLE IF EXISTS `impactstat`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `impactstat` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `icon` varchar(255) DEFAULT 'Map',
+  `value` varchar(255) NOT NULL,
+  `label` varchar(255) NOT NULL,
+  `desc` text,
+  `order` int DEFAULT '0',
+  `createdAt` datetime NOT NULL,
+  `updatedAt` datetime NOT NULL,
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Dumping data for table `impactstat`
+--
+
+LOCK TABLES `impactstat` WRITE;
+/*!40000 ALTER TABLE `impactstat` DISABLE KEYS */;
+/*!40000 ALTER TABLE `impactstat` ENABLE KEYS */;
 UNLOCK TABLES;
 
 --
@@ -281,7 +452,7 @@ CREATE TABLE `inquiries` (
   `createdAt` datetime NOT NULL,
   `updatedAt` datetime NOT NULL,
   PRIMARY KEY (`id`)
-) ENGINE=InnoDB AUTO_INCREMENT=7 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=8 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -290,8 +461,66 @@ CREATE TABLE `inquiries` (
 
 LOCK TABLES `inquiries` WRITE;
 /*!40000 ALTER TABLE `inquiries` DISABLE KEYS */;
-INSERT INTO `inquiries` VALUES (6,'Jap Feodrian Calvin','jf.calvin20@gmail.com','089513598982','Kadu','Careers','Ingfo loker',1,'2026-03-17 02:36:32','2026-03-26 01:49:55');
+INSERT INTO `inquiries` VALUES (6,'Jap Feodrian Calvin','jf.calvin20@gmail.com','089513598982','Kadu','Careers','Ingfo loker',1,'2026-03-17 02:36:32','2026-03-26 01:49:55'),(7,'Budi Santoso','budi.santoso@technusantara.co.id','62 812-3456-7890','PT Teknologi Nusantara','Business Partnership','Selamat siang tim DAW Group. Kami dari PT Teknologi Nusantara tertarik untuk menjajaki peluang kerja sama di sektor digitalisasi energi terbarukan. Apakah memungkinkan untuk mengatur jadwal meeting online minggu depan untuk membahas potensi sinergi ini? Terima kasih.',1,'2026-03-26 10:10:49','2026-03-27 03:04:21');
 /*!40000 ALTER TABLE `inquiries` ENABLE KEYS */;
+UNLOCK TABLES;
+
+--
+-- Table structure for table `inquiry`
+--
+
+DROP TABLE IF EXISTS `inquiry`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `inquiry` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `name` varchar(255) NOT NULL,
+  `email` varchar(255) NOT NULL,
+  `phone` varchar(255) DEFAULT NULL,
+  `company` varchar(255) DEFAULT NULL,
+  `subject` varchar(255) DEFAULT 'General Inquiry',
+  `message` text NOT NULL,
+  `isRead` tinyint(1) DEFAULT '0',
+  `createdAt` datetime NOT NULL,
+  `updatedAt` datetime NOT NULL,
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Dumping data for table `inquiry`
+--
+
+LOCK TABLES `inquiry` WRITE;
+/*!40000 ALTER TABLE `inquiry` DISABLE KEYS */;
+/*!40000 ALTER TABLE `inquiry` ENABLE KEYS */;
+UNLOCK TABLES;
+
+--
+-- Table structure for table `investmentsetting`
+--
+
+DROP TABLE IF EXISTS `investmentsetting`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `investmentsetting` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `teaserHeadline` varchar(255) DEFAULT 'Other Investments.',
+  `teaserBody` text,
+  `sectionIntro` text,
+  `createdAt` datetime NOT NULL,
+  `updatedAt` datetime NOT NULL,
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Dumping data for table `investmentsetting`
+--
+
+LOCK TABLES `investmentsetting` WRITE;
+/*!40000 ALTER TABLE `investmentsetting` DISABLE KEYS */;
+/*!40000 ALTER TABLE `investmentsetting` ENABLE KEYS */;
 UNLOCK TABLES;
 
 --
@@ -349,8 +578,43 @@ CREATE TABLE `managements` (
 
 LOCK TABLES `managements` WRITE;
 /*!40000 ALTER TABLE `managements` DISABLE KEYS */;
-INSERT INTO `managements` VALUES (1,'Sudhamek AWS','Chariman','Mr Sudhamek is the Chairman of PT. Dharma Agung Wijaya since 2009. He is also the Chairman of Garudafood Group since 2012. Previously, he had been the CEO of Garudafood group for 18 years.  \r\n\r\nIn 2016, Mr. Sudhamek was inducted as a member of the National Economic & Industry Committe by The President of the Republic of Indonesia: Mr. Joko Widodo; within the same year, He was also awarded with Doctor Honoris Causa by The Universitas Kristen Satya Wacana, on his concept called the Spirituality Based Company (SBC). He is affiliated with other organisations, including as the Chairman of the oldest Buddhist organization in Indonesia (Buddhayana), one of the founders of ICRP (Indonesian Conference on Religion And Peace), and as the Board of Governors of an educational institution called Global Sevilla School, which he established together with the late Mr. Nurcholish Madjid. \r\n','chairman',1,'/uploads/1773279893375-969525494.png','2026-03-12 01:44:53','2026-03-12 01:44:53'),(2,'Adhitya Soenjoto','President Director','He is the President Director of PT. Dharma Agung Wijaya since 2009, responsible for managing the whole business operation of DAW Group. He sits in the management board of other business units under DAW Group, such as: the Director of PT. Hanusentra Agro Lestari (a palm oil plantation) since 2012, the Director of PT Sentosa Bumi Wijaya (a palm oil mill) since 2010 and the Director of PT. Bina Niaga Multiusaha (precision stainless steel rolling mill) since 2016. From 2007 until 2008, he worked at Ernst & Young in Hong Kong, as an auditor. He obtained his Bachelor of Art Degree in Economics in 2005, at The University of Michigan - Ann Arbor, USA. He then obtained his MBA Degree in 2009, at Babson College, Boston - Massachusetts, USA.','director',1,NULL,'2026-03-12 09:28:17','2026-03-12 09:28:17'),(3,'Yudie Soenjoto','Vice President Director','He is the Director of PT. Dharma Agung Wijaya since June 2014, with management responsibility over Energy Division of DAW group. Within the energy division, he serves as director at PT. BEA. He is affiliated with an educational institution a Board Member Executive Secreatry at Global Sevilla School. Prior to joining DAW group, he had served as Project Manager at Garudafood Group, from February 2010 until December 2011. He obtained his Bachelor Degree in Mechanical Engineering from University of Michigan - Ann Arbor. In 2014, he completed his M.B.A in entrepreneurship at Babson College, Wellesley, MA.','director',2,'/uploads/photo-1773725805880-128737937.jpg','2026-03-12 09:28:37','2026-03-17 05:36:45'),(4,'Hendy Liusgria','Chief Financial Officer','He is the Chief Financial Officer for PT. Dharma Agung Wijaya since 2019, with management responsibilities over the financials and tax of both Resources Division and Energy Division of DAW Group. Mr. Hendy had extensive and long term experiences in finance and tax, previously served as the CFO of  PT Sinar Niaga Sejahtera, which is the distribution company serving Garudafood Group.','division',1,NULL,'2026-03-12 09:29:00','2026-03-12 09:29:00'),(5,'Eduard Siregar','Division Head','Previously, he served the responsibility as Head of Financial Accounting under the Resources Division. In 2017, Mr Eduard served as the Head of Resources division of DAW, managing the operation of four palm oil mills and plantation in Sumatera and Kalimantan.\r\n','division',2,NULL,'2026-03-12 09:29:17','2026-03-12 09:29:17'),(6,'Sentiyono','Division Head','He is the Head of Bioenergy Division of DAW Group since 2017, managing the operation of palm kernel shells trading business and renewable energy developments in the bioenergy sectors. He is also a certified Toyota Trainer in various subjects, such as Toyota Practical Problem Solving, Quality Control Check, and Project management.','division',3,NULL,'2026-03-12 09:29:32','2026-03-12 09:29:32');
+INSERT INTO `managements` VALUES (1,'Sudhamek AWS','Chariman','Mr Sudhamek is the Chairman of PT. Dharma Agung Wijaya since 2009. He is also the Chairman of Garudafood Group since 2012. Previously, he had been the CEO of Garudafood group for 18 years.  \r\n\r\nIn 2016, Mr. Sudhamek was inducted as a member of the National Economic & Industry Committe by The President of the Republic of Indonesia: Mr. Joko Widodo; within the same year, He was also awarded with Doctor Honoris Causa by The Universitas Kristen Satya Wacana, on his concept called the Spirituality Based Company (SBC). He is affiliated with other organisations, including as the Chairman of the oldest Buddhist organization in Indonesia (Buddhayana), one of the founders of ICRP (Indonesian Conference on Religion And Peace), and as the Board of Governors of an educational institution called Global Sevilla School, which he established together with the late Mr. Nurcholish Madjid. \r\n','chairman',1,'/uploads/1773279893375-969525494.png','2026-03-12 01:44:53','2026-03-12 01:44:53'),(2,'Adhitya Soenjoto','President Director','He is the President Director of PT. Dharma Agung Wijaya since 2009, responsible for managing the whole business operation of DAW Group. He sits in the management board of other business units under DAW Group, such as: the Director of PT. Hanusentra Agro Lestari (a palm oil plantation) since 2012, the Director of PT Sentosa Bumi Wijaya (a palm oil mill) since 2010 and the Director of PT. Bina Niaga Multiusaha (precision stainless steel rolling mill) since 2016. From 2007 until 2008, he worked at Ernst & Young in Hong Kong, as an auditor. He obtained his Bachelor of Art Degree in Economics in 2005, at The University of Michigan - Ann Arbor, USA. He then obtained his MBA Degree in 2009, at Babson College, Boston - Massachusetts, USA.','director',1,NULL,'2026-03-12 09:28:17','2026-03-27 03:28:20'),(3,'Yudie Soenjoto','Vice President Director','He is the Director of PT. Dharma Agung Wijaya since June 2014, with management responsibility over Energy Division of DAW group. Within the energy division, he serves as director at PT. BEA. He is affiliated with an educational institution a Board Member Executive Secreatry at Global Sevilla School. Prior to joining DAW group, he had served as Project Manager at Garudafood Group, from February 2010 until December 2011. He obtained his Bachelor Degree in Mechanical Engineering from University of Michigan - Ann Arbor. In 2014, he completed his M.B.A in entrepreneurship at Babson College, Wellesley, MA.','director',2,'/uploads/photo-1773725805880-128737937.jpg','2026-03-12 09:28:37','2026-03-17 05:36:45'),(4,'Hendy Liusgria','Chief Financial Officer','He is the Chief Financial Officer for PT. Dharma Agung Wijaya since 2019, with management responsibilities over the financials and tax of both Resources Division and Energy Division of DAW Group. Mr. Hendy had extensive and long term experiences in finance and tax, previously served as the CFO of  PT Sinar Niaga Sejahtera, which is the distribution company serving Garudafood Group.','division',1,NULL,'2026-03-12 09:29:00','2026-03-12 09:29:00'),(5,'Eduard Siregar','Division Head','Previously, he served the responsibility as Head of Financial Accounting under the Resources Division. In 2017, Mr Eduard served as the Head of Resources division of DAW, managing the operation of four palm oil mills and plantation in Sumatera and Kalimantan.\r\n','division',2,NULL,'2026-03-12 09:29:17','2026-03-12 09:29:17'),(6,'Sentiyono','Division Head','He is the Head of Bioenergy Division of DAW Group since 2017, managing the operation of palm kernel shells trading business and renewable energy developments in the bioenergy sectors. He is also a certified Toyota Trainer in various subjects, such as Toyota Practical Problem Solving, Quality Control Check, and Project management.','division',3,NULL,'2026-03-12 09:29:32','2026-03-12 09:29:32');
 /*!40000 ALTER TABLE `managements` ENABLE KEYS */;
+UNLOCK TABLES;
+
+--
+-- Table structure for table `menu`
+--
+
+DROP TABLE IF EXISTS `menu`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `menu` (
+  `id` char(36) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL,
+  `label` varchar(255) NOT NULL,
+  `parentId` char(36) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin DEFAULT NULL,
+  `orderIndex` int DEFAULT '0',
+  `type` enum('page','external','folder') DEFAULT 'page',
+  `pageId` char(36) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin DEFAULT NULL,
+  `externalLink` varchar(255) DEFAULT NULL,
+  `isActive` tinyint(1) DEFAULT '1',
+  `createdAt` datetime NOT NULL,
+  `updatedAt` datetime NOT NULL,
+  PRIMARY KEY (`id`),
+  KEY `parentId` (`parentId`),
+  KEY `pageId` (`pageId`),
+  CONSTRAINT `menu_ibfk_1` FOREIGN KEY (`parentId`) REFERENCES `menu` (`id`) ON DELETE CASCADE ON UPDATE CASCADE,
+  CONSTRAINT `menu_ibfk_2` FOREIGN KEY (`pageId`) REFERENCES `page` (`id`) ON DELETE SET NULL ON UPDATE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Dumping data for table `menu`
+--
+
+LOCK TABLES `menu` WRITE;
+/*!40000 ALTER TABLE `menu` DISABLE KEYS */;
+/*!40000 ALTER TABLE `menu` ENABLE KEYS */;
 UNLOCK TABLES;
 
 --
@@ -403,8 +667,41 @@ CREATE TABLE `menus` (
 
 LOCK TABLES `menus` WRITE;
 /*!40000 ALTER TABLE `menus` DISABLE KEYS */;
-INSERT INTO `menus` VALUES ('49e77e2e-7297-470a-bfa1-9891692ed5af','Achievement',NULL,1,'external',NULL,'https://beaenergy.daw.co.id/',1,'2026-03-26 04:15:45','2026-03-26 04:18:00'),('8ca694bd-254c-4537-9cdf-9619191446cb','Transformation',NULL,0,'folder',NULL,NULL,1,'2026-03-26 03:35:29','2026-03-26 04:18:00'),('de97d3fd-c338-4898-b094-cdc76b86615f','Sustainability','8ca694bd-254c-4537-9cdf-9619191446cb',1,'page','0a90cbc7-2a0f-489b-b226-09534ed8b6ba',NULL,1,'2026-03-26 04:14:45','2026-03-26 04:17:13');
 /*!40000 ALTER TABLE `menus` ENABLE KEYS */;
+UNLOCK TABLES;
+
+--
+-- Table structure for table `page`
+--
+
+DROP TABLE IF EXISTS `page`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `page` (
+  `id` char(36) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL,
+  `title` varchar(255) NOT NULL,
+  `subtitle` varchar(255) DEFAULT NULL,
+  `heroImage` varchar(255) DEFAULT NULL,
+  `templateType` enum('classic','modern','split') DEFAULT 'classic',
+  `slug` varchar(255) NOT NULL,
+  `content` longtext,
+  `metaDescription` varchar(255) DEFAULT NULL,
+  `sidebarLinks` json DEFAULT NULL,
+  `showDropCap` tinyint(1) DEFAULT '1',
+  `createdAt` datetime NOT NULL,
+  `updatedAt` datetime NOT NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `slug` (`slug`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Dumping data for table `page`
+--
+
+LOCK TABLES `page` WRITE;
+/*!40000 ALTER TABLE `page` DISABLE KEYS */;
+/*!40000 ALTER TABLE `page` ENABLE KEYS */;
 UNLOCK TABLES;
 
 --
@@ -453,6 +750,41 @@ INSERT INTO `pages` VALUES ('0a90cbc7-2a0f-489b-b226-09534ed8b6ba','Leading the 
 UNLOCK TABLES;
 
 --
+-- Table structure for table `project`
+--
+
+DROP TABLE IF EXISTS `project`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `project` (
+  `id` char(36) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL,
+  `title` varchar(255) NOT NULL,
+  `excerpt` varchar(500) DEFAULT NULL,
+  `content` longtext,
+  `category` enum('Resources','Energy') NOT NULL,
+  `status` enum('Draft','Published') DEFAULT 'Draft',
+  `author` varchar(255) NOT NULL,
+  `cover_image` varchar(255) DEFAULT NULL,
+  `gallery` json DEFAULT NULL,
+  `views` int DEFAULT '0',
+  `seo_title` varchar(255) DEFAULT NULL,
+  `meta_description` text,
+  `createdAt` datetime NOT NULL,
+  `updatedAt` datetime NOT NULL,
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Dumping data for table `project`
+--
+
+LOCK TABLES `project` WRITE;
+/*!40000 ALTER TABLE `project` DISABLE KEYS */;
+/*!40000 ALTER TABLE `project` ENABLE KEYS */;
+UNLOCK TABLES;
+
+--
 -- Table structure for table `projects`
 --
 
@@ -485,8 +817,39 @@ CREATE TABLE `projects` (
 
 LOCK TABLES `projects` WRITE;
 /*!40000 ALTER TABLE `projects` DISABLE KEYS */;
-INSERT INTO `projects` VALUES ('4f4482dd-1df5-11f1-8a02-c03532f000ea','CPO Mill and Plantation in West Kalimantan','Two CPO mills and 11,000 Ha in West Kalimantan.','<p>In&nbsp;<strong>West&nbsp;Kalimantan</strong>,&nbsp;DAW&nbsp;Group&nbsp;owns&nbsp;two&nbsp;CPO&nbsp;mills&nbsp;in&nbsp;<strong>Bengkayang&nbsp;</strong>and&nbsp;<strong>Sanggau&nbsp;Region</strong>.&nbsp;Each&nbsp;CPO&nbsp;mill&nbsp;has&nbsp;a&nbsp;capacity&nbsp;of&nbsp;<strong>45&nbsp;tonnes&nbsp;per&nbsp;hour.</strong>&nbsp;</p><p>In&nbsp;<strong>the</strong>&nbsp;<strong>Bengkayang&nbsp;Region</strong>,&nbsp;DAW&nbsp;Group&nbsp;have&nbsp;a&nbsp;palm&nbsp;oil&nbsp;plantation&nbsp;land&nbsp;bank&nbsp;of<strong>&nbsp;11,000&nbsp;Ha.</strong></p><p></p><p>Please&nbsp;check&nbsp;our&nbsp;galleries&nbsp;below&nbsp;for&nbsp;a&nbsp;glimpse&nbsp;of&nbsp;our&nbsp;CPO&nbsp;Mill&nbsp;in&nbsp;West&nbsp;Kalimantan.</p><p></p>','Resources','Published','Jap Calvin','cover_image-1773307485898-998356838.jpg','[\"gallery-1773307485905-887138229.jpg\",\"gallery-1773307485909-748912410.jpg\",\"gallery-1773307485919-506045683.jpg\",\"gallery-1773307485922-749410690.jpg\",\"gallery-1773307485922-562971435.jpeg\"]',23,'2026-03-12 09:24:45','2026-03-12 09:25:38',NULL,NULL),('69f45ba3-1df5-11f1-8a02-c03532f000ea','CPO Mill in Jambi','Newly acquired 45-tonne CPO mill in Sarolangun, Jambi.','<p>Our&nbsp;newly&nbsp;acquired&nbsp;CPO&nbsp;mill&nbsp;is&nbsp;located&nbsp;in&nbsp;<strong>Sarolangun</strong>,&nbsp;Jambi.&nbsp;It&nbsp;is&nbsp;a&nbsp;<strong>45&nbsp;tonnes&nbsp;per&nbsp;hour&nbsp;capacity</strong>&nbsp;mill&nbsp;and&nbsp;already&nbsp;in&nbsp;operation&nbsp;since&nbsp;2015.</p><p>Please&nbsp;check&nbsp;our&nbsp;galleries&nbsp;below&nbsp;for&nbsp;a&nbsp;glimpse&nbsp;of&nbsp;our&nbsp;<strong>Palm&nbsp;oil&nbsp;Mill&nbsp;progress</strong>&nbsp;in&nbsp;<strong>Jambi&nbsp;-&nbsp;West&nbsp;Sumatera.</strong></p><p></p>','Resources','Published','Jap Calvin','cover_image-1773307530674-706401182.jpg','[\"gallery-1773307530686-207993754.jpg\",\"gallery-1773307530689-925343087.jpg\",\"gallery-1773307530692-259329630.jpg\",\"gallery-1773307530693-549782054.jpg\",\"gallery-1773307530695-725032504.jpg\"]',1,'2026-03-12 09:25:30','2026-03-12 09:25:36',NULL,NULL),('9990ab1f-1df5-11f1-8a02-c03532f000ea','Hydropower - Kualu','15 MW hydropower project near Lake Toba, North Sumatera.','<p><strong style=\"background-color: rgb(255, 255, 255); color: rgb(51, 51, 51);\">Project&nbsp;Kualu</strong><span style=\"background-color: rgb(255, 255, 255); color: rgb(51, 51, 51);\">&nbsp;is&nbsp;a&nbsp;hydropower&nbsp;(PLTA)&nbsp;project,&nbsp;which&nbsp;has&nbsp;a&nbsp;power&nbsp;potential&nbsp;of&nbsp;</span><strong style=\"background-color: rgb(255, 255, 255); color: rgb(51, 51, 51);\">15&nbsp;MW</strong><span style=\"background-color: rgb(255, 255, 255); color: rgb(51, 51, 51);\">.&nbsp;It&nbsp;is&nbsp;located&nbsp;at&nbsp;</span><strong style=\"background-color: rgb(255, 255, 255); color: rgb(51, 51, 51);\">North&nbsp;Sumatera</strong><span style=\"background-color: rgb(255, 255, 255); color: rgb(51, 51, 51);\">&nbsp;near&nbsp;</span><strong style=\"background-color: rgb(255, 255, 255); color: rgb(51, 51, 51);\">the&nbsp;Toba&nbsp;Lake</strong><span style=\"background-color: rgb(255, 255, 255); color: rgb(51, 51, 51);\">.&nbsp;The&nbsp;name&nbsp;of&nbsp;the&nbsp;river&nbsp;is&nbsp;</span><strong style=\"background-color: rgb(255, 255, 255); color: rgb(51, 51, 51);\">Kualu</strong><span style=\"background-color: rgb(255, 255, 255); color: rgb(51, 51, 51);\">;&nbsp;the&nbsp;river&nbsp;runs&nbsp;long&nbsp;and&nbsp;is&nbsp;</span><strong style=\"background-color: rgb(255, 255, 255); color: rgb(51, 51, 51);\">connected</strong><span style=\"background-color: rgb(255, 255, 255); color: rgb(51, 51, 51);\">&nbsp;to&nbsp;</span><strong style=\"background-color: rgb(255, 255, 255); color: rgb(51, 51, 51);\">the&nbsp;channels</strong><span style=\"background-color: rgb(255, 255, 255); color: rgb(51, 51, 51);\">&nbsp;of&nbsp;the&nbsp;Toba&nbsp;Lake.&nbsp;Currently,&nbsp;the&nbsp;project&nbsp;is&nbsp;undergoing&nbsp;a&nbsp;Feasibility&nbsp;Study,&nbsp;which&nbsp;assess&nbsp;Topography&nbsp;study,&nbsp;geology&nbsp;study,&nbsp;and&nbsp;Basic&nbsp;Design&nbsp;of&nbsp;the&nbsp;hydropower&nbsp;plant.</span></p><p><img src=\"http://localhost:5000/uploads/inline_image-1773307601439-267751031.jpg\"></p>','Energy','Published','Jap Calvin','cover_image-1773307610567-486901940.jpg','[\"gallery-1773307610570-764330027.jpg\"]',5,'2026-03-12 09:26:50','2026-03-16 09:06:01',NULL,NULL),('ac7c22e2-1df5-11f1-8a02-c03532f000ea','Stockpile - Jambi','High-quality PKS stockpile and fuel products in Jambi.','<p><strong style=\"color: rgb(51, 51, 51); background-color: rgb(255, 255, 255);\">Palm&nbsp;kernel&nbsp;shells&nbsp;</strong><span style=\"color: rgb(51, 51, 51); background-color: rgb(255, 255, 255);\">(or&nbsp;PKS)&nbsp;a&nbsp;factory&nbsp;that&nbsp;processes&nbsp;oil&nbsp;palm&nbsp;</span><strong style=\"color: rgb(51, 51, 51); background-color: rgb(255, 255, 255);\">Fresh&nbsp;Fruit&nbsp;Bunches&nbsp;</strong><span style=\"color: rgb(51, 51, 51); background-color: rgb(255, 255, 255);\">(FFB)&nbsp;into&nbsp;crude&nbsp;palm&nbsp;oil&nbsp;(Crude&nbsp;Palm&nbsp;Oil&nbsp;/&nbsp;CPO)&nbsp;and&nbsp;Palm&nbsp;kernel&nbsp;(Kernel)&nbsp;products.&nbsp;As&nbsp;well&nbsp;as&nbsp;other&nbsp;products&nbsp;such&nbsp;as&nbsp;fiber&nbsp;and&nbsp;shells&nbsp;that&nbsp;can&nbsp;be&nbsp;used&nbsp;as&nbsp;fuel.&nbsp;The&nbsp;palm&nbsp;oil&nbsp;mill&nbsp;(POM)&nbsp;is&nbsp;built&nbsp;based&nbsp;on&nbsp;a&nbsp;certain&nbsp;design&nbsp;according&nbsp;to&nbsp;their&nbsp;wants&nbsp;or&nbsp;needs,&nbsp;accompanied&nbsp;by&nbsp;different&nbsp;technologies&nbsp;and&nbsp;different&nbsp;</span><strong style=\"color: rgb(51, 51, 51); background-color: rgb(255, 255, 255);\">capacities</strong><span style=\"color: rgb(51, 51, 51); background-color: rgb(255, 255, 255);\">.</span></p><p></p><p><strong style=\"background-color: rgb(255, 255, 255); color: rgb(51, 51, 51);\">Our&nbsp;Quality&nbsp;PKS</strong></p><ul><li><span style=\"background-color: rgb(255, 255, 255); color: rgb(51, 51, 51);\">Calorific&nbsp;value&nbsp;(4k&nbsp;based&nbsp;on&nbsp;ARB)</span></li><li><span style=\"background-color: rgb(255, 255, 255); color: rgb(51, 51, 51);\">Total&nbsp;Moisture&nbsp;15%&nbsp;-&nbsp;20%&nbsp;(depend&nbsp;customer)</span></li><li><span style=\"background-color: rgb(255, 255, 255); color: rgb(51, 51, 51);\">Foreight&nbsp;Matter&nbsp;Max&nbsp;(0,1)</span></li><li><span style=\"background-color: rgb(255, 255, 255); color: rgb(51, 51, 51);\">Ash&nbsp;Content&nbsp;(Max&nbsp;3,5&nbsp;%&nbsp;based&nbsp;on&nbsp;ADB)</span></li></ul><p><img src=\"http://localhost:5000/uploads/inlineimage-1773724119917-702878819.jpg\"></p><p></p>','Energy','Published','Jap Calvin','cover_image-1773307642310-730089667.jpeg','[\"gallery-1773307642312-402445926.jpeg\"]',42,'2026-03-12 09:27:22','2026-03-17 05:08:49','',''),('f8f4ad92-1df3-11f1-8a02-c03532f000ea','Palm Oil Plantation in East Kalimantan','10,000 Ha palm oil plantation in East Kalimantan.','<p><span style=\"color: rgb(51, 51, 51); background-color: rgb(255, 255, 255);\">Our&nbsp;first&nbsp;palm&nbsp;oil&nbsp;plantation&nbsp;is&nbsp;located&nbsp;in&nbsp;</span><strong style=\"color: rgb(51, 51, 51); background-color: rgb(255, 255, 255);\">Kutai&nbsp;Timur&nbsp;Region&nbsp;-&nbsp;East&nbsp;Kalimantan</strong><span style=\"color: rgb(51, 51, 51); background-color: rgb(255, 255, 255);\">,&nbsp;with&nbsp;total&nbsp;planted&nbsp;area&nbsp;of&nbsp;</span><strong style=\"color: rgb(51, 51, 51); background-color: rgb(255, 255, 255);\">5,100&nbsp;Ha</strong><span style=\"color: rgb(51, 51, 51); background-color: rgb(255, 255, 255);\">.&nbsp;The&nbsp;CPO&nbsp;mill,&nbsp;with&nbsp;</span><strong style=\"color: rgb(51, 51, 51); background-color: rgb(255, 255, 255);\">45&nbsp;tonnes&nbsp;per&nbsp;hour&nbsp;capacity</strong><span style=\"color: rgb(51, 51, 51); background-color: rgb(255, 255, 255);\">,&nbsp;will&nbsp;commence&nbsp;in&nbsp;mid&nbsp;of&nbsp;2018.&nbsp;Another&nbsp;estate&nbsp;(land&nbsp;bank)&nbsp;is&nbsp;located&nbsp;30&nbsp;Km&nbsp;north&nbsp;of&nbsp;HAL&nbsp;plantation,&nbsp;with&nbsp;total&nbsp;plantable&nbsp;area&nbsp;of&nbsp;</span><strong style=\"color: rgb(51, 51, 51); background-color: rgb(255, 255, 255);\">5,000&nbsp;Ha.</strong><span style=\"color: rgb(51, 51, 51); background-color: rgb(255, 255, 255);\">&nbsp;Hence,&nbsp;the&nbsp;total&nbsp;plantable&nbsp;area&nbsp;in&nbsp;</span><strong style=\"color: rgb(51, 51, 51); background-color: rgb(255, 255, 255);\">East&nbsp;Kalimantan</strong><span style=\"color: rgb(51, 51, 51); background-color: rgb(255, 255, 255);\">&nbsp;will&nbsp;be&nbsp;</span><strong style=\"color: rgb(51, 51, 51); background-color: rgb(255, 255, 255);\">10,000&nbsp;Ha.&nbsp;</strong></p>','Resources','Published','Jap Calvin','1773306911586-975036686.jpg','[\"gallery-1773307381099-381950749.jpg\",\"gallery-1773307381125-605669711.jpg\",\"gallery-1773307381137-320017060.jpg\",\"gallery-1773307381138-174096096.jpg\",\"gallery-1773307381140-622291193.jpg\",\"gallery-1773307381143-115357957.jpg\",\"gallery-1773307381145-771915469.jpg\"]',41,'2026-03-12 09:15:11','2026-03-25 10:15:47','','');
+INSERT INTO `projects` VALUES ('4f4482dd-1df5-11f1-8a02-c03532f000ea','CPO Mill and Plantation in West Kalimantan','Two CPO mills and 11,000 Ha in West Kalimantan.','<p>In&nbsp;<strong>West&nbsp;Kalimantan</strong>,&nbsp;DAW&nbsp;Group&nbsp;owns&nbsp;two&nbsp;CPO&nbsp;mills&nbsp;in&nbsp;<strong>Bengkayang&nbsp;</strong>and&nbsp;<strong>Sanggau&nbsp;Region</strong>.&nbsp;Each&nbsp;CPO&nbsp;mill&nbsp;has&nbsp;a&nbsp;capacity&nbsp;of&nbsp;<strong>45&nbsp;tonnes&nbsp;per&nbsp;hour.</strong>&nbsp;</p><p>In&nbsp;<strong>the</strong>&nbsp;<strong>Bengkayang&nbsp;Region</strong>,&nbsp;DAW&nbsp;Group&nbsp;have&nbsp;a&nbsp;palm&nbsp;oil&nbsp;plantation&nbsp;land&nbsp;bank&nbsp;of<strong>&nbsp;11,000&nbsp;Ha.</strong></p><p></p><p>Please&nbsp;check&nbsp;our&nbsp;galleries&nbsp;below&nbsp;for&nbsp;a&nbsp;glimpse&nbsp;of&nbsp;our&nbsp;CPO&nbsp;Mill&nbsp;in&nbsp;West&nbsp;Kalimantan.</p><p></p>','Resources','Published','Jap Calvin','cover_image-1773307485898-998356838.jpg','[\"gallery-1773307485905-887138229.jpg\",\"gallery-1773307485909-748912410.jpg\",\"gallery-1773307485919-506045683.jpg\",\"gallery-1773307485922-749410690.jpg\",\"gallery-1773307485922-562971435.jpeg\"]',24,'2026-03-12 09:24:45','2026-03-12 09:25:38',NULL,NULL),('69f45ba3-1df5-11f1-8a02-c03532f000ea','CPO Mill in Jambi','Newly acquired 45-tonne CPO mill in Sarolangun, Jambi.','<p>Our&nbsp;newly&nbsp;acquired&nbsp;CPO&nbsp;mill&nbsp;is&nbsp;located&nbsp;in&nbsp;<strong>Sarolangun</strong>,&nbsp;Jambi.&nbsp;It&nbsp;is&nbsp;a&nbsp;<strong>45&nbsp;tonnes&nbsp;per&nbsp;hour&nbsp;capacity</strong>&nbsp;mill&nbsp;and&nbsp;already&nbsp;in&nbsp;operation&nbsp;since&nbsp;2015.</p><p>Please&nbsp;check&nbsp;our&nbsp;galleries&nbsp;below&nbsp;for&nbsp;a&nbsp;glimpse&nbsp;of&nbsp;our&nbsp;<strong>Palm&nbsp;oil&nbsp;Mill&nbsp;progress</strong>&nbsp;in&nbsp;<strong>Jambi&nbsp;-&nbsp;West&nbsp;Sumatera.</strong></p><p></p>','Resources','Published','Jap Calvin','cover_image-1773307530674-706401182.jpg','[\"gallery-1773307530686-207993754.jpg\",\"gallery-1773307530689-925343087.jpg\",\"gallery-1773307530692-259329630.jpg\",\"gallery-1773307530693-549782054.jpg\",\"gallery-1773307530695-725032504.jpg\"]',1,'2026-03-12 09:25:30','2026-03-12 09:25:36',NULL,NULL),('9990ab1f-1df5-11f1-8a02-c03532f000ea','Hydropower - Kualu','15 MW hydropower project near Lake Toba, North Sumatera.','<p><strong style=\"background-color: rgb(255, 255, 255); color: rgb(51, 51, 51);\">Project&nbsp;Kualu</strong><span style=\"background-color: rgb(255, 255, 255); color: rgb(51, 51, 51);\">&nbsp;is&nbsp;a&nbsp;hydropower&nbsp;(PLTA)&nbsp;project,&nbsp;which&nbsp;has&nbsp;a&nbsp;power&nbsp;potential&nbsp;of&nbsp;</span><strong style=\"background-color: rgb(255, 255, 255); color: rgb(51, 51, 51);\">15&nbsp;MW</strong><span style=\"background-color: rgb(255, 255, 255); color: rgb(51, 51, 51);\">.&nbsp;It&nbsp;is&nbsp;located&nbsp;at&nbsp;</span><strong style=\"background-color: rgb(255, 255, 255); color: rgb(51, 51, 51);\">North&nbsp;Sumatera</strong><span style=\"background-color: rgb(255, 255, 255); color: rgb(51, 51, 51);\">&nbsp;near&nbsp;</span><strong style=\"background-color: rgb(255, 255, 255); color: rgb(51, 51, 51);\">the&nbsp;Toba&nbsp;Lake</strong><span style=\"background-color: rgb(255, 255, 255); color: rgb(51, 51, 51);\">.&nbsp;The&nbsp;name&nbsp;of&nbsp;the&nbsp;river&nbsp;is&nbsp;</span><strong style=\"background-color: rgb(255, 255, 255); color: rgb(51, 51, 51);\">Kualu</strong><span style=\"background-color: rgb(255, 255, 255); color: rgb(51, 51, 51);\">;&nbsp;the&nbsp;river&nbsp;runs&nbsp;long&nbsp;and&nbsp;is&nbsp;</span><strong style=\"background-color: rgb(255, 255, 255); color: rgb(51, 51, 51);\">connected</strong><span style=\"background-color: rgb(255, 255, 255); color: rgb(51, 51, 51);\">&nbsp;to&nbsp;</span><strong style=\"background-color: rgb(255, 255, 255); color: rgb(51, 51, 51);\">the&nbsp;channels</strong><span style=\"background-color: rgb(255, 255, 255); color: rgb(51, 51, 51);\">&nbsp;of&nbsp;the&nbsp;Toba&nbsp;Lake.&nbsp;Currently,&nbsp;the&nbsp;project&nbsp;is&nbsp;undergoing&nbsp;a&nbsp;Feasibility&nbsp;Study,&nbsp;which&nbsp;assess&nbsp;Topography&nbsp;study,&nbsp;geology&nbsp;study,&nbsp;and&nbsp;Basic&nbsp;Design&nbsp;of&nbsp;the&nbsp;hydropower&nbsp;plant.</span></p><p><img src=\"http://localhost:5000/uploads/inline_image-1773307601439-267751031.jpg\"></p>','Energy','Published','Jap Calvin','cover_image-1773307610567-486901940.jpg','[\"gallery-1773307610570-764330027.jpg\"]',5,'2026-03-12 09:26:50','2026-03-16 09:06:01',NULL,NULL),('ac7c22e2-1df5-11f1-8a02-c03532f000ea','Stockpile - Jambi','High-quality PKS stockpile and fuel products in Jambi.','<p><strong style=\"color: rgb(51, 51, 51); background-color: rgb(255, 255, 255);\">Palm&nbsp;kernel&nbsp;shells&nbsp;</strong><span style=\"color: rgb(51, 51, 51); background-color: rgb(255, 255, 255);\">(or&nbsp;PKS)&nbsp;a&nbsp;factory&nbsp;that&nbsp;processes&nbsp;oil&nbsp;palm&nbsp;</span><strong style=\"color: rgb(51, 51, 51); background-color: rgb(255, 255, 255);\">Fresh&nbsp;Fruit&nbsp;Bunches&nbsp;</strong><span style=\"color: rgb(51, 51, 51); background-color: rgb(255, 255, 255);\">(FFB)&nbsp;into&nbsp;crude&nbsp;palm&nbsp;oil&nbsp;(Crude&nbsp;Palm&nbsp;Oil&nbsp;/&nbsp;CPO)&nbsp;and&nbsp;Palm&nbsp;kernel&nbsp;(Kernel)&nbsp;products.&nbsp;As&nbsp;well&nbsp;as&nbsp;other&nbsp;products&nbsp;such&nbsp;as&nbsp;fiber&nbsp;and&nbsp;shells&nbsp;that&nbsp;can&nbsp;be&nbsp;used&nbsp;as&nbsp;fuel.&nbsp;The&nbsp;palm&nbsp;oil&nbsp;mill&nbsp;(POM)&nbsp;is&nbsp;built&nbsp;based&nbsp;on&nbsp;a&nbsp;certain&nbsp;design&nbsp;according&nbsp;to&nbsp;their&nbsp;wants&nbsp;or&nbsp;needs,&nbsp;accompanied&nbsp;by&nbsp;different&nbsp;technologies&nbsp;and&nbsp;different&nbsp;</span><strong style=\"color: rgb(51, 51, 51); background-color: rgb(255, 255, 255);\">capacities</strong><span style=\"color: rgb(51, 51, 51); background-color: rgb(255, 255, 255);\">.</span></p><p></p><p><strong style=\"background-color: rgb(255, 255, 255); color: rgb(51, 51, 51);\">Our&nbsp;Quality&nbsp;PKS</strong></p><ul><li><span style=\"background-color: rgb(255, 255, 255); color: rgb(51, 51, 51);\">Calorific&nbsp;value&nbsp;(4k&nbsp;based&nbsp;on&nbsp;ARB)</span></li><li><span style=\"background-color: rgb(255, 255, 255); color: rgb(51, 51, 51);\">Total&nbsp;Moisture&nbsp;15%&nbsp;-&nbsp;20%&nbsp;(depend&nbsp;customer)</span></li><li><span style=\"background-color: rgb(255, 255, 255); color: rgb(51, 51, 51);\">Foreight&nbsp;Matter&nbsp;Max&nbsp;(0,1)</span></li><li><span style=\"background-color: rgb(255, 255, 255); color: rgb(51, 51, 51);\">Ash&nbsp;Content&nbsp;(Max&nbsp;3,5&nbsp;%&nbsp;based&nbsp;on&nbsp;ADB)</span></li></ul><p><img src=\"http://localhost:5000/uploads/inlineimage-1773724119917-702878819.jpg\"></p><p></p>','Energy','Published','Jap Calvin','cover_image-1773307642310-730089667.jpeg','[\"gallery-1773307642312-402445926.jpeg\"]',43,'2026-03-12 09:27:22','2026-03-17 05:08:49','',''),('f8f4ad92-1df3-11f1-8a02-c03532f000ea','Palm Oil Plantation in East Kalimantan','10,000 Ha palm oil plantation in East Kalimantan.','<p><span style=\"color: rgb(51, 51, 51); background-color: rgb(255, 255, 255);\">Our&nbsp;first&nbsp;palm&nbsp;oil&nbsp;plantation&nbsp;is&nbsp;located&nbsp;in&nbsp;</span><strong style=\"color: rgb(51, 51, 51); background-color: rgb(255, 255, 255);\">Kutai&nbsp;Timur&nbsp;Region&nbsp;-&nbsp;East&nbsp;Kalimantan</strong><span style=\"color: rgb(51, 51, 51); background-color: rgb(255, 255, 255);\">,&nbsp;with&nbsp;total&nbsp;planted&nbsp;area&nbsp;of&nbsp;</span><strong style=\"color: rgb(51, 51, 51); background-color: rgb(255, 255, 255);\">5,100&nbsp;Ha</strong><span style=\"color: rgb(51, 51, 51); background-color: rgb(255, 255, 255);\">.&nbsp;The&nbsp;CPO&nbsp;mill,&nbsp;with&nbsp;</span><strong style=\"color: rgb(51, 51, 51); background-color: rgb(255, 255, 255);\">45&nbsp;tonnes&nbsp;per&nbsp;hour&nbsp;capacity</strong><span style=\"color: rgb(51, 51, 51); background-color: rgb(255, 255, 255);\">,&nbsp;will&nbsp;commence&nbsp;in&nbsp;mid&nbsp;of&nbsp;2018.&nbsp;Another&nbsp;estate&nbsp;(land&nbsp;bank)&nbsp;is&nbsp;located&nbsp;30&nbsp;Km&nbsp;north&nbsp;of&nbsp;HAL&nbsp;plantation,&nbsp;with&nbsp;total&nbsp;plantable&nbsp;area&nbsp;of&nbsp;</span><strong style=\"color: rgb(51, 51, 51); background-color: rgb(255, 255, 255);\">5,000&nbsp;Ha.</strong><span style=\"color: rgb(51, 51, 51); background-color: rgb(255, 255, 255);\">&nbsp;Hence,&nbsp;the&nbsp;total&nbsp;plantable&nbsp;area&nbsp;in&nbsp;</span><strong style=\"color: rgb(51, 51, 51); background-color: rgb(255, 255, 255);\">East&nbsp;Kalimantan</strong><span style=\"color: rgb(51, 51, 51); background-color: rgb(255, 255, 255);\">&nbsp;will&nbsp;be&nbsp;</span><strong style=\"color: rgb(51, 51, 51); background-color: rgb(255, 255, 255);\">10,000&nbsp;Ha.&nbsp;</strong></p>','Resources','Published','Jap Calvin','1773306911586-975036686.jpg','[\"gallery-1773307381099-381950749.jpg\",\"gallery-1773307381125-605669711.jpg\",\"gallery-1773307381137-320017060.jpg\",\"gallery-1773307381138-174096096.jpg\",\"gallery-1773307381140-622291193.jpg\",\"gallery-1773307381143-115357957.jpg\",\"gallery-1773307381145-771915469.jpg\"]',41,'2026-03-12 09:15:11','2026-03-25 10:15:47','','');
 /*!40000 ALTER TABLE `projects` ENABLE KEYS */;
+UNLOCK TABLES;
+
+--
+-- Table structure for table `setting`
+--
+
+DROP TABLE IF EXISTS `setting`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `setting` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `companyName` varchar(255) DEFAULT NULL,
+  `address` text,
+  `phone` varchar(50) DEFAULT NULL,
+  `email` varchar(100) DEFAULT NULL,
+  `website` varchar(100) DEFAULT NULL,
+  `googleMapsUrl` text,
+  `linkedinUrl` varchar(255) DEFAULT NULL,
+  `createdAt` datetime NOT NULL,
+  `updatedAt` datetime NOT NULL,
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Dumping data for table `setting`
+--
+
+LOCK TABLES `setting` WRITE;
+/*!40000 ALTER TABLE `setting` DISABLE KEYS */;
+/*!40000 ALTER TABLE `setting` ENABLE KEYS */;
 UNLOCK TABLES;
 
 --
@@ -518,6 +881,39 @@ LOCK TABLES `settings` WRITE;
 /*!40000 ALTER TABLE `settings` DISABLE KEYS */;
 INSERT INTO `settings` VALUES (1,'PT Dharma Agung Wijaya','Alamanda Tower, 22nd Floor\nJl. TB Simatupang Kav 23-24 Cilandak Barat, Jakarta Selatan','+62 21 2966 1956','info@daw.co.id','www.daw.co.id','https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3965.993077647209!2d106.7997972153702!3d-6.290886195446487!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x2e69f1fb25b84539%3A0xc6226d9c612f0b78!2sAlamanda%20Tower!5e0!3m2!1sen!2sid!4v1680000000000!5m2!1sen!2sid','https://www.linkedin.com/company/dharma-agung-wijaya','2026-03-25 09:07:25');
 /*!40000 ALTER TABLE `settings` ENABLE KEYS */;
+UNLOCK TABLES;
+
+--
+-- Table structure for table `user`
+--
+
+DROP TABLE IF EXISTS `user`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `user` (
+  `id` char(36) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL,
+  `name` varchar(255) NOT NULL,
+  `email` varchar(255) NOT NULL,
+  `password` varchar(255) NOT NULL,
+  `role` enum('Superadmin','Editor') DEFAULT 'Editor',
+  `status` enum('Active','Suspended') DEFAULT 'Active',
+  `lastLogin` datetime DEFAULT NULL,
+  `resetPasswordToken` varchar(255) DEFAULT NULL,
+  `resetPasswordExpires` datetime DEFAULT NULL,
+  `createdAt` datetime NOT NULL,
+  `updatedAt` datetime NOT NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `daw_email` (`email`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Dumping data for table `user`
+--
+
+LOCK TABLES `user` WRITE;
+/*!40000 ALTER TABLE `user` DISABLE KEYS */;
+/*!40000 ALTER TABLE `user` ENABLE KEYS */;
 UNLOCK TABLES;
 
 --
@@ -553,7 +949,7 @@ CREATE TABLE `users` (
 
 LOCK TABLES `users` WRITE;
 /*!40000 ALTER TABLE `users` DISABLE KEYS */;
-INSERT INTO `users` VALUES ('195fc498-ac3a-4bfa-a3a2-30b2613cb680','Joko Sudibah','jap.calv@gmail.com','$2b$10$6FS.fhyxrz5hndVnL13g1ebJyxgQYeZO3gx/5LAWOgfQSdAUVTHqO','Editor','Active','2026-03-26 09:29:14','2026-03-25 07:21:35','2026-03-26 09:29:14',NULL,NULL),('51ba09b4-edc5-4ccd-8aae-802647f0ba1d','Jap Calvin','jf.calvin20@gmail.com','$2b$10$cuWSoCIM6btWmSRp3JaC4O1k/4iOl9cSGemodrzETUJlVO9OJRKjy','Superadmin','Active','2026-03-26 09:29:05','2026-03-13 01:41:04','2026-03-26 09:29:05',NULL,NULL),('b9e90a55-9b6f-4386-b022-3ab92bf49180','Rama Ilyasyah','rama.ilyasyah@daw.co.id','$2b$10$4USMWL50q8UbuGJp.iBG1OKLSe/YMrqSc1pseXJcBLoAbtScmuOdG','Superadmin','Active',NULL,'2026-03-17 08:48:52','2026-03-17 08:48:52',NULL,NULL),('ca2f5579-6f9c-4eda-b9a1-48e029db6f53','John Doe','john@daw.co.id','$2b$10$a3gkUJk.Vattnu5kztVbuO6LsXSfL0aBjYcER6EIZk6pKIuXTM9t6','Editor','Active',NULL,'2026-03-25 09:21:54','2026-03-25 09:21:54',NULL,NULL);
+INSERT INTO `users` VALUES ('195fc498-ac3a-4bfa-a3a2-30b2613cb680','Joko Sudibah','jap.calv@gmail.com','$2b$10$.VSR6Et55lzJ4IRY9hGG8utmTdcpK6rMhbMk1.N3RCrkw/DwwHzCe','Editor','Active','2026-03-30 01:39:40','2026-03-25 07:21:35','2026-03-30 01:39:40',NULL,NULL),('51ba09b4-edc5-4ccd-8aae-802647f0ba1d','Jap Calvin','jf.calvin20@gmail.com','$2b$10$cuWSoCIM6btWmSRp3JaC4O1k/4iOl9cSGemodrzETUJlVO9OJRKjy','Superadmin','Active','2026-03-30 01:38:08','2026-03-13 01:41:04','2026-03-30 01:38:08',NULL,NULL),('b9e90a55-9b6f-4386-b022-3ab92bf49180','Rama Ilyasyah','rama.ilyasyah@daw.co.id','$2b$10$4USMWL50q8UbuGJp.iBG1OKLSe/YMrqSc1pseXJcBLoAbtScmuOdG','Superadmin','Active',NULL,'2026-03-17 08:48:52','2026-03-17 08:48:52',NULL,NULL),('ca2f5579-6f9c-4eda-b9a1-48e029db6f53','John Doe','john@daw.co.id','$2b$10$a3gkUJk.Vattnu5kztVbuO6LsXSfL0aBjYcER6EIZk6pKIuXTM9t6','Editor','Active',NULL,'2026-03-25 09:21:54','2026-03-25 09:21:54',NULL,NULL);
 /*!40000 ALTER TABLE `users` ENABLE KEYS */;
 UNLOCK TABLES;
 /*!40103 SET TIME_ZONE=@OLD_TIME_ZONE */;
@@ -566,4 +962,4 @@ UNLOCK TABLES;
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2026-03-26 16:32:21
+-- Dump completed on 2026-03-30  8:46:11
