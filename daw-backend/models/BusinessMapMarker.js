@@ -4,8 +4,13 @@ const sequelize = require("../config/database");
 const BusinessMapMarker = sequelize.define(
   "BusinessMapMarker",
   {
+    id: {
+      type: DataTypes.INTEGER,
+      primaryKey: true,
+      autoIncrement: true,
+    },
     title: {
-      type: DataTypes.STRING,
+      type: DataTypes.STRING(255),
       allowNull: false,
     },
     desc: {
@@ -16,12 +21,22 @@ const BusinessMapMarker = sequelize.define(
       type: DataTypes.ENUM("direct", "tudung"),
       allowNull: false,
     },
-    dotX: { type: DataTypes.STRING, allowNull: false }, // contoh: "18%"
-    dotY: { type: DataTypes.STRING, allowNull: false }, // contoh: "49%"
+    dotX: { type: DataTypes.STRING, allowNull: false },
+    dotY: { type: DataTypes.STRING, allowNull: false },
     boxX: { type: DataTypes.STRING, allowNull: false },
     boxY: { type: DataTypes.STRING, allowNull: false },
+
+    sectionId: {
+      type: DataTypes.STRING(255),
+      allowNull: false,
+      // references: {
+      //   model: "BusinessSection",
+      //   key: "id",
+      // },
+    },
   },
   {
+    tableName: "BusinessMapMarkers",
     timestamps: true,
   },
 );

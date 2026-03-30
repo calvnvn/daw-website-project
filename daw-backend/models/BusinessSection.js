@@ -5,8 +5,9 @@ const BusinessSection = sequelize.define(
   "BusinessSection",
   {
     id: {
-      type: DataTypes.STRING,
+      type: DataTypes.STRING(255),
       primaryKey: true,
+      allowNull: false,
     },
     category: {
       type: DataTypes.STRING,
