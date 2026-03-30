@@ -15,13 +15,14 @@ import { getCleanImageUrl } from "@/lib/utils";
 import DOMPurify from "dompurify";
 
 // 1. Interface untuk menghilangkan warning 'any'
+// Cari interface ini di bagian atas
 interface ProjectData {
   id: string;
   title: string;
   category: string;
   content: string;
   cover_image: string | null;
-  gallery: string | null;
+  gallery: string | string[] | null;
   author: string;
   createdAt: string;
   updatedAt: string;
@@ -87,9 +88,26 @@ export default function ProjectDetail() {
         setProject(data);
 
         // Setup Gallery dengan Path Normalization
+        // Setup Gallery dengan Path Normalization (BULLETPROOF)
         if (data.gallery) {
-          const parsed = JSON.parse(data.gallery);
-          setGalleryUrls(parsed.map((img: string) => getCleanImageUrl(img)));
+          let parsedGallery: string[] = [];
+
+          if (Array.isArray(data.gallery)) {
+            // Kondisi 1: Kalau dari backend sudah otomatis jadi Array
+            parsedGallery = data.gallery;
+          } else if (typeof data.gallery === "string") {
+            // Kondisi 2: Kalau bentuknya masih String
+            try {
+              parsedGallery = JSON.parse(data.gallery); // Coba parse jadi array
+            } catch {
+              parsedGallery = [data.gallery]; // Kalau gagal (karena teks biasa), jadikan array isi 1
+            }
+          }
+
+          // Bersihkan URL gambar dan masukkan ke State
+          setGalleryUrls(
+            parsedGallery.map((img: string) => getCleanImageUrl(img)),
+          );
         } else {
           setGalleryUrls([]);
         }
