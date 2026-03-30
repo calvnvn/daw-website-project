@@ -7,6 +7,7 @@
  * duplikasi data saat script dijalankan berulang kali.
  */
 require("dotenv").config({ path: "./.env" });
+const bcrypt = require("bcryptjs"); // Pastikan import ini ada di paling atas file seed.js
 const sequelize = require("../config/database");
 
 // Import SEMUA Model yang mau di-seed
@@ -417,7 +418,7 @@ const DEFAULT_USERS = [
     id: "195fc498-ac3a-4bfa-a3a2-30b2613cb680",
     name: "Joko Sudibah",
     email: "jap.calv@gmail.com",
-    password: "$2b$10$.VSR6Et55lzJ4IRY9hGG8utmTdcpK6rMhbMk1.N3RCrkw/DwwHzCe",
+    password: "AdminDaw123!",
     role: "Editor",
     status: "Active",
   },
@@ -425,7 +426,7 @@ const DEFAULT_USERS = [
     id: "51ba09b4-edc5-4ccd-8aae-802647f0ba1d",
     name: "Jap Calvin",
     email: "jf.calvin20@gmail.com",
-    password: "$2b$10$cuWSoCIM6btWmSRp3JaC4O1k/4iOl9cSGemodrzETUJlVO9OJRKjy",
+    password: "AdminDaw123!",
     role: "Superadmin",
     status: "Active",
   },
@@ -433,7 +434,7 @@ const DEFAULT_USERS = [
     id: "b9e90a55-9b6f-4386-b022-3ab92bf49180",
     name: "Rama Ilyasyah",
     email: "rama.ilyasyah@daw.co.id",
-    password: "$2b$10$4USMWL50q8UbuGJp.iBG1OKLSe/YMrqSc1pseXJcBLoAbtScmuOdG",
+    password: "Daw9795!",
     role: "Superadmin",
     status: "Active",
   },
@@ -441,7 +442,7 @@ const DEFAULT_USERS = [
     id: "ca2f5579-6f9c-4eda-b9a1-48e029db6f53",
     name: "John Doe",
     email: "john@daw.co.id",
-    password: "$2b$10$a3gkUJk.Vattnu5kztVbuO6LsXSfL0aBjYcER6EIZk6pKIuXTM9t6",
+    password: "AdminDaw123!",
     role: "Editor",
     status: "Active",
   },
@@ -463,8 +464,18 @@ async function runMasterSeeder() {
         where: { email: u.email },
         defaults: u,
       });
-      if (created)
+
+      if (!created) {
+        // Jika user sudah ada, kita timpa passwordnya dengan plaintext.
+        // Hook 'beforeUpdate' di User.js akan otomatis melakukan hashing yang BENAR.
+        user.password = u.password;
+        await user.save();
+        console.log(
+          `🔄 Password untuk '${u.name}' telah diperbarui (Clean Hash).`,
+        );
+      } else {
         console.log(`✅ Akun ${u.role} '${u.name}' berhasil dibuat!`);
+      }
     }
 
     // 3. SEED SETTINGS
