@@ -5,14 +5,12 @@ const path = require("path");
 // GET Project Function
 exports.getAllProjects = async (req, res) => {
   try {
-    // Pakai ORM: Jauh lebih aman, otomatis ngenalin tabel 'Projects', dan otomatis parse gallery!
     const projects = await Project.findAll({
       order: [["createdAt", "DESC"]],
     });
 
     res.status(200).json(projects);
   } catch (error) {
-    // 🚨 LOG INI YANG PALING PENTING 🚨
     console.error("🚨 ERROR DARI BACKEND GET PROJECTS:", error);
     res.status(500).json({ message: error.message });
   }
@@ -31,7 +29,7 @@ exports.createProject = async (req, res) => {
       meta_description,
     } = req.body;
 
-    console.log("🚀 Creating Project:", title);
+    console.log(" Creating Project:", title);
 
     // 1. Handle Upload Files
     let coverImageName = null;
@@ -79,7 +77,7 @@ exports.uploadInlineImage = async (req, res) => {
 
     const fileUrl = `${req.protocol}://${req.get("host")}/uploads/${req.file.filename}`;
 
-    console.log("🚀 Inline Upload Success:", fileUrl);
+    console.log(" Inline Upload Success:", fileUrl);
 
     res.status(200).json({
       message: "Image uploaded succesfully",

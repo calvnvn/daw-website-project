@@ -36,7 +36,7 @@ exports.getAllPages = async (req, res) => {
   try {
     const pages = await Page.findAll({
       order: [["createdAt", "DESC"]],
-      // 🚀 Tetap ringan, jangan tarik content & sidebarLinks untuk list
+      //  Tetap ringan, jangan tarik content & sidebarLinks untuk list
       attributes: ["id", "title", "slug"],
     });
     res.status(200).json(pages);

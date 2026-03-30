@@ -1,11 +1,17 @@
 const express = require("express");
 const router = express.Router();
 const userController = require("../controllers/userController");
-const { verifyToken, isSuperadmin } = require("../middleware/authJwt");
+const { verifyToken, authorizeRoles } = require("../middleware/authJwt"); // Pastikan path benar
 
-router.get("/", userController.getAllUsers); // GET /api/users
-router.post("/", userController.createUser); // POST /api/users
-router.put("/:id", userController.updateUser); // PUT /api/users/:id
-router.delete("/:id", userController.deleteUser); // DELETE /api/users/:id
+// Semua route di bawah ini butuh login
+router.use(verifyToken);
+
+// Editor boleh melihat daftar user (opsional, tergantung kebijakan kamu)
+router.get("/", userController.getAllUsers);
+
+// Hanya Superadmin yang boleh Create, Update, dan Delete
+router.post("/", authorizeRoles("Superadmin"), userController.createUser);
+router.put("/:id", authorizeRoles("Superadmin"), userController.updateUser);
+router.delete("/:id", authorizeRoles("Superadmin"), userController.deleteUser);
 
 module.exports = router;

@@ -299,7 +299,7 @@ export default function PageBuilder() {
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start animate-in fade-in duration-500 pb-20">
-      {/* 🚀 LEFT: DOCUMENT REPOSITORY (Sidebar) */}
+      {/*  LEFT: DOCUMENT REPOSITORY (Sidebar) */}
       {!isPreviewMode && (
         <div className="lg:col-span-4 space-y-4">
           <div className="bg-slate-50 border border-slate-200 rounded-[2rem] p-6 sticky top-24 shadow-sm">
@@ -391,7 +391,7 @@ export default function PageBuilder() {
         </div>
       )}
 
-      {/* 🚀 RIGHT: EDITORIAL WORKSPACE (Main Form) */}
+      {/*  RIGHT: EDITORIAL WORKSPACE (Main Form) */}
       <div
         className={`${isPreviewMode ? "lg:col-span-12 transition-all duration-500" : "lg:col-span-8 transition-all duration-500"}`}
       >
@@ -587,7 +587,7 @@ export default function PageBuilder() {
 
                   <hr className="mb-8 border-slate-200" />
 
-                  {/* 🚀 Bagian Content: Sinkronisasi 100% dengan DynamicPage.tsx */}
+                  {/*  Bagian Content: Sinkronisasi 100% dengan DynamicPage.tsx */}
                   <article
                     className={`w-full text-left break-words [&>*:first-child]:mt-0
                       /* Core Prose */

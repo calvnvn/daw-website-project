@@ -136,14 +136,14 @@ export default function UserManagement() {
       });
     }
 
-    // 🚀 TAHAP 1: Konfirmasi menggunakan Sonner Toast Action
+    //  TAHAP 1: Konfirmasi menggunakan Sonner Toast Action
     toast("Confirm Deletion", {
       description: `Are you sure you want to permanently delete ${targetUser?.name}?`,
       duration: Infinity, // Agar toast tidak hilang sampai user memilih
       action: {
         label: "Delete User",
         onClick: async () => {
-          // 🚀 TAHAP 2: Jalankan proses hapus setelah dikonfirmasi
+          //  TAHAP 2: Jalankan proses hapus setelah dikonfirmasi
           const loadingToast = toast.loading(
             `Terminating ${targetUser?.name}...`,
           );

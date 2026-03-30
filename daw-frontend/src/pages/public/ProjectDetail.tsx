@@ -313,7 +313,7 @@ export default function ProjectDetail() {
       tracking-[-0.01em]
     "
                   dangerouslySetInnerHTML={{
-                    // 🚀 WAJIB PAKAI DOMPURIFY DI PRODUCTION!
+                    //  WAJIB PAKAI DOMPURIFY DI PRODUCTION!
                     __html: DOMPurify.sanitize(project.content),
                   }}
                 />

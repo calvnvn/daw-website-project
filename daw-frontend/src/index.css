@@ -9,7 +9,7 @@
   --font-serif: "Lora", serif;
 }
 
-/* 🚀 REACT QUILL ALIGNMENT FIX FOR TAILWIND PROSE */
+/*  REACT QUILL ALIGNMENT FIX FOR TAILWIND PROSE */
 .prose .ql-align-center {
   text-align: center !important;
 }

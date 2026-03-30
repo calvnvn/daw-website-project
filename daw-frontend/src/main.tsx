@@ -10,7 +10,7 @@ import { AboutProvider } from "./contexts/AboutContext.tsx";
 import { InvestmentProvider } from "./contexts/InvestmentContext";
 import { BusinessProvider } from "./contexts/BusinessContext";
 import { HomeProvider } from "./contexts/HomeContext";
-import { HelmetProvider } from "react-helmet-async"; // 🚀 1. Import ini
+import { HelmetProvider } from "react-helmet-async"; //  1. Import ini
 
 const queryClient = new QueryClient();
 

@@ -50,7 +50,7 @@ const upload = multer({
   storage: storage,
   fileFilter: fileFilter,
   limits: {
-    // 🚀 Kita naikkan sedikit ke 15MB karena file kamera modern seringkali besar
+    //  Kita naikkan sedikit ke 15MB karena file kamera modern seringkali besar
     fileSize: 15 * 1024 * 1024,
   },
 });

@@ -54,20 +54,36 @@ exports.updateUser = async (req, res) => {
   try {
     const { id } = req.params;
     const { name, email, role, status } = req.body;
+    const requesterRole = req.userRole; // Dari middleware verifyToken
 
     const user = await User.findByPk(id);
     if (!user) return res.status(404).json({ message: "User not found" });
 
+    // 🛡️ PROTEKSI 1: Hanya Superadmin yang bisa ganti Role atau Status
+    if (requesterRole !== "Superadmin" && (role || status)) {
+      return res
+        .status(403)
+        .json({ message: "Editors cannot change roles or account status." });
+    }
+
+    // 🛡️ PROTEKSI 2: Proteksi Sejenjang (Superadmin dilarang suspend Superadmin lain)
     if (user.role === "Superadmin" && status === "Suspended") {
       return res.status(403).json({
-        message: "You cannot suspend a Superadmin account via this panal.",
+        message:
+          "Hierarchy Protection: A Superadmin cannot suspend another Superadmin account.",
       });
     }
+
     await user.update({ name, email, role, status });
     res.json({
       success: true,
       message: "User updated successfully",
-      data: user,
+      data: {
+        id: user.id,
+        name: user.name,
+        role: user.role,
+        status: user.status,
+      },
     });
   } catch (error) {
     res.status(500).json({ message: "Update failed", error: error.message });
@@ -75,39 +91,42 @@ exports.updateUser = async (req, res) => {
 };
 
 // DELETE User
-exports.deleteUser = async (req, res) => {
+exports.updateUser = async (req, res) => {
   try {
-    const { id } = req.params; // ID user yang mau dihapus
-    const currentAdminId = req.userId; // ID admin yang sedang login (dari token)
-    const targetId = req.params.id;
-
-    // 🛡️ GUARD 1: Anti-Self-Destruct (Cegah hapus diri sendiri)
-    if (String(currentAdminId) === String(targetId)) {
-      return res.status(403).json({ message: "You cannot delete yourself." });
-    }
+    const { id } = req.params;
+    const { name, email, role, status } = req.body;
+    const requesterRole = req.userRole; // Dari middleware verifyToken
 
     const user = await User.findByPk(id);
-
-    // Cek apakah user ada
     if (!user) return res.status(404).json({ message: "User not found" });
 
-    // 🛡️ GUARD 2: Proteksi Superadmin (Immutable)
-    if (user.role === "Superadmin") {
+    // 🛡️ PROTEKSI 1: Hanya Superadmin yang bisa ganti Role atau Status
+    if (requesterRole !== "Superadmin" && (role || status)) {
+      return res
+        .status(403)
+        .json({ message: "Editors cannot change roles or account status." });
+    }
+
+    // 🛡️ PROTEKSI 2: Proteksi Sejenjang (Superadmin dilarang suspend Superadmin lain)
+    if (user.role === "Superadmin" && status === "Suspended") {
       return res.status(403).json({
         message:
-          "Superadmin accounts are immutable and cannot be deleted via this panel.",
+          "Hierarchy Protection: A Superadmin cannot suspend another Superadmin account.",
       });
     }
 
-    // Eksekusi penghapusan
-    await user.destroy();
-
+    await user.update({ name, email, role, status });
     res.json({
       success: true,
-      message: `User ${user.name} has been deleted permanently.`,
+      message: "User updated successfully",
+      data: {
+        id: user.id,
+        name: user.name,
+        role: user.role,
+        status: user.status,
+      },
     });
   } catch (error) {
-    console.error("Delete User Error:", error);
-    res.status(500).json({ message: "Internal server error during deletion." });
+    res.status(500).json({ message: "Update failed", error: error.message });
   }
 };

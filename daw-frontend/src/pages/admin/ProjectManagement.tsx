@@ -266,7 +266,7 @@ export default function ProjectManagement() {
                         <button
                           onClick={() =>
                             handleDeleteRequest(project.id, project.title)
-                          } // 🚀 Panggil fungsi trigger
+                          } //  Panggil fungsi trigger
                           className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all"
                           title="Delete Record"
                         >

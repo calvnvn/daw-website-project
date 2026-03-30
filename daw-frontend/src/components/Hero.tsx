@@ -7,7 +7,7 @@ import { useHome } from "@/contexts/HomeContext";
 
 import fallbackSlide from "@/assets/hero-slide-1.jpg";
 import ScrollReveal from "./ScrollReveal";
-// 🚀 1. Import helper sakti kita
+//  1. Import helper sakti kita
 import { getCleanImageUrl } from "@/lib/utils";
 
 export default function Hero() {
@@ -16,7 +16,7 @@ export default function Hero() {
 
   const [currentSlide, setCurrentSlide] = useState(0);
   const [offsetY, setOffsetY] = useState(0);
-  // const [isPaused, setIsPaused] = useState(false); // 🚀 2. State untuk Pause on Hover
+  // const [isPaused, setIsPaused] = useState(false); //  2. State untuk Pause on Hover
 
   // Parallax Logic
   useEffect(() => {
@@ -30,7 +30,7 @@ export default function Hero() {
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
 
-  // 🚀 Auto-Play Logic
+  //  Auto-Play Logic
   useEffect(() => {
     if (slides.length <= 1) return;
 
@@ -73,7 +73,7 @@ export default function Hero() {
   return (
     <section
       className="relative h-screen min-h-[600px] w-full overflow-hidden bg-slate-900 group"
-      // 🚀 5. Pause auto-slide saat mouse di area Hero
+      //  5. Pause auto-slide saat mouse di area Hero
     >
       {/* --- PRELOADER HACK --- */}
       {/* Memaksa browser download gambar pertama secepat mungkin */}

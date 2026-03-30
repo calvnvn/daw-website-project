@@ -113,7 +113,7 @@ export default function DynamicNavbar() {
 
             {/* 2. MENU STATIS: ABOUT US (Hardcoded original Abang) */}
             <div className="relative group py-2">
-              {/* 🚀 Split Target Statis Desktop */}
+              {/*  Split Target Statis Desktop */}
               <div className="flex items-center cursor-pointer">
                 <Link to="/about" className={navLinkClass}>
                   {t("nav.about", "ABOUT US")}
@@ -166,7 +166,7 @@ export default function DynamicNavbar() {
             {menus.map((menu) => {
               const hasChildren = menu.children && menu.children.length > 0;
               const link = resolveLink(menu);
-              const isExternal = menu.type === "external"; // 🚀 FIX: Deklarasi isExternal ditambahkan
+              const isExternal = menu.type === "external"; //  FIX: Deklarasi isExternal ditambahkan
 
               return (
                 <div key={menu.id} className="relative group py-2">
@@ -290,7 +290,7 @@ export default function DynamicNavbar() {
 
             {/* 2. STATIC ACCORDION: ABOUT US */}
             <div className="flex flex-col w-full">
-              {/* 🚀 Split Target Statis Mobile */}
+              {/*  Split Target Statis Mobile */}
               <div className="flex items-center justify-between border-b border-slate-50/50">
                 <Link
                   to="/about"
@@ -387,7 +387,7 @@ export default function DynamicNavbar() {
             {menus.map((menu) => {
               const hasChildren = menu.children && menu.children.length > 0;
               const link = resolveLink(menu);
-              const isExternal = menu.type === "external"; // 🚀 FIX: Deklarasi isExternal ditambahkan
+              const isExternal = menu.type === "external"; //  FIX: Deklarasi isExternal ditambahkan
               const isOpen = openMobileAccordions[menu.id] || false;
 
               return (

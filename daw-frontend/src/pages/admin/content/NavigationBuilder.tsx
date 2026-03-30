@@ -12,7 +12,7 @@ import {
   Globe,
   ExternalLink,
   LayoutGrid,
-  Folder, // 🚀 TAMBAHAN IKON FOLDER
+  Folder, //  TAMBAHAN IKON FOLDER
 } from "lucide-react";
 import api from "@/lib/api";
 
@@ -27,7 +27,7 @@ interface Menu {
   label: string;
   parentId: string | null;
   orderIndex: number;
-  type: "page" | "external" | "folder"; // 🚀 TAMBAH TIPE FOLDER
+  type: "page" | "external" | "folder"; //  TAMBAH TIPE FOLDER
   pageId: string | null;
   externalLink: string | null;
   isActive: boolean;
@@ -149,7 +149,7 @@ export default function NavigationBuilder() {
       );
     }
 
-    // 🚀 VALIDASI FOLDER: Jika folder, paksa parentId jadi kosong (Root)
+    //  VALIDASI FOLDER: Jika folder, paksa parentId jadi kosong (Root)
     const finalParentId =
       formData.type === "folder" ? null : formData.parentId || null;
 
@@ -228,7 +228,7 @@ export default function NavigationBuilder() {
     const newParentId = mode === "child" ? targetMenu.id : targetMenu.parentId;
     const sourceMenu = flatMenus.find((m) => m.id === sourceId);
 
-    // 🚀 VALIDASI KHUSUS FOLDER: Folder tidak boleh punya parent!
+    //  VALIDASI KHUSUS FOLDER: Folder tidak boleh punya parent!
     if (sourceMenu?.type === "folder" && newParentId !== null) {
       setDraggedMenuId(null);
       return toast.error(
@@ -345,7 +345,7 @@ export default function NavigationBuilder() {
           <div className="flex items-center gap-4">
             <GripVertical className="w-4 h-4 text-slate-300 cursor-grab active:cursor-grabbing group-hover:text-slate-400" />
 
-            {/* 🚀 LOGIKA WARNA & IKON */}
+            {/*  LOGIKA WARNA & IKON */}
             <div
               className={`w-10 h-10 rounded-xl flex items-center justify-center transition-colors
               ${menu.type === "page" ? "bg-blue-50 text-blue-500" : menu.type === "folder" ? "bg-daw-green/10 text-daw-green" : "bg-amber-50 text-amber-500"}`}
@@ -502,7 +502,7 @@ export default function NavigationBuilder() {
               </p>
             </div>
 
-            {/* 🚀 GRID BUTTON DIUBAH MENJADI 3 KOLOM */}
+            {/*  GRID BUTTON DIUBAH MENJADI 3 KOLOM */}
             <div className="grid grid-cols-3 gap-3">
               <button
                 type="button"
@@ -538,7 +538,7 @@ export default function NavigationBuilder() {
                   External Link
                 </span>
               </button>
-              {/* 🚀 TOMBOL BARU: FOLDER */}
+              {/*  TOMBOL BARU: FOLDER */}
               <button
                 type="button"
                 onClick={() =>
@@ -564,7 +564,7 @@ export default function NavigationBuilder() {
               </button>
             </div>
 
-            {/* 🚀 KONDISIONAL INPUT: HILANG JIKA TIPE ADALAH FOLDER */}
+            {/*  KONDISIONAL INPUT: HILANG JIKA TIPE ADALAH FOLDER */}
             {formData.type === "page" && (
               <div className="space-y-2 animate-in slide-in-from-top-2 duration-300">
                 <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">
@@ -628,7 +628,7 @@ export default function NavigationBuilder() {
                 onChange={(e) =>
                   setFormData({ ...formData, parentId: e.target.value })
                 }
-                // 🚀 JIKA FOLDER, DISABLE SELECT INI
+                //  JIKA FOLDER, DISABLE SELECT INI
                 disabled={formData.type === "folder"}
                 className="w-full px-5 py-4 rounded-2xl bg-slate-50 border border-slate-100 outline-none text-sm font-bold text-slate-600 disabled:opacity-50 disabled:cursor-not-allowed"
               >

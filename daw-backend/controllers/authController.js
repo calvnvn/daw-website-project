@@ -99,7 +99,7 @@ exports.forceChangePassword = async (req, res) => {
     const user = await User.findByPk(userId);
     if (!user) return res.status(404).json({ message: "User not found" });
 
-    // 🚀 FIX: Mengandalkan Hook di Model agar tidak Double Hashing
+    //  FIX: Mengandalkan Hook di Model agar tidak Double Hashing
     user.password = newPassword;
 
     // Simpan data & picu Hook
@@ -142,14 +142,14 @@ exports.forgotPassword = async (req, res) => {
       resetPasswordExpires: tokenExpiry,
     });
 
-    // 🚀 SMART EXTRACTION: Ambil URL dari ALLOWED_ORIGINS jika FRONTEND_URL tidak ada
+    //  SMART EXTRACTION: Ambil URL dari ALLOWED_ORIGINS jika FRONTEND_URL tidak ada
     const allowedOrigins = process.env.ALLOWED_ORIGINS
       ? process.env.ALLOWED_ORIGINS.split(",")
       : ["http://localhost:5173"];
     const frontendUrl = process.env.FRONTEND_URL || allowedOrigins[0];
     const resetLink = `${frontendUrl}/reset-password/${resetToken}`;
 
-    // 📧 Eksekusi Pengiriman Email
+    //   Eksekusi Pengiriman Email
     await transporter.sendMail({
       from: `"${process.env.SMTP_FROM_NAME}" <${process.env.SMTP_USER}>`,
       to: user.email,

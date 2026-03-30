@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useNavigate, useLocation } from "react-router-dom"; // 🚀 Tambah useLocation
+import { useNavigate, useLocation } from "react-router-dom"; //  Tambah useLocation
 import { Mail, Lock, Eye, EyeOff, ArrowRight, ShieldCheck } from "lucide-react";
 import { toast } from "sonner";
 import logoDaw from "@/assets/logo-daw.png";
@@ -9,7 +9,7 @@ import { Link } from "react-router-dom";
 
 export default function Login() {
   const navigate = useNavigate();
-  const location = useLocation(); // 🚀 Tangkap lokasi asal dari ProtectedRoute
+  const location = useLocation(); //  Tangkap lokasi asal dari ProtectedRoute
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -54,7 +54,7 @@ export default function Login() {
         navigate("/force-change-password");
       } else {
         toast.success(`Welcome, ${data.name}!`);
-        // 🚀 SMART REDIRECT: Balik ke halaman tujuan awal
+        //  SMART REDIRECT: Balik ke halaman tujuan awal
         navigate(from, { replace: true });
       }
     } catch (err: any) {

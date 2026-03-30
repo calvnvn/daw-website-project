@@ -451,7 +451,7 @@ const DEFAULT_USERS = [
 async function runMasterSeeder() {
   console.log("DEBUG: Mencoba konek ke port:", process.env.DB_PORT); // Tambahin ini!
   try {
-    console.log("🚀 Memulai Master Seeder DAW Group...");
+    console.log(" Memulai Master Seeder DAW Group...");
 
     // 1. SINKRONISASI MODEL
     await sequelize.sync();
@@ -471,7 +471,7 @@ async function runMasterSeeder() {
         user.password = u.password;
         await user.save();
         console.log(
-          `🔄 Password untuk '${u.name}' telah diperbarui (Clean Hash).`,
+          `Password untuk '${u.name}' telah diperbarui (Clean Hash).`,
         );
       } else {
         console.log(`✅ Akun ${u.role} '${u.name}' berhasil dibuat!`);

@@ -3,7 +3,7 @@ const fs = require("fs");
 const path = require("path");
 
 /**
- * 🚀 HELPER: Menghapus file secara aman dari storage
+ *  HELPER: Menghapus file secara aman dari storage
  * Menangani leading slash dan path absolut
  */
 const deletePhysicalFile = (relativeUrl) => {

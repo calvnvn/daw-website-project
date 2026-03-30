@@ -15,7 +15,7 @@ import {
 } from "lucide-react";
 import { useDropzone } from "react-dropzone";
 import api, { BASE_UPLOAD_URL } from "@/lib/api";
-import { compressImage } from "@/utils/imageHelper"; // 🚀 Import yang hilang
+import { compressImage } from "@/utils/imageHelper"; //  Import yang hilang
 
 const GalleryPreviewItem = ({
   file,
@@ -66,7 +66,7 @@ export default function EditProject() {
   const [isLoading, setIsLoading] = useState(false);
   const [isFetching, setIsFetching] = useState(true);
 
-  // 🚀 FIXED: Definisi state awal lengkap dengan SEO
+  //  FIXED: Definisi state awal lengkap dengan SEO
   const [formData, setFormData] = useState({
     title: "",
     excerpt: "",
@@ -102,7 +102,7 @@ export default function EditProject() {
     return () => URL.revokeObjectURL(objectUrl);
   }, [coverFile]);
 
-  // 🚀 FIXED: Ganti any dengan type string pada gallery mapping
+  //  FIXED: Ganti any dengan type string pada gallery mapping
   const removeOldGalleryImage = (indexToRemove: number) => {
     try {
       const currentGallery: string[] = JSON.parse(formData.gallery);
@@ -436,7 +436,7 @@ export default function EditProject() {
                   alt="New Preview"
                 />
               ) : formData.cover_image ? (
-                // 🚀 FIXED: Gambar lama dari server (PASTIKAN ABSOLUT)
+                //  FIXED: Gambar lama dari server (PASTIKAN ABSOLUT)
                 <img
                   src={`${BASE_UPLOAD_URL}/${formData.cover_image}`}
                   className="w-full h-full object-cover"

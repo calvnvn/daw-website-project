@@ -185,19 +185,19 @@ export default function CreateProject() {
     try {
       const payload = new FormData();
 
-      // 🚀 1. OPTIMIZED COVER
+      //  1. OPTIMIZED COVER
       if (coverFile) {
         const optimizedCover = await compressImage(coverFile);
         payload.append("cover_image", optimizedCover);
       }
 
-      // 🚀 2. OPTIMIZED GALLERY
+      //  2. OPTIMIZED GALLERY
       for (const file of galleryFiles) {
         const optimizedFile = await compressImage(file);
         payload.append("gallery", optimizedFile);
       }
 
-      // 🚀 3. DATA TEXT & SEO
+      //  3. DATA TEXT & SEO
       payload.append("title", formData.title.trim());
       payload.append("slug", generatedSlug);
       payload.append("excerpt", formData.excerpt.trim());
