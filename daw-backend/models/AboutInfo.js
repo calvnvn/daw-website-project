@@ -8,7 +8,6 @@ const AboutInfo = sequelize.define(
       type: DataTypes.INTEGER,
       primaryKey: true,
       autoIncrement: true,
-      defaultValue: 1,
     },
     spiritText: { type: DataTypes.TEXT },
     missionText: { type: DataTypes.TEXT },
