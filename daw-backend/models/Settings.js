@@ -8,7 +8,6 @@ const Settings = sequelize.define(
       type: DataTypes.INTEGER,
       primaryKey: true,
       autoIncrement: true,
-      defaultValue: 1,
     },
     companyName: { type: DataTypes.STRING(255) },
     address: { type: DataTypes.TEXT },
