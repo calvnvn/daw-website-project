@@ -273,16 +273,21 @@ exports.updateProject = async (req, res) => {
   }
 };
 
+// Ganti fungsi getPublicProjects kamu dengan ini:
 exports.getPublicProjects = async (req, res) => {
   try {
-    const query = `SELECT id, title, excerpt, category, cover_image, createdAt, views FROM Projects WHERE status = 'Published' ORDER BY createdAt DESC`;
-    const projects = await sequelize.query(query, {
-      type: sequelize.QueryTypes.SELECT,
+    const projects = await Project.findAll({
+      where: { status: "Published" },
+      order: [["createdAt", "DESC"]],
     });
+
     res.status(200).json(projects);
   } catch (error) {
-    console.error("Error GET Public Projects:", error);
-    res.status(500).json({ message: "Failed to fetch projects." });
+    console.error("🚨 ERROR GET PUBLIC PROJECTS:", error);
+    res.status(500).json({
+      message: "Failed to fetch public projects.",
+      error: error.message,
+    });
   }
 };
 
