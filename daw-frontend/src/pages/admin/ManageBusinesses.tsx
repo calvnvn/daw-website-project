@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import ReactQuill from "react-quill-new";
 import "react-quill-new/dist/quill.snow.css";
 import { toast } from "sonner";
@@ -32,6 +32,106 @@ export default function ManageBusinesses() {
   const [isSaving, setIsSaving] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [isMapModalOpen, setIsMapModalOpen] = useState(false);
+
+  const [isMobile, setIsMobile] = useState(false);
+  const [isHoveringMap, setIsHoveringMap] = useState(false);
+  const [isTouching, setIsTouching] = useState(false);
+
+  // 1. REFS UNTUK DOM MANIPULATION (BYPASS REACT RENDER)
+  const mapContainerRef = useRef<HTMLDivElement>(null);
+  const crosshairRef = useRef<HTMLDivElement>(null);
+  const loupeRef = useRef<HTMLDivElement>(null);
+  const radarRef = useRef<HTMLDivElement>(null);
+
+  // Ref untuk "mengingat" titik terakhir tanpa memicu re-render
+  const lastMousePos = useRef({ xPercent: 0, yPercent: 0 });
+
+  useEffect(() => {
+    const checkMobile = () => setIsMobile(window.innerWidth < 768);
+    checkMobile();
+    window.addEventListener("resize", checkMobile);
+    return () => window.removeEventListener("resize", checkMobile);
+  }, []);
+
+  // 2. FUNGSI TRACKER (SANGAT RINGAN & CEPAT)
+  const updatePointerPos = (clientX: number, clientY: number) => {
+    if (!mapContainerRef.current) return;
+    const rect = mapContainerRef.current.getBoundingClientRect();
+    const xPixel = clientX - rect.left;
+    const yPixel = clientY - rect.top;
+
+    const xP = Math.max(0, Math.min(100, (xPixel / rect.width) * 100));
+    const yP = Math.max(0, Math.min(100, (yPixel / rect.height) * 100));
+
+    // Simpan ke memori diam
+    lastMousePos.current = { xPercent: xP, yPercent: yP };
+
+    // MANIPULASI DOM LANGSUNG SECARA KILAT!
+    if (!isMobile) {
+      if (crosshairRef.current) {
+        crosshairRef.current.style.left = `${xP}%`;
+        crosshairRef.current.style.top = `${yP}%`;
+      }
+      if (loupeRef.current) {
+        loupeRef.current.style.left = `${xP}%`;
+        loupeRef.current.style.top = `${yP}%`;
+        loupeRef.current.style.backgroundPosition = `${xP}% ${yP}%`;
+      }
+    } else {
+      if (radarRef.current) {
+        radarRef.current.style.backgroundPosition = `${xP}% ${yP}%`;
+        // Fix TypeScript: Cast ke HTMLSpanElement
+        const textNode = radarRef.current.querySelector(
+          ".radar-coord",
+        ) as HTMLSpanElement | null;
+        if (textNode)
+          textNode.innerHTML = `X:${xP.toFixed(0)} Y:${yP.toFixed(0)}`;
+      }
+    }
+  };
+
+  const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (isMobile) return;
+    updatePointerPos(e.clientX, e.clientY);
+  };
+
+  const handleTouchMove = (e: React.TouchEvent<HTMLDivElement>) => {
+    if (!isMobile) return;
+    updatePointerPos(e.touches[0].clientX, e.touches[0].clientY);
+  };
+
+  // Logika Klik Peta
+  const handleMapClick = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (!isEditing) return;
+
+    // Ambil data dari memori diam kita
+    const finalX = lastMousePos.current.xPercent;
+    const finalY = lastMousePos.current.yPercent;
+
+    const xPercentStr = finalX.toFixed(2) + "%";
+    const yPercentStr = finalY.toFixed(2) + "%";
+    const boxYPercentStr = Math.max(0, finalY - 15).toFixed(2) + "%";
+
+    const newMarker: MapMarker = {
+      id: Date.now().toString(),
+      title: "New Location",
+      desc: "Capacity / Details",
+      type: "direct",
+      dotX: xPercentStr,
+      dotY: yPercentStr,
+      boxX: xPercentStr,
+      boxY: boxYPercentStr,
+      mapUrl: "", // Jangan lupa mapUrl!
+    };
+
+    setFormData((prev) => ({
+      ...prev,
+      mapMarkers: [...prev.mapMarkers, newMarker],
+    }));
+
+    toast.success("Presisi terkunci! Marker berhasil ditambahkan.");
+    if (isMapModalOpen) setIsMapModalOpen(false);
+  };
 
   // Local state untuk menyimpan ketikan Admin sebelum di-save
   const [formData, setFormData] = useState<Omit<SectionData, "id">>({
@@ -93,37 +193,6 @@ export default function ManageBusinesses() {
       return;
     }
     setActiveTab(targetTab);
-  };
-
-  // Logika Klik Peta
-  const handleMapClick = (e: React.MouseEvent<HTMLDivElement>) => {
-    if (!isEditing) return;
-    const rect = e.currentTarget.getBoundingClientRect();
-    const xPixel = e.clientX - rect.left;
-    const yPixel = e.clientY - rect.top;
-
-    const xPercent = ((xPixel / rect.width) * 100).toFixed(2) + "%";
-    const yPercent = ((yPixel / rect.height) * 100).toFixed(2) + "%";
-    const boxYPercent = (((yPixel - 60) / rect.height) * 100).toFixed(2) + "%";
-
-    const newMarker: MapMarker = {
-      id: Date.now().toString(),
-      title: "New Location",
-      desc: "Capacity / Details",
-      type: "direct",
-      dotX: xPercent,
-      dotY: yPercent,
-      boxX: xPercent,
-      boxY: boxYPercent,
-    };
-
-    setFormData((prev) => ({
-      ...prev,
-      mapMarkers: [...prev.mapMarkers, newMarker],
-    }));
-
-    toast.success("Marker pinned! Edit details in the list.");
-    if (isMapModalOpen) setIsMapModalOpen(false);
   };
 
   const updateMarker = (
@@ -450,27 +519,116 @@ export default function ManageBusinesses() {
                 <X className="w-5 h-5" />
               </button>
             </div>
+
+            {/* --- THE LOUPE & CROSSHAIR UI --- */}
             <div className="flex-1 overflow-auto bg-[#e5e7eb] flex items-center justify-center p-4">
               <div
+                ref={mapContainerRef}
                 onClick={handleMapClick}
-                className="relative w-full max-w-4xl aspect-[16/9] bg-white shadow-xl cursor-crosshair border-2 border-transparent hover:border-daw-green transition-colors rounded-xl overflow-hidden"
+                onMouseMove={handleMouseMove}
+                onMouseEnter={() => !isMobile && setIsHoveringMap(true)}
+                onMouseLeave={() => !isMobile && setIsHoveringMap(false)}
+                // Event Khusus Mobile
+                onTouchStart={(e) => {
+                  if (!isMobile) return;
+                  setIsTouching(true);
+                  updatePointerPos(e.touches[0].clientX, e.touches[0].clientY);
+                }}
+                onTouchMove={handleTouchMove}
+                onTouchEnd={() => setIsTouching(false)}
+                // CSS Dinamis: touch-none wajib agar layar tidak ikut ke-scroll saat menggeser radar!
+                className={`relative w-full max-w-4xl aspect-[16/9] bg-white shadow-xl border-2 border-transparent hover:border-daw-green transition-colors rounded-xl overflow-hidden ${
+                  isMobile ? "touch-none cursor-crosshair" : "cursor-none"
+                }`}
               >
+                {/* Peta Dasar */}
                 <img
                   src={mapBase}
                   alt="Map of Indonesia"
                   className="absolute inset-0 w-full h-full object-contain pointer-events-none"
                 />
+
+                {/* Marker yang sudah ada (Ukurannya dikecilkan biar elegan) */}
                 {formData.mapMarkers.map((m, idx) => (
                   <div
                     key={idx}
-                    className="absolute -translate-x-1/2 -translate-y-1/2 group pointer-events-none"
+                    className="absolute -translate-x-1/2 -translate-y-1/2 group pointer-events-none z-20"
                     style={{ left: m.dotX, top: m.dotY }}
                   >
+                    {/* Core Dot (Super Kecil & Presisi) */}
                     <div
-                      className={`w-4 h-4 md:w-6 md:h-6 rounded-full border-[3px] border-white shadow-lg ${m.type === "direct" ? "bg-[#004B23]" : "bg-[#D97706]"}`}
+                      className={`w-2.5 h-2.5 md:w-3 md:h-3 rounded-full border-[1.5px] border-white shadow-md ${m.type === "direct" ? "bg-[#004B23]" : "bg-[#D97706]"}`}
+                    ></div>
+                    {/* Ghost Ring (Penanda area klik) */}
+                    <div
+                      className={`absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-8 h-8 rounded-full opacity-20 ${m.type === "direct" ? "bg-[#004B23]" : "bg-[#D97706]"}`}
                     ></div>
                   </div>
                 ))}
+
+                {/* EFEK KACA PEMBESAR & CROSSHAIR (Muncul saat Hover) */}
+                {!isMobile && isHoveringMap && isEditing && (
+                  <>
+                    {/* The Crosshair Desktop */}
+                    <div
+                      ref={crosshairRef}
+                      className="absolute -translate-x-1/2 -translate-y-1/2 pointer-events-none z-40 flex items-center justify-center transition-opacity duration-75"
+                      // Style awal diambil dari lastMousePos agar tidak kedip di pojok saat baru muncul
+                      style={{
+                        left: `${lastMousePos.current.xPercent}%`,
+                        top: `${lastMousePos.current.yPercent}%`,
+                      }}
+                    >
+                      <div className="absolute w-6 h-[1px] bg-slate-900/80"></div>
+                      <div className="absolute h-6 w-[1px] bg-slate-900/80"></div>
+                      <div className="absolute w-1.5 h-1.5 bg-red-500 rounded-full shadow-[0_0_4px_rgba(0,0,0,0.5)]"></div>
+                    </div>
+
+                    {/* The Magnifier Loupe Desktop */}
+                    <div
+                      ref={loupeRef}
+                      className="absolute pointer-events-none z-50 w-32 h-32 md:w-40 md:h-40 rounded-full border-[3px] border-white shadow-[0_10px_25px_rgba(0,0,0,0.3)] bg-white overflow-hidden transform -translate-y-[120%] -translate-x-1/2 transition-opacity duration-75"
+                      style={{
+                        left: `${lastMousePos.current.xPercent}%`,
+                        top: `${lastMousePos.current.yPercent}%`,
+                        backgroundImage: `url(${mapBase})`,
+                        backgroundSize: "400%",
+                        backgroundPosition: `${lastMousePos.current.xPercent}% ${lastMousePos.current.yPercent}%`,
+                        backgroundRepeat: "no-repeat",
+                      }}
+                    >
+                      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-1.5 h-1.5 bg-red-500/80 rounded-full"></div>
+                      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[1px] h-full bg-slate-900/10"></div>
+                      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 h-[1px] w-full bg-slate-900/10"></div>
+                    </div>
+                  </>
+                )}
+
+                {/* 2. MOBILE MODE: THE "FIXED SATELLITE RADAR" */}
+                {isMobile && isTouching && isEditing && (
+                  <div
+                    ref={radarRef}
+                    // Posisi Fixed (Pojok Kiri Atas Peta) agar tidak tertutup jempol
+                    className="absolute top-4 left-4 pointer-events-none z-[100] w-28 h-28 rounded-full border-4 border-daw-green shadow-[0_15px_35px_rgba(0,0,0,0.4)] bg-white overflow-hidden animate-in zoom-in-90 duration-150"
+                    style={{
+                      backgroundImage: `url(${mapBase})`,
+                      backgroundSize: "600%", // Zoom ekstra brutal khusus mobile!
+                      backgroundPosition: `${lastMousePos.current.xPercent}% ${lastMousePos.current.yPercent}%`,
+                      backgroundRepeat: "no-repeat",
+                    }}
+                  >
+                    {/* Visual UI Radar */}
+                    <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-2 h-2 bg-red-500 rounded-full shadow-[0_0_10px_rgba(255,0,0,0.8)] animate-pulse"></div>
+                    <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[1px] h-full bg-daw-green/40"></div>
+                    <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 h-[1px] w-full bg-daw-green/40"></div>
+
+                    {/* Live Coordinate Display (Diberi class "radar-coord" agar bisa dimanipulasi dari logic Ref) */}
+                    <div className="radar-coord absolute bottom-2 left-1/2 -translate-x-1/2 bg-black/60 backdrop-blur-sm text-white text-[8px] font-mono px-2 py-0.5 rounded-full border border-white/20 whitespace-nowrap">
+                      X:{lastMousePos.current.xPercent.toFixed(0)} Y:
+                      {lastMousePos.current.yPercent.toFixed(0)}
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           </div>
