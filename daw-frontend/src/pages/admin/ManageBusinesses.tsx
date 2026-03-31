@@ -101,7 +101,7 @@ export default function ManageBusinesses() {
   };
 
   // Logika Klik Peta
-  const handleMapClick = (e: React.MouseEvent<HTMLDivElement>) => {
+  const handleMapClick = () => {
     if (!isEditing) return;
 
     // Ambil data dari memori diam kita

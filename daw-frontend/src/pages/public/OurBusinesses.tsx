@@ -29,7 +29,7 @@ export default function OurBusinesses() {
 
       return () => clearTimeout(timeoutId);
     }
-  }, [isLoading, hash]); // Trigger jalan saat data selesai load atau hash berubah
+  }, [isLoading, hash]);
 
   // STATE UNTUK SCROLL PROGRESS BAR (Sama seperti Dynamic Page)
   const [scrollProgress, setScrollProgress] = useState(0);

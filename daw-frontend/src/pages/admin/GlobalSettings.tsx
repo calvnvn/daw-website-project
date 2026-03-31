@@ -36,6 +36,9 @@ export default function GlobalSettings() {
   const [isSaving, setIsSaving] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
 
+  const [isDraggingLogo, setIsDraggingLogo] = useState(false);
+  const [isDraggingFavicon, setIsDraggingFavicon] = useState(false);
+
   const { refreshSettings } = useSettings();
   // --- 1. Fetch Data ---
   useEffect(() => {
@@ -287,7 +290,10 @@ export default function GlobalSettings() {
               </div>
             </div>
           </div>
+        </div>
 
+        {/* ---> AREA BRANDING & SEO <--- */}
+        <div className="md:col-span-3 space-y-6">
           {/* Google Maps Embed Card */}
           <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
             <div className="px-5 py-4 border-b border-slate-100 bg-slate-50/50 flex items-center justify-between">
@@ -319,9 +325,6 @@ export default function GlobalSettings() {
               </div>
             </div>
           </div>
-        </div>
-        {/* ---> AREA BRANDING & SEO <--- */}
-        <div className="md:col-span-3 space-y-6">
           <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
             <div className="px-5 py-4 border-b border-slate-100 bg-slate-50/50 flex items-center gap-2">
               <ImageIcon className="w-5 h-5 text-daw-green" />
@@ -331,13 +334,43 @@ export default function GlobalSettings() {
             </div>
 
             <div className="p-5 md:p-6 grid grid-cols-1 lg:grid-cols-2 gap-8">
-              {/* Box Upload Logo Utama */}
+              {/* --- BOX UPLOAD LOGO UTAMA --- */}
               <div className="space-y-4">
                 <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest">
                   Logo Utama
                 </label>
-                <div className="border-2 border-dashed border-slate-200 rounded-xl p-4 flex flex-col items-center gap-4 bg-slate-50/50">
-                  <div className="h-20 w-full max-w-[200px] flex items-center justify-center bg-white rounded-lg border border-slate-100 p-2 shadow-inner">
+                <div
+                  // EVENT LISTENER UNTUK DRAG & DROP LOGO
+                  onDragOver={(e) => {
+                    e.preventDefault();
+                    if (isEditing) setIsDraggingLogo(true);
+                  }}
+                  onDragLeave={(e) => {
+                    e.preventDefault();
+                    setIsDraggingLogo(false);
+                  }}
+                  onDrop={(e) => {
+                    e.preventDefault();
+                    setIsDraggingLogo(false);
+                    if (!isEditing) return;
+                    const file = e.dataTransfer.files?.[0];
+                    if (file && file.type.startsWith("image/")) {
+                      setLogoFile(file);
+                      setLogoPreview(URL.createObjectURL(file));
+                    } else if (file) {
+                      toast.error(
+                        "Format file tidak didukung. Gunakan gambar.",
+                      );
+                    }
+                  }}
+                  // CSS Dinamis: Berubah warna saat file di-drag
+                  className={`border-2 border-dashed rounded-xl p-4 flex flex-col items-center gap-4 transition-all duration-200 ${
+                    isDraggingLogo
+                      ? "border-daw-green bg-daw-green/5 scale-[0.99] ring-4 ring-daw-green/10"
+                      : "border-slate-200 bg-slate-50/50 hover:border-slate-300"
+                  } ${!isEditing && "opacity-70 cursor-not-allowed"}`}
+                >
+                  <div className="h-20 w-full max-w-[200px] flex items-center justify-center bg-white rounded-lg border border-slate-100 p-2 shadow-inner pointer-events-none">
                     {logoPreview ? (
                       <img
                         src={logoPreview}
@@ -350,29 +383,68 @@ export default function GlobalSettings() {
                       </span>
                     )}
                   </div>
-                  <input
-                    type="file"
-                    accept="image/*"
-                    disabled={!isEditing}
-                    onChange={(e) => {
-                      const file = e.target.files?.[0];
-                      if (file) {
-                        setLogoFile(file);
-                        setLogoPreview(URL.createObjectURL(file));
-                      }
-                    }}
-                    className="w-full text-[10px] file:mr-3 file:py-1.5 file:px-3 file:rounded-full file:border-0 file:bg-daw-green/10 file:text-daw-green file:font-bold cursor-pointer disabled:opacity-50"
-                  />
+
+                  <div className="text-center">
+                    <p className="text-xs font-bold text-slate-600 mb-1">
+                      {isDraggingLogo
+                        ? "Lepaskan file di sini"
+                        : "Drag & drop logo"}
+                    </p>
+                    <p className="text-[10px] text-slate-400 mb-2">atau</p>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      disabled={!isEditing}
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) {
+                          setLogoFile(file);
+                          setLogoPreview(URL.createObjectURL(file));
+                        }
+                      }}
+                      className="w-full text-[10px] file:mr-3 file:py-1.5 file:px-3 file:rounded-full file:border-0 file:bg-daw-green/10 file:text-daw-green file:font-bold cursor-pointer disabled:opacity-50"
+                    />
+                  </div>
                 </div>
               </div>
 
-              {/* Box Upload Favicon */}
+              {/* --- BOX UPLOAD FAVICON --- */}
               <div className="space-y-4">
                 <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest">
                   Ikon Tab (Favicon)
                 </label>
-                <div className="border-2 border-dashed border-slate-200 rounded-xl p-4 flex flex-col items-center gap-4 bg-slate-50/50">
-                  <div className="h-20 w-20 flex items-center justify-center bg-white rounded-lg border border-slate-100 p-2 shadow-inner">
+                <div
+                  // EVENT LISTENER UNTUK DRAG & DROP FAVICON
+                  onDragOver={(e) => {
+                    e.preventDefault();
+                    if (isEditing) setIsDraggingFavicon(true);
+                  }}
+                  onDragLeave={(e) => {
+                    e.preventDefault();
+                    setIsDraggingFavicon(false);
+                  }}
+                  onDrop={(e) => {
+                    e.preventDefault();
+                    setIsDraggingFavicon(false);
+                    if (!isEditing) return;
+                    const file = e.dataTransfer.files?.[0];
+                    if (file && file.type.startsWith("image/")) {
+                      setFaviconFile(file);
+                      setFaviconPreview(URL.createObjectURL(file));
+                    } else if (file) {
+                      toast.error(
+                        "Format file tidak didukung. Gunakan gambar.",
+                      );
+                    }
+                  }}
+                  // CSS Dinamis: Berubah warna saat file di-drag
+                  className={`border-2 border-dashed rounded-xl p-4 flex flex-col items-center gap-4 transition-all duration-200 ${
+                    isDraggingFavicon
+                      ? "border-daw-green bg-daw-green/5 scale-[0.99] ring-4 ring-daw-green/10"
+                      : "border-slate-200 bg-slate-50/50 hover:border-slate-300"
+                  } ${!isEditing && "opacity-70 cursor-not-allowed"}`}
+                >
+                  <div className="h-20 w-20 flex items-center justify-center bg-white rounded-lg border border-slate-100 p-2 shadow-inner pointer-events-none">
                     {faviconPreview ? (
                       <img
                         src={faviconPreview}
@@ -380,24 +452,33 @@ export default function GlobalSettings() {
                         alt="Preview"
                       />
                     ) : (
-                      <span className="text-slate-300 text-[10px]">
+                      <span className="text-slate-300 text-[10px] text-center leading-tight">
                         No Icon
                       </span>
                     )}
                   </div>
-                  <input
-                    type="file"
-                    accept="image/png, image/x-icon"
-                    disabled={!isEditing}
-                    onChange={(e) => {
-                      const file = e.target.files?.[0];
-                      if (file) {
-                        setFaviconFile(file);
-                        setFaviconPreview(URL.createObjectURL(file));
-                      }
-                    }}
-                    className="w-full text-[10px] file:mr-3 file:py-1.5 file:px-3 file:rounded-full file:border-0 file:bg-daw-green/10 file:text-daw-green file:font-bold cursor-pointer disabled:opacity-50"
-                  />
+
+                  <div className="text-center">
+                    <p className="text-xs font-bold text-slate-600 mb-1">
+                      {isDraggingFavicon
+                        ? "Lepaskan file di sini"
+                        : "Drag & drop ikon"}
+                    </p>
+                    <p className="text-[10px] text-slate-400 mb-2">atau</p>
+                    <input
+                      type="file"
+                      accept="image/png, image/x-icon, image/svg+xml"
+                      disabled={!isEditing}
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) {
+                          setFaviconFile(file);
+                          setFaviconPreview(URL.createObjectURL(file));
+                        }
+                      }}
+                      className="w-full text-[10px] file:mr-3 file:py-1.5 file:px-3 file:rounded-full file:border-0 file:bg-daw-green/10 file:text-daw-green file:font-bold cursor-pointer disabled:opacity-50"
+                    />
+                  </div>
                 </div>
               </div>
             </div>
