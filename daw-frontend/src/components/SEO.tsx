@@ -29,7 +29,7 @@ export default function SEO({
   const { settings } = useSettings();
 
   // Fallback values jika database kosong
-  const siteName = settings?.companyName || "PT Dharma Agung Wijaya";
+  const siteName = settings?.companyName || "Dharma Agung Wijaya";
   const defaultDesc =
     "PT Dharma Agung Wijaya (DAW Group) is an operating holding company focusing on Renewable Energy and Natural Resources.";
   const metaDesc = description || defaultDesc;

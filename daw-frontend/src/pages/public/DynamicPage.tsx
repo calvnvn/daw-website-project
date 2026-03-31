@@ -6,6 +6,7 @@ import DOMPurify from "dompurify";
 import api, { API_URL } from "@/lib/api"; // <-- KUNCI 1: Import API_URL
 import ScrollReveal from "@/components/ScrollReveal";
 import { getCleanImageUrl } from "@/lib/utils"; // <-- KUNCI 2: Pastikan ini di-import
+import SEO from "@/components/SEO";
 
 // Data structures for Page and Table of Contents
 interface PageData {
@@ -276,84 +277,93 @@ export default function DynamicPage() {
   if (isError || !pageData) return null;
 
   return (
-    <div className="min-h-screen bg-white selection:bg-daw-green selection:text-white">
-      <Helmet>
-        <title>{`${pageData.title} | DAW Group`}</title>
-        <meta
-          name="description"
-          content={
-            pageData.metaDescription || pageData.subtitle || "DAW Group Article"
-          }
-        />
-        <meta property="og:title" content={pageData.title} />
-        <meta property="og:image" content={pageData.heroImage || ""} />
-        <meta property="og:type" content="article" />
-      </Helmet>
+    <>
+      <SEO
+        title={pageData.title}
+        description={pageData.metaDescription || pageData.subtitle || undefined}
+        image={pageData.heroImage || undefined}
+        type="article"
+      />
+      <div className="min-h-screen bg-white selection:bg-daw-green selection:text-white">
+        <Helmet>
+          <title>{`${pageData.title} | DAW Group`}</title>
+          <meta
+            name="description"
+            content={
+              pageData.metaDescription ||
+              pageData.subtitle ||
+              "DAW Group Article"
+            }
+          />
+          <meta property="og:title" content={pageData.title} />
+          <meta property="og:image" content={pageData.heroImage || ""} />
+          <meta property="og:type" content="article" />
+        </Helmet>
 
-      {/* Progress Bar */}
-      <ScrollProgressBar />
+        {/* Progress Bar */}
+        <ScrollProgressBar />
 
-      {/* Hero Section */}
-      <section className="relative h-[85vh] flex items-center justify-center overflow-hidden">
-        <div
-          className="absolute inset-0 bg-cover bg-center transition-transform duration-700 hover:scale-105"
-          style={{
-            backgroundImage: `url(${
-              pageData.heroImage
-                ? getCleanImageUrl(pageData.heroImage)
-                : "/placeholder.jpg"
-            })`,
-            backgroundAttachment: "fixed",
-          }}
-        />
-        <div className="absolute inset-0 bg-[#004B23]/70 mix-blend-multiply" />
-        <div className="absolute inset-0 bg-gradient-to-b from-slate-900/60 via-slate-900/40 to-slate-900/80" />
+        {/* Hero Section */}
+        <section className="relative h-[85vh] flex items-center justify-center overflow-hidden">
+          <div
+            className="absolute inset-0 bg-cover bg-center transition-transform duration-700 hover:scale-105"
+            style={{
+              backgroundImage: `url(${
+                pageData.heroImage
+                  ? getCleanImageUrl(pageData.heroImage)
+                  : "/placeholder.jpg"
+              })`,
+              backgroundAttachment: "fixed",
+            }}
+          />
+          <div className="absolute inset-0 bg-[#004B23]/70 mix-blend-multiply" />
+          <div className="absolute inset-0 bg-gradient-to-b from-slate-900/60 via-slate-900/40 to-slate-900/80" />
 
-        <div className="relative z-10 text-center px-6 max-w-5xl mt-16 animate-in fade-in slide-in-from-bottom-12 duration-1000">
-          <ScrollReveal direction="up" delay={0}>
-            {pageData.subtitle && (
-              <p className="text-emerald-400 font-bold tracking-[0.4em] uppercase text-[11px] mb-6 drop-shadow-md">
-                {pageData.subtitle}
-              </p>
-            )}
-            <h1 className="text-5xl md:text-7xl lg:text-8xl font-serif font-bold text-white mb-10 leading-[1.1] tracking-tight drop-shadow-lg">
-              {pageData.title}
-            </h1>
-            <div className="flex items-center justify-center gap-8">
-              <div className="h-px w-16 bg-white/30" />
-              <div className="w-3 h-3 border-2 border-daw-green rotate-45" />
-              <div className="h-px w-16 bg-white/30" />
-            </div>
-          </ScrollReveal>
-        </div>
-      </section>
+          <div className="relative z-10 text-center px-6 max-w-5xl mt-16 animate-in fade-in slide-in-from-bottom-12 duration-1000">
+            <ScrollReveal direction="up" delay={0}>
+              {pageData.subtitle && (
+                <p className="text-emerald-400 font-bold tracking-[0.4em] uppercase text-[11px] mb-6 drop-shadow-md">
+                  {pageData.subtitle}
+                </p>
+              )}
+              <h1 className="text-5xl md:text-7xl lg:text-8xl font-serif font-bold text-white mb-10 leading-[1.1] tracking-tight drop-shadow-lg">
+                {pageData.title}
+              </h1>
+              <div className="flex items-center justify-center gap-8">
+                <div className="h-px w-16 bg-white/30" />
+                <div className="w-3 h-3 border-2 border-daw-green rotate-45" />
+                <div className="h-px w-16 bg-white/30" />
+              </div>
+            </ScrollReveal>
+          </div>
+        </section>
 
-      {/* Main Layout Container */}
-      <div className="bg-white relative z-20 shadow-[0_-20px_40px_rgba(0,0,0,0.05)] pt-18 pb-32">
-        <div className="container mx-auto px-6 max-w-[90rem]">
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 lg:gap-16 items-start">
-            {/* Sidebar Navigation: Table of Contents */}
-            <aside className="hidden lg:block lg:col-span-3 sticky top-22 self-start w-full max-w-[280px]">
-              {toc.length > 0 && (
-                <div className="pr-4 flex flex-col">
-                  {/* Header ToC */}
-                  <h4 className="text-[10px] font-black uppercase text-slate-400 tracking-[0.25em] mb-8 flex items-center gap-3">
-                    <span className="w-8 h-[2px] bg-slate-200 rounded-full"></span>
-                    Table of Contents
-                  </h4>
+        {/* Main Layout Container */}
+        <div className="bg-white relative z-20 shadow-[0_-20px_40px_rgba(0,0,0,0.05)] pt-18 pb-32">
+          <div className="container mx-auto px-6 max-w-[90rem]">
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 lg:gap-16 items-start">
+              {/* Sidebar Navigation: Table of Contents */}
+              <aside className="hidden lg:block lg:col-span-3 sticky top-22 self-start w-full max-w-[280px]">
+                {toc.length > 0 && (
+                  <div className="pr-4 flex flex-col">
+                    {/* Header ToC */}
+                    <h4 className="text-[10px] font-black uppercase text-slate-400 tracking-[0.25em] mb-8 flex items-center gap-3">
+                      <span className="w-8 h-[2px] bg-slate-200 rounded-full"></span>
+                      Table of Contents
+                    </h4>
 
-                  {/* Navigasi List */}
-                  <nav className="flex flex-col relative border-l-2 border-slate-100 ml-1">
-                    {toc.map((item) => {
-                      const isActive = activeTocId === item.id;
+                    {/* Navigasi List */}
+                    <nav className="flex flex-col relative border-l-2 border-slate-100 ml-1">
+                      {toc.map((item) => {
+                        const isActive = activeTocId === item.id;
 
-                      return (
-                        <button
-                          key={item.id}
-                          onClick={() => scrollToHeading(item.id)}
-                          title={item.text}
-                          aria-current={isActive ? "true" : "false"}
-                          className={`group text-left py-3 pr-4 relative transition-all duration-300 ease-out flex items-center w-full
+                        return (
+                          <button
+                            key={item.id}
+                            onClick={() => scrollToHeading(item.id)}
+                            title={item.text}
+                            aria-current={isActive ? "true" : "false"}
+                            className={`group text-left py-3 pr-4 relative transition-all duration-300 ease-out flex items-center w-full
                             /* Hierarki Indentasi & Tipografi */
                             ${item.level === 3 ? "pl-8 text-[12px]" : "pl-5 text-[13px] font-bold"}
                             
@@ -363,30 +373,30 @@ export default function DynamicPage() {
                                 ? "text-daw-green bg-gradient-to-r from-daw-green/[0.06] to-transparent"
                                 : "text-slate-400 hover:text-slate-700 hover:bg-slate-50/80"
                             }`}
-                        >
-                          {/* Indikator Garis Aktif (Neon Glow) */}
-                          {isActive && (
-                            <span className="absolute left-[-2px] top-0 bottom-0 w-[2px] bg-daw-green rounded-full shadow-[0_0_10px_rgba(16,185,129,0.7)]" />
-                          )}
+                          >
+                            {/* Indikator Garis Aktif (Neon Glow) */}
+                            {isActive && (
+                              <span className="absolute left-[-2px] top-0 bottom-0 w-[2px] bg-daw-green rounded-full shadow-[0_0_10px_rgba(16,185,129,0.7)]" />
+                            )}
 
-                          {/* Text Constraint */}
-                          <span className="line-clamp-2 leading-[1.4] w-full tracking-tight">
-                            {item.text}
-                          </span>
-                        </button>
-                      );
-                    })}
-                  </nav>
-                </div>
-              )}
-            </aside>
+                            {/* Text Constraint */}
+                            <span className="line-clamp-2 leading-[1.4] w-full tracking-tight">
+                              {item.text}
+                            </span>
+                          </button>
+                        );
+                      })}
+                    </nav>
+                  </div>
+                )}
+              </aside>
 
-            {/* Dynamic Content Area */}
-            <div className="lg:col-span-9 xl:col-span-6 min-w-0 w-full overflow-hidden">
-              <div className="max-w-[720px] mx-auto">
-                <article
-                  ref={articleRef}
-                  className={`w-full text-left
+              {/* Dynamic Content Area */}
+              <div className="lg:col-span-9 xl:col-span-6 min-w-0 w-full overflow-hidden">
+                <div className="max-w-[720px] mx-auto">
+                  <article
+                    ref={articleRef}
+                    className={`w-full text-left
                     /* 1. KUNCI ANTI OVERFLOW: Gunakan break-words sebagai jaring pengaman */
                     break-words
                     [&>*:first-child]:mt-0
@@ -422,49 +432,53 @@ export default function DynamicPage() {
 
                     /* 6. LISTS & BULLETS */
                     prose-li:marker:text-daw-green prose-li:my-2`}
-                  dangerouslySetInnerHTML={{ __html: parsedContent }}
-                />
-              </div>
-            </div>
-
-            {/* Supplementary Widget */}
-            {safeSidebarLinks.length > 0 ? (
-              <aside className="hidden lg:block lg:col-span-3 sticky top-32">
-                <div className="p-8 bg-slate-50 rounded-[2rem] border border-slate-100 shadow-sm">
-                  <h4 className="text-lg font-serif font-bold text-slate-900 mb-4 flex items-center gap-2">
-                    <Share2 className="w-5 h-5 text-daw-green" /> Inside this
-                    Topic
-                  </h4>
-                  <p className="text-xs text-slate-500 leading-relaxed mb-6">
-                    Discover more about DAW Group's related initiatives and
-                    resources.
-                  </p>
-
-                  {/* Looping Link Dinamis */}
-                  <div className="flex flex-col gap-2">
-                    {safeSidebarLinks.map(
-                      (link: { url: string; label: string }, index: number) => (
-                        <Link
-                          key={index}
-                          to={link.url}
-                          className="flex items-center justify-between p-4 bg-white rounded-xl border border-slate-200 hover:border-daw-green hover:shadow-md transition-all group"
-                        >
-                          <span className="text-xs font-bold uppercase tracking-wider text-slate-700 group-hover:text-daw-green transition-colors">
-                            {link.label}
-                          </span>
-                          <ChevronRight className="w-4 h-4 text-slate-300 group-hover:text-daw-green group-hover:translate-x-1 transition-transform" />
-                        </Link>
-                      ),
-                    )}
-                  </div>
+                    dangerouslySetInnerHTML={{ __html: parsedContent }}
+                  />
                 </div>
-              </aside>
-            ) : (
-              <div className="hidden lg:block lg:col-span-3" />
-            )}
+              </div>
+
+              {/* Supplementary Widget */}
+              {safeSidebarLinks.length > 0 ? (
+                <aside className="hidden lg:block lg:col-span-3 sticky top-32">
+                  <div className="p-8 bg-slate-50 rounded-[2rem] border border-slate-100 shadow-sm">
+                    <h4 className="text-lg font-serif font-bold text-slate-900 mb-4 flex items-center gap-2">
+                      <Share2 className="w-5 h-5 text-daw-green" /> Inside this
+                      Topic
+                    </h4>
+                    <p className="text-xs text-slate-500 leading-relaxed mb-6">
+                      Discover more about DAW Group's related initiatives and
+                      resources.
+                    </p>
+
+                    {/* Looping Link Dinamis */}
+                    <div className="flex flex-col gap-2">
+                      {safeSidebarLinks.map(
+                        (
+                          link: { url: string; label: string },
+                          index: number,
+                        ) => (
+                          <Link
+                            key={index}
+                            to={link.url}
+                            className="flex items-center justify-between p-4 bg-white rounded-xl border border-slate-200 hover:border-daw-green hover:shadow-md transition-all group"
+                          >
+                            <span className="text-xs font-bold uppercase tracking-wider text-slate-700 group-hover:text-daw-green transition-colors">
+                              {link.label}
+                            </span>
+                            <ChevronRight className="w-4 h-4 text-slate-300 group-hover:text-daw-green group-hover:translate-x-1 transition-transform" />
+                          </Link>
+                        ),
+                      )}
+                    </div>
+                  </div>
+                </aside>
+              ) : (
+                <div className="hidden lg:block lg:col-span-3" />
+              )}
+            </div>
           </div>
         </div>
       </div>
-    </div>
+    </>
   );
 }
