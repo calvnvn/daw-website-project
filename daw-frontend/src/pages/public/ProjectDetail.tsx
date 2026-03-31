@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
 import {
   ArrowLeft,
@@ -13,10 +13,12 @@ import ProjectDetailSkeleton from "@/components/ProjectDetailSkeleton";
 import api from "@/lib/api";
 import { getCleanImageUrl } from "@/lib/utils";
 import DOMPurify from "dompurify";
+import SEO from "@/components/SEO";
 
 // 1. Interface untuk menghilangkan warning 'any'
 // Cari interface ini di bagian atas
 interface ProjectData {
+  excerpt: string;
   id: string;
   title: string;
   category: string;
@@ -47,6 +49,17 @@ export default function ProjectDetail() {
   // Progress Bar & Parallax
   const [scrollProgress, setScrollProgress] = useState(0);
   const [offsetY, setOffsetY] = useState(0);
+
+  const cleanContent = useMemo(() => {
+    if (!project?.content) return "";
+
+    // Regex ini akan mencari src="http://localhost:5000/uploads/..."
+    // atau IP 172.30... dan mengubahnya menjadi src="/uploads/..."
+    return project.content.replace(
+      /src="https?:\/\/(localhost:5000|localhost:5550|172\.30\.1\.20:5550)\/uploads\//g,
+      'src="/uploads/',
+    );
+  }, [project?.content]);
 
   useEffect(() => {
     const handleScroll = () => {
@@ -168,6 +181,16 @@ export default function ProjectDetail() {
 
   return (
     <>
+      <SEO
+        title={project.title}
+        description={project.excerpt || "Project Detail of DAW Group"} // Pakai excerpt kalau ada
+        image={
+          project.cover_image
+            ? getCleanImageUrl(project.cover_image)
+            : undefined
+        }
+        type="article"
+      />
       <div
         className="fixed top-0 left-0 h-1.5 bg-gradient-to-r from-daw-green via-emerald-400 to-daw-green z-[100] transition-all duration-150 ease-out shadow-[0_0_10px_rgba(16,185,129,0.5)]"
         style={{ width: `${scrollProgress}%` }}
@@ -314,7 +337,7 @@ export default function ProjectDetail() {
     "
                   dangerouslySetInnerHTML={{
                     //  WAJIB PAKAI DOMPURIFY DI PRODUCTION!
-                    __html: DOMPurify.sanitize(project.content),
+                    __html: DOMPurify.sanitize(cleanContent),
                   }}
                 />
               </ScrollReveal>
