@@ -40,6 +40,21 @@ export default function Inbox() {
     navigator.clipboard.writeText(email);
     toast.success("Alamat email berhasil disalin!");
   };
+  const openWebMail = (provider: "gmail" | "outlook" | "default") => {
+    if (!selectedInquiry) return;
+
+    const email = selectedInquiry.email;
+    const subject = encodeURIComponent("Reply from Dharma Agung Wijaya");
+
+    // Link khusus untuk direct compose
+    const urls = {
+      gmail: `https://mail.google.com/mail/?view=cm&fs=1&to=${email}&su=${subject}`,
+      outlook: `https://outlook.office.com/mail/deeplink/compose?to=${email}&subject=${subject}`,
+      default: `mailto:${email}?subject=${subject}`,
+    };
+
+    window.open(urls[provider], "_blank");
+  };
 
   // FETCH DATA DARI DATABASE
   useEffect(() => {
@@ -412,6 +427,7 @@ export default function Inbox() {
         <div className="flex-1 flex flex-col bg-slate-50/30 overflow-hidden">
           {selectedInquiry ? (
             <>
+              {/* TOP ACTION BAR KANAN */}
               <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-white shrink-0">
                 <div className="flex items-center gap-2 text-slate-500">
                   {selectedInquiry.isRead ? (
@@ -442,73 +458,127 @@ export default function Inbox() {
                 </div>
               </div>
 
-              <div className="flex-1 overflow-y-auto p-6 md:p-8 custom-scrollbar">
-                <div className="max-w-3xl">
-                  <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm mb-6 flex flex-wrap gap-6 items-center justify-between">
-                    <div>
-                      <h2 className="text-xl font-bold text-slate-900 mb-1">
-                        {selectedInquiry.name}
-                      </h2>
-                      <div className="flex items-center gap-4 text-sm text-slate-500">
-                        <a
-                          href={`mailto:${selectedInquiry.email}`}
-                          className="flex items-center gap-1.5 hover:text-daw-green transition-colors"
-                        >
-                          <Mail className="w-4 h-4" /> {selectedInquiry.email}
-                        </a>
-                        {selectedInquiry.phone && (
-                          <a
-                            href={`tel:${selectedInquiry.phone}`}
-                            className="flex items-center gap-1.5 hover:text-daw-green transition-colors"
+              <div className="flex-1 overflow-y-auto p-6 md:p-8 lg:p-10 custom-scrollbar bg-slate-50/30">
+                <div className="max-w-4xl mx-auto space-y-6">
+                  {/* --- THE HEADER CARD --- */}
+                  <div className="bg-white p-6 md:p-8 rounded-2xl border border-slate-200 shadow-sm relative overflow-hidden group">
+                    <div className="absolute -top-12 -right-12 w-32 h-32 bg-daw-green/5 rounded-full blur-2xl group-hover:bg-daw-green/10 transition-colors duration-500 pointer-events-none" />
+
+                    <div className="flex flex-col md:flex-row md:items-start justify-between gap-6 relative z-10">
+                      <div className="space-y-4 flex-1">
+                        <div className="flex flex-wrap items-center gap-3 text-xs">
+                          <span className="px-3 py-1 bg-slate-100 text-slate-600 font-bold uppercase tracking-wider rounded-md border border-slate-200">
+                            {selectedInquiry.subject || "General Inquiry"}
+                          </span>
+                          <span className="flex items-center gap-1.5 text-slate-400 font-medium">
+                            <Clock className="w-3.5 h-3.5" />
+                            {formatDate(selectedInquiry.createdAt)}
+                          </span>
+                        </div>
+
+                        <h2 className="text-2xl md:text-3xl font-serif font-black text-slate-900 tracking-tight">
+                          {selectedInquiry.name}
+                        </h2>
+
+                        <div className="flex flex-wrap items-center gap-x-6 gap-y-3 text-sm">
+                          <button
+                            onClick={() =>
+                              copyEmailToClipboard(selectedInquiry.email)
+                            }
+                            className="flex items-center gap-2 text-slate-600 hover:text-daw-green font-medium transition-colors group/copy"
+                            title="Click to copy email"
                           >
-                            <Phone className="w-4 h-4" />{" "}
-                            {selectedInquiry.phone}
-                          </a>
-                        )}
+                            <div className="p-1.5 bg-slate-100 rounded-md group-hover/copy:bg-daw-green/10 transition-colors">
+                              <Mail className="w-3.5 h-3.5" />
+                            </div>
+                            {selectedInquiry.email}
+                          </button>
+
+                          {selectedInquiry.phone && (
+                            <a
+                              href={`tel:${selectedInquiry.phone}`}
+                              className="flex items-center gap-2 text-slate-600 hover:text-daw-green font-medium transition-colors group/phone"
+                            >
+                              <div className="p-1.5 bg-slate-100 rounded-md group-hover/phone:bg-daw-green/10 transition-colors">
+                                <Phone className="w-3.5 h-3.5" />
+                              </div>
+                              {selectedInquiry.phone}
+                            </a>
+                          )}
+
+                          {selectedInquiry.company && (
+                            <div className="flex items-center gap-2 text-slate-600 font-medium">
+                              <div className="p-1.5 bg-blue-50 text-blue-600 rounded-md">
+                                <Building className="w-3.5 h-3.5" />
+                              </div>
+                              <span className="text-slate-900">
+                                {selectedInquiry.company}
+                              </span>
+                            </div>
+                          )}
+                        </div>
                       </div>
                     </div>
-                    <div className="text-right">
-                      <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1 flex items-center justify-end gap-1.5">
-                        <Clock className="w-3.5 h-3.5" /> Received
-                      </p>
-                      <p className="text-sm font-medium text-slate-700">
-                        {formatDate(selectedInquiry.createdAt)}
-                      </p>
-                    </div>
                   </div>
 
-                  {selectedInquiry.company && (
-                    <div className="mb-6 inline-flex items-center gap-2 px-3 py-1.5 bg-blue-50 text-blue-700 rounded-lg text-sm font-medium border border-blue-100">
-                      <Building className="w-4 h-4" /> Organization:{" "}
-                      {selectedInquiry.company}
+                  {/* --- THE MESSAGE CONTENT --- */}
+                  <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+                    <div className="px-6 md:px-8 py-4 border-b border-slate-100 bg-slate-50/50 flex items-center justify-between">
+                      <h3 className="text-xs font-bold text-slate-500 uppercase tracking-widest flex items-center gap-2">
+                        <MailOpen className="w-4 h-4 text-daw-green" />
+                        Message Content
+                      </h3>
                     </div>
-                  )}
-
-                  <div className="bg-white p-6 md:p-8 rounded-xl border border-slate-200 shadow-sm">
-                    <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-4 border-b border-slate-100 pb-2">
-                      Message Content
-                    </h3>
-                    <p className="text-slate-700 leading-relaxed whitespace-pre-wrap font-sans">
+                    <div className="p-6 md:p-8 text-slate-700 leading-relaxed whitespace-pre-wrap font-sans text-[15px]">
                       {selectedInquiry.message}
-                    </p>
+                    </div>
                   </div>
 
-                  <div className="mt-8 flex flex-wrap items-center gap-3">
-                    <a
-                      href={`mailto:${selectedInquiry.email}?subject=Reply from PT Dharma Agung Wijaya`}
-                      className="inline-flex items-center gap-2 bg-slate-900 hover:bg-slate-800 text-white px-6 py-3 rounded-lg font-medium transition-colors shadow-sm"
-                    >
-                      <Mail className="w-4 h-4" /> Reply via Email Client
-                    </a>
-                    {/* Tombol Copy Alternatif */}
-                    <button
-                      onClick={() =>
-                        copyEmailToClipboard(selectedInquiry.email)
-                      }
-                      className="inline-flex items-center gap-2 bg-white border border-slate-200 hover:border-daw-green hover:bg-daw-green/5 text-slate-700 hover:text-daw-green px-6 py-3 rounded-lg font-medium transition-colors shadow-sm"
-                    >
-                      Copy Email Address
-                    </button>
+                  {/* --- THE ACTION BAR --- */}
+                  <div className="bg-slate-900 p-6 md:p-8 rounded-2xl shadow-xl flex flex-col md:flex-row items-center justify-between gap-6 relative overflow-hidden">
+                    <div className="absolute inset-0 opacity-20 pointer-events-none">
+                      <div className="absolute -top-24 -left-24 w-48 h-48 bg-daw-green rounded-full blur-[80px]"></div>
+                    </div>
+
+                    <div className="relative z-10 text-center md:text-left">
+                      <h4 className="text-white font-bold text-lg mb-1">
+                        Ready to reply?
+                      </h4>
+                      <p className="text-slate-400 text-sm">
+                        Choose your preferred email client below.
+                      </p>
+                    </div>
+
+                    <div className="flex flex-wrap justify-center md:justify-end items-center gap-3 relative z-10 w-full md:w-auto">
+                      <button
+                        onClick={() => openWebMail("gmail")}
+                        className="flex-1 md:flex-none inline-flex items-center justify-center gap-2 bg-white/10 hover:bg-white/20 text-white border border-white/10 px-5 py-2.5 rounded-xl font-medium transition-all backdrop-blur-sm group"
+                      >
+                        <div className="w-6 h-6 rounded-full bg-red-500 flex items-center justify-center group-hover:scale-110 transition-transform">
+                          <Mail className="w-3.5 h-3.5 text-white" />
+                        </div>
+                        Gmail
+                      </button>
+
+                      <button
+                        onClick={() => openWebMail("outlook")}
+                        className="flex-1 md:flex-none inline-flex items-center justify-center gap-2 bg-white/10 hover:bg-white/20 text-white border border-white/10 px-5 py-2.5 rounded-xl font-medium transition-all backdrop-blur-sm group"
+                      >
+                        <div className="w-6 h-6 rounded-full bg-blue-500 flex items-center justify-center group-hover:scale-110 transition-transform">
+                          <Mail className="w-3.5 h-3.5 text-white" />
+                        </div>
+                        Outlook
+                      </button>
+
+                      <button
+                        onClick={() =>
+                          copyEmailToClipboard(selectedInquiry.email)
+                        }
+                        className="w-full md:w-auto inline-flex items-center justify-center gap-2 bg-daw-green hover:bg-emerald-500 text-white px-5 py-2.5 rounded-xl font-bold transition-all shadow-[0_0_15px_rgba(16,185,129,0.3)] hover:shadow-[0_0_20px_rgba(16,185,129,0.5)]"
+                      >
+                        Copy Email
+                      </button>
+                    </div>
                   </div>
                 </div>
               </div>
