@@ -118,11 +118,13 @@ export default function InvestmentsSection() {
                 const isHovered = hoveredCategory === company.category;
                 const isAnyHovered = hoveredCategory !== null;
 
+                // --- LOGIKA OPACITY DIPERBARUI (HAPUS GRAYSCALE) ---
                 const opacityClass = isAnyHovered
                   ? isHovered
-                    ? "opacity-100 scale-105"
-                    : "opacity-20 grayscale scale-95"
-                  : "opacity-80 grayscale hover:grayscale-0 hover:opacity-100";
+                    ? "opacity-100 scale-105" // Kategori yang dipilih: Terang & Besar
+                    : "opacity-20 scale-95" // Kategori lain: Redup tapi tetap berwarna
+                  : "opacity-100"; // Kondisi Default: Semua Terang & Berwarna
+
                 const borderClass = isHovered
                   ? "border-emerald-500/50 shadow-[0_0_20px_rgba(16,185,129,0.15)] bg-white/10"
                   : "border-white/5 bg-white/5";
@@ -132,11 +134,12 @@ export default function InvestmentsSection() {
                     key={company.id}
                     className={`relative flex flex-col items-center justify-center aspect-square md:aspect-[4/3] rounded-2xl p-4 transition-all duration-700 ease-[cubic-bezier(0.4,0,0.2,1)] ${opacityClass} ${borderClass}`}
                   >
-                    <div className="w-16 h-16 mb-3 rounded-full bg-slate-300 flex items-center justify-center text-slate-500 text-xs text-center border border-white/10 font-bold overflow-hidden">
+                    {/* CONTAINER LOGO: Diubah ke bg-white agar warna logo asli terlihat kontras */}
+                    <div className="w-16 h-16 mb-3 rounded-full bg-white flex items-center justify-center shadow-lg overflow-hidden border border-white/20">
                       <img
                         src={getCleanImageUrl(company.logoUrl)}
                         alt={company.name}
-                        className="w-full h-full object-contain p-2"
+                        className="w-full h-full object-contain p-3" // p-3 supaya logo tidak mepet ke pinggir circle
                         onError={(e) => {
                           e.currentTarget.style.display = "none";
                         }}

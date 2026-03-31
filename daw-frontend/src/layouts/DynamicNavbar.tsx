@@ -82,7 +82,7 @@ export default function DynamicNavbar() {
     return "#";
   };
 
-  // 🔥 THE FIX: Deteksi apakah link ini adalah rute lokal (misal: /businesses atau #resources)
+  // THE FIX: Deteksi apakah link ini adalah rute lokal (misal: /businesses atau #resources)
   const isLocalRoute = (url: string) =>
     url.startsWith("/") || url.startsWith("#");
 
