@@ -123,7 +123,7 @@ export default function BusinessGrid({
                       className={`relative pb-4 text-[14px] font-bold uppercase tracking-[0.15em] transition-colors duration-300 z-10 ${
                         activeFilter === f.value
                           ? "text-daw-green"
-                          : "text-slate-400 hover:text-slate-900"
+                          : "text-slate-400 hover:text-daw-yellow"
                       }`}
                     >
                       {f.label}
@@ -186,7 +186,7 @@ export default function BusinessGrid({
                         {project.excerpt || "No description available."}
                       </p>
 
-                      <div className="mt-auto inline-flex items-center gap-2 text-daw-green font-semibold text-[14px]">
+                      <div className="mt-auto inline-flex items-center gap-2 text-daw-green group-hover:text-daw-yellow font-semibold text-[14px] transition-colors duration-300">
                         <span>{t("business.readMore", "Read More")}</span>
                         <ArrowRight className="w-4 h-4 transform group-hover:translate-x-1.5 transition-transform duration-300" />
                       </div>

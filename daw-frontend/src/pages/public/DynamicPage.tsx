@@ -398,7 +398,7 @@ export default function DynamicPage() {
                     ref={articleRef}
                     className={`w-full text-left
                     /* 1. KUNCI ANTI OVERFLOW: Gunakan break-words sebagai jaring pengaman */
-                    break-words
+                    
                     [&>*:first-child]:mt-0
                     /* 2. PROSE CORE */ 
                     prose prose-slate prose-lg md:prose-xl max-w-none

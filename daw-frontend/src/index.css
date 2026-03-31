@@ -4,6 +4,7 @@
 
 @theme {
   --color-daw-green: #004b23;
+  --color-daw-yellow: #e29504;
   --color-daw-green-hover: #003619;
   --font-sans: "Inter", sans-serif;
   --font-serif: "Lora", serif;
@@ -125,4 +126,30 @@
 }
 .daw-editorial-content ul li::marker {
   color: #00a651; /* Bullet point warna hijau DAW */
+}
+
+/* =======================================================
+   🚀 FIX: BAD WORD BREAKING (QUILL & TAILWIND PROSE)
+   ======================================================= */
+.prose,
+.daw-editorial-content,
+.ql-editor {
+  word-break: normal !important; /* HARAM memotong kata di tengah! */
+  overflow-wrap: break-word !important; /* Boleh memotong HANYA untuk URL super panjang */
+  white-space: normal !important;
+  text-wrap: pretty !important; /* CSS Modern: Mencegah 1 kata sendirian di baris bawah (Orphans) */
+}
+
+/* Pastikan tag paragraf di dalamnya juga tunduk pada aturan yang sama */
+.prose p,
+.daw-editorial-content p,
+.prose h1,
+.prose h2,
+.prose h3,
+.prose h4,
+.daw-editorial-content h1,
+.daw-editorial-content h2,
+.daw-editorial-content h3 {
+  word-break: normal !important;
+  overflow-wrap: break-word !important;
 }
