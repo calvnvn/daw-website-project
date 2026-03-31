@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo, memo } from "react";
 import mapBase from "@/assets/map-indonesia-base.svg";
+import { MapIcon } from "lucide-react";
 
 export interface MapMarker {
   id: string;
@@ -10,6 +11,7 @@ export interface MapMarker {
   dotY: string;
   boxX: string;
   boxY: string;
+  mapUrl?: string;
 }
 
 interface InteractiveMapProps {
@@ -216,7 +218,23 @@ const InteractiveMap = memo(function InteractiveMap({
                 <p className="font-sans text-[11px] font-medium text-slate-600 leading-relaxed break-words">
                   {m.desc}
                 </p>
-
+                {m.mapUrl && (
+                  <div className="mt-2 pt-2 border-t border-slate-100/60 pointer-events-auto">
+                    <a
+                      href={m.mapUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className={`inline-flex items-center gap-1.5 text-[9px] md:text-[10px] font-bold uppercase tracking-widest transition-colors ${
+                        m.type === "direct"
+                          ? "text-[#004B23] hover:text-[#10B981]"
+                          : "text-[#D97706] hover:text-amber-500"
+                      }`}
+                    >
+                      <MapIcon className="w-3 h-3" />
+                      View on Map
+                    </a>
+                  </div>
+                )}
                 {/* Aksen Segitiga Penunjuk di Mobile agar lebih manis seperti Tooltip Maps */}
                 {isMobile && (
                   <div className="absolute -bottom-2 left-1/2 -translate-x-1/2 w-4 h-4 bg-white rotate-45 border-r border-b border-slate-200/50 -z-10"></div>

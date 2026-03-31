@@ -394,6 +394,26 @@ export default function ManageBusinesses() {
                           className={`w-full px-2 py-1.5 text-xs rounded-md transition-all mb-2 ${isEditing ? "bg-white border border-slate-300 text-slate-900 focus:ring-2 focus:ring-daw-green/20" : "bg-slate-100/50 border-transparent text-slate-500"}`}
                           placeholder="Capacity (e.g. 45 ton/hour)"
                         />
+                        {/* 👇 TAMBAHKAN KOTAK INPUT INI DI BAWAHNYA 👇 */}
+                        <div className="relative mt-2">
+                          <div className="absolute inset-y-0 left-0 pl-2.5 flex items-center pointer-events-none">
+                            <MapIcon className="w-3.5 h-3.5 text-slate-400" />
+                          </div>
+                          <input
+                            type="url"
+                            value={marker.mapUrl || ""}
+                            onChange={(e) =>
+                              updateMarker(index, "mapUrl", e.target.value)
+                            }
+                            disabled={!isEditing}
+                            className={`w-full pl-8 pr-2 py-1.5 text-xs rounded-md transition-all font-mono ${
+                              isEditing
+                                ? "bg-white border border-slate-300 text-blue-600 focus:ring-2 focus:ring-blue-500/20"
+                                : "bg-slate-100/50 border-transparent text-slate-400"
+                            }`}
+                            placeholder="https://maps.app.goo.gl/... (Optional)"
+                          />
+                        </div>
                       </div>
                     ))}
                     {formData.mapMarkers.length === 0 && (

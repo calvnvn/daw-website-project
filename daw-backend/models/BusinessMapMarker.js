@@ -25,16 +25,15 @@ const BusinessMapMarker = sequelize.define(
     dotY: { type: DataTypes.STRING, allowNull: false },
     boxX: { type: DataTypes.STRING, allowNull: false },
     boxY: { type: DataTypes.STRING, allowNull: false },
-
+    mapUrl: {
+      type: DataTypes.STRING(255),
+      allowNull: true,
+    },
     sectionId: {
       type: DataTypes.STRING(255),
       allowNull: false,
-      // references: {
-      //   model: "BusinessSection",
-      //   key: "id",
-      // },
     },
-  },
+  }, // <--- Koma di sini wajib ada!
   {
     tableName: "BusinessMapMarkers",
     timestamps: true,

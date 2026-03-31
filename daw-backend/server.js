@@ -145,7 +145,7 @@ BusinessMapMarker.belongsTo(BusinessSection, {
 const PORT = process.env.PORT || 5000;
 
 sequelize
-  .sync({ alter: false }) // Hindari alter: true di production karena bisa mengunci/drop tabel
+  .sync({ alter: true }) // Hindari alter: true di production karena bisa mengunci/drop tabel
   .then(() => {
     // const User = require("./models/User");
     // async function repairRemoteAdmin() {

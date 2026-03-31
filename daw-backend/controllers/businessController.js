@@ -19,10 +19,11 @@ exports.getPublicBusinessData = async (req, res) => {
             "dotY",
             "boxX",
             "boxY",
+            "mapUrl",
           ],
         },
       ],
-      order: [["createdAt", "ASC"]], // Urutkan sesuai waktu pembuatan
+      order: [["createdAt", "ASC"]],
     });
 
     res.status(200).json(sections);
@@ -68,7 +69,6 @@ exports.updateBusinessSection = async (req, res) => {
 
     // Jika Admin menyalakan toggle Map dan mengirimkan data marker baru
     if (hasMap && mapMarkers && mapMarkers.length > 0) {
-      // Siapkan array marker baru dengan menyisipkan 'sectionId'
       const newMarkers = mapMarkers.map((marker) => ({
         title: marker.title,
         desc: marker.desc,
@@ -77,7 +77,8 @@ exports.updateBusinessSection = async (req, res) => {
         dotY: marker.dotY,
         boxX: marker.boxX,
         boxY: marker.boxY,
-        sectionId: id, // Hubungkan marker ini ke section yang sedang diedit
+        mapUrl: marker.mapUrl,
+        sectionId: id,
       }));
 
       // Masukkan semua marker baru sekaligus (Bulk Create)

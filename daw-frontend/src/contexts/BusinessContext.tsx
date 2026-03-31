@@ -17,6 +17,7 @@ export interface MapMarker {
   dotY: string;
   boxX: string;
   boxY: string;
+  mapUrl?: string;
 }
 
 export interface SectionData {
