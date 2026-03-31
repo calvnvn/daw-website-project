@@ -31,7 +31,7 @@ const InteractiveMap = memo(function InteractiveMap({
     return () => window.removeEventListener("resize", checkMobile);
   }, []);
 
-  // PHYSICS COLLISION ENGINE V3: THE SHIELD
+  // PHYSICS COLLISION ENGINE V4: TALL STEM ARCHITECTURE
   const smartMarkers = useMemo(() => {
     if (!markers || markers.length === 0) return [];
 
@@ -43,13 +43,14 @@ const InteractiveMap = memo(function InteractiveMap({
         dX,
         dY,
         bX: dX,
-        bY: dY - 12,
+        // 1. Spawn awal ditaruh jauh lebih tinggi (20% ke atas)
+        bY: dY - 20,
       };
     });
 
     for (let i = 0; i < 25; i++) {
       for (let j = 0; j < nodes.length; j++) {
-        // Box vs Box Dodge each other
+        // 1. Box vs Box Dodge (Saling menghindar kalau tabrakan)
         for (let k = j + 1; k < nodes.length; k++) {
           const n1 = nodes[j];
           const n2 = nodes[k];
@@ -57,8 +58,9 @@ const InteractiveMap = memo(function InteractiveMap({
           const dy = n1.bY - n2.bY;
           const dist = Math.sqrt(dx * dx + dy * dy) || 0.1;
 
-          if (dist < 14) {
-            const force = (14 - dist) * 0.5;
+          // Jarak aman antar kotak diperlebar ke 16
+          if (dist < 16) {
+            const force = (16 - dist) * 0.5;
             n1.bX += (dx / dist) * force;
             n1.bY += (dy / dist) * force;
             n2.bX -= (dx / dist) * force;
@@ -66,32 +68,37 @@ const InteractiveMap = memo(function InteractiveMap({
           }
         }
 
-        // Box VS Dot Anti-Eclipse
+        // 2. Box VS Dot Anti-Eclipse (Kotak menjauhi titik)
         const n = nodes[j];
         nodes.forEach((dotNode) => {
           const dx = n.bX - dotNode.dX;
           const dy = n.bY - dotNode.dY;
           const dist = Math.sqrt(dx * dx + dy * dy) || 0.1;
 
-          if (dist < 9) {
-            // The box must be at least 9% away from any point
-            const force = (9 - dist) * 0.8;
+          // Jarak aman dari titik diperlebar agar tangkai terpaksa memanjang
+          if (dist < 14) {
+            const force = (14 - dist) * 0.8;
             n.bX += (dx / dist) * force;
             n.bY += (dy / dist) * force;
           }
         });
 
-        // 3. Gravity (Drag the box back toward its starting point so it doesn’t disappear)
+        // 3. Gravity (THE HOVER ANCHOR)
+        // KUNCI UTAMA: Kita JANGAN tarik gravitasinya balik ke titik (n.dY)!
+        // Kita tarik gravitasinya ke "Titik Melayang" (25% tegak lurus di atas dot)
+        const targetHoverY = n.dY - 20;
+
         const anchorDx = n.dX - n.bX;
-        const anchorDy = n.dY - n.bY;
+        const anchorDy = targetHoverY - n.bY; // Perhatikan ini, ditarik ke targetHoverY
         const anchorDist = Math.sqrt(anchorDx * anchorDx + anchorDy * anchorDy);
 
-        if (anchorDist > 18) {
+        // Jika kotak didorong terlalu jauh oleh kotak lain, tarik perlahan ke posisi melayangnya
+        if (anchorDist > 5) {
           n.bX += anchorDx * 0.05;
           n.bY += anchorDy * 0.05;
         }
 
-        // 4. Maximum Map Screen
+        // 4. Batas Edge Layar
         n.bX = Math.max(5, Math.min(95, n.bX));
         n.bY = Math.max(5, Math.min(90, n.bY));
       }
