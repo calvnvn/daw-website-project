@@ -25,6 +25,15 @@ import logoDaw from "@/assets/logo-daw.png";
 import { useSettings } from "@/contexts/SettingsContext";
 import { getCleanImageUrl } from "@/lib/utils";
 
+interface InquiryData {
+  id: string | number;
+  name: string;
+  subject: string;
+  message: string;
+  isRead: boolean;
+  [key: string]: unknown;
+}
+
 export default function AdminLayout() {
   const { settings } = useSettings();
 
@@ -32,27 +41,33 @@ export default function AdminLayout() {
   const [isDesktopCollapsed, setIsDesktopCollapsed] = useState(false);
   const [isLogoutModalOpen, setIsLogoutModalOpen] = useState(false);
 
-  const [unreadInquiries, setUnreadInquiries] = useState<any[]>([]);
+  const [unreadInquiries, setUnreadInquiries] = useState<InquiryData[]>([]);
   const [isNotifOpen, setIsNotifOpen] = useState(false);
 
   const location = useLocation();
   const navigate = useNavigate();
 
   useEffect(() => {
-    const fetchUnreadInquiries = async () => {
+    // ✅ FIX 1: Pindahkan setState ke dalam fungsi async agar React tidak menganggapnya sebagai "Synchronous effect mutation"
+    const handleRouteChange = async () => {
+      // Tutup panel notifikasi (dan sekalian menu HP) setiap kali pindah halaman
+      setIsNotifOpen(false);
+      setIsMobileMenuOpen(false);
+
       try {
         const response = await api.get("/inquiries");
         if (response.data) {
-          const unread = response.data.filter((item: any) => !item.isRead);
+          const unread = response.data.filter(
+            (item: InquiryData) => !item.isRead,
+          );
           setUnreadInquiries(unread);
         }
-      } catch (error: any) {
-        console.error("Failed to fetch notifications:", error.message);
+      } catch (error) {
+        console.error("Failed to fetch notifications:", error);
       }
     };
 
-    fetchUnreadInquiries();
-    setIsNotifOpen(false);
+    handleRouteChange();
   }, [location.pathname]);
 
   const userData = JSON.parse(localStorage.getItem("daw_user") || "{}");
@@ -77,8 +92,6 @@ export default function AdminLayout() {
       icon: Inbox,
       badge: unreadInquiries.length > 0 ? unreadInquiries.length : undefined,
     },
-    // { name: "Page Manager", path: "/admin/page-manager", icon: FileText }, // TAMBAHKAN INI
-    // { name: "Menu Manager", path: "/admin/menu-manager", icon: MenuIcon },
 
     { name: "Content Manager", path: "/admin/content", icon: FileText },
     { name: "User Access", path: "/admin/users", icon: Shield },
