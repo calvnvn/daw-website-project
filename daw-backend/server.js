@@ -1,4 +1,4 @@
-require("dotenv").config(); // Load environment variables
+require("dotenv").config();
 const express = require("express");
 const cors = require("cors");
 const path = require("path");
@@ -147,6 +147,23 @@ const PORT = process.env.PORT || 5000;
 sequelize
   .sync({ alter: false }) // Hindari alter: true di production karena bisa mengunci/drop tabel
   .then(() => {
+    // const User = require("./models/User");
+    // async function repairRemoteAdmin() {
+    //   try {
+    //     const user = await User.findOne({
+    //       where: { email: "rama.ilyasyah@daw.co.id" },
+    //     });
+    //     if (user) {
+    //       // Masukkan password plain text, nanti hook beforeUpdate yang akan nge-hash 1x
+    //       user.password = "admin123";
+    //       await user.save();
+    //       console.log("🚀 [REMOTE] Password di DB Kantor berhasil diperbaiki!");
+    //     }
+    //   } catch (err) {
+    //     console.error("❌ Gagal akses DB Kantor:", err.message);
+    //   }
+    // }
+    // repairRemoteAdmin();
     console.log("[DATABASE] MySQL/MariaDB Connected & Tables Synced.");
     // Server baru menyala SETELAH database dipastikan aman
     app.listen(PORT, () => {

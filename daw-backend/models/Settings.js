@@ -16,6 +16,8 @@ const Settings = sequelize.define(
     website: { type: DataTypes.STRING(100) },
     googleMapsUrl: { type: DataTypes.TEXT },
     linkedinUrl: { type: DataTypes.STRING(255) },
+    logoUrl: { type: DataTypes.STRING(255) },
+    faviconUrl: { type: DataTypes.STRING(255) },
   },
   {
     tableName: "Settings",
