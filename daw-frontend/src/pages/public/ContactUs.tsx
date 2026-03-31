@@ -28,6 +28,24 @@ export default function ContactUs() {
   // Scroll Progress Logic
   const [scrollProgress, setScrollProgress] = useState(0);
 
+  const [subjects, setSubjects] = useState<any[]>([]);
+  const [isLoadingSubjects, setIsLoadingSubjects] = useState(true);
+
+  // Fetch active subjects
+  useEffect(() => {
+    const fetchActiveSubjects = async () => {
+      try {
+        const res = await api.get("/inquiries/subjects/active");
+        setSubjects(res.data);
+      } catch (error) {
+        console.error("Gagal mengambil daftar subjek:", error);
+      } finally {
+        setIsLoadingSubjects(false);
+      }
+    };
+    fetchActiveSubjects();
+  }, []);
+
   useEffect(() => {
     const handleScroll = () => {
       const totalHeight =
@@ -404,21 +422,17 @@ export default function ContactUs() {
                             }`}
                           >
                             <option value="" disabled>
-                              Select a subject...
+                              {isLoadingSubjects
+                                ? "Loading subjects..."
+                                : "Select a subject..."}
                             </option>
-                            <option value="General Inquiry">
-                              General Inquiry
-                            </option>
-                            <option value="Business Partnership">
-                              Business Partnership
-                            </option>
-                            <option value="Investment & ESG">
-                              Investment & ESG
-                            </option>
-                            <option value="Careers">
-                              Careers & Internships
-                            </option>
-                            <option value="Media & PR">Media & PR</option>
+
+                            {/* MAPPING DINAMIS DARI DATABASE */}
+                            {subjects.map((sub) => (
+                              <option key={sub.id} value={sub.name}>
+                                {sub.name}
+                              </option>
+                            ))}
                           </select>
                           <div className="absolute inset-y-0 right-0 flex items-center pr-4 pointer-events-none">
                             <ChevronDown className="w-5 h-5 text-slate-400" />

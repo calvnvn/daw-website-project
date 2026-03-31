@@ -11,7 +11,6 @@ export default function Footer() {
   const { t } = useTranslation();
   const { settings } = useSettings();
 
-  // MAPPING LINK YANG BENAR
   const quickLinks = [
     { label: t("nav.home", "Home"), path: "/" },
     { label: t("nav.about", "About Us"), path: "/about" },

@@ -41,6 +41,7 @@ require("./models/Page");
 require("./models/Menu");
 require("./models/Affiliate");
 require("./models/Inquiry");
+require("./models/InquirySubject");
 require("./models/InvestmentSettings");
 
 const app = express();
@@ -146,24 +147,27 @@ const PORT = process.env.PORT || 5000;
 
 sequelize
   .sync({ alter: false }) // Hindari alter: true di production karena bisa mengunci/drop tabel
-  .then(() => {
-    // const User = require("./models/User");
-    // async function repairRemoteAdmin() {
-    //   try {
-    //     const user = await User.findOne({
-    //       where: { email: "rama.ilyasyah@daw.co.id" },
-    //     });
-    //     if (user) {
-    //       // Masukkan password plain text, nanti hook beforeUpdate yang akan nge-hash 1x
-    //       user.password = "admin123";
-    //       await user.save();
-    //       console.log("🚀 [REMOTE] Password di DB Kantor berhasil diperbaiki!");
-    //     }
-    //   } catch (err) {
-    //     console.error("❌ Gagal akses DB Kantor:", err.message);
+  .then(async () => {
+    // // Tambahkan 'async' di sini
+
+    // // --- AUTO-SEED INQUIRY SUBJECTS ---
+    // const InquirySubject = require("./models/InquirySubject");
+    // try {
+    //   const count = await InquirySubject.count();
+    //   if (count === 0) {
+    //     await InquirySubject.bulkCreate([
+    //       { name: "General Inquiry", isActive: true },
+    //       { name: "Business Partnership", isActive: true },
+    //       { name: "Investment & ESG", isActive: true },
+    //       { name: "Careers & Internships", isActive: true },
+    //       { name: "Media & PR", isActive: true },
+    //     ]);
+    //     console.log("🌱 [SEED] Inquiry Subjects auto-seeded successfully!");
     //   }
+    // } catch (err) {
+    //   console.error("❌ Gagal auto-seed subjects:", err.message);
     // }
-    // repairRemoteAdmin();
+
     console.log("[DATABASE] MySQL/MariaDB Connected & Tables Synced.");
     // Server baru menyala SETELAH database dipastikan aman
     app.listen(PORT, () => {
