@@ -4,6 +4,8 @@ import { MapPin, ChevronUp, ArrowUpRight } from "lucide-react";
 import logoDaw from "@/assets/logo-daw.png";
 import { useSettings } from "@/contexts/SettingsContext";
 import { getCleanImageUrl } from "@/lib/utils";
+import { useState, useEffect } from "react";
+import api from "@/lib/api";
 
 export default function Footer() {
   const { t } = useTranslation();
@@ -26,6 +28,30 @@ export default function Footer() {
   const scrollToTop = () => {
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
+
+  const [dynamicMenus, setDynamicMenus] = useState<any[]>([]);
+
+  useEffect(() => {
+    const fetchMenus = async () => {
+      try {
+        const response = await api.get("/menus/tree");
+        // FILTER: Buang menu yang namanya sudah ada di Hardcode (Home, About, dll)
+        const hardcodedLabels = [
+          "home",
+          "about us",
+          "our businesses",
+          "contact us",
+        ];
+        const filtered = response.data.filter(
+          (m: any) => !hardcodedLabels.includes(m.label.toLowerCase()),
+        );
+        setDynamicMenus(filtered);
+      } catch (error) {
+        console.error(error);
+      }
+    };
+    fetchMenus();
+  }, []);
 
   return (
     <footer className="bg-[#070e07] text-white overflow-hidden relative">
@@ -76,6 +102,7 @@ export default function Footer() {
                 {t("footer.quickLinks", "Navigation")}
               </h4>
               <ul className="flex flex-col gap-4">
+                {/* --- 1. RENDER HARDCODE (HAKIKAT) --- */}
                 {quickLinks.map((item) => (
                   <li key={item.path}>
                     <Link
@@ -88,6 +115,69 @@ export default function Footer() {
                     </Link>
                   </li>
                 ))}
+
+                {/* --- 2. RENDER DYNAMIC (MENU TAMBAHAN) --- */}
+                {dynamicMenus.map((menu) => {
+                  // --- FUNGSI SMART RESOLVER (LOGIC REDIRECT KE ANAK PERTAMA) ---
+                  const getEffectiveUrl = (node: any): string => {
+                    // 1. Jika menu ini punya Page (Link Langsung)
+                    if (node.type === "page" && node.Page?.slug)
+                      return `/page/${node.Page.slug}`;
+
+                    // 2. Jika menu ini Link External murni
+                    if (node.type === "external" && node.externalLink)
+                      return node.externalLink;
+
+                    // 3. JIKA FOLDER (ROOT): Ambil link dari anak pertamanya secara rekursif
+                    if (node.children && node.children.length > 0) {
+                      return getEffectiveUrl(node.children[0]);
+                    }
+
+                    return "#"; // Fallback jika kosong melompong
+                  };
+
+                  const url = getEffectiveUrl(menu);
+                  const isLocal = url.startsWith("/") || url.startsWith("#");
+
+                  const handleClick = () => {
+                    // Scroll ke atas hanya jika bukan target spesifik (# atau ?)
+                    if (!url.includes("#") && !url.includes("?")) {
+                      scrollToTop();
+                    }
+                  };
+
+                  const classes =
+                    "text-slate-400 hover:text-daw-green transition-all font-medium text-sm flex items-center gap-2 group";
+                  const content = (
+                    <>
+                      <span className="h-px w-0 bg-daw-green group-hover:w-4 transition-all duration-300" />
+                      {menu.label}
+                    </>
+                  );
+
+                  return (
+                    <li key={menu.id}>
+                      {isLocal ? (
+                        <Link
+                          to={url}
+                          onClick={handleClick}
+                          className={classes}
+                        >
+                          {content}
+                        </Link>
+                      ) : (
+                        <a
+                          href={url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className={classes}
+                        >
+                          {content}
+                        </a>
+                      )}
+                    </li>
+                  );
+                })}
               </ul>
             </div>
 
