@@ -117,7 +117,7 @@ export default function Footer() {
           <div className="container mx-auto px-6 py-8 max-w-7xl flex flex-col md:flex-row justify-between items-center gap-6">
             <p className="text-[12px] text-slate-500 font-medium tracking-wide">
               © {new Date().getFullYear()} PT Dharma Agung Wijaya.{" "}
-              {t("footer.copyright", "All rights reserved.")}
+              {t("All rights reserved.")}
             </p>
 
             <button

@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useTranslation } from "react-i18next";
 import { useSearchParams } from "react-router-dom";
 import OurCompany from "@/components/about/OurCompany";
@@ -22,6 +22,20 @@ export default function AboutUs() {
     const current = TABS.find((t) => t.id === activeTab);
     return current ? current.label : "About Us";
   };
+
+  const contentRef = useRef<HTMLElement>(null);
+  useEffect(() => {
+    if (searchParams.has("tab") && contentRef.current) {
+      const offset = 100; // Jarak aman agar judul tidak tertutup Sticky Navbar
+      const elementPosition = contentRef.current.getBoundingClientRect().top;
+      const offsetPosition = elementPosition + window.pageYOffset - offset;
+
+      window.scrollTo({
+        top: offsetPosition,
+        behavior: "smooth",
+      });
+    }
+  }, [activeTab, searchParams]);
 
   useEffect(() => {
     const handleScroll = () => {
@@ -112,7 +126,7 @@ export default function AboutUs() {
 
         {/* --- MAIN CONTENT SECTION --- */}
         {/* Tambahkan padding top yang lebih besar agar lega (py-24) */}
-        <section className="py-24 relative">
+        <section ref={contentRef} className="py-24 relative">
           {/* Dekorasi blur di background */}
           <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-daw-green/[0.03] rounded-full blur-[120px] -z-10 pointer-events-none" />
 

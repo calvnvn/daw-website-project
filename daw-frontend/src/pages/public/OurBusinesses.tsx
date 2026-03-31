@@ -118,7 +118,7 @@ export default function OurBusinesses() {
         title={t("businessesPage.hero.title", "Our Businesses")}
         description="Explore PT Dharma Agung Wijaya Group's diverse business portfolio in Renewable Energy and Natural Resources."
       />
-      <div className="bg-white min-h-screen selection:bg-daw-green selection:text-white overflow-x-hidden">
+      <div className="bg-white min-h-screen selection:bg-daw-green selection:text-white">
         {/* PROGRESS BAR DARI DYNAMIC PAGE */}
         <div
           className="fixed top-0 left-0 h-1.5 bg-gradient-to-r from-daw-green via-emerald-400 to-daw-green z-[100] transition-all duration-150 ease-out shadow-[0_0_10px_rgba(16,185,129,0.5)]"
@@ -162,63 +162,71 @@ export default function OurBusinesses() {
           </div>
         </section>
 
-        {/* --- STICKY NAV --- */}
-        <div className="sticky top-[72px] z-40 bg-white/90 backdrop-blur-md border-b border-slate-200 shadow-sm transition-all duration-300">
-          <div className="container mx-auto px-6 max-w-5xl flex justify-center sm:justify-between items-center overflow-x-auto">
-            {["resources", "energy", "investments"].map((section) => (
-              <button
-                key={section}
-                onClick={() => scrollToSection(section)}
-                className={`relative px-6 py-4 text-[13px] font-bold uppercase tracking-widest transition-all duration-300 ${
-                  activeSection === section
-                    ? "text-[#004B23] after:absolute after:bottom-0 after:left-0 after:w-full after:h-[3px] after:bg-[#004B23]"
-                    : "text-slate-400 hover:text-slate-800"
-                }`}
-              >
-                {t(`businessesPage.nav.${section}`)}
-              </button>
-            ))}
+        <div className="relative">
+          {/* --- STICKY NAV --- */}
+          {/* top-[72px] disesuaikan dengan tinggi navbar utama kamu */}
+          <div className="sticky top-[72px] z-40 bg-white/90 backdrop-blur-md border-b border-slate-200 shadow-sm transition-all duration-300">
+            <div className="container mx-auto px-6 max-w-5xl flex justify-center sm:justify-between items-center overflow-x-auto hide-scrollbar">
+              {["resources", "energy", "investments"].map((section) => (
+                <button
+                  key={section}
+                  onClick={() => scrollToSection(section)}
+                  className={`relative px-6 py-4 text-[13px] font-bold uppercase tracking-widest transition-all duration-300 ${
+                    activeSection === section
+                      ? "text-daw-green"
+                      : "text-slate-400 hover:text-slate-800"
+                  }`}
+                >
+                  {t(`businessesPage.nav.${section}`)}
+
+                  {/* INDIKATOR AKTIF: Menggunakan DAW Yellow agar "Lampaui Batas" */}
+                  {activeSection === section && (
+                    <div className="absolute bottom-0 left-0 w-full h-[3px] bg-daw-green animate-in fade-in zoom-in-95 duration-300" />
+                  )}
+                </button>
+              ))}
+            </div>
           </div>
-        </div>
 
-        {/* --- SECTIONS CONTAINER --- */}
-        <div className="flex flex-col relative">
-          {/* Ambient Blur Decoration */}
-          <div className="absolute top-40 right-0 w-[500px] h-[500px] bg-daw-green/[0.03] rounded-full blur-[120px] -z-10 pointer-events-none" />
+          {/* --- SECTIONS CONTAINER --- */}
+          {/* Semua konten di dalam sini adalah batas pergerakan Sticky Nav di atas */}
+          <div className="flex flex-col relative">
+            {/* Ambient Blur Decoration */}
+            <div className="absolute top-40 right-0 w-[500px] h-[500px] bg-daw-green/[0.03] rounded-full blur-[120px] -z-10 pointer-events-none" />
 
-          {isLoading ? (
-            <div className="py-32 text-center flex flex-col items-center justify-center gap-4">
-              <div className="w-12 h-12 border-4 border-daw-green border-t-transparent rounded-full animate-spin"></div>
-              <p className="text-slate-400 font-bold tracking-[0.2em] uppercase text-xs">
-                Loading Business Data...
-              </p>
-            </div>
-          ) : (
-            pageData.map((sectionData) => (
-              <section
-                key={sectionData.id}
-                id={sectionData.id}
-                className="bg-transparent" // Transparent to let ambient blurs show
-              >
-                <DynamicBusinessSection data={sectionData} />
-              </section>
-            ))
-          )}
+            {isLoading ? (
+              <div className="py-32 text-center flex flex-col items-center justify-center gap-4">
+                <div className="w-12 h-12 border-4 border-daw-green border-t-transparent rounded-full animate-spin"></div>
+                <p className="text-slate-400 font-bold tracking-[0.2em] uppercase text-xs">
+                  Loading Business Data...
+                </p>
+              </div>
+            ) : (
+              pageData.map((sectionData) => (
+                <section
+                  key={sectionData.id}
+                  id={sectionData.id}
+                  className="bg-transparent"
+                >
+                  <DynamicBusinessSection data={sectionData} />
+                </section>
+              ))
+            )}
 
-          {/* INVESTMENTS SECTION */}
-          <section
-            id="investments"
-            className="pt-32 pb-40 bg-[#081C15] overflow-hidden relative"
-          >
-            <div className="container mx-auto px-6 max-w-7xl relative z-10">
-              <h2 className="text-4xl md:text-5xl lg:text-6xl font-serif font-bold text-white mb-20 text-center tracking-tight">
-                {t("businessesPage.investments.title")}
-              </h2>
-              <InvestmentsSection />
-            </div>
-            {/* Subtle background glow for dark section */}
-            <div className="absolute bottom-0 right-0 w-[800px] h-[800px] bg-emerald-900/20 rounded-full blur-[150px] pointer-events-none" />
-          </section>
+            {/* INVESTMENTS SECTION: Ini adalah batas paling bawah */}
+            <section
+              id="investments"
+              className="pt-32 pb-40 bg-[#081C15] overflow-hidden relative"
+            >
+              <div className="container mx-auto px-6 max-w-7xl relative z-10">
+                <h2 className="text-4xl md:text-5xl lg:text-6xl font-serif font-bold text-white mb-20 text-center tracking-tight">
+                  {t("businessesPage.investments.title")}
+                </h2>
+                <InvestmentsSection />
+              </div>
+              <div className="absolute bottom-0 right-0 w-[800px] h-[800px] bg-emerald-900/20 rounded-full blur-[150px] pointer-events-none" />
+            </section>
+          </div>
         </div>
       </div>
     </>
