@@ -94,7 +94,20 @@ export default function NavigationBuilder() {
   };
 
   useEffect(() => {
-    fetchData();
+    fetchData(); // Fetch awal saat komponen dimuat
+
+    // Bikin fungsi untuk merespon sinyal
+    const handleRefresh = () => {
+      fetchData(); // Tarik data ulang dari database
+    };
+
+    // Pasang "telinga" untuk dengerin event "pagesDataUpdated"
+    window.addEventListener("pagesDataUpdated", handleRefresh);
+
+    // Wajib ada cleanup biar memorinya nggak bocor
+    return () => {
+      window.removeEventListener("pagesDataUpdated", handleRefresh);
+    };
   }, []);
 
   const resetForm = () => {

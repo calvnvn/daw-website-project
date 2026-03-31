@@ -261,6 +261,8 @@ export default function PageBuilder() {
       resetForm();
       setHeroFile(null); // Reset file setelah sukses
       fetchPages();
+
+      window.dispatchEvent(new Event("pagesDataUpdated"));
     } catch (error) {
       toast.error("Gagal menyimpan ke server.", { id: toastId });
       console.error("Error: ", error);
