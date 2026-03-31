@@ -48,9 +48,7 @@ export default function AdminLayout() {
   const navigate = useNavigate();
 
   useEffect(() => {
-    // ✅ FIX 1: Pindahkan setState ke dalam fungsi async agar React tidak menganggapnya sebagai "Synchronous effect mutation"
     const handleRouteChange = async () => {
-      // Tutup panel notifikasi (dan sekalian menu HP) setiap kali pindah halaman
       setIsNotifOpen(false);
       setIsMobileMenuOpen(false);
 
