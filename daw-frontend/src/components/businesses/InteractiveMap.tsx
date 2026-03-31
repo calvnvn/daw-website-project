@@ -86,7 +86,7 @@ const InteractiveMap = memo(function InteractiveMap({
         // 3. Gravity (THE HOVER ANCHOR)
         // KUNCI UTAMA: Kita JANGAN tarik gravitasinya balik ke titik (n.dY)!
         // Kita tarik gravitasinya ke "Titik Melayang" (25% tegak lurus di atas dot)
-        const targetHoverY = n.dY - 20;
+        const targetHoverY = n.dY - 18;
 
         const anchorDx = n.dX - n.bX;
         const anchorDy = targetHoverY - n.bY; // Perhatikan ini, ditarik ke targetHoverY
