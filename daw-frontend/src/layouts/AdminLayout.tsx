@@ -21,9 +21,13 @@ import {
   FileText,
 } from "lucide-react";
 import api from "@/lib/api";
-import logoDaw from "../assets/logo-daw.png";
+import logoDaw from "@/assets/logo-daw.png";
+import { useSettings } from "@/contexts/SettingsContext";
+import { getCleanImageUrl } from "@/lib/utils";
 
 export default function AdminLayout() {
+  const { settings } = useSettings();
+
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isDesktopCollapsed, setIsDesktopCollapsed] = useState(false);
   const [isLogoutModalOpen, setIsLogoutModalOpen] = useState(false);
@@ -102,7 +106,9 @@ export default function AdminLayout() {
         {/* AREA LOGO (Warna Asli) */}
         <div className="h-20 flex items-center px-8 border-b border-slate-100">
           <img
-            src={logoDaw}
+            src={
+              settings?.logoUrl ? getCleanImageUrl(settings.logoUrl) : logoDaw
+            }
             alt="DAW Admin Logo"
             className="h-10 w-auto object-contain"
           />

@@ -4,6 +4,8 @@ import { useTranslation } from "react-i18next";
 import { Menu, X, ChevronDown } from "lucide-react";
 import logoDaw from "@/assets/logo-daw.png";
 import api from "@/lib/api";
+import { useSettings } from "@/contexts/SettingsContext";
+import { getCleanImageUrl } from "@/lib/utils";
 
 // --- BENTUK DATA DARI BACKEND ---
 interface MenuNode {
@@ -16,15 +18,18 @@ interface MenuNode {
 }
 
 export default function DynamicNavbar() {
+  const { settings } = useSettings();
   const [menus, setMenus] = useState<MenuNode[]>([]);
   const [isScrolled, setIsScrolled] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [openMobileAccordions, setOpenMobileAccordions] = useState<
     Record<string, boolean>
   >({});
-
   const { t } = useTranslation();
 
+  const displayLogo = settings?.logoUrl
+    ? getCleanImageUrl(settings.logoUrl)
+    : logoDaw;
   // --- FETCH MENU TREE ---
   useEffect(() => {
     const fetchMenus = async () => {
@@ -99,9 +104,11 @@ export default function DynamicNavbar() {
         <div className="container mx-auto px-6 relative z-20 flex items-center justify-between">
           <Link to="/" onClick={closeMenu} className="flex items-center gap-3">
             <img
-              src={logoDaw}
-              alt="Logo PT Dharma Agung Wijaya"
-              className={`h-10 w-auto transition-all duration-300 ${isTransparent ? "brightness-0 invert" : ""}`}
+              src={displayLogo}
+              alt={settings?.companyName || "DAW Logo"}
+              className={`h-10 w-auto transition-all duration-300 ${
+                isTransparent ? "brightness-0 invert" : ""
+              }`}
             />
           </Link>
 

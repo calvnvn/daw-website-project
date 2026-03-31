@@ -10,10 +10,12 @@ import {
   Map,
   Lock,
   Unlock,
+  Image as ImageIcon,
 } from "lucide-react";
 import { toast } from "sonner";
 import api from "@/lib/api";
-
+import { getCleanImageUrl } from "@/lib/utils";
+import { useSettings } from "@/contexts/SettingsContext";
 export default function GlobalSettings() {
   const [formData, setFormData] = useState({
     companyName: "",
@@ -25,10 +27,16 @@ export default function GlobalSettings() {
     linkedinUrl: "",
   });
 
+  const [logoFile, setLogoFile] = useState<File | null>(null);
+  const [faviconFile, setFaviconFile] = useState<File | null>(null);
+  const [logoPreview, setLogoPreview] = useState<string | null>(null);
+  const [faviconPreview, setFaviconPreview] = useState<string | null>(null);
+
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
 
+  const { refreshSettings } = useSettings();
   // --- 1. Fetch Data ---
   useEffect(() => {
     const fetchSettings = async () => {
@@ -45,6 +53,10 @@ export default function GlobalSettings() {
           googleMapsUrl: data.googleMapsUrl || "",
           linkedinUrl: data.linkedinUrl || "",
         });
+
+        if (data.logoUrl) setLogoPreview(getCleanImageUrl(data.logoUrl));
+        if (data.faviconUrl)
+          setFaviconPreview(getCleanImageUrl(data.faviconUrl));
       } catch {
         toast.error(
           "Gagal terhubung ke server. Silakan coba beberapa saat lagi.",
@@ -60,9 +72,24 @@ export default function GlobalSettings() {
     setIsSaving(true);
     const loadingToast = toast.loading("Sedang menyimpan pengaturan global...");
     try {
-      await api.put("/settings", formData);
+      const data = new FormData();
+
+      // Loop data teks
+      Object.entries(formData).forEach(([key, value]) => {
+        data.append(key, value);
+      });
+
+      // Append File (Gunakan key yang sama dengan Multer di Backend)
+      if (logoFile) data.append("logo", logoFile);
+      if (faviconFile) data.append("favicon", faviconFile);
+
+      await api.put("/settings", data);
+      await refreshSettings();
       toast.success("Pengaturan berhasil diperbarui!", { id: loadingToast });
+
       setIsEditing(false);
+      setLogoFile(null);
+      setFaviconFile(null);
     } catch (error: any) {
       toast.error("Gagal Memperbarui Data", {
         description:
@@ -94,23 +121,23 @@ export default function GlobalSettings() {
   return (
     <div className="max-w-6xl mx-auto space-y-6 pb-12">
       {/* --- HEADER --- */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white p-6 rounded-xl border border-slate-200 shadow-sm top-0 z-20">
-        <div>
-          <h1 className="text-2xl font-serif font-bold text-slate-900">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-white p-5 md:p-6 rounded-xl border border-slate-200 shadow-sm top-0 z-20">
+        <div className="w-full">
+          <h1 className="text-xl md:text-2xl font-serif font-bold text-slate-900">
             Global Settings
           </h1>
-          <p className="text-sm text-slate-500 mt-1">
-            Kelola identitas, informasi kontak resmi, dan pengaturan bagian kaki
-            (footer) website.
+          <p className="text-xs md:text-sm text-slate-500 mt-1">
+            Kelola identitas, kontak, dan branding website.
           </p>
         </div>
-        <div className="flex items-center gap-3">
+
+        <div className="flex items-center gap-2 w-full md:w-auto">
           <button
             onClick={() => setIsEditing(!isEditing)}
-            className={`flex items-center gap-2 px-4 py-2.5 rounded-lg font-bold text-sm transition-colors border ${
+            className={`flex-1 md:flex-none flex items-center justify-center gap-2 px-3 py-2.5 rounded-lg font-bold text-xs transition-colors border ${
               isEditing
-                ? "bg-amber-100 text-amber-700 border-amber-200 hover:bg-amber-200"
-                : "bg-slate-100 text-slate-500 border-slate-200 hover:bg-slate-200"
+                ? "bg-amber-100 text-amber-700 border-amber-200"
+                : "bg-slate-100 text-slate-500 border-slate-200"
             }`}
           >
             {isEditing ? (
@@ -118,16 +145,16 @@ export default function GlobalSettings() {
             ) : (
               <Lock className="w-4 h-4" />
             )}
-            <span>{isEditing ? "Editing Mode" : "Locked"}</span>
+            <span>{isEditing ? "Editing" : "Locked"}</span>
           </button>
 
           <button
             onClick={handleSave}
             disabled={isSaving || !isEditing}
-            className="flex items-center gap-2 bg-daw-green hover:bg-[#003b1c] disabled:bg-slate-300 disabled:cursor-not-allowed text-white px-6 py-2.5 rounded-lg font-medium transition-colors shadow-sm"
+            className="flex-1 md:flex-none flex items-center justify-center gap-2 bg-daw-green hover:bg-[#003b1c] disabled:bg-slate-200 disabled:text-slate-400 text-white px-5 py-2.5 rounded-lg font-bold text-xs transition-all shadow-sm"
           >
-            <Save className="w-5 h-5" />
-            <span>{isSaving ? "Saving..." : "Save Changes"}</span>
+            <Save className="w-4 h-4" />
+            <span>{isSaving ? "Saving..." : "Save"}</span>
           </button>
         </div>
       </div>
@@ -289,6 +316,89 @@ export default function GlobalSettings() {
                   Buka Google Maps &gt; Bagikan &gt; Sematkan peta &gt; Salin
                   URL yang ada di dalam atribut <code>src="..."</code>.
                 </p>
+              </div>
+            </div>
+          </div>
+        </div>
+        {/* ---> AREA BRANDING & SEO <--- */}
+        <div className="md:col-span-3 space-y-6">
+          <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+            <div className="px-5 py-4 border-b border-slate-100 bg-slate-50/50 flex items-center gap-2">
+              <ImageIcon className="w-5 h-5 text-daw-green" />
+              <h2 className="font-bold text-slate-800 text-sm md:text-base">
+                Branding & Identitas Visual
+              </h2>
+            </div>
+
+            <div className="p-5 md:p-6 grid grid-cols-1 lg:grid-cols-2 gap-8">
+              {/* Box Upload Logo Utama */}
+              <div className="space-y-4">
+                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                  Logo Utama
+                </label>
+                <div className="border-2 border-dashed border-slate-200 rounded-xl p-4 flex flex-col items-center gap-4 bg-slate-50/50">
+                  <div className="h-20 w-full max-w-[200px] flex items-center justify-center bg-white rounded-lg border border-slate-100 p-2 shadow-inner">
+                    {logoPreview ? (
+                      <img
+                        src={logoPreview}
+                        className="max-h-full object-contain"
+                        alt="Preview"
+                      />
+                    ) : (
+                      <span className="text-slate-300 text-[10px]">
+                        No Logo
+                      </span>
+                    )}
+                  </div>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    disabled={!isEditing}
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) {
+                        setLogoFile(file);
+                        setLogoPreview(URL.createObjectURL(file));
+                      }
+                    }}
+                    className="w-full text-[10px] file:mr-3 file:py-1.5 file:px-3 file:rounded-full file:border-0 file:bg-daw-green/10 file:text-daw-green file:font-bold cursor-pointer disabled:opacity-50"
+                  />
+                </div>
+              </div>
+
+              {/* Box Upload Favicon */}
+              <div className="space-y-4">
+                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                  Ikon Tab (Favicon)
+                </label>
+                <div className="border-2 border-dashed border-slate-200 rounded-xl p-4 flex flex-col items-center gap-4 bg-slate-50/50">
+                  <div className="h-20 w-20 flex items-center justify-center bg-white rounded-lg border border-slate-100 p-2 shadow-inner">
+                    {faviconPreview ? (
+                      <img
+                        src={faviconPreview}
+                        className="max-h-full object-contain"
+                        alt="Preview"
+                      />
+                    ) : (
+                      <span className="text-slate-300 text-[10px]">
+                        No Icon
+                      </span>
+                    )}
+                  </div>
+                  <input
+                    type="file"
+                    accept="image/png, image/x-icon"
+                    disabled={!isEditing}
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) {
+                        setFaviconFile(file);
+                        setFaviconPreview(URL.createObjectURL(file));
+                      }
+                    }}
+                    className="w-full text-[10px] file:mr-3 file:py-1.5 file:px-3 file:rounded-full file:border-0 file:bg-daw-green/10 file:text-daw-green file:font-bold cursor-pointer disabled:opacity-50"
+                  />
+                </div>
               </div>
             </div>
           </div>

@@ -6,8 +6,12 @@ import logoDaw from "@/assets/logo-daw.png";
 import bgImage from "@/assets/hero-bg.jpg";
 import api from "@/lib/api";
 import { Link } from "react-router-dom";
+import { useSettings } from "@/contexts/SettingsContext";
+import { getCleanImageUrl } from "@/lib/utils";
 
 export default function Login() {
+  const { settings } = useSettings();
+
   const navigate = useNavigate();
   const location = useLocation(); //  Tangkap lokasi asal dari ProtectedRoute
 
@@ -88,7 +92,9 @@ export default function Login() {
       <div className="w-full lg:w-[480px] xl:w-[500px] flex flex-col justify-center px-8 sm:px-12 md:px-16 py-12 shrink-0 relative z-10 border-r border-slate-100 shadow-[20px_0_40px_-15px_rgba(0,0,0,0.05)]">
         <div className="mb-16">
           <img
-            src={logoDaw}
+            src={
+              settings?.logoUrl ? getCleanImageUrl(settings.logoUrl) : logoDaw
+            }
             alt="DAW Group Logo"
             className="h-14 w-auto object-contain"
           />

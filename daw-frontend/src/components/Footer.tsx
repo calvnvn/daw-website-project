@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { MapPin, ChevronUp, ArrowUpRight } from "lucide-react";
 import logoDaw from "@/assets/logo-daw.png";
 import { useSettings } from "@/contexts/SettingsContext";
+import { getCleanImageUrl } from "@/lib/utils";
 
 export default function Footer() {
   const { t } = useTranslation();
@@ -43,12 +44,15 @@ export default function Footer() {
             <div className="md:col-span-5 space-y-8">
               <Link to="/" onClick={scrollToTop}>
                 <img
-                  src={logoDaw}
+                  src={
+                    settings?.logoUrl
+                      ? getCleanImageUrl(settings.logoUrl)
+                      : logoDaw
+                  }
                   alt="DAW Group"
                   className="h-10 md:h-12 w-auto brightness-0 invert opacity-90 transition-opacity hover:opacity-100"
                 />
               </Link>
-
               <div className="space-y-6">
                 <div className="flex items-start gap-4 group">
                   <div className="w-10 h-10 rounded-full bg-daw-green/10 flex items-center justify-center shrink-0 border border-daw-green/20 group-hover:bg-daw-green transition-colors">

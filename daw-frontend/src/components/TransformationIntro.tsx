@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 import { ArrowRight } from "lucide-react";
 import logoDaw from "@/assets/logo-daw.png";
 import ScrollReveal from "./ScrollReveal";
-import { useHome } from "@/contexts/HomeContext"; // 👈 IMPORT CONTEXT
+import { useHome } from "@/contexts/HomeContext";
 
 export default function TransformationIntro() {
   const { t } = useTranslation();
