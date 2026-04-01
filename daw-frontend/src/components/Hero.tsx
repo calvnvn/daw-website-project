@@ -156,7 +156,7 @@ export default function Hero() {
                 <Button
                   size="lg"
                   variant="outline"
-                  className="bg-transparent border-2 border-white/80 text-white hover:bg-white hover:text-slate-900 rounded-full px-8 py-6 text-[14px] tracking-wide font-bold shadow-lg transition-all duration-300 hover:-translate-y-1 backdrop-blur-sm"
+                  className="bg-transparent border-2 border-white/80 text-white hover:bg-daw-yellow hover:text-white rounded-full px-8 py-6 text-[14px] tracking-wide font-bold shadow-lg transition-all duration-300 hover:-translate-y-1 backdrop-blur-sm"
                 >
                   {t("hero.ctaSecondary", "Discover Our Vision")}
                 </Button>
@@ -177,7 +177,7 @@ export default function Hero() {
                 className={`h-2 rounded-full transition-all duration-500 ease-out ${
                   index === currentSlide
                     ? "w-12 bg-daw-green shadow-[0_0_10px_rgba(0,166,81,0.5)]"
-                    : "w-3 bg-white/30 hover:bg-white/60"
+                    : "w-3 bg-white/30 hover:bg-daw-yellow"
                 }`}
                 aria-label={`Go to slide ${index + 1}`}
               />
