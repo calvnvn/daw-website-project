@@ -337,7 +337,9 @@ export default function ProjectDetail() {
     "
                   dangerouslySetInnerHTML={{
                     //  WAJIB PAKAI DOMPURIFY DI PRODUCTION!
-                    __html: DOMPurify.sanitize(cleanContent),
+                    __html: DOMPurify.sanitize(
+                      cleanContent.replace(/&nbsp;|\u00A0/g, " "),
+                    ),
                   }}
                 />
               </ScrollReveal>

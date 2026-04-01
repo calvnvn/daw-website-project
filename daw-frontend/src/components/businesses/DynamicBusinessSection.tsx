@@ -51,21 +51,23 @@ const DynamicBusinessSection = memo(function DynamicBusinessSection({
               <div
                 // PERUBAHAN 2 (KUNCI UTAMA): max-w-[65ch] untuk panjang baris bacaan yang sempurna!
                 className="w-full min-w-0 max-w-[65ch] selection:bg-[#004B23] selection:text-white
-                  [&_*]:break-words [&_*]:max-w-full [&_img]:rounded-2xl [&_img]:shadow-md [&_img]:transition-all [&_img]:duration-700 hover:[&_img]:scale-[1.02] hover:[&_img]:shadow-2xl [&_img]:ring-1 [&_img]:ring-slate-100
+                  [&_*]:overflow-wrap-anywhere [&_img]:rounded-2xl [&_img]:shadow-md [&_img]:transition-all [&_img]:duration-700 hover:[&_img]:scale-[1.02] hover:[&_img]:shadow-2xl [&_img]:ring-1 [&_img]:ring-slate-100
                   
                   prose prose-lg md:prose-xl max-w-none 
                   prose-headings:font-serif prose-headings:font-bold prose-headings:tracking-tight prose-headings:mb-5 prose-headings:mt-8
                   prose-h2:text-transparent prose-h2:bg-clip-text prose-h2:bg-gradient-to-r prose-h2:from-[#004B23] prose-h2:to-[#10B981]
                   prose-h3:text-slate-800 prose-p:mb-12
-                  
+
                   /* Jarak antar baris (leading) dilegakan jadi 1.85 agar tidak sumpek */
-                  prose-p:font-sans prose-p:font-normal prose-p:text-slate-600 prose-p:leading-[1.85] prose-p:mb-6 prose-p:text-justify prose-p:hyphens-auto
+                  prose-p:font-sans prose-p:font-normal prose-p:text-slate-600 prose-p:leading-[1.85] prose-p:mb-6 prose-p:text-left prose-p:hyphens-none
                   
                   prose-strong:font-bold prose-strong:text-slate-900 
                   prose-a:font-semibold prose-a:text-daw-green hover:prose-a:text-emerald-500 prose-a:transition-colors prose-a:underline-offset-4
                   prose-ul:list-disc prose-ul:pl-5 prose-li:text-slate-600 prose-li:marker:text-[#10B981]
                   prose-blockquote:border-l-4 prose-blockquote:border-daw-green prose-blockquote:bg-slate-50/80 prose-blockquote:py-4 prose-blockquote:px-6 prose-blockquote:text-slate-800 prose-blockquote:font-serif prose-blockquote:text-xl prose-blockquote:italic prose-blockquote:rounded-r-2xl prose-blockquote:shadow-sm"
-                dangerouslySetInnerHTML={{ __html: data.htmlContent }}
+                dangerouslySetInnerHTML={{
+                  __html: data.htmlContent.replace(/&nbsp;|\u00A0/g, " "),
+                }}
               />
             </ScrollReveal>
           </div>
@@ -90,7 +92,7 @@ const DynamicBusinessSection = memo(function DynamicBusinessSection({
       )}
 
       {/* --- BAGIAN 3: PORTFOLIO GRID --- */}
-      <div className="container mx-auto px-6 max-w-7xl pt-16 pb-24 relative z-10">
+      <div className="container mx-auto px-6 max-w-7xl pt-16 pb-5 relative z-10">
         <div className="text-center max-w-3xl mx-auto mb-12">
           <ScrollReveal direction="up" delay={0}>
             <div className="flex items-center justify-center gap-4 mb-4">

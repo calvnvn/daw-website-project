@@ -123,7 +123,7 @@ const InteractiveMap = () => {
 
             {/* Kotak Teks */}
             <div
-              className={`absolute z-30 bg-white/95 backdrop-blur-md border shadow-[0_8px_30px_rgba(0,0,0,0.06)] p-3 md:p-4 min-w-[130px] md:min-w-[170px] -translate-x-1/2 -translate-y-1/2 transition-transform hover:scale-105 cursor-default ${
+              className={`absolute z-30 bg-white/95 backdrop-blur-md border shadow-[0_8px_30px_rgba(0,0,0,0.06)] p-3 md:p-4 min-w-[130px] md:min-w-[170px] max-w-[200px] md:max-w-[260px] w-max -translate-x-1/2 -translate-y-1/2 transition-transform hover:scale-105 cursor-default ${
                 m.type === "direct"
                   ? "border-[#004B23]/20"
                   : "border-[#D97706]/20"

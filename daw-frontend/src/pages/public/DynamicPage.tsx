@@ -432,7 +432,9 @@ export default function DynamicPage() {
 
                     /* 6. LISTS & BULLETS */
                     prose-li:marker:text-daw-green prose-li:my-2`}
-                    dangerouslySetInnerHTML={{ __html: parsedContent }}
+                    dangerouslySetInnerHTML={{
+                      __html: parsedContent.replace(/&nbsp;|\u00A0/g, " "),
+                    }}
                   />
                 </div>
               </div>

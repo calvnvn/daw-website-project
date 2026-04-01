@@ -136,8 +136,9 @@
 .ql-editor {
   word-break: normal !important; /* HARAM memotong kata di tengah! */
   overflow-wrap: break-word !important; /* Boleh memotong HANYA untuk URL super panjang */
-  white-space: normal !important;
+  /* white-space: normal !important; */
   text-wrap: pretty !important; /* CSS Modern: Mencegah 1 kata sendirian di baris bawah (Orphans) */
+  line-break: strict;
 }
 
 /* Pastikan tag paragraf di dalamnya juga tunduk pada aturan yang sama */
