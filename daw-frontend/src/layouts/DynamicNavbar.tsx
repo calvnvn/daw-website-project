@@ -70,7 +70,7 @@ export default function DynamicNavbar() {
     if (isMobileMenuOpen) {
       document.body.style.overflow = "hidden";
     } else {
-      document.body.style.overflow = ""; // Jangan pakai "unset"
+      document.body.style.overflow = "";
     }
     // Cleanup function untuk berjaga-jaga jika komponen unmount
     return () => {
