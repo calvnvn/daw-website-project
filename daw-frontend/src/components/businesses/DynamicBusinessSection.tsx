@@ -16,7 +16,7 @@ const DynamicBusinessSection = memo(function DynamicBusinessSection({
   data: SectionData;
 }) {
   return (
-    <div className="flex flex-col w-full relative bg-white">
+    <div className="flex flex-col w-full relative bg-white overflow-x-hidden max-w-full">
       {/* 1. CINEMATIC BACKGROUND EFFECTS */}
       <div className="absolute top-0 left-0 w-full h-full bg-[radial-gradient(ellipse_at_top_left,_var(--tw-gradient-stops))] from-daw-green/[0.04] via-transparent to-transparent pointer-events-none"></div>
       <div className="absolute top-[20%] right-[-5%] w-[400px] h-[400px] bg-[#D97706]/[0.02] rounded-full blur-[100px] pointer-events-none hidden lg:block"></div>
