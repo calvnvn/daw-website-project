@@ -533,35 +533,6 @@ export default function PageBuilder() {
                     placeholder="Brief overview or engaging hook for the article..."
                   />
                 </div>
-                <div className="flex items-center gap-3 bg-white p-4 rounded-2xl border border-slate-200 shadow-sm mt-4">
-                  <div
-                    className={`w-10 h-10 rounded-xl flex items-center justify-center transition-colors ${formData.showDropCap ? "bg-daw-green/10 text-daw-green" : "bg-slate-100 text-slate-400"}`}
-                  >
-                    <span className="text-xl font-serif font-black">A</span>
-                  </div>
-                  <div className="flex-1">
-                    <p className="text-xs font-bold text-slate-700">
-                      Drop Cap Typography
-                    </p>
-                    <p className="text-[10px] text-slate-500 uppercase font-medium">
-                      Huruf besar di awal paragraf
-                    </p>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() =>
-                      setFormData((prev) => ({
-                        ...prev,
-                        showDropCap: !prev.showDropCap,
-                      }))
-                    }
-                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none ${formData.showDropCap ? "bg-daw-green" : "bg-slate-300"}`}
-                  >
-                    <span
-                      className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${formData.showDropCap ? "translate-x-6" : "translate-x-1"}`}
-                    />
-                  </button>
-                </div>
               </div>
             </div>
 
@@ -848,6 +819,35 @@ export default function PageBuilder() {
                   ))
                 )}
               </div>
+            </div>
+            <div className="flex items-center gap-3 bg-white p-4 rounded-2xl border border-slate-200 shadow-sm mt-4">
+              <div
+                className={`w-10 h-10 rounded-xl flex items-center justify-center transition-colors ${formData.showDropCap ? "bg-daw-green/10 text-daw-green" : "bg-slate-100 text-slate-400"}`}
+              >
+                <span className="text-xl font-serif font-black">A</span>
+              </div>
+              <div className="flex-1">
+                <p className="text-xs font-bold text-slate-700">
+                  Drop Cap Typography
+                </p>
+                <p className="text-[10px] text-slate-500 uppercase font-medium">
+                  Huruf besar di awal paragraf
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() =>
+                  setFormData((prev) => ({
+                    ...prev,
+                    showDropCap: !prev.showDropCap,
+                  }))
+                }
+                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none ${formData.showDropCap ? "bg-daw-green" : "bg-slate-300"}`}
+              >
+                <span
+                  className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${formData.showDropCap ? "translate-x-6" : "translate-x-1"}`}
+                />
+              </button>
             </div>
             {/* 🌟 SECTION 4: TEXT EDITOR */}
             <div className="space-y-6">
