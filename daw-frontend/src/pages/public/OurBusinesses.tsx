@@ -147,7 +147,7 @@ export default function OurBusinesses() {
               </h1>
               <div className="flex items-center justify-center gap-8">
                 <div className="h-px w-16 bg-white/30" />
-                <div className="w-3 h-3 border-2 border-daw-green rotate-45" />
+                <div className="w-3 h-3 border-2 border-daw-yellow rotate-45" />
                 <div className="h-px w-16 bg-white/30" />
               </div>
             </div>
