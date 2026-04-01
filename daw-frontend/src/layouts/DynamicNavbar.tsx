@@ -70,10 +70,24 @@ export default function DynamicNavbar() {
     if (isMobileMenuOpen) {
       document.body.style.overflow = "hidden";
     } else {
-      document.body.style.overflow = "unset";
+      document.body.style.overflow = ""; // Jangan pakai "unset"
     }
+    // Cleanup function untuk berjaga-jaga jika komponen unmount
+    return () => {
+      document.body.style.overflow = "";
+    };
   }, [isMobileMenuOpen]);
 
+  useEffect(() => {
+    const handleResize = () => {
+      // Jika layar ditarik jadi desktop (>= 768px) saat menu mobile masih terbuka, paksa tutup!
+      if (window.innerWidth >= 768 && isMobileMenuOpen) {
+        closeMenu();
+      }
+    };
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, [isMobileMenuOpen]);
   // --- THE MAGIC URL RESOLVER ---
   const resolveLink = (menu: MenuNode) => {
     if (menu.type === "external" && menu.externalLink) return menu.externalLink;
@@ -311,7 +325,7 @@ export default function DynamicNavbar() {
                     e.preventDefault();
                     toggleMobileAccordion("static-about");
                   }}
-                  className="p-2 ml-2 bg-slate-50 rounded-lg hover:bg-slate-100 transition-colors active:scale-95"
+                  className="p-2 ml-2 transition-colors active:scale-95"
                 >
                   <ChevronDown
                     className={`h-5 w-5 text-slate-500 transition-transform duration-300 ${openMobileAccordions["static-about"] ? "rotate-180" : ""}`}
@@ -319,7 +333,7 @@ export default function DynamicNavbar() {
                 </button>
               </div>{" "}
               <div
-                className={`flex flex-col pl-4 border-l-2 border-slate-100 overflow-hidden transition-all duration-300 ${openMobileAccordions["static-about"] ? "max-h-96 mt-2" : "max-h-0"}`}
+                className={`flex flex-col pl-4 border-l-2 border-slate-100 overflow-hidden transition-all duration-500 ease-in-out ${openMobileAccordions["static-about"] ? "max-h-[1000px] mt-2" : "max-h-0"}`}
               >
                 <Link
                   to="/about?tab=company"
@@ -354,17 +368,25 @@ export default function DynamicNavbar() {
 
             {/* 3. STATIC ACCORDION: OUR BUSINESSES */}
             <div className="flex flex-col">
-              <button
-                onClick={() => toggleMobileAccordion("static-business")}
-                className="text-[13px] py-3 tracking-wide font-bold text-slate-800 hover:text-daw-green transition-colors flex items-center justify-between uppercase"
-              >
-                {t("nav.businesses", "OUR BUSINESSES")}
-                <ChevronDown
-                  className={`h-5 w-5 text-slate-400 transition-transform duration-300 ${openMobileAccordions["static-business"] ? "rotate-180" : ""}`}
-                />
-              </button>
+              <div className="flex items-center justify-between border-b border-slate-50/50">
+                <span className="text-[13px] py-3 tracking-wide font-bold text-slate-800 uppercase">
+                  {t("nav.businesses", "OUR BUSINESSES")}
+                </span>
+                <button
+                  onClick={() => toggleMobileAccordion("static-business")}
+                  className="p-2 ml-2 text-slate-400 hover:text-daw-green transition-colors active:scale-95"
+                >
+                  <ChevronDown
+                    className={`h-5 w-5 transition-transform duration-300 ${
+                      openMobileAccordions["static-business"]
+                        ? "rotate-180"
+                        : ""
+                    }`}
+                  />
+                </button>
+              </div>
               <div
-                className={`flex flex-col pl-4 border-l-2 border-slate-100 overflow-hidden transition-all duration-300 ${openMobileAccordions["static-business"] ? "max-h-64 mt-2" : "max-h-0"}`}
+                className={`flex flex-col pl-4 border-l-2 border-slate-100 overflow-hidden transition-all duration-500 ease-in-out ${openMobileAccordions["static-business"] ? "max-h-[1000px] mt-2" : "max-h-0"}`}
               >
                 <Link
                   to="/businesses#resources"
@@ -415,7 +437,7 @@ export default function DynamicNavbar() {
                             e.preventDefault();
                             toggleMobileAccordion(menu.id);
                           }}
-                          className="p-2 ml-2 bg-slate-50 rounded-lg hover:bg-slate-100 transition-colors active:scale-95"
+                          className="p-2 ml-2 transition-colors active:scale-95"
                           aria-label="Toggle Submenu"
                         >
                           <ChevronDown
@@ -426,7 +448,7 @@ export default function DynamicNavbar() {
 
                       {/* Dropdown / Accordion Anak Mobile */}
                       <div
-                        className={`flex flex-col pl-4 border-l-2 border-slate-100 overflow-hidden transition-all duration-300 ${isOpen ? "max-h-96 mt-2" : "max-h-0"}`}
+                        className={`flex flex-col pl-4 border-l-2 border-slate-100 overflow-hidden transition-all duration-500 ease-in-out ${isOpen ? "max-h-[1000px] mt-2" : "max-h-0"}`}
                       >
                         {menu.children.map((child) => {
                           const childLink = resolveLink(child);
