@@ -126,7 +126,7 @@ export default function AboutUs() {
 
         {/* --- MAIN CONTENT SECTION --- */}
         {/* Tambahkan padding top yang lebih besar agar lega (py-24) */}
-        <section ref={contentRef} className="py-24 relative overflow-hidden">
+        <section ref={contentRef} className="py-10 relative overflow-hidden">
           {/* Dekorasi blur di background */}
           <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-daw-green/[0.03] rounded-full blur-[120px] -z-10 pointer-events-none" />
 
