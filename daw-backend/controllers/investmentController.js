@@ -1,7 +1,6 @@
 const InvestmentSetting = require("../models/InvestmentSettings");
 const Affiliate = require("../models/Affiliate");
-const fs = require("fs");
-const path = require("path");
+const { deleteSingleFile } = require("../utils/fileRemover");
 
 // 1. GET Data Investasi
 exports.getInvestmentData = async (req, res) => {
@@ -39,7 +38,7 @@ exports.updateSettings = async (req, res) => {
 exports.createAffiliate = async (req, res) => {
   try {
     const { name, desc, category } = req.body;
-    const logoUrl = req.file ? `/uploads/${req.file.filename}` : null;
+    const logoUrl = req.file ? req.file.filename : null;
 
     const company = await Affiliate.create({ name, desc, category, logoUrl });
     res.status(201).json(company);
@@ -57,18 +56,13 @@ exports.updateAffiliate = async (req, res) => {
     const company = await Affiliate.findByPk(id);
     if (!company) return res.status(404).json({ message: "Company not found" });
 
-    let finalLogoUrl = company.logoUrl; // Gunakan kolom logoUrl sesuai model
+    let finalLogoUrl = company.logoUrl;
 
     if (req.file) {
-      // Hapus yang lama jika ada
-      if (company.logoUrl) {
-        const oldPath = path.join(__dirname, "..", "public", company.logoUrl);
-        if (fs.existsSync(oldPath)) fs.unlinkSync(oldPath);
-      }
-      finalLogoUrl = `/uploads/${req.file.filename}`; // Set file baru
-    } else if (removePhoto === "true" && company.logoUrl) {
-      const oldPath = path.join(__dirname, "..", "public", company.logoUrl);
-      if (fs.existsSync(oldPath)) fs.unlinkSync(oldPath);
+      deleteSingleFile(company.logoUrl);
+      finalLogoUrl = req.file.filename;
+    } else if (removePhoto === "true") {
+      deleteSingleFile(company.logoUrl);
       finalLogoUrl = null;
     }
 
@@ -87,13 +81,7 @@ exports.deleteAffiliate = async (req, res) => {
     const company = await Affiliate.findByPk(id);
 
     if (!company) return res.status(404).json({ message: "Data not found" });
-
-    if (company.logoUrl) {
-      const photoPath = path.join(__dirname, "..", "public", company.logoUrl);
-      if (fs.existsSync(photoPath)) {
-        fs.unlinkSync(photoPath);
-      }
-    }
+    deleteSingleFile(company.logoUrl);
 
     await company.destroy();
     res

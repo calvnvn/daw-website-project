@@ -1,8 +1,7 @@
 const HeroSlide = require("../models/HeroSlide");
 const HomeSetting = require("../models/HomeSetting");
 const ImpactStat = require("../models/ImpactStat");
-const fs = require("fs");
-const path = require("path");
+const { deleteSingleFile } = require("../utils/fileRemover");
 
 // GET Data di HomePage
 exports.getHomepageData = async (req, res) => {
@@ -51,8 +50,7 @@ exports.updateSettings = async (req, res) => {
 exports.createHeroSlide = async (req, res) => {
   try {
     const { title, subtitle, order } = req.body;
-    const imageUrl = req.file ? `/uploads/${req.file.filename}` : null;
-
+    const imageUrl = req.file ? req.file.filename : null;
     const slide = await HeroSlide.create({ title, subtitle, order, imageUrl });
     res.status(201).json(slide);
   } catch (error) {
@@ -71,12 +69,8 @@ exports.updateHeroSlide = async (req, res) => {
     let newImageUrl = slide.imageUrl;
     // Jika admin upload gambar baru
     if (req.file) {
-      // Hapus gambar lama dari folder public/uploads
-      if (slide.imageUrl) {
-        const oldPath = path.join(__dirname, "..", "public", slide.imageUrl);
-        if (fs.existsSync(oldPath)) fs.unlinkSync(oldPath);
-      }
-      newImageUrl = `/uploads/${req.file.filename}`;
+      deleteSingleFile(slide.imageUrl);
+      newImageUrl = req.file.filename;
     }
 
     await slide.update({ title, subtitle, order, imageUrl: newImageUrl });
@@ -91,10 +85,7 @@ exports.deleteHeroSlide = async (req, res) => {
     const slide = await HeroSlide.findByPk(req.params.id);
     if (!slide) return res.status(404).json({ message: "Slide not found" });
 
-    if (slide.imageUrl) {
-      const oldPath = path.join(__dirname, "..", "public", slide.imageUrl);
-      if (fs.existsSync(oldPath)) fs.unlinkSync(oldPath);
-    }
+    deleteSingleFile(slide.imageUrl);
 
     await slide.destroy();
     res.status(200).json({ message: "Slide deleted!" });

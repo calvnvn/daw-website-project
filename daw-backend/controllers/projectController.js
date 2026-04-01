@@ -1,6 +1,5 @@
 const Project = require("../models/Project");
-const fs = require("fs");
-const path = require("path");
+const { deleteSingleFile } = require("../utils/fileRemover");
 
 // GET Project Function
 exports.getAllProjects = async (req, res) => {
@@ -76,7 +75,6 @@ exports.uploadInlineImage = async (req, res) => {
     if (!req.file) {
       return res.status(400).json({ message: "No image file provided." });
     }
-
     const fileUrl = `${req.protocol}://${req.get("host")}/uploads/${req.file.filename}`;
 
     console.log(" Inline Upload Success:", fileUrl);
@@ -94,44 +92,30 @@ exports.uploadInlineImage = async (req, res) => {
 exports.deleteProject = async (req, res) => {
   try {
     const { id } = req.params;
-
-    // 1. Ambil data
     const project = await Project.findByPk(id);
     if (!project) return res.status(404).json({ message: "Project not found" });
 
-    const deleteFile = (fileName) => {
-      if (!fileName) return;
-      const baseName = path.basename(fileName);
-      const filePath = path.join(process.cwd(), "public", "uploads", baseName);
+    deleteSingleFile(project.cover_image);
 
-      if (fs.existsSync(filePath)) {
-        try {
-          fs.unlinkSync(filePath);
-          console.log(`🗑️ Deleted file: ${baseName}`);
-        } catch (e) {
-          console.error(`❌ Failed to delete file: ${baseName}`, e);
-        }
-      }
-    };
+    // Hapus Gallery (Parsing dulu jika string)
+    const gallery =
+      typeof project.gallery === "string"
+        ? JSON.parse(project.gallery || "[]")
+        : project.gallery;
 
-    // A. Hapus Cover & Gallery
-    deleteFile(project.cover_image);
-
-    // ORM handle JSON gallery otomatis jadi Array
-    if (project.gallery && Array.isArray(project.gallery)) {
-      project.gallery.forEach((file) => deleteFile(file));
+    if (Array.isArray(gallery)) {
+      gallery.forEach((file) => deleteSingleFile(file));
     }
 
-    // B. Hapus Gambar Inline di Content (Logic Regex kamu sudah keren)
+    // Hapus Gambar dari Content Quill (Regex)
     if (project.content) {
-      const imgRegex = /src="[^"]*\/uploads\/([^"]+)"/g;
+      const imgRegex = /src="[^"]*\/uploads\/([^"'\s>]+)"/g;
       let match;
       while ((match = imgRegex.exec(project.content)) !== null) {
-        deleteFile(match[1]);
+        deleteSingleFile(match[1]); // match[1] adalah nama filenya
       }
     }
 
-    // Hapus dari Database
     await project.destroy();
 
     res.status(200).json({ message: "Project and associated files deleted!" });
@@ -144,7 +128,6 @@ exports.deleteProject = async (req, res) => {
 exports.getProjectById = async (req, res) => {
   try {
     const { id } = req.params;
-
     const project = await Project.findByPk(id);
 
     if (!project) {
@@ -180,14 +163,28 @@ exports.updateProject = async (req, res) => {
     let finalGallery = [];
     if (existing_gallery) {
       try {
-        // Cek kalau sudah array atau masih string
-        finalGallery =
+        const remainingGallery =
           typeof existing_gallery === "string"
             ? JSON.parse(existing_gallery)
             : existing_gallery;
+
+        // --- TAMBAHKAN LOGIC CLEANUP GALLERY ---
+        // Cari gambar yang ada di database lama tapi TIDAK ADA di kiriman 'existing_gallery'
+        const oldGallery =
+          typeof project.gallery === "string"
+            ? JSON.parse(project.gallery || "[]")
+            : project.gallery;
+
+        const filesToDelete = oldGallery.filter(
+          (file) => !remainingGallery.includes(file),
+        );
+
+        // Hapus file-file yang dibuang tersebut dari folder
+        filesToDelete.forEach((file) => deleteSingleFile(file));
+
+        finalGallery = remainingGallery;
       } catch (e) {
-        console.error("Gagal parse gallery lama:", existing_gallery);
-        finalGallery = [];
+        console.error("Gagal parse gallery lama:", e);
       }
     }
 
@@ -199,6 +196,8 @@ exports.updateProject = async (req, res) => {
     // 3. Olah Cover Image
     let coverImageName = project.cover_image;
     if (req.files && req.files["cover_image"]) {
+      deleteSingleFile(project.cover_image);
+
       coverImageName = req.files["cover_image"][0].filename;
     }
 

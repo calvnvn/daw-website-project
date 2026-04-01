@@ -4,6 +4,7 @@ const { JSDOM } = require("jsdom");
 const createDOMPurify = require("dompurify");
 const window = new JSDOM("").window;
 const dompurify = createDOMPurify(window);
+const { deleteSingleFile } = require("../utils/fileRemover");
 
 const stripHtml = (html) => html.replace(/<[^>]*>?/gm, "");
 
@@ -135,19 +136,9 @@ exports.updatePage = async (req, res) => {
     const finalSlug = await generateUniqueSlug(title, slug, id);
     const sanitizedContent = dompurify.sanitize(content);
     let heroImageName = page.heroImage; // Default pakai gambar lama
+
     if (req.file) {
-      // 1. Jika ada file baru, hapus gambar lama dari folder uploads (Cleanup)
-      // if (page.heroImage) {
-      //   const oldImagePath = path.join(
-      //     __dirname,
-      //     "../../public/uploads/",
-      //     page.heroImage,
-      //   );
-      //   if (fs.existsSync(oldImagePath)) {
-      //     fs.unlinkSync(oldImagePath);
-      //   }
-      // }
-      // 2. Set nama file baru dari Multer
+      deleteSingleFile(page.heroImage);
       heroImageName = req.file.filename;
     }
 
@@ -188,8 +179,23 @@ exports.deletePage = async (req, res) => {
     const { id } = req.params;
     const page = await Page.findByPk(id);
     if (!page) return res.status(404).json({ message: "Page not found" });
+
+    // Hapus Hero Image fisik
+    deleteSingleFile(page.heroImage);
+
+    // Hapus Gambar Inline di dalam Content (Rich Text)
+    if (page.content) {
+      // Regex untuk mencari nama file di folder uploads dalam tag <img>
+      const imgRegex = /src="[^"]*\/uploads\/([^"'\s>]+)"/g;
+      let match;
+      while ((match = imgRegex.exec(page.content)) !== null) {
+        deleteSingleFile(match[1]); // match[1] adalah nama filenya
+      }
+    }
     await page.destroy();
-    res.status(200).json({ message: "Page deleted successfully" });
+    res
+      .status(200)
+      .json({ message: "Page and all associated assets deleted successfully" });
   } catch (error) {
     res
       .status(500)

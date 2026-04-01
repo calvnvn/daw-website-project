@@ -1,35 +1,34 @@
 const Management = require("../models/Management");
-const fs = require("fs");
-const path = require("path");
+const { deleteSingleFile } = require("../utils/fileRemover");
 
 /**
  *  HELPER: Menghapus file secara aman dari storage
  * Menangani leading slash dan path absolut
  */
-const deletePhysicalFile = (relativeUrl) => {
-  if (!relativeUrl) return;
+// const deletePhysicalFile = (relativeUrl) => {
+//   if (!relativeUrl) return;
 
-  // Hilangkan leading slash jika ada agar path.join bekerja benar
-  // '/uploads/foto.jpg' -> 'uploads/foto.jpg'
-  const cleanPath = relativeUrl.startsWith("/")
-    ? relativeUrl.substring(1)
-    : relativeUrl;
+//   // Hilangkan leading slash jika ada agar path.join bekerja benar
+//   // '/uploads/foto.jpg' -> 'uploads/foto.jpg'
+//   const cleanPath = relativeUrl.startsWith("/")
+//     ? relativeUrl.substring(1)
+//     : relativeUrl;
 
-  // Gunakan process.cwd() agar path selalu relatif terhadap root project
-  const fullPath = path.join(process.cwd(), "public", cleanPath);
+//   // Gunakan process.cwd() agar path selalu relatif terhadap root project
+//   const fullPath = path.join(process.cwd(), "public", cleanPath);
 
-  try {
-    if (fs.existsSync(fullPath)) {
-      fs.unlinkSync(fullPath);
-      console.log(`[CLEANUP] Deleted: ${fullPath}`);
-    }
-  } catch (err) {
-    console.error(
-      `[CLEANUP ERROR] Failed to delete ${relativeUrl}:`,
-      err.message,
-    );
-  }
-};
+//   try {
+//     if (fs.existsSync(fullPath)) {
+//       fs.unlinkSync(fullPath);
+//       console.log(`[CLEANUP] Deleted: ${fullPath}`);
+//     }
+//   } catch (err) {
+//     console.error(
+//       `[CLEANUP ERROR] Failed to delete ${relativeUrl}:`,
+//       err.message,
+//     );
+//   }
+// };
 
 // 1. GET Data
 exports.getAllManagements = async (req, res) => {
@@ -51,7 +50,7 @@ exports.getAllManagements = async (req, res) => {
 exports.createManagement = async (req, res) => {
   try {
     const { name, role, description, level, order } = req.body;
-    const photoUrl = req.file ? `/uploads/${req.file.filename}` : null;
+    const photoUrl = req.file ? req.file.filename : null;
 
     const newPerson = await Management.create({
       name,
@@ -86,12 +85,12 @@ exports.updateManagement = async (req, res) => {
 
     // Skenario 1: Ada Upload File Baru
     if (req.file) {
-      deletePhysicalFile(person.photoUrl); // Hapus foto lama
-      finalPhotoUrl = `/uploads/${req.file.filename}`;
+      deleteSingleFile(person.photoUrl);
+      finalPhotoUrl = req.file.filename;
     }
     // Skenario 2: User klik 'Remove Photo' di UI
     else if (removePhoto === "true") {
-      deletePhysicalFile(person.photoUrl);
+      deleteSingleFile(person.photoUrl);
       finalPhotoUrl = null;
     }
 
@@ -120,8 +119,7 @@ exports.deleteManagement = async (req, res) => {
     if (!person) return res.status(404).json({ message: "Data not found" });
 
     // Hapus file fisik
-    deletePhysicalFile(person.photoUrl);
-
+    deleteSingleFile(person.photoUrl);
     // Hapus dari DB
     await person.destroy();
 

@@ -1,4 +1,5 @@
 const sequelize = require("../config/database");
+const { deleteSingleFile } = require("../utils/fileRemover");
 
 // --- 1. GET Data Settings ---
 exports.getSettings = async (req, res) => {
@@ -44,12 +45,12 @@ exports.updateSettings = async (req, res) => {
     // 3. Tangkap File Baru (Jika Di-upload)
     if (req.files) {
       if (req.files.logo && req.files.logo[0]) {
-        newLogoUrl = `/uploads/${req.files.logo[0].filename}`;
-        // fileRemover(oldData?.logoUrl); // Hapus yang lama jika diperlukan
+        deleteSingleFile(oldData?.logoUrl);
+        newLogoUrl = req.files.logo[0].filename;
       }
       if (req.files.favicon && req.files.favicon[0]) {
-        newFaviconUrl = `/uploads/${req.files.favicon[0].filename}`;
-        // fileRemover(oldData?.faviconUrl); // Hapus yang lama jika diperlukan
+        deleteSingleFile(oldData?.faviconUrl);
+        newFaviconUrl = req.files.favicon[0].filename;
       }
     }
 
