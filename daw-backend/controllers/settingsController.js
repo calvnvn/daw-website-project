@@ -45,11 +45,11 @@ exports.updateSettings = async (req, res) => {
     // 3. Tangkap File Baru (Jika Di-upload)
     if (req.files) {
       if (req.files.logo && req.files.logo[0]) {
-        deleteSingleFile(oldData?.logoUrl);
+        // deleteSingleFile(oldData?.logoUrl);
         newLogoUrl = req.files.logo[0].filename;
       }
       if (req.files.favicon && req.files.favicon[0]) {
-        deleteSingleFile(oldData?.faviconUrl);
+        // deleteSingleFile(oldData?.faviconUrl);
         newFaviconUrl = req.files.favicon[0].filename;
       }
     }
