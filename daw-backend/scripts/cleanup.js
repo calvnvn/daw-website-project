@@ -1,4 +1,4 @@
-// daw-backend/cleanup.js
+// daw-backend/scripts/cleanup.js
 const fs = require("fs");
 const path = require("path");
 const sequelize = require("../config/database");
@@ -12,79 +12,101 @@ async function runCleanup() {
     const [projects] = await sequelize.query(
       "SELECT cover_image, gallery, content FROM Projects",
     );
+
     projects.forEach((p) => {
       // Masukkan cover_image
       if (p.cover_image) validFiles.add(path.basename(p.cover_image));
 
-      // Masukkan gallery (parse JSON)
+      // Masukkan gallery
       if (p.gallery) {
         try {
-          const galleryArr = JSON.parse(p.gallery);
-          galleryArr.forEach((img) => validFiles.add(path.basename(img)));
-        } catch (e) {}
+          // Sequelize kadang mengembalikan string, kadang sudah jadi array objek
+          const galleryArr =
+            typeof p.gallery === "string" ? JSON.parse(p.gallery) : p.gallery;
+          if (Array.isArray(galleryArr)) {
+            galleryArr.forEach((img) => validFiles.add(path.basename(img)));
+          }
+        } catch (e) {
+          console.warn("⚠️ Gagal parse gallery untuk salah satu project");
+        }
       }
 
-      // Masukkan inline images (gambar dari dalam artikel Quill)
+      // Masukkan inline images (gambar dari Quill)
       if (p.content) {
-        const regex = /\/uploads\/([^"'\s>]+)/g;
+        // Regex yang lebih kuat untuk menangkap nama file di folder uploads
+        const regex = /src="[^"]*\/uploads\/([^"'\s>]+)"/g;
         let match;
         while ((match = regex.exec(p.content)) !== null) {
-          validFiles.add(path.basename(match[1])); // Ambil nama filenya saja
+          validFiles.add(path.basename(match[1]));
         }
       }
     });
 
-    // 2. Cek Tabel HeroSlides
-    const [slides] = await sequelize.query("SELECT imageUrl FROM HeroSlides");
-    slides.forEach((s) => {
-      if (s.imageUrl) validFiles.add(path.basename(s.imageUrl));
-    });
+    // 2, 3, 4. (HeroSlides, Managements, Affiliates) - Tetap sama
+    const tableQueries = [
+      { table: "HeroSlides", col: "imageUrl" },
+      { table: "Managements", col: "photoUrl" },
+      { table: "Affiliates", col: "logoUrl" },
+    ];
 
-    // 3. Cek Tabel Managements
-    const [managements] = await sequelize.query(
-      "SELECT photoUrl FROM Managements",
-    );
-    managements.forEach((m) => {
-      if (m.photoUrl) validFiles.add(path.basename(m.photoUrl));
-    });
-
-    // 4. Cek Tabel Affiliates
-    const [affiliates] = await sequelize.query(
-      "SELECT logoUrl FROM Affiliates",
-    );
-    affiliates.forEach((a) => {
-      if (a.logoUrl) validFiles.add(path.basename(a.logoUrl));
-    });
+    for (const item of tableQueries) {
+      const [rows] = await sequelize.query(
+        `SELECT ${item.col} FROM ${item.table}`,
+      );
+      rows.forEach((row) => {
+        if (row[item.col]) validFiles.add(path.basename(row[item.col]));
+      });
+    }
 
     console.log(
       `✅ Ditemukan ${validFiles.size} file gambar yang sedang digunakan di sistem.`,
     );
 
-    // 5. Eksekusi Penghapusan di Folder
-    const uploadsDir = path.join(__dirname, "public", "uploads");
+    // --- FIX PATH DI SINI ---
+    // Jika script di: daw-backend/scripts/cleanup.js
+    // Folder upload di: daw-backend/public/uploads
+    // Maka kita butuh ".." untuk naik satu level ke root
+    const uploadsDir = path.join(__dirname, "..", "public", "uploads");
+
     if (!fs.existsSync(uploadsDir)) {
-      console.log("📂 Folder uploads tidak ditemukan.");
+      console.log(`📂 Folder uploads tidak ditemukan di: ${uploadsDir}`);
       process.exit(0);
     }
 
     const filesInDir = fs.readdirSync(uploadsDir);
     let deletedCount = 0;
+    let skippedCount = 0;
+
+    console.log("🚀 Memulai pembersihan...");
 
     filesInDir.forEach((file) => {
-      if (file === ".gitkeep") return; // Abaikan file sistem
+      // Abaikan file sistem atau folder
+      if (
+        file === ".gitkeep" ||
+        fs.lstatSync(path.join(uploadsDir, file)).isDirectory()
+      ) {
+        skippedCount++;
+        return;
+      }
 
-      // Jika file di folder TIDAK ADA di dalam Set validFiles -> HAPUS
+      // HAPUS jika tidak ada di database
       if (!validFiles.has(file)) {
         const filePath = path.join(uploadsDir, file);
-        fs.unlinkSync(filePath);
-        console.log(`🗑️ Dihapus (File Sampah): ${file}`);
-        deletedCount++;
+        try {
+          fs.unlinkSync(filePath);
+          console.log(`🗑️  Dihapus: ${file}`);
+          deletedCount++;
+        } catch (err) {
+          console.error(`❌ Gagal menghapus ${file}:`, err.message);
+        }
       }
     });
 
-    console.log(
-      `\n🎉 Proses Selesai! Berhasil membersihkan ${deletedCount} file sampah dari server.`,
-    );
+    console.log(`\n🎉 Proses Selesai!`);
+    console.log(`✅ File Aktif: ${validFiles.size}`);
+    console.log(`🗑️  File Sampah Dihapus: ${deletedCount}`);
+    console.log(`📦 File Sistem Diabaikan: ${skippedCount}`);
+
     process.exit(0);
   } catch (error) {
     console.error("❌ Terjadi kesalahan saat cleanup:", error);

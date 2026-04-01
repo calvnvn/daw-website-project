@@ -27,6 +27,7 @@ exports.createProject = async (req, res) => {
       status,
       seo_title,
       meta_description,
+      author,
     } = req.body;
 
     console.log(" Creating Project:", title);
@@ -48,6 +49,7 @@ exports.createProject = async (req, res) => {
     // ID (UUID) biasanya sudah di-handle otomatis di Model atau Database
     const newProject = await Project.create({
       title,
+      author: author || "Admin DAW",
       excerpt: excerpt || "",
       content,
       category,

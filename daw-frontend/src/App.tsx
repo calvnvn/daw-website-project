@@ -8,7 +8,9 @@ import ContactUs from "./pages/public/ContactUs";
 import ProjectDetail from "./pages/public/ProjectDetail";
 import Dashboard from "./pages/admin/Dashboard";
 import ProjectManagement from "./pages/admin/ProjectManagement";
-import CreateProject from "./pages/admin/CreateProject";
+// import CreateProject from "./pages/admin/CreateProject";
+// import EditProject from "./pages/admin/EditProject";
+
 import GlobalSettings from "./pages/admin/GlobalSettings";
 import AboutUsManager from "./pages/admin/AboutUsManager";
 import Inbox from "./pages/admin/Inbox";
@@ -17,7 +19,6 @@ import Login from "./pages/admin/Login";
 import UserManagement from "./pages/admin/UserManagement";
 import InvestmentsManager from "./pages/admin/InvestmentsManager";
 import { Toaster } from "sonner";
-import EditProject from "./pages/admin/EditProject";
 import ProtectedRoute from "./components/ProtectedRoute";
 import ForceChangePassword from "./pages/admin/ForceChangePassword";
 import ManageBusinesses from "./pages/admin/ManageBusinesses";
@@ -25,6 +26,8 @@ import ContentManager from "./pages/admin/ContentManager";
 import DynamicPage from "./pages/public/DynamicPage";
 import ForgotPassword from "./pages/admin/ForgotPassword";
 import ResetPassword from "./pages/admin/ResetPassword";
+import ProjectForm from "./pages/admin/ProjectForm";
+
 function App() {
   return (
     <>
@@ -59,7 +62,8 @@ function App() {
           <Route path="/admin" element={<AdminLayout />}>
             <Route index element={<Dashboard />} />
             <Route path="projects" element={<ProjectManagement />} />
-            <Route path="projects/create" element={<CreateProject />} />
+            <Route path="/admin/projects/create" element={<ProjectForm />} />
+            <Route path="/admin/projects/edit/:id" element={<ProjectForm />} />
             <Route path="content" element={<ContentManager />} />
 
             {/* <Route path="menu-manager" element={<MenuManager />} />
@@ -71,7 +75,6 @@ function App() {
             <Route path="inbox" element={<Inbox />} />
             <Route path="users" element={<UserManagement />} />
             <Route path="investments" element={<InvestmentsManager />} />
-            <Route path="/admin/projects/edit/:id" element={<EditProject />} />
           </Route>
         </Route>
       </Routes>
