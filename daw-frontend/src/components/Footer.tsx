@@ -75,13 +75,13 @@ export default function Footer() {
                       : logoDaw
                   }
                   alt="DAW Group"
-                  className="h-10 md:h-12 w-auto brightness-0 invert opacity-90 transition-opacity hover:opacity-100"
+                  className="h-10 md:h-12 w-auto brightness-0 mb-5 invert opacity-90 transition-opacity hover:opacity-100"
                 />
               </Link>
               <div className="space-y-6">
                 <div className="flex items-start gap-4 group">
-                  <div className="w-10 h-10 rounded-full bg-daw-green/10 flex items-center justify-center shrink-0 border border-daw-green/20 group-hover:bg-daw-green transition-colors">
-                    <MapPin className="w-5 h-5 text-daw-green group-hover:text-white transition-colors" />
+                  <div className="w-10 h-10 rounded-full bg-daw-green/10 flex items-center justify-center shrink-0 border border-daw-green/20  transition-colors">
+                    <MapPin className="w-5 h-5 text-daw-green transition-colors" />
                   </div>
                   <div className="space-y-1">
                     <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500">
