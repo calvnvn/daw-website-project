@@ -78,7 +78,7 @@ export default function AboutUs() {
   return (
     <>
       <SEO title={`${getTabLabel()} | About Us`} />
-      <div className="bg-white min-h-screen">
+      <div className="bg-white min-h-screen overflow-x-hidden w-full relative">
         {/* Progress Scrolling Bar */}
         <div
           className="fixed top-0 left-0 h-1.5 bg-gradient-to-r from-daw-green via-emerald-400 to-daw-green z-[100] transition-all duration-150 ease-out shadow-[0_0_10px_rgba(16,185,129,0.5)]"
@@ -126,7 +126,7 @@ export default function AboutUs() {
 
         {/* --- MAIN CONTENT SECTION --- */}
         {/* Tambahkan padding top yang lebih besar agar lega (py-24) */}
-        <section ref={contentRef} className="py-24 relative">
+        <section ref={contentRef} className="py-24 relative overflow-hidden">
           {/* Dekorasi blur di background */}
           <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-daw-green/[0.03] rounded-full blur-[120px] -z-10 pointer-events-none" />
 
