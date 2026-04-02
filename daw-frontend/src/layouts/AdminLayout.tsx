@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Link, Outlet, useLocation, useNavigate } from "react-router-dom";
 import {
   LayoutDashboard,
@@ -19,11 +19,13 @@ import {
   MessageSquare,
   Building2,
   FileText,
+  Key,
 } from "lucide-react";
 import api from "@/lib/api";
 import logoDaw from "@/assets/logo-daw.png";
 import { useSettings } from "@/contexts/SettingsContext";
 import { getCleanImageUrl } from "@/lib/utils";
+import { useAuth } from "@/contexts/AuthContext";
 
 interface InquiryData {
   id: string | number;
@@ -34,8 +36,64 @@ interface InquiryData {
   [key: string]: unknown;
 }
 
+const MASTER_MENU_CONFIG = [
+  { name: "Dashboard", path: "/admin", icon: LayoutDashboard },
+  {
+    name: "Homepage",
+    path: "/admin/home",
+    icon: MonitorPlay,
+    perm: "manage_homepage",
+  },
+  {
+    name: "Projects",
+    path: "/admin/projects",
+    icon: FolderTree,
+    perm: "manage_projects",
+  },
+  {
+    name: "Businesses",
+    path: "/admin/businesses",
+    icon: Building2,
+    perm: "manage_businesses",
+  },
+  {
+    name: "Investments",
+    path: "/admin/investments",
+    icon: Briefcase,
+    perm: "manage_investments",
+  },
+  { name: "About Us", path: "/admin/about", icon: Users, perm: "manage_about" },
+  { name: "Inbox", path: "/admin/inbox", icon: Inbox, perm: "manage_inbox" },
+  {
+    name: "Content Manager",
+    path: "/admin/content",
+    icon: FileText,
+    perm: "manage_content",
+  },
+  {
+    name: "Role Management",
+    path: "/admin/roles",
+    icon: Key,
+    perm: "manage_users",
+  },
+  {
+    name: "User Access",
+    path: "/admin/users",
+    icon: Shield,
+    perm: "manage_users",
+  },
+  {
+    name: "Settings",
+    path: "/admin/settings",
+    icon: Settings,
+    perm: "manage_settings",
+  },
+];
+
 export default function AdminLayout() {
   const { settings } = useSettings();
+
+  const { can, user, logout } = useAuth();
 
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isDesktopCollapsed, setIsDesktopCollapsed] = useState(false);
@@ -47,57 +105,75 @@ export default function AdminLayout() {
   const location = useLocation();
   const navigate = useNavigate();
 
-  useEffect(() => {
-    const handleRouteChange = async () => {
-      setIsNotifOpen(false);
-      setIsMobileMenuOpen(false);
+  const breadcrumbLabels: Record<string, string> = {
+    admin: "Dashboard",
+    projects: "Project List",
+    users: "User Management",
+    roles: "Access Control",
+    settings: "Global Settings",
+    home: "Homepage Editor",
+    create: "New Data",
+    edit: "Modify",
+  };
 
-      try {
-        const response = await api.get("/inquiries");
-        if (response.data) {
-          const unread = response.data.filter(
-            (item: InquiryData) => !item.isRead,
-          );
-          setUnreadInquiries(unread);
+  const isParamId = (path: string) => path.length > 20 || !isNaN(Number(path));
+
+  useEffect(() => {
+    // 1. Fungsi fetcher yang bisa dipanggil berulang kali
+    const fetchNotifications = async () => {
+      if (can("manage_inbox")) {
+        try {
+          const response = await api.get("/inquiries");
+          if (response.data) {
+            const unread = response.data.filter(
+              (item: InquiryData) => !item.isRead,
+            );
+            setUnreadInquiries(unread);
+          }
+        } catch (error) {
+          console.error("Failed to fetch notifications:", error);
         }
-      } catch (error) {
-        console.error("Failed to fetch notifications:", error);
+      } else {
+        setUnreadInquiries([]);
       }
     };
 
-    handleRouteChange();
-  }, [location.pathname]);
+    // 2. UI Resets (Hanya dijalankan saat pindah rute)
+    setIsNotifOpen(false);
+    setIsMobileMenuOpen(false);
 
-  const userData = JSON.parse(localStorage.getItem("daw_user") || "{}");
+    // 3. Jalankan fetch pertama kali (langsung)
+    fetchNotifications();
+
+    // 4. Pasang Interval untuk polling (misal: setiap 2 menit)
+    const interval = setInterval(
+      () => {
+        fetchNotifications();
+      },
+      1000 * 60 * 2,
+    );
+
+    // 5. CLEANUP FUNCTION (Sangat Penting!)
+    return () => clearInterval(interval);
+  }, [location.pathname, user, can]);
+
+  // const userData = JSON.parse(localStorage.getItem("daw_user") || "{}");
 
   const executeLogout = () => {
-    localStorage.removeItem("daw_token");
-    localStorage.removeItem("daw_user");
+    // localStorage.removeItem("daw_token");
+    // localStorage.removeItem("daw_user");
     setIsLogoutModalOpen(false);
-    navigate("/admin/login");
+    logout();
   };
 
-  const menuItems = [
-    { name: "Dashboard", path: "/admin", icon: LayoutDashboard },
-    { name: "Homepage", path: "/admin/home", icon: MonitorPlay },
-    { name: "Projects", path: "/admin/projects", icon: FolderTree },
-    { name: "Businesses", path: "/admin/businesses", icon: Building2 },
-    { name: "Investments", path: "/admin/investments", icon: Briefcase },
-    { name: "About Us", path: "/admin/about", icon: Users },
-    {
-      name: "Inbox",
-      path: "/admin/inbox",
-      icon: Inbox,
-      badge: unreadInquiries.length > 0 ? unreadInquiries.length : undefined,
-    },
-
-    { name: "Content Manager", path: "/admin/content", icon: FileText },
-    { name: "User Access", path: "/admin/users", icon: Shield },
-    { name: "Settings", path: "/admin/settings", icon: Settings },
-  ];
+  // Hanya tampilkan menu yang user punya akses (atau jika menu itu public/dashboard)
+  const filteredMenu = useMemo(
+    () => MASTER_MENU_CONFIG.filter((item) => !item.perm || can(item.perm)),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [user, can],
+  );
 
   return (
-    // Warna dasar background untuk seluruh area Admin Panel
     <div className="h-[100dvh] bg-slate-50 flex font-sans text-slate-900 overflow-hidden">
       {/* --- 1. OVERLAY UNTUK MOBILE --- */}
       {isMobileMenuOpen && (
@@ -133,9 +209,14 @@ export default function AdminLayout() {
             {isDesktopCollapsed ? "Menu" : "Main Menu"}
           </p>
 
-          {menuItems.map((item) => {
+          {filteredMenu.map((item) => {
             const isActive = location.pathname === item.path;
             const Icon = item.icon;
+
+            const dynamicBadge =
+              item.name === "Inbox" && unreadInquiries.length > 0
+                ? unreadInquiries.length
+                : undefined;
 
             return (
               <Link
@@ -164,11 +245,9 @@ export default function AdminLayout() {
                   </span>
                 </div>
                 {/* Badge Notifikasi */}
-                {item.badge && (
-                  <span
-                    className={`bg-red-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full shadow-sm transition-all duration-300 ${isDesktopCollapsed ? "absolute top-2 right-2 px-1.5 py-0.5 text-[8px]" : ""}`}
-                  >
-                    {item.badge}
+                {dynamicBadge && (
+                  <span className="bg-red-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full shadow-sm">
+                    {dynamicBadge}
                   </span>
                 )}
               </Link>
@@ -183,18 +262,18 @@ export default function AdminLayout() {
           <div
             className={`flex items-center gap-3 ${isDesktopCollapsed ? "justify-center" : "px-2"}`}
           >
-            <div className="w-10 h-10 shrink-0 rounded-full bg-daw-green text-white flex items-center justify-center font-bold shadow-sm">
-              {userData.name ? userData.name.charAt(0) : "U"}
+            <div className="w-10 h-10 shrink-0 rounded-full bg-daw-green text-white flex items-center justify-center font-bold shadow-sm uppercase">
+              {user?.name ? user.name.charAt(0) : "U"}
             </div>
             {/* Detail Profil Menghilang saat Collapsed */}
             <div
               className={`flex-1 min-w-0 transition-all duration-300 overflow-hidden ${isDesktopCollapsed ? "md:w-0 md:opacity-0" : "w-auto opacity-100"}`}
             >
               <p className="text-sm font-bold text-slate-800 truncate">
-                {userData.name || "Unknown User"}
+                {user?.name || "Loading..."}
               </p>
               <p className="text-[11px] text-slate-500 truncate uppercase tracking-wider">
-                {userData.role || "Guest"}
+                {user?.role || "Synchronizing..."}
               </p>
             </div>
           </div>
@@ -239,15 +318,18 @@ export default function AdminLayout() {
             <div className="hidden sm:flex items-center gap-2 text-sm font-medium">
               {location.pathname
                 .split("/")
-                .filter((x) => x)
+                .filter((x) => x && !isParamId(x))
                 .map((path, index, array) => {
                   const isLast = index === array.length - 1;
+                  const label =
+                    breadcrumbLabels[path] || path.replace(/-/g, " ");
+
                   return (
                     <div key={path} className="flex items-center gap-2">
                       <span
                         className={`capitalize ${isLast ? "text-slate-900 font-bold" : "text-slate-400"}`}
                       >
-                        {path.replace(/-/g, " ")}
+                        {label}
                       </span>
                       {!isLast && (
                         <ChevronRight className="w-4 h-4 text-slate-300" />
@@ -291,7 +373,9 @@ export default function AdminLayout() {
                           className="p-4 hover:bg-slate-50 transition-colors cursor-pointer group"
                           onClick={() => {
                             setIsNotifOpen(false);
-                            navigate("/admin/inbox");
+                            if (can("manage_inbox")) {
+                              navigate("/admin/inbox");
+                            }
                           }}
                         >
                           <div className="flex gap-3 items-start">
@@ -328,7 +412,7 @@ export default function AdminLayout() {
                   )}
                 </div>
 
-                {unreadInquiries.length > 0 && (
+                {unreadInquiries.length > 0 && can("manage_inbox") && (
                   <div className="p-3 border-t border-slate-100 bg-white">
                     <button
                       onClick={() => {

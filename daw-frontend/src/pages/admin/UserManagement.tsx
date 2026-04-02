@@ -11,48 +11,61 @@ import {
 } from "lucide-react";
 import api from "@/lib/api";
 import { toast } from "sonner";
+import { useAuth } from "@/contexts/AuthContext";
 
 interface AdminUser {
   id: string;
   name: string;
   email: string;
-  role: "Superadmin" | "Editor" | "Viewer";
+  roleId: string;
+  roleData?: { name: string };
   status: "Active" | "Suspended";
   lastLogin: string | null;
   createdAt: string;
 }
 
+interface RoleData {
+  id: string;
+  name: string;
+}
+
 export default function UserManagement() {
+  const { user: currentUser } = useAuth();
+  const currentUserId = currentUser?.id;
+
   const [users, setUsers] = useState<AdminUser[]>([]);
+  const [roles, setRoles] = useState<RoleData[]>([]);
+
   const [searchTerm, setSearchTerm] = useState("");
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
-  const currentUserId = localStorage.getItem("userId");
 
   // Fungsi Fetch Data dari API
-  const fetchUsers = async () => {
+  const fetchUsersAndRoles = async () => {
     setIsLoading(true);
     try {
-      // Api instance (Token otomatis terbawa)
-      const response = await api.get("/users");
-      setUsers(response.data);
+      const [usersRes, rolesRes] = await Promise.all([
+        api.get("/users"),
+        api.get("/roles"),
+      ]);
+      setUsers(usersRes.data);
+      setRoles(rolesRes.data);
     } catch (error) {
-      console.error("Error fetching users:", error);
-      toast.error("Gagal memuat daftar user.");
+      console.error("Error fetching data:", error);
+      toast.error("Gagal memuat daftar user & role.");
     } finally {
       setIsLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchUsers();
+    fetchUsersAndRoles();
   }, []);
 
-  // Role otomatis di-set (hardcoded) ke Editor
   const [formData, setFormData] = useState({
     name: "",
     email: "",
-    role: "Editor",
+    roleId: "",
   });
 
   const [tempCredentials, setTempCredentials] = useState<{
@@ -63,7 +76,7 @@ export default function UserManagement() {
   const handleCloseModal = () => {
     setIsModalOpen(false);
     setTempCredentials(null);
-    setFormData({ name: "", email: "", role: "Editor" }); // Reset form
+    setFormData({ name: "", email: "", roleId: "" }); // Reset form
   };
 
   const filteredUsers = users.filter(
@@ -73,10 +86,9 @@ export default function UserManagement() {
   );
 
   const handleAddUser = async () => {
-    if (!formData.name || !formData.email) {
-      return toast.error("Please fill in all required fields.");
+    if (!formData.name || !formData.email || !formData.roleId) {
+      return toast.error("Please fill in all required fields, including Role.");
     }
-
     const loadingToast = toast.loading("Creating user account...");
     try {
       const response = await api.post("/users", formData);
@@ -87,7 +99,7 @@ export default function UserManagement() {
         id: loadingToast,
       });
 
-      fetchUsers();
+      fetchUsersAndRoles();
 
       setTempCredentials({ email: formData.email, pass: result.tempPassword });
     } catch (error: any) {
@@ -111,7 +123,7 @@ export default function UserManagement() {
     try {
       await api.put(`/users/${user.id}`, { ...user, status: newStatus });
       toast.success(`Berhasil ${actionText} user.`);
-      fetchUsers();
+      fetchUsersAndRoles();
     } catch (error) {
       toast.error("Gagal mengubah status user.");
       console.error(error);
@@ -119,7 +131,7 @@ export default function UserManagement() {
   };
 
   const handleDeleteUser = async (id: string) => {
-    // 🛡️ Guard 1: Suicide Prevention (Cegah hapus diri sendiri)
+    // Guard 1: Suicide Prevention (Cegah hapus diri sendiri)
     if (String(id) === String(currentUserId)) {
       return toast.error("Safety Breach", {
         description:
@@ -129,8 +141,8 @@ export default function UserManagement() {
 
     const targetUser = users.find((u) => String(u.id) === String(id));
 
-    // 🛡️ Guard 2: Superadmin Protection
-    if (targetUser?.role === "Superadmin") {
+    // Guard 2: Superadmin Protection
+    if (targetUser?.roleData?.name === "Superadmin") {
       return toast.error("Action Denied", {
         description: "Superadmin accounts are immutable and cannot be deleted.",
       });
@@ -156,7 +168,7 @@ export default function UserManagement() {
               description: `${targetUser?.name} has been removed from the DAW database.`,
             });
 
-            fetchUsers(); // Refresh data
+            fetchUsersAndRoles(); // Refresh data
           } catch (error: any) {
             toast.error("Operation Failed", {
               id: loadingToast,
@@ -250,9 +262,10 @@ export default function UserManagement() {
               ) : filteredUsers.length > 0 ? (
                 /* --- DATA ITERATION --- */
                 filteredUsers.map((user) => {
-                  // 🛡️ LOGIKA PROTEKSI (Dihitung per baris user)
+                  // LOGIKA PROTEKSI (Dihitung per baris user)
                   const isSelf = String(user.id) === String(currentUserId);
-                  const isSuperadmin = user.role === "Superadmin";
+                  const roleName = user.roleData?.name || "Unknown Role";
+                  const isSuperadmin = roleName === "Superadmin";
                   return (
                     <tr
                       key={user.id}
@@ -280,10 +293,10 @@ export default function UserManagement() {
                       </td>
                       <td className="px-6 py-4">
                         <span
-                          className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-bold border ${getRoleBadgeColor(user.role)}`}
+                          className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-bold border ${getRoleBadgeColor(roleName)}`}
                         >
                           {isSuperadmin && <Shield className="w-3.5 h-3.5" />}
-                          {user.role}
+                          {roleName}{" "}
                         </span>
                       </td>
                       <td className="px-6 py-4">
@@ -425,7 +438,6 @@ export default function UserManagement() {
                       description: "You can now paste it securely to the user.",
                     });
 
-                    // ✅ Panggil fungsi ini daripada nulis manual lagi
                     handleCloseModal();
                   }}
                   className="w-full flex items-center justify-center gap-2 py-3.5 bg-daw-green hover:bg-[#003b1c] text-white rounded-xl font-bold transition-colors shadow-md"
@@ -482,12 +494,22 @@ export default function UserManagement() {
                     <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">
                       System Role
                     </label>
-                    <div className="w-full flex items-center gap-2 px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-slate-500 cursor-not-allowed">
-                      <Shield className="w-4 h-4 text-blue-500" />
-                      <span className="text-sm font-medium">
-                        Editor (Default)
-                      </span>
-                    </div>
+                    <select
+                      className="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-daw-green/20 focus:border-daw-green transition-all appearance-none cursor-pointer"
+                      value={formData.roleId}
+                      onChange={(e) =>
+                        setFormData({ ...formData, roleId: e.target.value })
+                      }
+                    >
+                      <option value="" disabled>
+                        -- Select a Role --
+                      </option>
+                      {roles.map((role) => (
+                        <option key={role.id} value={role.id}>
+                          {role.name}
+                        </option>
+                      ))}
+                    </select>
                     <p className="text-[11px] text-slate-400 mt-2 flex items-center gap-1.5">
                       <Key className="w-3.5 h-3.5" /> A secure temporary
                       password will be generated.

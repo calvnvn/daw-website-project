@@ -3,9 +3,11 @@ import { useNavigate } from "react-router-dom";
 import { Key, Lock, Eye, EyeOff, ShieldCheck } from "lucide-react";
 import { toast } from "sonner";
 import api from "@/lib/api";
+import { useAuth } from "@/contexts/AuthContext";
 
 export default function ForceChangePassword() {
   const navigate = useNavigate();
+  const { login } = useAuth();
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -33,10 +35,24 @@ export default function ForceChangePassword() {
       const response = await api.post("/auth/force-change-password", {
         newPassword,
       });
+
+      // Ambil token yang tersimpan (karena di Login.tsx kita simpan token sementaranya)
+      const currentToken = localStorage.getItem("daw_token");
+
+      if (!currentToken)
+        throw new Error("Sesi tidak valid, silakan login ulang.");
+
+      // Panggil /auth/me untuk mendapatkan data user lengkap beserta permissions
+      const meResponse = await api.get("/auth/me");
+      const userData = meResponse.data;
+
+      // SINKRONISASI KE AUTH CONTEXT
+      login(userData, currentToken);
+
       toast.success("Password Updated!", {
         description: response.data.message || "Akun Anda kini sepenuhnya aman.",
       });
-      navigate("/admin");
+      navigate("/admin", { replace: true });
     } catch (error: any) {
       toast.error("Update Failed", {
         description:

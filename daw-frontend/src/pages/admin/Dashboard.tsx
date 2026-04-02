@@ -20,6 +20,7 @@ import {
   Users,
 } from "lucide-react";
 import api from "@/lib/api";
+import { useAuth } from "@/contexts/AuthContext";
 
 interface Inquiry {
   id: string;
@@ -43,9 +44,8 @@ export default function Dashboard() {
     null,
   );
   const [isLoading, setIsLoading] = useState(true);
-
-  const user = JSON.parse(localStorage.getItem("daw_user") || "{}");
-  const firstName = user.name ? user.name.split(" ")[0] : "Admin";
+  const { user, can } = useAuth();
+  const firstName = user?.name ? user.name.split(" ")[0] : "Admin";
 
   const today = new Date().toLocaleDateString("en-US", {
     weekday: "long",
@@ -273,13 +273,13 @@ export default function Dashboard() {
             </div>
             <div className="flex-1 min-w-0">
               <h3 className="text-base font-bold text-slate-900 truncate">
-                {user.name || "Administrator"}
+                {user?.name || "Administrator"}
               </h3>
               <p className="text-[10px] font-bold text-daw-green uppercase tracking-widest mt-0.5">
-                {user.role || "Superadmin"}
+                {user?.role || "Superadmin"}
               </p>
               <p className="text-xs text-slate-500 truncate mt-1">
-                {user.email || "admin@daw.com"}
+                {user?.email || "admin@daw.com"}
               </p>
             </div>
           </div>
@@ -304,20 +304,22 @@ export default function Dashboard() {
                 <ArrowRight className="w-4 h-4 text-slate-400 group-hover:text-daw-green transition-all transform group-hover:translate-x-1" />
               </Link>
 
-              <Link
-                to="/admin/users"
-                className="flex items-center justify-between p-4 rounded-xl border border-slate-100 bg-white hover:border-blue-300 hover:bg-blue-50 group transition-all shadow-sm hover:shadow-md"
-              >
-                <div className="flex items-center gap-3">
-                  <div className="bg-white p-1.5 rounded-md shadow-sm text-blue-600">
-                    <Users className="w-4 h-4" />
+              {can("manage_users") && (
+                <Link
+                  to="/admin/users"
+                  className="flex items-center justify-between p-4 rounded-xl border border-slate-100 bg-white hover:border-blue-300 hover:bg-blue-50 group transition-all shadow-sm hover:shadow-md"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="bg-white p-1.5 rounded-md shadow-sm text-blue-600">
+                      <Users className="w-4 h-4" />
+                    </div>
+                    <span className="text-sm font-bold text-slate-700 group-hover:text-blue-600 transition-colors">
+                      Kelola Pengguna
+                    </span>
                   </div>
-                  <span className="text-sm font-bold text-slate-700 group-hover:text-blue-600 transition-colors">
-                    Kelola Pengguna
-                  </span>
-                </div>
-                <ArrowRight className="w-4 h-4 text-slate-400 group-hover:text-blue-600 transition-all transform group-hover:translate-x-1" />
-              </Link>
+                  <ArrowRight className="w-4 h-4 text-slate-400 group-hover:text-blue-600 transition-all transform group-hover:translate-x-1" />
+                </Link>
+              )}
             </div>
           </div>
         </div>

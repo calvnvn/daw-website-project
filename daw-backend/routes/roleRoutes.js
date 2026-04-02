@@ -3,7 +3,7 @@ const router = express.Router();
 const roleController = require("../controllers/roleController");
 const { verifyToken, checkPermission } = require("../middleware/authJwt");
 
-routes.use(verifyToken);
+router.use(verifyToken);
 router.use(checkPermission("manage_users"));
 
 router.get("/", roleController.getAllRoles);

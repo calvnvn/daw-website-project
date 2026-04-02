@@ -8,6 +8,7 @@ import api from "@/lib/api";
 import { Link } from "react-router-dom";
 import { useSettings } from "@/contexts/SettingsContext";
 import { getCleanImageUrl } from "@/lib/utils";
+import { useAuth } from "@/contexts/AuthContext";
 
 export default function Login() {
   const { settings } = useSettings();
@@ -19,6 +20,7 @@ export default function Login() {
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const { login } = useAuth();
 
   // Ambil alamat asal, kalau tidak ada default ke /admin
   const from = location.state?.from?.pathname || "/admin";
@@ -45,34 +47,23 @@ export default function Login() {
         throw new Error("Token tidak diterima dari server.");
       }
 
-      // Simpan satu per satu dengan aman
-      localStorage.setItem("daw_token", data.accessToken);
-      localStorage.setItem("userId", data.id || "");
-
-      // Simpan User Info dengan Fallback (Cadangan)
-      const userData = {
-        id: data.id,
-        name: data.name || "Admin DAW", // Kalau name undefined, kasih nama default
-        email: data.email,
-        role: data.role,
-      };
-      localStorage.setItem("daw_user", JSON.stringify(userData));
-
       if (data.needsPasswordChange) {
+        localStorage.setItem("daw_token", data.accessToken);
+        localStorage.setItem("userId", data.id || "");
+
         toast.info("Security Check", {
           description: "Please change your password.",
         });
         navigate("/force-change-password");
       } else {
-        // Gunakan userData.name yang sudah diproteksi fallback
         if (data.accessToken && data.name) {
-          // Pastikan name ada
-          localStorage.setItem("daw_token", data.accessToken);
-          localStorage.setItem("daw_user", JSON.stringify(data));
+          const { accessToken, ...userData } = data;
+
+          login(userData, accessToken);
+
           toast.success(`Welcome, ${data.name}!`);
           navigate(from, { replace: true });
         } else {
-          // Kalau name atau token gak ada, refuse masuk!
           console.error("Data user tidak lengkap:", data);
           toast.error("Data user tidak lengkap dari server.");
         }
@@ -86,7 +77,6 @@ export default function Login() {
     }
   };
 
-  // ✅ FIXED: Return sekarang berada di level atas komponen (bukan di dalam handleLogin)
   return (
     <div className="min-h-screen w-full flex bg-white animate-in fade-in duration-700">
       <div className="w-full lg:w-[480px] xl:w-[500px] flex flex-col justify-center px-8 sm:px-12 md:px-16 py-12 shrink-0 relative z-10 border-r border-slate-100 shadow-[20px_0_40px_-15px_rgba(0,0,0,0.05)]">

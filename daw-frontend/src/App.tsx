@@ -8,8 +8,6 @@ import ContactUs from "./pages/public/ContactUs";
 import ProjectDetail from "./pages/public/ProjectDetail";
 import Dashboard from "./pages/admin/Dashboard";
 import ProjectManagement from "./pages/admin/ProjectManagement";
-// import CreateProject from "./pages/admin/CreateProject";
-// import EditProject from "./pages/admin/EditProject";
 
 import GlobalSettings from "./pages/admin/GlobalSettings";
 import AboutUsManager from "./pages/admin/AboutUsManager";
@@ -27,10 +25,12 @@ import DynamicPage from "./pages/public/DynamicPage";
 import ForgotPassword from "./pages/admin/ForgotPassword";
 import ResetPassword from "./pages/admin/ResetPassword";
 import ProjectForm from "./pages/admin/ProjectForm";
+import RoleManagement from "./pages/admin/RoleManagement";
+import { AuthProvider } from "./contexts/AuthContext";
 
 function App() {
   return (
-    <>
+    <AuthProvider>
       <Toaster
         position="top-center"
         richColors
@@ -38,8 +38,8 @@ function App() {
           style: { border: "1px solid #004B23" },
         }}
       />
-      {/* Public Route */}
       <Routes>
+        {/* Public Route */}
         <Route element={<MainLayout />}>
           <Route path="/" element={<Home />} />
           <Route path="/about" element={<AboutUs />} />
@@ -49,7 +49,7 @@ function App() {
           <Route path="page/:slug" element={<DynamicPage />} />
         </Route>
 
-        {/* Admin Login */}
+        {/* Auth Route */}
         <Route path="/admin/login" element={<Login />} />
         <Route
           path="/force-change-password"
@@ -57,6 +57,7 @@ function App() {
         />
         <Route path="/forgot-password" element={<ForgotPassword />} />
         <Route path="/reset-password/:token" element={<ResetPassword />} />
+
         {/* Admin Route */}
         <Route element={<ProtectedRoute />}>
           <Route path="/admin" element={<AdminLayout />}>
@@ -64,21 +65,43 @@ function App() {
             <Route path="projects" element={<ProjectManagement />} />
             <Route path="/admin/projects/create" element={<ProjectForm />} />
             <Route path="/admin/projects/edit/:id" element={<ProjectForm />} />
-            <Route path="content" element={<ContentManager />} />
+            <Route element={<ProtectedRoute permission="manage_content" />}>
+              <Route path="content" element={<ContentManager />} />
+            </Route>
 
-            {/* <Route path="menu-manager" element={<MenuManager />} />
-            <Route path="page-manager" element={<PageManager />} /> */}
-            <Route path="settings" element={<GlobalSettings />} />
-            <Route path="home" element={<HomepageManager />} />
-            <Route path="businesses" element={<ManageBusinesses />} />
-            <Route path="about" element={<AboutUsManager />} />
-            <Route path="inbox" element={<Inbox />} />
-            <Route path="users" element={<UserManagement />} />
-            <Route path="investments" element={<InvestmentsManager />} />
+            <Route element={<ProtectedRoute permission="manage_settings" />}>
+              <Route path="settings" element={<GlobalSettings />} />
+            </Route>
+
+            <Route element={<ProtectedRoute permission="manage_homepage" />}>
+              <Route path="home" element={<HomepageManager />} />
+            </Route>
+
+            <Route element={<ProtectedRoute permission="manage_businesses" />}>
+              <Route path="businesses" element={<ManageBusinesses />} />
+            </Route>
+
+            <Route element={<ProtectedRoute permission="manage_about" />}>
+              <Route path="about" element={<AboutUsManager />} />
+            </Route>
+
+            <Route element={<ProtectedRoute permission="manage_inbox" />}>
+              <Route path="inbox" element={<Inbox />} />
+            </Route>
+
+            <Route element={<ProtectedRoute permission="manage_investments" />}>
+              <Route path="investments" element={<InvestmentsManager />} />
+            </Route>
+
+            {/* User & Role Management (Kunci dengan manage_users) */}
+            <Route element={<ProtectedRoute permission="manage_users" />}>
+              <Route path="users" element={<UserManagement />} />
+              <Route path="roles" element={<RoleManagement />} />
+            </Route>
           </Route>
         </Route>
       </Routes>
-    </>
+    </AuthProvider>
   );
 }
 
