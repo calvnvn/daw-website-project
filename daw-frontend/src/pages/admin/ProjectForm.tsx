@@ -27,6 +27,7 @@ import {
 import { useDropzone } from "react-dropzone";
 import api, { BASE_UPLOAD_URL } from "@/lib/api";
 import { compressImage } from "@/utils/imageHelper";
+import { useAuth } from "@/contexts/AuthContext";
 
 // --- SUB-COMPONENT: GALLERY PREVIEW ---
 const GalleryPreviewItem = ({
@@ -74,7 +75,7 @@ export default function ProjectForm() {
   const { id } = useParams(); // Jika ada ID, berarti Edit Mode
   const isEditMode = !!id;
   const quillRef = useRef<ReactQuill>(null);
-
+  const { user, can } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
   const [isFetching, setIsFetching] = useState(isEditMode); // Fetching hanya aktif jika Edit Mode
 
@@ -89,6 +90,16 @@ export default function ProjectForm() {
     seo_title: "",
     meta_description: "",
   });
+
+  const parsedGallery = useMemo(() => {
+    try {
+      return typeof formData.gallery === "string"
+        ? JSON.parse(formData.gallery)
+        : [];
+    } catch {
+      return [];
+    }
+  }, [formData.gallery]);
 
   const [coverFile, setCoverFile] = useState<File | null>(null);
   const [galleryFiles, setGalleryFiles] = useState<File[]>([]);
@@ -116,13 +127,29 @@ export default function ProjectForm() {
 
   // --- LOGIC: FETCH EXISTING DATA (EDIT MODE ONLY) ---
   useEffect(() => {
-    if (!isEditMode) return;
-
+    if (!isEditMode) {
+      setFormData({
+        title: "",
+        excerpt: "",
+        content: "",
+        category: "Resources",
+        status: "Draft",
+        cover_image: "",
+        gallery: "[]",
+        seo_title: "",
+        meta_description: "",
+      });
+      setCoverFile(null);
+      setGalleryFiles([]);
+      setCoverPreview(null);
+      setIsFetching(false);
+      return;
+    }
     const fetchProject = async () => {
+      setIsFetching(true);
       try {
         const response = await api.get(`/projects/${id}`);
         const data = response.data.data || response.data;
-
         setFormData({
           title: data.title || "",
           excerpt: data.excerpt || "",
@@ -137,7 +164,8 @@ export default function ProjectForm() {
           seo_title: data.seo_title || "",
           meta_description: data.meta_description || "",
         });
-      } catch {
+      } catch (error) {
+        console.error("Fetch Error:", error);
         toast.error("Gagal memuat data proyek");
         navigate("/admin/projects");
       } finally {
@@ -145,19 +173,14 @@ export default function ProjectForm() {
       }
     };
     fetchProject();
-  }, [id, isEditMode, navigate]);
+  }, [id, isEditMode]);
 
   // Remove existing gallery image (Edit Mode)
   const removeOldGalleryImage = (indexToRemove: number) => {
-    try {
-      const currentGallery: string[] = JSON.parse(formData.gallery);
-      const updatedGallery = currentGallery.filter(
-        (_, idx) => idx !== indexToRemove,
-      );
-      setFormData({ ...formData, gallery: JSON.stringify(updatedGallery) });
-    } catch (e) {
-      console.error("Gallery parse error", e);
-    }
+    const updatedGallery = parsedGallery.filter(
+      (_: any, idx: number) => idx !== indexToRemove,
+    );
+    setFormData({ ...formData, gallery: JSON.stringify(updatedGallery) });
   };
 
   // --- QUILL: IMAGE HANDLER ---
@@ -265,18 +288,7 @@ export default function ProjectForm() {
       }
 
       // Append Author (Dari Local Storage)
-      let authorName = "Admin DAW";
-      try {
-        const userStr = localStorage.getItem("daw_user");
-        if (userStr) {
-          const userObj = JSON.parse(userStr);
-          // Cek berbagai kemungkinan key nama di objek user kamu
-          authorName = userObj.name || userObj.username || "Admin DAW";
-        }
-      } catch (e) {
-        console.warn("Gagal parse user data:", e);
-      }
-      payload.append("author", authorName);
+      payload.append("author", user?.name || "Admin DAW");
 
       // Dinamis menggunakan POST (Create) atau PUT (Edit)
       const endpoint = isEditMode ? `/projects/${id}` : "/projects";
@@ -339,9 +351,9 @@ export default function ProjectForm() {
   }
 
   return (
-    <div className="max-w-7xl mx-auto animate-in fade-in duration-500 pb-12">
+    <div className="max-w-7xl mx-auto animate-in fade-in duration-500">
       {/* TOOLBAR HEADER */}
-      <div className="flex items-center justify-between mb-8 top-0 bg-slate-50/80 backdrop-blur-md z-30 py-4 border-b border-slate-200 px-1 sticky">
+      <div className="flex items-center justify-between mb-6 top-0 bg-[#F8FAFC]/90 backdrop-blur-md z-[40] py-4 border-b border-slate-200">
         <div className="flex items-center gap-4">
           <button
             onClick={() => navigate("/admin/projects")}
@@ -364,14 +376,14 @@ export default function ProjectForm() {
         <div className="flex gap-3">
           <button
             onClick={() => handleSave("Draft")}
-            disabled={isLoading}
-            className="px-5 py-2 bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 rounded-lg font-bold text-sm shadow-sm transition-all active:scale-95"
+            disabled={isLoading || !can("manage_projects")}
+            className="px-5 py-2 bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 rounded-lg font-bold text-sm shadow-sm transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <Save className="w-4 h-4 inline mr-2 text-slate-400" /> Draf
           </button>
           <button
             onClick={() => handleSave("Published")}
-            disabled={isLoading}
+            disabled={isLoading || !can("manage_projects")}
             className="px-5 py-2 bg-daw-green hover:bg-[#003b1c] text-white rounded-lg font-bold text-sm shadow-sm transition-all active:scale-95 disabled:opacity-50"
           >
             <Send className="w-4 h-4 inline mr-2" />{" "}
@@ -387,7 +399,7 @@ export default function ProjectForm() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         {/* KIRI: CONTENT AREA */}
         <div className="lg:col-span-2 space-y-6">
-          <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden flex flex-col min-h-[600px] p-0 md:p-8 space-y-8">
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden flex flex-col p-0 md:p-8 space-y-8">
             <input
               type="text"
               placeholder="Masukkan judul proyek yang menarik..."
@@ -425,14 +437,14 @@ export default function ProjectForm() {
               <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
                 Isi Artikel Utama
               </label>
-              <div className="flex-1 min-h-[400px] border border-slate-100 rounded-xl overflow-hidden shadow-inner">
+              <div className="flex-1 min-h-[400px] max-h-[600px] border border-slate-100 rounded-xl overflow-hidden shadow-inner flex flex-col bg-white">
                 <ReactQuill
                   ref={quillRef}
                   theme="snow"
                   modules={modules}
                   value={formData.content}
                   onChange={(v) => setFormData({ ...formData, content: v })}
-                  className="h-full border-none"
+                  className="flex-1 overflow-y-auto"
                 />
               </div>
             </div>
