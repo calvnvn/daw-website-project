@@ -1,6 +1,6 @@
 const Role = require("../models/Role");
 const Permission = require("../models/Permission");
-const RolePermission = require("../models/RolePermission");
+const sequelize = require("../config/database"); // Import sequelize untuk transaksi
 
 // Get All Roles (dengan list permission-nya)
 exports.getAllRoles = async (req, res) => {
@@ -39,17 +39,25 @@ exports.getAllPermissions = async (req, res) => {
 
 // Create Role
 exports.createRole = async (req, res) => {
+  const t = await sequelize.transaction();
   try {
     const { name, description, permissionIds } = req.body;
 
-    const role = await Role.create({ name, description });
+    const role = await Role.create({ name, description }, { transaction: t });
 
-    if (permissionIds && permissionIds.lenght > 0) {
-      await role.setPermissions(permissionIds);
+    if (
+      permissionIds &&
+      Array.isArray(permissionIds) &&
+      permissionIds.length > 0
+    ) {
+      await role.setPermissions(permissionIds, { transaction: t });
     }
+
+    await t.commit();
 
     res.status(201).json({ message: "Role created successfully", data: role });
   } catch (error) {
+    await t.rollback();
     res
       .status(500)
       .json({ message: "Failed to create role", error: error.message });
@@ -58,26 +66,37 @@ exports.createRole = async (req, res) => {
 
 // Update Role
 exports.updateRole = async (req, res) => {
+  const t = await sequelize.transaction();
+
   try {
     const { id } = req.params;
     const { name, description, permissionIds } = req.body;
 
     const role = await Role.findByPk(id);
-    if (!role) return res.status(404).json({ message: "Role not found" });
+    if (!role) {
+      await t.rollback();
+      return res.status(404).json({ message: "Role not found" });
+    }
 
+    // Proteksi Superadmin
     if (role.name === "Superadmin" && name !== "Superadmin") {
+      await t.rollback();
       return res.status(403).json({ message: "Cannot rename Superadmin role" });
     }
 
-    await role.update({ name, description });
+    // Update data dasar
+    await role.update({ name, description }, { transaction: t });
 
-    if (permissionIds) {
-      await role.setPermissions(permissionIds);
+    // Update Junction Table
+    if (permissionIds && Array.isArray(permissionIds)) {
+      await role.setPermissions(permissionIds, { transaction: t });
     }
 
+    await t.commit();
     res.status(200).json({ message: "Role updated successfully" });
   } catch (error) {
-    res.status(500).json({ message: "Updated failed", error: error.message });
+    await t.rollback();
+    res.status(500).json({ message: "Update failed", error: error.message });
   }
 };
 

@@ -8,6 +8,7 @@ import {
   ShieldCheck,
   X,
   Trash2,
+  ChevronDown,
 } from "lucide-react";
 import api from "@/lib/api";
 import { toast } from "sonner";
@@ -185,7 +186,55 @@ export default function UserManagement() {
     });
   };
 
+  // --- UBAH ROLE USER ---
+  const handleUpdateRole = async (userId: string, newRoleId: string) => {
+    if (String(userId) === String(currentUserId)) {
+      return toast.error("Action Denied", {
+        description: "You cannot change your own role.",
+      });
+    }
+
+    const targetUser = users.find((u) => String(u.id) === String(userId));
+    const newRole = roles.find((r) => String(r.id) === String(newRoleId));
+
+    // Eksekusi API Call (Dibungkus dalam fungsi agar bisa dipanggil dari Action)
+    const executeUpdate = async () => {
+      const loadingToast = toast.loading(
+        `Updating role for ${targetUser?.name}...`,
+      );
+      try {
+        await api.put(`/users/${userId}`, { roleId: newRoleId });
+        toast.success("Role Updated", {
+          id: loadingToast,
+          description: `${targetUser?.name} is now a ${newRole?.name}.`,
+        });
+        fetchUsersAndRoles(); // Refresh tabel untuk sinkronisasi
+      } catch (error: any) {
+        toast.error("Failed to update role", {
+          id: loadingToast,
+          description:
+            error.response?.data?.message || "Internal server error.",
+        });
+      }
+    };
+
+    // Konfirmasi Elegan via Sonner Toast (Hanya untuk Superadmin)
+    if (newRole?.name === "Superadmin") {
+      toast("Promote to Superadmin?", {
+        description: `This will give ${targetUser?.name} full system access.`,
+        duration: Infinity,
+        action: { label: "Yes, Promote", onClick: executeUpdate },
+        cancel: { label: "Cancel", onClick: () => toast.dismiss() },
+      });
+    } else {
+      // Langsung eksekusi jika bukan Superadmin
+      executeUpdate();
+    }
+  };
+
+  // --- SENIOR FULLSTACK MAGIC: DETERMINISTIC COLOR ASSIGNMENT ---
   const getRoleBadgeColor = (role: string) => {
+    // 1. CORE SYSTEM ROLES (Pertahankan identitas aslinya)
     switch (role) {
       case "Superadmin":
         return "bg-purple-100 text-purple-700 border-purple-200";
@@ -193,9 +242,33 @@ export default function UserManagement() {
         return "bg-blue-100 text-blue-700 border-blue-200";
       case "Viewer":
         return "bg-slate-100 text-slate-700 border-slate-200";
-      default:
-        return "bg-slate-100 text-slate-700";
     }
+
+    // 2. CURATED PALETTE (Palet warna premium untuk role kustom)
+    // Kita kurasi agar tidak ada warna jelek (seperti kuning stabilo) yang merusak mata.
+    const customPalette = [
+      "bg-emerald-100 text-emerald-700 border-emerald-200", // Nature / Fresh
+      "bg-amber-100 text-amber-700 border-amber-200", // Warm / Alert
+      "bg-rose-100 text-rose-700 border-rose-200", // Passion / Urgent
+      "bg-indigo-100 text-indigo-700 border-indigo-200", // Tech / Corporate
+      "bg-cyan-100 text-cyan-700 border-cyan-200", // Modern / Clean
+      "bg-fuchsia-100 text-fuchsia-700 border-fuchsia-200", // Creative / Pop
+      "bg-teal-100 text-teal-700 border-teal-200", // Professional
+      "bg-orange-100 text-orange-700 border-orange-200", // Energetic
+    ];
+
+    // 3. THE HASHING ALGORITHM
+    // Mengubah string (contoh: "Marketing") menjadi angka integer unik secara konsisten
+    let hash = 0;
+    for (let i = 0; i < role.length; i++) {
+      hash = role.charCodeAt(i) + ((hash << 5) - hash);
+    }
+
+    // 4. MAPPING TO PALETTE
+    // Gunakan absolute & modulo agar angka hash selalu muat di dalam index array palet kita
+    const colorIndex = Math.abs(hash) % customPalette.length;
+
+    return customPalette[colorIndex];
   };
 
   return (
@@ -291,13 +364,50 @@ export default function UserManagement() {
                           </div>
                         </div>
                       </td>
+                      {/* --- SYSTEM ROLE CELL --- */}
                       <td className="px-6 py-4">
-                        <span
-                          className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-bold border ${getRoleBadgeColor(roleName)}`}
-                        >
-                          {isSuperadmin && <Shield className="w-3.5 h-3.5" />}
-                          {roleName}{" "}
-                        </span>
+                        {currentUser?.role === "Superadmin" && !isSelf ? (
+                          <div className="relative inline-block group/role">
+                            {/* Highlight Background saat Hover */}
+                            <div className="absolute inset-0 bg-slate-100 rounded-lg opacity-0 group-hover/role:opacity-100 transition-opacity duration-200" />
+
+                            <select
+                              value={user.roleId}
+                              onChange={(e) =>
+                                handleUpdateRole(user.id, e.target.value)
+                              }
+                              className={`relative appearance-none outline-none pr-8 pl-3 py-1.5 rounded-lg text-xs font-bold border transition-all cursor-pointer w-full min-w-[130px] shadow-sm
+                                ${getRoleBadgeColor(roleName)} 
+                                hover:border-daw-green hover:shadow-md focus:ring-2 focus:ring-daw-green/30 active:scale-[0.98]`}
+                            >
+                              {roles.map((r) => (
+                                <option
+                                  key={r.id}
+                                  value={r.id}
+                                  className="text-slate-700 bg-white font-medium"
+                                >
+                                  {r.name}
+                                </option>
+                              ))}
+                            </select>
+
+                            {/* Custom Icon: Berputar saat hover */}
+                            <div className="absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400 group-hover/role:text-daw-green transition-all duration-300 group-hover/role:rotate-180">
+                              <ChevronDown className="w-4 h-4" />
+                            </div>
+                          </div>
+                        ) : (
+                          /* Mode Statis (Bukan Superadmin atau Akun Sendiri) */
+                          <span
+                            className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold border shadow-sm ${getRoleBadgeColor(roleName)} ${isSelf ? "opacity-80 ring-1 ring-slate-200 ring-offset-1" : ""}`}
+                            title={
+                              isSelf ? "Your current role" : "Role is locked"
+                            }
+                          >
+                            {isSuperadmin && <Shield className="w-3.5 h-3.5" />}
+                            {roleName}
+                          </span>
+                        )}
                       </td>
                       <td className="px-6 py-4">
                         {user.status === "Active" ? (
@@ -391,7 +501,7 @@ export default function UserManagement() {
 
       {/* ADD USER MODAL */}
       {isModalOpen && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6 bg-slate-900/60 animate-in fade-in duration-200">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md flex flex-col overflow-hidden animate-in zoom-in-95 duration-200">
             {/* CONDITIONAL RENDERING: Cek apakah ada kredensial sementara */}
             {tempCredentials ? (
