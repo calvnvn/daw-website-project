@@ -45,15 +45,27 @@ export default function UserManagement() {
   const fetchUsersAndRoles = async () => {
     setIsLoading(true);
     try {
-      const [usersRes, rolesRes] = await Promise.all([
+      const [usersRes, rolesRes] = await Promise.allSettled([
         api.get("/users"),
         api.get("/roles"),
       ]);
-      setUsers(usersRes.data);
-      setRoles(rolesRes.data);
+
+      if (usersRes.status === "fulfilled") {
+        setUsers(usersRes.value.data);
+      } else {
+        toast.error("Gagal memuat daftar user.");
+      }
+
+      if (rolesRes.status === "fulfilled") {
+        setRoles(rolesRes.value.data);
+      } else {
+        console.warn(
+          "Gagal memuat roles (403 Forbidden). Cek izin akses token Anda.",
+        );
+        setRoles([]); // Kosongkan agar tidak crash
+      }
     } catch (error) {
-      console.error("Error fetching data:", error);
-      toast.error("Gagal memuat daftar user & role.");
+      console.error("Critical Error fetching data:", error);
     } finally {
       setIsLoading(false);
     }
@@ -188,46 +200,75 @@ export default function UserManagement() {
 
   // --- UBAH ROLE USER ---
   const handleUpdateRole = async (userId: string, newRoleId: string) => {
-    if (String(userId) === String(currentUserId)) {
-      return toast.error("Action Denied", {
-        description: "You cannot change your own role.",
-      });
-    }
-
+    // 1. Identifikasi Target & Scope Variable
     const targetUser = users.find((u) => String(u.id) === String(userId));
     const newRole = roles.find((r) => String(r.id) === String(newRoleId));
 
-    // Eksekusi API Call (Dibungkus dalam fungsi agar bisa dipanggil dari Action)
+    // FIX: Definisikan isEditingSelf di dalam scope fungsi ini
+    const isEditingSelf = String(userId) === String(currentUserId);
+
+    // 2. GUARD: Anti-Self-Demotion
+    if (isEditingSelf) {
+      toast.error("Security Lock", {
+        description:
+          "You cannot demote your own Superadmin status for safety reasons.",
+      });
+      return;
+    }
+
+    // 3. GUARD: Hierarchy Protection (Superadmin vs Superadmin)
+    if (targetUser?.roleData?.name === "Superadmin" && !isEditingSelf) {
+      toast.error("Action Denied", {
+        description:
+          "Hierarchy Protection: Superadmin accounts are immutable by other administrators.",
+      });
+      return;
+    }
+
+    // --- FUNGSI EKSEKUSI API ---
     const executeUpdate = async () => {
       const loadingToast = toast.loading(
-        `Updating role for ${targetUser?.name}...`,
+        `Provisioning ${newRole?.name} access for ${targetUser?.name}...`,
       );
+
       try {
         await api.put(`/users/${userId}`, { roleId: newRoleId });
-        toast.success("Role Updated", {
+
+        toast.success("Access Level Updated", {
           id: loadingToast,
           description: `${targetUser?.name} is now a ${newRole?.name}.`,
         });
-        fetchUsersAndRoles(); // Refresh tabel untuk sinkronisasi
+
+        await fetchUsersAndRoles();
       } catch (error: any) {
-        toast.error("Failed to update role", {
+        toast.error("Update Failed", {
           id: loadingToast,
           description:
             error.response?.data?.message || "Internal server error.",
         });
+
+        fetchUsersAndRoles(); // Kembalikan ke state database jika gagal
       }
     };
 
-    // Konfirmasi Elegan via Sonner Toast (Hanya untuk Superadmin)
+    // --- LOGIKA KONFIRMASI ---
     if (newRole?.name === "Superadmin") {
-      toast("Promote to Superadmin?", {
-        description: `This will give ${targetUser?.name} full system access.`,
+      toast("Elevate to Superadmin?", {
+        description: `This grants ${targetUser?.name} full administrative control. Proceed with caution.`,
         duration: Infinity,
-        action: { label: "Yes, Promote", onClick: executeUpdate },
-        cancel: { label: "Cancel", onClick: () => toast.dismiss() },
+        action: {
+          label: "Confirm & Promote",
+          onClick: () => executeUpdate(),
+        },
+        cancel: {
+          label: "Abort",
+          onClick: () => {
+            toast.dismiss();
+            fetchUsersAndRoles(); // Reset UI dropdown jika dibatalkan
+          },
+        },
       });
     } else {
-      // Langsung eksekusi jika bukan Superadmin
       executeUpdate();
     }
   };

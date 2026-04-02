@@ -134,7 +134,7 @@ export default function AboutUs() {
             <div className="grid md:grid-cols-12 gap-12 lg:gap-20">
               {/* SIDEBAR NAV */}
               <div className="md:col-span-3 h-full mb-8 md:mb-0">
-                <div className="sticky top-20 md:top-32 pb-2 md:pb-8 z-20 bg-white/95 backdrop-blur-sm md:bg-transparent">
+                <div className="sticky top-20 md:top-32 pb-2 md:pb-8 z-20 bg-white/95 md:bg-transparent">
                   <ScrollReveal direction="right" delay={100}>
                     <div className="flex flex-row md:flex-col overflow-x-auto md:overflow-visible space-x-4 md:space-x-0 md:space-y-2 border-b md:border-b-0 border-slate-100 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
                       <span className="hidden md:block text-[11px] font-bold text-slate-400 uppercase tracking-[0.2em] mb-4 pl-5">

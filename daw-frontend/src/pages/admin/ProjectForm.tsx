@@ -574,7 +574,7 @@ export default function ProjectForm() {
                           alt="Saved"
                         />
                         <div className="absolute inset-0 bg-black/10 group-hover:bg-black/20 flex items-center justify-center pointer-events-none">
-                          <span className="text-[9px] text-white font-black uppercase bg-daw-green/80 backdrop-blur-sm px-2 py-0.5 rounded-full shadow-sm tracking-tighter">
+                          <span className="text-[9px] text-white font-black uppercase bg-daw-green/80 px-2 py-0.5 rounded-full shadow-sm tracking-tighter">
                             Saved
                           </span>
                         </div>

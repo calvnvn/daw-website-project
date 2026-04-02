@@ -166,7 +166,7 @@ export default function RoleManagement() {
             Role Management
           </h1>
           <p className="text-sm text-slate-500 mt-1">
-            Create custom roles and assign specific module permissions.
+            Kelola role khusus dan tetapkan izin fitur tertentu.
           </p>
         </div>
         <button

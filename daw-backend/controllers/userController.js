@@ -68,48 +68,62 @@ exports.updateUser = async (req, res) => {
   try {
     const { id } = req.params;
     const { name, email, roleId, status } = req.body;
-    const requesterRole = req.userRole;
+    const requesterRole = req.userRole; // Role si pengeklik (dari JWT)
+    const requesterId = req.userId; // ID si pengeklik
 
     const user = await User.findByPk(id, {
       include: [{ model: Role, as: "roleData" }],
     });
+
     if (!user) return res.status(404).json({ message: "User not found" });
 
-    // 🛡️ PROTEKSI 1: Editor dilarang keras ubah Role atau Status
+    // 🛡️ 1. ULTIMATE HIERARCHY GUARD
+    // Siapapun (termasuk Superadmin lain) dilarang mengubah Role/Status seorang Superadmin,
+    // KECUALI Superadmin itu sendiri yang mengubah datanya (misal: ganti nama/email).
+    const targetIsSuperadmin = user.roleData?.name === "Superadmin";
+    const isEditingSelf = String(requesterId) === String(id);
+
+    if (targetIsSuperadmin && !isEditingSelf) {
+      if (roleId || status) {
+        return res.status(403).json({
+          message:
+            "Hierarchy Protection: Superadmin access levels are immutable by other users.",
+        });
+      }
+    }
+
+    // 🛡️ 2. EDITOR ACCESS RESTRICTION
     if (requesterRole === "Editor" && (roleId || status)) {
       return res.status(403).json({
-        message: "Access Denied: Editors cannot change roles or status.",
-      });
-    }
-
-    // 🛡️ PROTEKSI 2: Proteksi Sejenjang
-    const targetRoleName = user.roleData?.name;
-    if (
-      targetRoleName === "Superadmin" &&
-      status === "Suspended" &&
-      requesterRole === "Superadmin"
-    ) {
-      return res.status(403).json({
         message:
-          "Hierarchy Protection: You cannot suspend a fellow Superadmin.",
+          "Forbidden: Editors are not authorized to elevate roles or change account status.",
       });
     }
 
-    // 🛡️ PROTEKSI 3: Jangan biarkan orang ganti role ke Superadmin sembarangan
-    if (roleId && roleId !== user.roleId) {
-      const checkRole = await Role.findByPk(roleId);
-      if (!checkRole)
-        return res.status(400).json({ message: "Invalid role selected." });
+    // 🛡️ 3. PARTIAL UPDATE PATTERN (Surgical Precision)
+    // Kita hanya memasukkan data ke objek update jika nilainya benar-benar dikirim.
+    const updatePayload = {};
+    if (name !== undefined) updatePayload.name = name;
+    if (email !== undefined) updatePayload.email = email;
+    if (roleId !== undefined) updatePayload.roleId = roleId;
+    if (status !== undefined) updatePayload.status = status;
+
+    // Pastikan tidak ada payload kosong yang dikirim ke .update()
+    if (Object.keys(updatePayload).length === 0) {
+      return res
+        .status(400)
+        .json({ message: "No valid fields provided for update." });
     }
 
-    await user.update({ name, email, roleId, status });
+    await user.update(updatePayload);
 
     res.json({
       success: true,
-      message: "User updated successfully",
+      message: `User ${user.name} updated successfully.`,
     });
   } catch (error) {
-    res.status(500).json({ message: "Update failed", error: error.message });
+    console.error("[UPDATE USER ERROR]:", error);
+    res.status(500).json({ message: "Internal server error during update." });
   }
 };
 

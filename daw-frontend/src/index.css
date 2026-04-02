@@ -10,16 +10,6 @@
   --font-serif: "Lora", serif;
 }
 
-html,
-body,
-#root {
-  height: 100%;
-  margin: 0;
-  padding: 0;
-  overflow: hidden; /* Mencegah double scroll di level browser */
-  background-color: #f8fafc; /* Pastikan warna dasar sama dengan background admin */
-}
-
 /*  REACT QUILL ALIGNMENT FIX FOR TAILWIND PROSE */
 .prose .ql-align-center {
   text-align: center !important;

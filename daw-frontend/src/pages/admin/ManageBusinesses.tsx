@@ -500,7 +500,7 @@ export default function ManageBusinesses() {
 
       {/* --- FULLSCREEN MAP MODAL --- */}
       {isMapModalOpen && (
-        <div className="fixed inset-0 z-[100] bg-slate-900/80 backdrop-blur-sm flex items-center justify-center p-4 md:p-10 animate-in fade-in zoom-in-95 duration-200">
+        <div className="fixed inset-0 z-[100] bg-slate-900/80  flex items-center justify-center p-4 md:p-10 animate-in fade-in zoom-in-95 duration-200">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-5xl h-full max-h-[90vh] flex flex-col overflow-hidden">
             <div className="flex justify-between items-center p-4 md:p-6 border-b border-slate-100 bg-slate-50">
               <div>
@@ -623,7 +623,7 @@ export default function ManageBusinesses() {
                     <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 h-[1px] w-full bg-daw-green/40"></div>
 
                     {/* Live Coordinate Display (Diberi class "radar-coord" agar bisa dimanipulasi dari logic Ref) */}
-                    <div className="radar-coord absolute bottom-2 left-1/2 -translate-x-1/2 bg-black/60 backdrop-blur-sm text-white text-[8px] font-mono px-2 py-0.5 rounded-full border border-white/20 whitespace-nowrap">
+                    <div className="radar-coord absolute bottom-2 left-1/2 -translate-x-1/2 bg-black/60  text-white text-[8px] font-mono px-2 py-0.5 rounded-full border border-white/20 whitespace-nowrap">
                       X:{lastMousePos.current.xPercent.toFixed(0)} Y:
                       {lastMousePos.current.yPercent.toFixed(0)}
                     </div>
