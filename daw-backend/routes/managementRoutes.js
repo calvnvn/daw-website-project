@@ -2,24 +2,26 @@ const express = require("express");
 const router = express.Router();
 const managementController = require("../controllers/managementController");
 const upload = require("../middleware/upload");
-
-// Pastikan import ini sesuai dengan nama file aslimu (authJwt atau authMiddleware)
-const { verifyToken } = require("../middleware/authJwt");
+const { verifyToken, checkPermission } = require("../middleware/authJwt");
 
 router.get("/", managementController.getAllManagements);
 
 router.post(
   "/",
-  verifyToken,
+  [verifyToken, checkPermission("manage_about")],
   upload.single("photo"),
   managementController.createManagement,
 );
 router.put(
   "/:id",
-  verifyToken,
+  [verifyToken, checkPermission("manage_about")],
   upload.single("photo"),
   managementController.updateManagement,
 );
-router.delete("/:id", verifyToken, managementController.deleteManagement);
+router.delete(
+  "/:id",
+  [verifyToken, checkPermission("manage_about")],
+  managementController.deleteManagement,
+);
 
 module.exports = router;

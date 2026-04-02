@@ -1,7 +1,7 @@
 const express = require("express");
 const router = express.Router();
 const userController = require("../controllers/userController");
-const { verifyToken, authorizeRoles } = require("../middleware/authJwt");
+const { verifyToken, checkPermission } = require("../middleware/authJwt");
 
 // Semua route di bawah ini butuh login
 router.use(verifyToken);
@@ -10,8 +10,12 @@ router.use(verifyToken);
 router.get("/", userController.getAllUsers);
 
 // Hanya Superadmin yang boleh Create, Update, dan Delete
-router.post("/", authorizeRoles("Superadmin"), userController.createUser);
-router.put("/:id", authorizeRoles("Superadmin"), userController.updateUser);
-router.delete("/:id", authorizeRoles("Superadmin"), userController.deleteUser);
+router.post("/", checkPermission("manage_users"), userController.createUser);
+router.put("/:id", checkPermission("manage_users"), userController.updateUser);
+router.delete(
+  "/:id",
+  checkPermission("manage_users"),
+  userController.deleteUser,
+);
 
 module.exports = router;

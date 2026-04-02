@@ -5,13 +5,30 @@ const jwt = require("jsonwebtoken");
 const crypto = require("crypto");
 const User = require("../models/User");
 const transporter = require("../utils/mailer");
+const Role = require("../models/Role");
+const Permission = require("../models/Permission");
 
 // 1. LOGIN
 exports.login = async (req, res) => {
   try {
     const { email, password } = req.body;
-    // Di authController.js fungsi login
-    const user = await User.findOne({ where: { email } });
+    const user = await User.findOne({
+      where: { email },
+      include: [
+        {
+          model: Role,
+          as: "roleData", // Sesuaikan dengan alias di server.js
+          include: [
+            {
+              model: Permission,
+              as: "permissions",
+              attributes: ["name"],
+              through: { attributes: [] }, // Sembunyikan tabel junction
+            },
+          ],
+        },
+      ],
+    });
     if (!user) {
       return res.status(404).json({ message: "User not found." });
     }
@@ -43,15 +60,28 @@ exports.login = async (req, res) => {
       process.exit(1);
     }
 
-    const token = jwt.sign({ id: user.id, role: user.role }, jwtSecret, {
-      expiresIn: process.env.JWT_EXPIRES_IN || "24h",
-    });
+    // Ambil daftar nama permission ke dalam array string sederhana
+    const userPermissions =
+      user.roleData?.permissions?.map((p) => p.name) || [];
+
+    const token = jwt.sign(
+      {
+        id: user.id,
+        role: user.roleData?.name || "No Role",
+        permissions: userPermissions,
+      },
+      jwtSecret,
+      {
+        expiresIn: process.env.JWT_EXPIRES_IN || "24h",
+      },
+    );
 
     res.status(200).json({
       id: user.id,
       name: user.name,
       email: user.email,
-      role: user.role,
+      role: user.roleData?.name, // Kirim nama role asli ke frontend
+      permissions: userPermissions, // Kirim array permission agar frontend bisa sembunyikan menu
       accessToken: token,
       needsPasswordChange: isFirstLogin,
     });
@@ -65,7 +95,21 @@ exports.login = async (req, res) => {
 exports.getMe = async (req, res) => {
   try {
     const user = await User.findByPk(req.userId, {
-      attributes: ["id", "name", "email", "role", "status"],
+      attributes: ["id", "name", "email", "status"],
+      include: [
+        {
+          model: Role,
+          as: "roleData",
+          include: [
+            {
+              model: Permission,
+              as: "permissions",
+              attributes: ["name"],
+              through: { attributes: [] },
+            },
+          ],
+        },
+      ],
     });
 
     if (!user) return res.status(404).json({ message: "User not found." });
@@ -76,7 +120,18 @@ exports.getMe = async (req, res) => {
         .json({ message: "Your account has been suspended." });
     }
 
-    res.status(200).json(user);
+    // Ekstraksi permission agar formatnya sama dengan login
+    const userPermissions =
+      user.roleData?.permissions?.map((p) => p.name) || [];
+
+    res.status(200).json({
+      id: user.id,
+      name: user.name,
+      email: user.email,
+      role: user.roleData?.name,
+      permissions: userPermissions,
+      status: user.status,
+    });
   } catch (error) {
     console.error("[GET ME ERROR]:", error.message);
     res.status(500).json({ message: "Internal Server Error" });

@@ -19,7 +19,6 @@ const verifyToken = (req, res, next) => {
     }
 
     // DEBUG 2: Liat token setelah dibersihin
-
     // 3. Pastikan token tidak kosong atau string "undefined"
     if (!token || token === "undefined" || token === "null") {
       console.error("[ERROR] Token formatnya sampah (undefined/null/empty)");
@@ -54,6 +53,7 @@ const verifyToken = (req, res, next) => {
 
       req.userId = decoded.id;
       req.userRole = decoded.role;
+      req.userPermissions = decoded.permissions || [];
       next();
     });
   } catch (error) {
@@ -64,16 +64,36 @@ const verifyToken = (req, res, next) => {
   }
 };
 
-const authorizeRoles = (...allowedRoles) => {
+/**
+ * Middleware untuk mengecek hak akses spesifik
+ * @param {string} requiredPermission - Nama permission (contoh: 'manage_projects')
+ */
+const checkPermission = (requiredPermission) => {
   return (req, res, next) => {
-    // req.userRole didapat dari fungsi verifyToken sebelumnya
-    if (!req.userRole || !allowedRoles.includes(req.userRole)) {
+    // Jika role-nya adalah Superadmin, langsung izinkan tanpa cek permission
+    if (req.userRole === "Superadmin") {
+      return next();
+    }
+    // Cek apakah permission yang diminta ada di dalam array permissions user
+    if (!req.userPermissions.includes(requiredPermission)) {
       return res.status(403).json({
-        message: `Forbidden! Role '${req.userRole}' does not have access to this action.`,
+        message: `Forbidden! You don't have permission to: ${requiredPermission}`,
       });
     }
     next();
   };
 };
 
-module.exports = { verifyToken, authorizeRoles };
+const authorizeRoles = (...allowedRoles) => {
+  return (req, res, next) => {
+    // req.userRole didapat dari fungsi verifyToken sebelumnya
+    if (!req.userRole || !allowedRoles.includes(req.userRole)) {
+      return res.status(403).json({
+        message: `Forbidden! Role '${req.userRole}' does not have access.`,
+      });
+    }
+    next();
+  };
+};
+
+module.exports = { verifyToken, authorizeRoles, checkPermission };

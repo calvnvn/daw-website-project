@@ -1,24 +1,31 @@
 const express = require("express");
 const router = express.Router();
 const projectController = require("../controllers/projectController");
-const { verifyToken } = require("../middleware/authJwt");
+const { verifyToken, checkPermission } = require("../middleware/authJwt");
 const multer = require("multer");
 const upload = require("../middleware/upload");
+
+// Public Routes (Without Login)
 router.get("/public", projectController.getPublicProjects);
 router.get("/public/:id", projectController.getPublicProjectById);
-router.get("/", verifyToken, projectController.getAllProjects);
-router.get("/:id", verifyToken, projectController.getProjectById);
-router.delete("/:id", verifyToken, projectController.deleteProject);
 
+// Protected Routes (Need Login)
+router.use(verifyToken);
+
+/** READ-ONLY: Semua user yang login biasanya boleh melihat daftar data. Jadi tidak butuh checkPermission khusus.
+ */
+router.get("/", projectController.getAllProjects);
+router.get("/:id", projectController.getProjectById);
+
+// Create Project
 router.post(
   "/",
-  verifyToken,
+  checkPermission("manage_projects"),
   (req, res, next) => {
     upload.fields([
       { name: "cover_image", maxCount: 1 },
       { name: "gallery", maxCount: 10 },
     ])(req, res, (err) => {
-      // 👇 Sekarang 'multer' di bawah ini sudah tidak error lagi
       if (err instanceof multer.MulterError) {
         if (err.code === "LIMIT_FILE_SIZE") {
           return res
@@ -41,21 +48,30 @@ router.post(
   projectController.createProject,
 );
 
-router.post(
-  "/upload-inline",
-  verifyToken,
-  upload.single("inline_image"),
-  projectController.uploadInlineImage,
-);
-
+// Update Project
 router.put(
   "/:id",
-  verifyToken,
+  checkPermission("manage_projects"),
   upload.fields([
     { name: "cover_image", maxCount: 1 },
     { name: "gallery", maxCount: 10 },
   ]),
   projectController.updateProject,
+);
+
+// Delete Project
+router.delete(
+  "/:id",
+  checkPermission("manage_projects"),
+  projectController.deleteProject,
+);
+
+// Upload Image dalam Editor
+router.post(
+  "/upload-inline",
+  checkPermission("manage_projects"),
+  upload.single("inline_image"),
+  projectController.uploadInlineImage,
 );
 
 module.exports = router;

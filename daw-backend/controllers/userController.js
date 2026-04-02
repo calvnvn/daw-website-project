@@ -1,10 +1,18 @@
 const User = require("../models/User");
+const Role = require("../models/Role");
 
 exports.getAllUsers = async (req, res) => {
   try {
     // Fetch all users w/o send it to frontend
     const users = await User.findAll({
       attributes: { exclude: ["password"] },
+      include: [
+        {
+          model: Role,
+          as: "roleData",
+          attributes: ["name"],
+        },
+      ],
       order: [["createdAt", "DESC"]],
     });
     res.status(200).json(users);
@@ -17,7 +25,7 @@ exports.getAllUsers = async (req, res) => {
 // --- 1. CREATE USER (Tambahkan Guard Role) ---
 exports.createUser = async (req, res) => {
   try {
-    const { name, email, role } = req.body;
+    const { name, email, roleId } = req.body;
     const requesterRole = req.userRole; // Dari middleware verifyToken
 
     // 🛡️ PROTEKSI: Hanya Superadmin yang boleh buat user baru
@@ -35,10 +43,10 @@ exports.createUser = async (req, res) => {
     const randomNum = Math.floor(1000 + Math.random() * 9000);
     const tempPassword = `Daw${randomNum}!`;
 
-    const newUser = await User.create({
+    await User.create({
       name,
       email,
-      role: role || "Editor",
+      roleId,
       password: tempPassword,
     });
 
@@ -59,22 +67,25 @@ exports.createUser = async (req, res) => {
 exports.updateUser = async (req, res) => {
   try {
     const { id } = req.params;
-    const { name, email, role, status } = req.body;
+    const { name, email, roleId, status } = req.body;
     const requesterRole = req.userRole;
 
-    const user = await User.findByPk(id);
+    const user = await User.findByPk(id, {
+      include: [{ model: Role, as: "roleData" }],
+    });
     if (!user) return res.status(404).json({ message: "User not found" });
 
     // 🛡️ PROTEKSI 1: Editor dilarang keras ubah Role atau Status
-    if (requesterRole === "Editor" && (role || status)) {
+    if (requesterRole === "Editor" && (roleId || status)) {
       return res.status(403).json({
         message: "Access Denied: Editors cannot change roles or status.",
       });
     }
 
-    // 🛡️ PROTEKSI 2: Proteksi Sejenjang (Superadmin dilarang suspend sesama Superadmin)
+    // 🛡️ PROTEKSI 2: Proteksi Sejenjang
+    const targetRoleName = user.roleData?.name;
     if (
-      user.role === "Superadmin" &&
+      targetRoleName === "Superadmin" &&
       status === "Suspended" &&
       requesterRole === "Superadmin"
     ) {
@@ -85,23 +96,17 @@ exports.updateUser = async (req, res) => {
     }
 
     // 🛡️ PROTEKSI 3: Jangan biarkan orang ganti role ke Superadmin sembarangan
-    if (role === "Superadmin" && requesterRole !== "Superadmin") {
-      return res
-        .status(403)
-        .json({ message: "You cannot promote users to Superadmin." });
+    if (roleId && roleId !== user.roleId) {
+      const checkRole = await Role.findByPk(roleId);
+      if (!checkRole)
+        return res.status(400).json({ message: "Invalid role selected." });
     }
 
-    await user.update({ name, email, role, status });
+    await user.update({ name, email, roleId, status });
 
     res.json({
       success: true,
       message: "User updated successfully",
-      data: {
-        id: user.id,
-        name: user.name,
-        role: user.role,
-        status: user.status,
-      },
     });
   } catch (error) {
     res.status(500).json({ message: "Update failed", error: error.message });
@@ -112,10 +117,12 @@ exports.updateUser = async (req, res) => {
 exports.deleteUser = async (req, res) => {
   try {
     const { id } = req.params;
-    const currentUserId = req.userId; // ID Superadmin yang lagi login
+    const currentUserId = req.userId;
     const requesterRole = req.userRole;
 
-    const user = await User.findByPk(id);
+    const user = await User.findByPk(id, {
+      include: [{ model: Role, as: "roleData" }],
+    });
     if (!user) return res.status(404).json({ message: "User not found" });
 
     // 🛡️ GUARD 1: Anti-Self-Destruct (Cegah hapus akun sendiri)
@@ -126,10 +133,9 @@ exports.deleteUser = async (req, res) => {
     }
 
     // 🛡️ GUARD 2: Proteksi Sejenjang (Superadmin dilarang hapus sesama Superadmin)
-    if (user.role === "Superadmin") {
+    if (user.roleData?.name === "Superadmin") {
       return res.status(403).json({
-        message:
-          "Hierarchy Protection: Superadmin accounts are protected from deletion.",
+        message: "Hierarchy Protection: Superadmin accounts are protected.",
       });
     }
 

@@ -26,7 +26,11 @@ const pageRoutes = require("./routes/pageRoutes");
 const menuRoutes = require("./routes/menuRoutes");
 
 // --- 3. MODELS IMPORT ---
-require("./models/User");
+const User = require("./models/User");
+const Role = require("./models/Role");
+const Permission = require("./models/Permission");
+const RolePermission = require("./models/RolePermission");
+
 require("./models/Project");
 require("./models/Management");
 require("./models/Settings");
@@ -130,6 +134,24 @@ const swaggerDocs = swaggerJsDoc(swaggerOptions);
 app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(swaggerDocs));
 
 // DATABASE ASSOCIATIONS (Relationships)
+
+// 1. User & Role Relations
+Role.hasMany(User, { foreignKey: "roleId", as: "users" });
+User.belongsTo(Role, { foreignKey: "roleId", as: "roleData" });
+
+// 2. Role & Permission Relations (Many-to-Many)
+Role.belongsToMany(Permission, {
+  through: RolePermission,
+  foreignKey: "roleId",
+  as: "permissions",
+});
+Permission.belongsToMany(Role, {
+  through: RolePermission,
+  foreignKey: "permissionId",
+  as: "roles",
+});
+
+//3. Business Map Relations
 BusinessSection.hasMany(BusinessMapMarker, {
   foreignKey: "sectionId",
   sourceKey: "id",
@@ -146,9 +168,9 @@ BusinessMapMarker.belongsTo(BusinessSection, {
 const PORT = process.env.PORT || 5000;
 
 sequelize
-  .sync({ alter: false }) // Hindari alter: true di production karena bisa mengunci/drop tabel
+  .sync({ alter: false })
   .then(async () => {
-    // // Tambahkan 'async' di sini
+    console.log("[DATABASE] MySQL/MariaDB Connected & Tables Synced.");
 
     // // --- AUTO-SEED INQUIRY SUBJECTS ---
     // const InquirySubject = require("./models/InquirySubject");
@@ -168,18 +190,81 @@ sequelize
     //   console.error("❌ Gagal auto-seed subjects:", err.message);
     // }
 
-    console.log("[DATABASE] MySQL/MariaDB Connected & Tables Synced.");
-    // Server baru menyala SETELAH database dipastikan aman
+    // --- AUTO-SEED ROLES & PERMISSIONS ---
+    try {
+      // 1. SEED PERMISSIONS
+      const permissionCount = await Permission.count();
+      let allPermissions = [];
+      if (permissionCount === 0) {
+        console.log("🌱 [SEED] Initializing Permissions...");
+        allPermissions = await Permission.bulkCreate([
+          { name: "manage_homepage", description: "Access to Homepage" },
+          { name: "manage_projects", description: "Access to Projects" },
+          { name: "manage_businesses", description: "Access to Businesses" },
+          { name: "manage_investments", description: "Access to Investments" },
+          { name: "manage_about", description: "Access to About Us" },
+          { name: "manage_inbox", description: "Access to Inbox" },
+          { name: "manage_content", description: "Access to Content Manager" },
+          { name: "manage_users", description: "Access to User Access" },
+          { name: "manage_settings", description: "Access to Settings" },
+        ]);
+      } else {
+        allPermissions = await Permission.findAll();
+      }
+
+      // 2. SEED ROLES
+      const [superAdminRole] = await Role.findOrCreate({
+        where: { name: "Superadmin" },
+        defaults: { description: "Ultimate Access (Bypass System)" },
+      });
+
+      const [editorRole] = await Role.findOrCreate({
+        where: { name: "Editor" },
+        defaults: { description: "Standard Editor Access" },
+      });
+
+      // 3. AUTO-MIGRATION LOGIC (Pindah data dari 'role' ke 'roleId')
+      const usersToMigrate = await User.findAll({
+        where: { roleId: null }, // Cari user yang belum punya roleId baru
+      });
+
+      if (usersToMigrate.length > 0) {
+        console.log(
+          `intl [MIGRATION] Found ${usersToMigrate.length} users to migrate to RBAC...`,
+        );
+        for (const user of usersToMigrate) {
+          // Jika role lamanya Superadmin, arahkan ke UUID Superadmin yang baru
+          if (user.role === "Superadmin") {
+            await user.update({ roleId: superAdminRole.id });
+          } else {
+            // Default ke Editor
+            await user.update({ roleId: editorRole.id });
+          }
+        }
+        console.log(
+          "✅ [MIGRATION] User roles successfully migrated to UUID system!",
+        );
+      }
+
+      // 4. SYNC PERMISSIONS FOR EDITOR (Contoh default akses Editor)
+      const editorPermissions = await editorRole.getPermissions();
+      if (editorPermissions.length === 0) {
+        // Berikan akses default ke Editor (misal: Projects & Inbox)
+        const defaultAkses = allPermissions.filter((p) =>
+          ["manage_projects", "manage_inbox"].includes(p.name),
+        );
+        await editorRole.setPermissions(defaultAkses);
+      }
+    } catch (err) {
+      console.error("❌ RBAC Error:", err.message);
+    }
+    // =====================================
+
     app.listen(PORT, () => {
       console.log(`[SERVER] Running cleanly on port ${PORT}`);
-      console.log(
-        `[DOCS] Swagger available at http://localhost:${PORT}/api-docs`,
-      );
     });
   })
   .catch((err) => {
-    // FIXED: Jangan nyalakan server jika database mati.
-    // Biarkan process exit agar PM2 / Docker merestart container secara otomatis.
     console.error(
       "[CRITICAL ERROR] Database connection failed. Shutting down.",
     );

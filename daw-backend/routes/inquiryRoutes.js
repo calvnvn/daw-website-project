@@ -1,22 +1,50 @@
 const express = require("express");
 const router = express.Router();
 const inquiryController = require("../controllers/inquiryController");
-const { verifyToken } = require("../middleware/authJwt"); // Pastikan middleware auth sudah di-import
+const { verifyToken, checkPermission } = require("../middleware/authJwt"); // Pastikan middleware auth sudah di-import
 
 // --- ROUTES UNTUK MASTER SUBJECT ---
-// Public: Form Contact Us butuh ini
+// Public
 router.get("/subjects/active", inquiryController.getActiveSubjects);
+router.post("/", inquiryController.submitInquiry);
 
 // Admin Only
-router.get("/subjects", verifyToken, inquiryController.getAllSubjects);
-router.post("/subjects", verifyToken, inquiryController.createSubject);
-router.put("/subjects/:id", verifyToken, inquiryController.updateSubject);
-router.delete("/subjects/:id", verifyToken, inquiryController.deleteSubject);
+router.get(
+  "/subjects",
+  [verifyToken, checkPermission("manage_inbox")],
+  inquiryController.getAllSubjects,
+);
+router.post(
+  "/subjects",
+  [verifyToken, checkPermission("manage_inbox")],
+  inquiryController.createSubject,
+);
+router.put(
+  "/subjects/:id",
+  [verifyToken, checkPermission("manage_inbox")],
+  inquiryController.updateSubject,
+);
+router.delete(
+  "/subjects/:id",
+  [verifyToken, checkPermission("manage_inbox")],
+  inquiryController.deleteSubject,
+);
 
 // Inbox
-router.post("/", inquiryController.submitInquiry);
-router.get("/", verifyToken, inquiryController.getAllInquiries);
-router.put("/:id/read", verifyToken, inquiryController.markAsRead);
-router.delete("/:id", verifyToken, inquiryController.deleteInquiry);
+router.get(
+  "/",
+  [verifyToken, checkPermission("manage_inbox")],
+  inquiryController.getAllInquiries,
+);
+router.put(
+  "/:id/read",
+  [verifyToken, checkPermission("manage_inbox")],
+  inquiryController.markAsRead,
+);
+router.delete(
+  "/:id",
+  [verifyToken, checkPermission("manage_inbox")],
+  inquiryController.deleteInquiry,
+);
 
 module.exports = router;

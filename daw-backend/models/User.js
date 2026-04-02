@@ -31,6 +31,10 @@ const User = sequelize.define(
       type: DataTypes.ENUM("Superadmin", "Editor"),
       defaultValue: "Editor",
     },
+    roleId: {
+      type: DataTypes.UUID,
+      allowNull: true,
+    },
     status: {
       type: DataTypes.ENUM("Active", "Suspended"),
       defaultValue: "Active",
