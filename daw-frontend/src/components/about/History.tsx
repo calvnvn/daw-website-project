@@ -43,7 +43,7 @@ export default function History() {
               {companyHistory.map((item) => (
                 <div key={item.id} className="relative pl-12 md:pl-20 group">
                   {/* 1. THE NODE (Glowing Dot on Hover) */}
-                  <div className="absolute left-0 md:left-4 top-2 md:top-4 w-10 h-10 rounded-full bg-white border-[3px] border-slate-100 flex items-center justify-center group-hover:border-daw-green/30 transition-all duration-500 z-10 shadow-[0_0_15px_rgba(0,0,0,0.03)] group-hover:shadow-[0_0_20px_rgba(0,75,35,0.15)] group-hover:scale-110">
+                  <div className="absolute left-0 md:left-4 top-2 md:top-4 w-10 h-10 rounded-full bg-white border-[3px] border-slate-100 flex items-center justify-center group-hover:border-daw-yellow/80 transition-all duration-500 z-10 shadow-[0_0_15px_rgba(0,0,0,0.03)] group-hover:shadow-[0_0_20px_rgba(0,75,35,0.15)] group-hover:scale-110">
                     <div className="w-3 h-3 rounded-full bg-slate-300 group-hover:bg-daw-green transition-colors duration-500"></div>
                   </div>
 
