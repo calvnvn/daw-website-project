@@ -87,6 +87,7 @@ export default function Hero() {
       </div>
 
       {/* Layer Pict & Overlay */}
+      {/* Layer Pict & Overlay */}
       {displaySlides.map((slide, index) => {
         const isActive = index === currentSlide;
         const imgUrl = slide.imageUrl
@@ -103,19 +104,26 @@ export default function Hero() {
             <div
               className="absolute inset-0 w-full h-full"
               style={{
-                transform: `translate3d(0, ${offsetY * 0.4}px, 0)`, // Gunakan translate3d untuk Hardware Acceleration
+                transform: `translate3d(0, ${offsetY * 0.4}px, 0)`,
                 willChange: "transform",
               }}
             >
-              {/* LAYER ZOOM */}
-              <div
-                className={`absolute inset-0 w-full h-[110%] -top-[5%] bg-cover bg-center bg-no-repeat transition-transform duration-[10000ms] ease-out will-change-transform ${
+              {/* 🔥 OPTIMASI UTAMA: Mengganti div bg-image menjadi tag img */}
+              <img
+                src={imgUrl}
+                alt={slide.title}
+                // Kasih prioritas TERTINGGI hanya untuk slide pertama (LCP Candidate)
+                fetchPriority={index === 0 ? "high" : "low"}
+                // Muat secepat mungkin untuk slide pertama, sisanya tunda (lazy)
+                loading={index === 0 ? "eager" : "lazy"}
+                decoding="async"
+                className={`absolute inset-0 w-full h-[110%] -top-[5%] object-cover object-center transition-transform duration-[10000ms] ease-out will-change-transform ${
                   isActive ? "scale-110" : "scale-100"
                 }`}
-                style={{ backgroundImage: `url('${imgUrl}')` }}
               />
             </div>
-            {/* OVERLAY */}
+
+            {/* OVERLAY TETAP SAMA */}
             <div className="absolute inset-0 bg-[#004B23]/20 mix-blend-multiply" />
             <div className="absolute bottom-0 left-0 right-0 h-2/3 bg-gradient-to-t from-black/90 via-black/40 to-transparent" />
             <div className="absolute top-0 left-0 right-0 h-48 bg-gradient-to-b from-black/70 to-transparent" />
