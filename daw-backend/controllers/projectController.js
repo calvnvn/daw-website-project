@@ -1,5 +1,29 @@
 const Project = require("../models/Project");
 const { deleteSingleFile } = require("../utils/fileRemover");
+const { Op } = require("sequelize");
+
+// Slug Generator
+const generateUniqueProjectSlug = async (title, id = null) => {
+  let baseSlug = title
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/(^-|-$)+/g, "");
+
+  let finalSlug = baseSlug;
+  let counter = 1;
+
+  while (true) {
+    const whereClause = id
+      ? { slug: finalSlug, id: { [Op.ne]: id } }
+      : { slug: finalSlug };
+    const existing = await Project.findOne({ where: whereClause });
+    if (!existing) break;
+
+    finalSlug = `${baseSlug}-${counter}`;
+    counter++;
+  }
+  return finalSlug;
+};
 
 // GET Project Function
 exports.getAllProjects = async (req, res) => {
@@ -28,7 +52,7 @@ exports.createProject = async (req, res) => {
       meta_description,
       author,
     } = req.body;
-
+    const finalSlug = await generateUniqueProjectSlug(title);
     console.log(" Creating Project:", title);
 
     // 1. Handle Upload Files
@@ -48,6 +72,7 @@ exports.createProject = async (req, res) => {
     // ID (UUID) biasanya sudah di-handle otomatis di Model atau Database
     const newProject = await Project.create({
       title,
+      slug: finalSlug,
       author: author || "Admin DAW",
       excerpt: excerpt || "",
       content,
@@ -146,6 +171,7 @@ exports.updateProject = async (req, res) => {
     const { id } = req.params;
     const {
       title,
+      slug,
       excerpt,
       content,
       category,
@@ -201,9 +227,21 @@ exports.updateProject = async (req, res) => {
       coverImageName = req.files["cover_image"][0].filename;
     }
 
+    let finalSlug = project.slug;
+
+    // 1. Jika user manual input slug di frontend
+    if (slug && slug !== project.slug) {
+      finalSlug = await generateUniqueProjectSlug(slug, id);
+    }
+    // 2. Jika slug tidak diinput manual tapi judul berubah, generate otomatis
+    else if (title && title !== project.title) {
+      finalSlug = await generateUniqueProjectSlug(title, id);
+    }
+
     // 4. Update Data (Tinggal panggil .update(), jauh lebih bersih!)
     await project.update({
       title: title || project.title,
+      slug: finalSlug,
       excerpt: excerpt !== undefined ? excerpt : project.excerpt,
       content: content || project.content,
       category: category || project.category,
@@ -244,7 +282,7 @@ exports.getPublicProjectById = async (req, res) => {
     const { id } = req.params;
 
     const project = await Project.findOne({
-      where: { id, status: "Published" },
+      where: { slug: slug, status: "Published" },
     });
 
     if (!project) {
@@ -272,6 +310,29 @@ exports.incrementProjectView = async (req, res) => {
     }
     res.status(200).json({ message: "View incremented" });
   } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// Tambahkan fungsi baru ini
+exports.getPublicProjectBySlug = async (req, res) => {
+  try {
+    const { slug } = req.params;
+
+    const project = await Project.findOne({
+      where: { slug: slug, status: "Published" },
+    });
+
+    if (!project) {
+      return res
+        .status(404)
+        .json({ message: "Project not found or not published" });
+    }
+
+    await project.increment("views", { by: 1 });
+    res.status(200).json(project);
+  } catch (error) {
+    console.error("Error GET Public Project Detail by Slug:", error);
     res.status(500).json({ message: error.message });
   }
 };

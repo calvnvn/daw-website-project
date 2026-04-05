@@ -8,7 +8,7 @@ const { upload, optimizeImage } = require("../middleware/upload");
 // Public Routes (Without Login)
 router.get("/public", projectController.getPublicProjects);
 router.get("/public/:id", projectController.getPublicProjectById);
-
+router.get("/public/s/:slug", projectController.getPublicProjectBySlug);
 // Protected Routes (Need Login)
 router.use(verifyToken);
 

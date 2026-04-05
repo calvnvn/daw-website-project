@@ -20,6 +20,7 @@ import SEO from "@/components/SEO";
 interface ProjectData {
   excerpt: string;
   id: string;
+  slug: string;
   title: string;
   category: string;
   content: string;
@@ -32,7 +33,7 @@ interface ProjectData {
 }
 
 export default function ProjectDetail() {
-  const { id } = useParams<{ id: string }>();
+  const { slug } = useParams<{ slug: string }>();
   const navigate = useNavigate();
 
   // Menggunakan interface yang sudah dikunci bentuknya
@@ -78,7 +79,7 @@ export default function ProjectDetail() {
 
   // Menghindari "Calling State Synchronously"
   useEffect(() => {
-    if (hasFetched.current === id) return;
+    if (hasFetched.current === slug) return;
 
     const preparePage = setTimeout(() => {
       setIsLoading(true);
@@ -86,13 +87,13 @@ export default function ProjectDetail() {
       setSelectedImageIndex(null);
     }, 0);
 
-    hasFetched.current = id || null;
+    hasFetched.current = slug || null;
 
     // Fetch Data Utama
     const fetchData = async () => {
       try {
         const [projectRes, otherProjectsRes] = await Promise.all([
-          api.get(`/projects/public/${id}`),
+          api.get(`/projects/public/s/${slug}`),
           api.get("/projects/public"),
         ]);
 
@@ -127,7 +128,9 @@ export default function ProjectDetail() {
 
         // Setup Other Projects
         const otherData: ProjectData[] = otherProjectsRes.data;
-        const filtered = otherData.filter((p) => p.id !== id).slice(0, 4);
+        const filtered = otherData
+          .filter((p) => (p.slug || p.id) !== slug)
+          .slice(0, 4);
         setOtherProjects(filtered);
       } catch (err) {
         console.error("Error fetching data:", err);
@@ -140,7 +143,7 @@ export default function ProjectDetail() {
     fetchData();
 
     return () => clearTimeout(preparePage);
-  }, [id]);
+  }, [slug]);
 
   const closeLightbox = () => setSelectedImageIndex(null);
 
@@ -386,7 +389,7 @@ export default function ProjectDetail() {
                     {otherProjects.map((other) => (
                       <Link
                         key={other.id}
-                        to={`/projects/${other.id}`}
+                        to={`/projects/${other.slug || other.id}`}
                         className="group flex gap-4 items-center"
                       >
                         <div className="w-16 h-16 md:w-20 md:h-20 rounded-xl overflow-hidden shrink-0 bg-white border border-slate-100 shadow-sm flex items-center justify-center relative">

@@ -268,7 +268,9 @@ export default function ProjectForm() {
 
       // Append Texts
       payload.append("title", formData.title.trim());
-      payload.append("slug", generatedSlug);
+      if (generatedSlug) {
+        payload.append("slug", generatedSlug);
+      }
       payload.append("excerpt", formData.excerpt.trim());
       payload.append("content", formData.content);
       payload.append("category", formData.category);

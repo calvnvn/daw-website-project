@@ -63,7 +63,7 @@ function App() {
             <Route path="/about" element={<AboutUs />} />
             <Route path="/businesses" element={<OurBusinesses />} />
             <Route path="/contact-us" element={<ContactUs />} />
-            <Route path="/projects/:id" element={<ProjectDetail />} />
+            <Route path="/projects/:slug" element={<ProjectDetail />} />
             <Route path="page/:slug" element={<DynamicPage />} />
           </Route>
 

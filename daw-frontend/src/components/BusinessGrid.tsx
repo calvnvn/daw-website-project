@@ -16,6 +16,7 @@ interface BusinessGridProps {
 // Interface untuk data dari backend
 interface ProjectData {
   id: string;
+  slug: string;
   title: string;
   category: FilterOption;
   excerpt: string;
@@ -159,7 +160,9 @@ export default function BusinessGrid({
                   }`}
                 >
                   <div
-                    onClick={() => navigate(`/projects/${project.id}`)}
+                    onClick={() =>
+                      navigate(`/projects/${project.slug || project.id}`)
+                    }
                     className="group bg-white rounded-[8px] border border-slate-100 shadow-[0_4px_20px_rgba(0,0,0,0.03)] hover:shadow-[0_8px_30px_rgba(0,0,0,0.08)] overflow-hidden transition-all duration-500 flex flex-col h-full cursor-pointer hover:-translate-y-1"
                   >
                     <div className="relative w-full aspect-[3/2] overflow-hidden bg-slate-100 flex items-center justify-center">

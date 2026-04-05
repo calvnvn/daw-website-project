@@ -13,6 +13,11 @@ const Project = sequelize.define(
       type: DataTypes.STRING,
       allowNull: false,
     },
+    slug: {
+      type: DataTypes.STRING,
+      allowNull: true,
+      unique: true,
+    },
     excerpt: {
       type: DataTypes.STRING(500),
       allowNull: true,
