@@ -82,7 +82,17 @@ app.use("/uploads", (req, res, next) => {
 });
 
 // 4. Static File Server (Hanya melayani file jika file-nya ada)
-app.use("/uploads", express.static(uploadPath));
+app.use(
+  "/uploads",
+  express.static(uploadPath, {
+    maxAge: "30d", // Menyuruh browser menyimpan cache selama 30 hari
+    immutable: true, // Memberitahu browser bahwa file ini tidak akan berubah
+    setHeaders: function (res, path) {
+      // Pastikan header Cache-Control benar-benar diset
+      res.setHeader("Cache-Control", "public, max-age=2592000, immutable");
+    },
+  }),
+);
 
 // ROUTER REGISTRATION
 app.use("/api/auth", authRoutes);
