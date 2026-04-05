@@ -45,15 +45,9 @@ export default function Hero() {
     window.scrollBy({ top: window.innerHeight, behavior: "smooth" });
   };
 
-  // 4. getCleanImageUrl dengan fallback
-
-  if (isLoading)
-    return (
-      <section className="h-screen w-full bg-slate-900 flex items-center justify-center">
-        {/* Loading yang lebih elegan daripada sekadar hitam */}
-        <div className="w-16 h-16 border-4 border-daw-green/30 border-t-daw-green rounded-full animate-spin"></div>
-      </section>
-    );
+  if (isLoading) {
+    return <section className="h-screen min-h-[600px] w-full bg-slate-900" />;
+  }
 
   const displaySlides =
     slides.length > 0

@@ -3,7 +3,7 @@ const router = express.Router();
 const projectController = require("../controllers/projectController");
 const { verifyToken, checkPermission } = require("../middleware/authJwt");
 const multer = require("multer");
-const upload = require("../middleware/upload");
+const { upload, optimizeImage } = require("../middleware/upload");
 
 // Public Routes (Without Login)
 router.get("/public", projectController.getPublicProjects);
@@ -45,6 +45,7 @@ router.post(
       next();
     });
   },
+  optimizeImage,
   projectController.createProject,
 );
 
@@ -56,6 +57,7 @@ router.put(
     { name: "cover_image", maxCount: 1 },
     { name: "gallery", maxCount: 10 },
   ]),
+  optimizeImage,
   projectController.updateProject,
 );
 
@@ -71,6 +73,7 @@ router.post(
   "/upload-inline",
   checkPermission("manage_projects"),
   upload.single("inline_image"),
+  optimizeImage,
   projectController.uploadInlineImage,
 );
 

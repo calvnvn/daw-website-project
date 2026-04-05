@@ -5,9 +5,15 @@ import ImpactStatistics from "@/components/ImpactStatistics";
 import TransformationIntro from "@/components/TransformationIntro";
 import OtherInvestmentsTeaser from "@/components/OtherInvestmentsTeaser";
 import SEO from "@/components/SEO";
+import { useHome } from "@/contexts/HomeContext";
+import { getCleanImageUrl } from "@/lib/utils";
 
 export default function Home() {
+  const { slides } = useHome();
   const [scrollProgress, setScrollProgress] = useState(0);
+
+  const firstHeroImage =
+    slides.length > 0 ? getCleanImageUrl(slides[0].imageUrl) : null;
 
   useEffect(() => {
     const handleScroll = () => {
@@ -22,7 +28,7 @@ export default function Home() {
 
   return (
     <>
-      <SEO title="Home" />
+      <SEO title="Home" preloadImage={firstHeroImage} />
       <div className="bg-white selection:bg-daw-green selection:text-white">
         <div
           className="fixed top-0 left-0 h-1.5 bg-gradient-to-r from-daw-green via-emerald-400 to-daw-green z-[100] transition-all duration-150 ease-out shadow-[0_0_10px_rgba(16,185,129,0.5)]"

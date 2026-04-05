@@ -11,6 +11,7 @@ interface SEOProps {
   author?: string;
   publishedAt?: string;
   updatedAt?: string;
+  preloadImage?: string | null;
 }
 
 export default function SEO({
@@ -24,6 +25,7 @@ export default function SEO({
   author,
   publishedAt,
   updatedAt,
+  preloadImage,
 }: SEOProps) {
   // 1. AMBIL DATA DARI CONTEXT (Hasil inputan Admin tadi)
   const { settings } = useSettings();
@@ -98,6 +100,14 @@ export default function SEO({
 
   return (
     <Helmet>
+      {preloadImage && (
+        <link
+          rel="preload"
+          as="image"
+          href={preloadImage}
+          fetchPriority="high"
+        />
+      )}
       {/* --- DYNAMIC FAVICON (Ini yang bikin logo tab berubah) --- */}
       <link rel="icon" type="image/png" href={dynamicFavicon} />
       <link rel="apple-touch-icon" href={dynamicFavicon} />

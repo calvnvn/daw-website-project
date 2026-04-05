@@ -1,31 +1,16 @@
 const multer = require("multer");
+const sharp = require("sharp");
 const path = require("path");
+const fs = require("fs");
 
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    // Pastikan folder ini sudah kamu buat secara fisik!
-    cb(null, "./public/uploads/");
-  },
-  filename: (req, file, cb) => {
-    const uniqueSuffix = Date.now() + "-" + Math.round(Math.random() * 1e9);
-    const safeFieldName = file.fieldname.replace(/[^a-zA-Z0-9]/g, "");
-    const ext = path.extname(file.originalname);
-
-    cb(null, `${safeFieldName}-${uniqueSuffix}${ext}`);
-  },
-});
+// 1. Simpan di Memory (RAM) agar bisa diproses Sharp sebelum ditulis ke Disk
+const storage = multer.memoryStorage();
 
 const fileFilter = (req, file, cb) => {
-  // 1. Cek tipe file (Mime-type)
-  // image/png, image/jpeg, image/x-icon (untuk .ico)
   if (!file.mimetype.startsWith("image/")) {
-    return cb(
-      new Error("Hanya file gambar (JPG, PNG, ICO, dll) yang diizinkan!"),
-      false,
-    );
+    return cb(new Error("Hanya file gambar yang diizinkan!"), false);
   }
 
-  // 2. Filter nama field
   const allowedFields = [
     "cover_image",
     "gallery",
@@ -40,7 +25,6 @@ const fileFilter = (req, file, cb) => {
   if (allowedFields.includes(file.fieldname)) {
     cb(null, true);
   } else {
-    // Kalau field name dari frontend tidak ada di list atas, dia nolak
     cb(new multer.MulterError("LIMIT_UNEXPECTED_FILE"), false);
   }
 };
@@ -48,9 +32,53 @@ const fileFilter = (req, file, cb) => {
 const upload = multer({
   storage: storage,
   fileFilter: fileFilter,
-  limits: {
-    fileSize: 15 * 1024 * 1024, // 15MB
-  },
+  limits: { fileSize: 15 * 1024 * 1024 }, // 15MB
 });
 
-module.exports = upload;
+// 2. Middleware Utama untuk Kompresi & Resize
+const optimizeImage = async (req, res, next) => {
+  // Jika tidak ada file, lanjut ke controller
+  if (!req.file && !req.files) return next();
+
+  const uploadPath = path.join(process.cwd(), "public", "uploads");
+
+  // Helper Fungsi untuk memproses gambar
+  const processImage = async (file) => {
+    const uniqueSuffix = Date.now() + "-" + Math.round(Math.random() * 1e9);
+    const safeFieldName = file.fieldname.replace(/[^a-zA-Z0-9]/g, "");
+
+    // Paksa ekstensi jadi .webp untuk kompresi terbaik
+    const newFilename = `${safeFieldName}-${uniqueSuffix}.webp`;
+
+    await sharp(file.buffer)
+      .resize(1920, null, {
+        // Resize lebar maks 1920px, tinggi otomatis (rasio terjaga)
+        withoutEnlargement: true, // Jangan paksa besarkan jika gambar aslinya kecil
+        fit: "inside",
+      })
+      .webp({ quality: 80 }) // Konversi ke WebP, kualitas 80% (seimbang tajam & ringan)
+      .toFile(path.join(uploadPath, newFilename));
+
+    // TIMPANI properti file agar Controller menerima nama file yang baru (.webp)
+    file.filename = newFilename;
+  };
+
+  try {
+    if (req.file) {
+      // Kasus Single File (misal: logo, favicon)
+      await processImage(req.file);
+    } else if (req.files) {
+      // Kasus Multiple Fields (misal: cover_image + gallery)
+      const fields = Object.keys(req.files);
+      for (const field of fields) {
+        await Promise.all(req.files[field].map((file) => processImage(file)));
+      }
+    }
+    next();
+  } catch (error) {
+    console.error("🚨 Sharp Optimization Error:", error);
+    res.status(500).json({ message: "Gagal memproses gambar." });
+  }
+};
+
+module.exports = { upload, optimizeImage };

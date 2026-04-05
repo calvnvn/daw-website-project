@@ -1,7 +1,7 @@
 const express = require("express");
 const router = express.Router();
 const homeController = require("../controllers/homeController");
-const upload = require("../middleware/upload");
+const { upload, optimizeImage } = require("../middleware/upload");
 const { verifyToken, checkPermission } = require("../middleware/authJwt");
 
 // Public Site
@@ -19,12 +19,14 @@ router.post(
   "/hero",
   [verifyToken, checkPermission("manage_homepage")],
   upload.single("image"),
+  optimizeImage,
   homeController.createHeroSlide,
 );
 router.put(
   "/hero/:id",
   [verifyToken, checkPermission("manage_homepage")],
   upload.single("image"),
+  optimizeImage,
   homeController.updateHeroSlide,
 );
 router.delete(

@@ -1,7 +1,7 @@
 const express = require("express");
 const router = express.Router();
 const investmentController = require("../controllers/investmentController");
-const upload = require("../middleware/upload");
+const { upload, optimizeImage } = require("../middleware/upload");
 
 const { verifyToken, checkPermission } = require("../middleware/authJwt");
 
@@ -19,12 +19,14 @@ router.post(
   "/affiliate",
   [verifyToken, checkPermission("manage_investments")],
   upload.single("logo"),
+  optimizeImage,
   investmentController.createAffiliate,
 );
 router.put(
   "/affiliate/:id",
   [verifyToken, checkPermission("manage_investments")],
   upload.single("logo"),
+  optimizeImage,
   investmentController.updateAffiliate,
 );
 router.delete(

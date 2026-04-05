@@ -2,7 +2,7 @@ const express = require("express");
 const router = express.Router();
 const settingsController = require("../controllers/settingsController");
 const { verifyToken, checkPermission } = require("../middleware/authJwt");
-const upload = require("../middleware/upload"); // Pastikan import multer kamu
+const { upload, optimizeImage } = require("../middleware/upload");
 
 // 1. Public SIte
 router.get("/", settingsController.getSettings);
@@ -15,6 +15,7 @@ router.put(
     { name: "logo", maxCount: 1 }, // Slot untuk Main Logo
     { name: "favicon", maxCount: 1 }, // Slot untuk Tab Icon
   ]),
+  optimizeImage,
   settingsController.updateSettings,
 );
 

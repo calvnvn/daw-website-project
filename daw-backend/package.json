@@ -27,6 +27,7 @@
     "nodemailer": "^8.0.2",
     "react-quill": "^2.0.0",
     "sequelize": "^6.37.8",
+    "sharp": "^0.34.5",
     "swagger-jsdoc": "^6.2.8",
     "swagger-ui-express": "^5.0.1"
   },
