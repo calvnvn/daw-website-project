@@ -1,0 +1,20 @@
+# Aturan untuk semua bot
+User-agent: *
+
+# Area Terlarang (Security & SEO Cleanup)
+Disallow: /admin
+Disallow: /admin/
+Disallow: /admin/*
+Disallow: /force-change-password
+Disallow: /forgot-password
+Disallow: /reset-password/
+Disallow: /api/
+
+# Area yang Boleh Diindeks
+Allow: /
+Allow: /about
+Allow: /businesses
+Allow: /projects/
+
+# Tautan ke Dynamic Sitemap (Ubah saat ganti domain ke daw.co.id)
+Sitemap: https://dev-web.daw.co.id/sitemap.xml

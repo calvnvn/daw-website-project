@@ -24,6 +24,7 @@ const dashboardRoutes = require("./routes/dashboardRoutes");
 const businessRoutes = require("./routes/businessRoutes");
 const pageRoutes = require("./routes/pageRoutes");
 const menuRoutes = require("./routes/menuRoutes");
+const sitemapRoutes = require("./routes/sitemapRoutes");
 
 // --- 3. MODELS IMPORT ---
 const User = require("./models/User");
@@ -88,7 +89,6 @@ app.use(
     maxAge: "30d", // Menyuruh browser menyimpan cache selama 30 hari
     immutable: true, // Memberitahu browser bahwa file ini tidak akan berubah
     setHeaders: function (res, path) {
-      // Pastikan header Cache-Control benar-benar diset
       res.setHeader("Cache-Control", "public, max-age=2592000, immutable");
     },
   }),
@@ -110,6 +110,7 @@ app.use("/api/dashboard", dashboardRoutes);
 app.use("/api/businesses", businessRoutes);
 app.use("/api/pages", pageRoutes);
 app.use("/api/menus", menuRoutes);
+app.use("/", sitemapRoutes);
 
 // Base Health Check Route
 app.get("/", (req, res) => {
