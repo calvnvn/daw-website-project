@@ -6,7 +6,6 @@ import {
   X,
   ChevronLeft,
   ImageIcon,
-  Calendar,
 } from "lucide-react";
 import ScrollReveal from "@/components/ScrollReveal";
 import ProjectDetailSkeleton from "@/components/ProjectDetailSkeleton";
@@ -283,49 +282,6 @@ export default function ProjectDetail() {
                 <h1 className="text-3xl md:text-5xl lg:text-[52px] font-serif text-slate-900 leading-[1.15] mb-8">
                   {project.title}
                 </h1>
-
-                {/* 3. METADATA BAR (Desain Editorial Premium) */}
-                <div className="flex flex-wrap items-center gap-y-4 gap-x-6 text-sm text-slate-500 py-5 border-y border-slate-100 bg-white">
-                  {/* Publish Date */}
-                  <div
-                    className="flex items-center gap-2 font-medium"
-                    title="Published Date"
-                  >
-                    <Calendar className="w-4 h-4 text-slate-400" />
-                    <span>
-                      {new Date(project.createdAt).toLocaleDateString("en-US", {
-                        month: "long",
-                        day: "numeric",
-                        year: "numeric",
-                      })}
-                    </span>
-                  </div>
-
-                  {/* 👇 LOGIKA UPDATED AT (Berubah jadi Badge Eksklusif) 👇 */}
-                  {new Date(project.createdAt).toDateString() !==
-                    new Date(project.updatedAt).toDateString() && (
-                    <>
-                      <div className="hidden sm:block w-1.5 h-1.5 rounded-full bg-slate-200"></div>
-                      <div
-                        className="flex items-center gap-2 bg-slate-50 px-3 py-1.5 rounded-full border border-slate-100"
-                        title="Last Updated"
-                      >
-                        {/* Titik hijau berkedip (Pulse Effect) */}
-                        <span className="relative flex h-2 w-2">
-                          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-daw-green opacity-75"></span>
-                          <span className="relative inline-flex rounded-full h-2 w-2 bg-daw-green"></span>
-                        </span>
-                        <span className="text-[10px] uppercase font-bold tracking-[0.1em] text-slate-600">
-                          Updated{" "}
-                          {new Date(project.updatedAt).toLocaleDateString(
-                            "en-US",
-                            { month: "short", day: "numeric", year: "numeric" },
-                          )}
-                        </span>
-                      </div>
-                    </>
-                  )}
-                </div>
               </ScrollReveal>
               {/* TEXT CONTENT */}
               <ScrollReveal direction="up" delay={150}>
