@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import { ArrowRight, ImageIcon } from "lucide-react";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import ScrollReveal from "./ScrollReveal";
 import api from "@/lib/api";
 import { getCleanImageUrl } from "@/lib/utils";
@@ -159,10 +159,9 @@ export default function BusinessGrid({
                       : "lg:w-[calc(33.333%-22px)]"
                   }`}
                 >
-                  <div
-                    onClick={() =>
-                      navigate(`/projects/${project.slug || project.id}`)
-                    }
+                  <Link
+                    to={`/projects/${project.slug || project.id}`}
+                    aria-label={`Read more details about the ${project.title} project`}
                     className="group bg-white rounded-[8px] border border-slate-100 shadow-[0_4px_20px_rgba(0,0,0,0.03)] hover:shadow-[0_8px_30px_rgba(0,0,0,0.08)] overflow-hidden transition-all duration-500 flex flex-col h-full cursor-pointer hover:-translate-y-1"
                   >
                     <div className="relative w-full aspect-[3/2] overflow-hidden bg-slate-100 flex items-center justify-center">
@@ -194,7 +193,7 @@ export default function BusinessGrid({
                         <ArrowRight className="w-4 h-4 transform group-hover:translate-x-1.5 transition-transform duration-300" />
                       </div>
                     </div>
-                  </div>
+                  </Link>
                 </ScrollReveal>
               );
             })}

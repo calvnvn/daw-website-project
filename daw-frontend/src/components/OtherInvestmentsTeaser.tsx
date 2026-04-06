@@ -38,6 +38,10 @@ export default function OtherInvestmentsTeaser() {
             <ScrollReveal direction="up" delay={450}>
               <Link
                 to="/businesses#investments"
+                aria-label={t(
+                  "investmentsTeaser.ctaAria",
+                  "View details about our other investments and partnerships",
+                )}
                 className="group inline-flex items-center gap-4 bg-white/5 hover:bg-daw-green border border-white/10 hover:border-daw-green text-white px-7 py-3.5 rounded-full text-[14px] font-bold tracking-widest uppercase transition-all duration-300 backdrop-blur-sm"
               >
                 <span>{t("investmentsTeaser.cta", "Read More")}</span>

@@ -46,6 +46,10 @@ export default function TransformationIntro() {
             <ScrollReveal direction="up" delay={400}>
               <Link
                 to="/about?tab=history"
+                aria-label={t(
+                  "intro.ctaAria",
+                  "Learn more about the history of DAW Group",
+                )}
                 className="group inline-flex items-center gap-3 text-daw-green text-[15px] font-bold uppercase tracking-wide transition-colors hover:text-daw-green-hover"
               >
                 <span>{t("intro.cta")}</span>
