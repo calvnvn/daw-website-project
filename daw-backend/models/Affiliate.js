@@ -8,6 +8,10 @@ const Affiliate = sequelize.define("Affiliate", {
     type: DataTypes.ENUM("fnb", "steel", "finance", "edu"),
     defaultValue: "fnb",
   },
+  websiteUrl: {
+    type: DataTypes.STRING,
+    field: "website_url",
+  },
   logoUrl: { type: DataTypes.STRING },
 });
 

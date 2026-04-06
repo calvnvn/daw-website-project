@@ -37,10 +37,16 @@ exports.updateSettings = async (req, res) => {
 // 3. POST: Create Affiliate
 exports.createAffiliate = async (req, res) => {
   try {
-    const { name, desc, category } = req.body;
+    const { name, desc, category, websiteUrl } = req.body;
     const logoUrl = req.file ? req.file.filename : null;
 
-    const company = await Affiliate.create({ name, desc, category, logoUrl });
+    const company = await Affiliate.create({
+      name,
+      desc,
+      category,
+      websiteUrl,
+      logoUrl,
+    });
     res.status(201).json(company);
   } catch (error) {
     res.status(500).json({ message: error.message });
@@ -51,7 +57,7 @@ exports.createAffiliate = async (req, res) => {
 exports.updateAffiliate = async (req, res) => {
   try {
     const { id } = req.params;
-    const { name, desc, category, removePhoto } = req.body;
+    const { name, desc, category, websiteUrl, removePhoto } = req.body;
 
     const company = await Affiliate.findByPk(id);
     if (!company) return res.status(404).json({ message: "Company not found" });
@@ -66,7 +72,13 @@ exports.updateAffiliate = async (req, res) => {
       finalLogoUrl = null;
     }
 
-    await company.update({ name, desc, category, logoUrl: finalLogoUrl });
+    await company.update({
+      name,
+      desc,
+      category,
+      websiteUrl,
+      logoUrl: finalLogoUrl,
+    });
 
     res.status(200).json({ message: "Affiliate updated!", data: company });
   } catch (error) {

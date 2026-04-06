@@ -21,6 +21,7 @@ export interface Affiliate {
   desc: string;
   category: "fnb" | "steel" | "finance" | "edu";
   logoUrl: string | null;
+  websiteUrl: string | null;
 }
 
 interface InvestmentContextType {

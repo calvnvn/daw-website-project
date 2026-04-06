@@ -18,6 +18,7 @@ interface LocalAffiliate {
   name: string;
   desc: string;
   category: "fnb" | "steel" | "finance" | "edu";
+  websiteUrl?: string;
   logoUrl: string | null;
   newLogoFile?: File | null;
   isNew?: boolean;
@@ -76,6 +77,7 @@ export default function InvestmentsManager() {
         name: "",
         desc: "",
         category: "fnb",
+        websiteUrl: "",
         logoUrl: null,
         isNew: true,
       },
@@ -156,6 +158,7 @@ export default function InvestmentsManager() {
         formData.append("name", comp.name);
         formData.append("desc", comp.desc || "");
         formData.append("category", comp.category);
+        formData.append("websiteUrl", comp.websiteUrl || "");
 
         if (comp.newLogoFile) {
           formData.append("logo", comp.newLogoFile);
@@ -506,6 +509,25 @@ export default function InvestmentsManager() {
                           <option value="edu">Education</option>
                         </select>
                       </div>
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">
+                        Website Link (Optional)
+                      </label>
+                      <input
+                        type="url"
+                        placeholder="e.g. https://www.example.com"
+                        value={company.websiteUrl || ""}
+                        onChange={(e) =>
+                          updateCompany(
+                            company.id,
+                            "websiteUrl",
+                            e.target.value,
+                          )
+                        }
+                        disabled={!isEditing}
+                        className={`w-full px-3 py-1.5 text-xs rounded-md transition-all duration-300 ${isEditing ? "bg-white border border-slate-300 text-slate-900 focus:ring-2 focus:ring-daw-green/20" : "bg-slate-100/50 border-transparent text-slate-500"}`}
+                      />
                     </div>
                   </div>
 

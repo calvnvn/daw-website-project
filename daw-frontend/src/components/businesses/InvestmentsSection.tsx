@@ -220,10 +220,16 @@ export default function InvestmentsSection() {
               {selectedCompany?.name}
             </h3>
 
-            {selectedCompany?.desc && (
-              <p className="text-emerald-50/60 text-center font-sans text-sm md:text-base font-light leading-relaxed mb-8 z-10 max-w-sm">
-                {selectedCompany.desc}
-              </p>
+            {selectedCompany?.websiteUrl && (
+              <a
+                href={selectedCompany.websiteUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="z-10 mb-8 flex items-center gap-2 px-8 py-3.5 bg-emerald-500 hover:bg-emerald-600 text-white rounded-full font-bold text-sm transition-all shadow-[0_10px_25px_-5px_rgba(16,185,129,0.4)] active:scale-95 group/btn"
+              >
+                <Globe2 className="w-4 h-4 group-hover/btn:rotate-12 transition-transform" />
+                VISIT WEBSITE
+              </a>
             )}
 
             {/* Premium Category Badge */}

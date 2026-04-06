@@ -53,27 +53,43 @@ export default function OtherInvestmentsTeaser() {
           {/* KOLOM KANAN: Grid Logo Perusahaan Dinamis */}
           <div className="lg:col-span-7">
             <div className="grid grid-cols-2 md:grid-cols-3 gap-4 sm:gap-6">
-              {displayCompanies.map((company, index) => (
-                <ScrollReveal
-                  key={company.id}
-                  direction="up"
-                  delay={index * 100}
-                >
-                  <div className="group aspect-[4/3] bg-white rounded-2xl flex items-center justify-center p-6 sm:p-8 border border-transparent hover:border-daw-yellow transition-all duration-500 hover:-translate-y-2 hover:shadow-[0_15px_35px_rgba(0,0,0,0.3)] h-full">
-                    <img
-                      src={getCleanImageUrl(company.logoUrl)}
-                      alt={company.name}
-                      // --- REMOVE GRAYSCALE & INVERT ---
-                      // Kita gunakan opacity 90% saat idle agar tidak terlalu menusuk mata, lalu 100% saat hover
-                      className="max-h-full max-w-full object-contain opacity-90 group-hover:opacity-100 transition-all duration-500 transform group-hover:scale-110"
-                      onError={(e) => {
-                        e.currentTarget.style.display = "none";
-                        e.currentTarget.parentElement!.innerHTML = `<span class="text-xs font-bold text-slate-800 text-center tracking-widest uppercase opacity-70">${company.name}</span>`;
-                      }}
-                    />
-                  </div>
-                </ScrollReveal>
-              ))}
+              {displayCompanies.map((company, index) => {
+                // 🔥 THE FIX: Tentukan tag (a atau div) dan propertinya secara dinamis
+                const Wrapper = company.websiteUrl ? "a" : "div";
+                const wrapperProps = company.websiteUrl
+                  ? {
+                      href: company.websiteUrl,
+                      target: "_blank",
+                      rel: "noopener noreferrer",
+                    }
+                  : {};
+
+                return (
+                  <ScrollReveal
+                    key={company.id}
+                    direction="up"
+                    delay={index * 100}
+                  >
+                    {/* 🔥 THE FIX: Gunakan <Wrapper> menggantikan <div> */}
+                    <Wrapper
+                      {...wrapperProps}
+                      className={`group aspect-[4/3] bg-white rounded-2xl flex items-center justify-center p-6 sm:p-8 border border-transparent hover:border-daw-yellow transition-all duration-500 hover:-translate-y-2 hover:shadow-[0_15px_35px_rgba(0,0,0,0.3)] h-full ${
+                        company.websiteUrl ? "cursor-pointer block" : ""
+                      }`}
+                    >
+                      <img
+                        src={getCleanImageUrl(company.logoUrl)}
+                        alt={company.name}
+                        className="max-h-full max-w-full object-contain opacity-90 group-hover:opacity-100 transition-all duration-500 transform group-hover:scale-110"
+                        onError={(e) => {
+                          e.currentTarget.style.display = "none";
+                          e.currentTarget.parentElement!.innerHTML = `<span class="text-xs font-bold text-slate-800 text-center tracking-widest uppercase opacity-70">${company.name}</span>`;
+                        }}
+                      />
+                    </Wrapper>
+                  </ScrollReveal>
+                );
+              })}
 
               {displayCompanies.length === 0 && (
                 <div className="col-span-full text-center text-slate-400 italic">
