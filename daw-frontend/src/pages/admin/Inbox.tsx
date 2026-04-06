@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import {
   Search,
   Mail,
@@ -10,9 +10,14 @@ import {
   Building,
   CheckSquare,
   X,
+  LinkIcon,
+  Send,
+  Info,
+  Save,
 } from "lucide-react";
 import api from "@/lib/api";
 import { toast } from "sonner";
+import SubjectManagerModal from "./SubjectManagerModal";
 
 interface Inquiry {
   id: number;
@@ -39,11 +44,6 @@ export default function Inbox() {
 
   const [subjects, setSubjects] = useState<any[]>([]);
   const [isSubjectModalOpen, setIsSubjectModalOpen] = useState(false);
-  const [newSubject, setNewSubject] = useState({
-    name: "",
-    isActive: true,
-  });
-  const [editingSubjectId, setEditingSubjectId] = useState<number | null>(null);
 
   // FETCH MASTER SUBJECTS
   const fetchSubjects = async () => {
@@ -98,14 +98,16 @@ export default function Inbox() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const filteredInquiries = inquiries.filter((inq) => {
-    const matchesSearch =
-      inq.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      inq.message.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesFilter =
-      filterSubject === "All" || inq.subject === filterSubject;
-    return matchesSearch && matchesFilter;
-  });
+  const filteredInquiries = useMemo(() => {
+    return inquiries.filter((inq) => {
+      const matchesSearch =
+        inq.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        inq.message.toLowerCase().includes(searchTerm.toLowerCase());
+      const matchesFilter =
+        filterSubject === "All" || inq.subject === filterSubject;
+      return matchesSearch && matchesFilter;
+    });
+  }, [inquiries, searchTerm, filterSubject]);
 
   const handleSelectAll = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.checked) {
@@ -183,7 +185,6 @@ export default function Inbox() {
   };
 
   const deleteInquiry = (id: number) => {
-    // Langsung panggil toast konfirmasi dari Sonner
     toast("Delete Message", {
       description: "Are you sure you want to delete this message permanently?",
       action: {
@@ -611,174 +612,11 @@ export default function Inbox() {
       </div>
 
       {/* MODAL MASTER SUBJECT */}
-      {isSubjectModalOpen && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
-          <div
-            className="absolute inset-0 bg-slate-900/80"
-            onClick={() => setIsSubjectModalOpen(false)}
-          />
-          <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-xl overflow-hidden animate-in zoom-in-95 duration-200">
-            {/* Header Modal */}
-            <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
-              <h2 className="font-serif font-bold text-xl text-slate-900">
-                Manage Inquiry Subjects
-              </h2>
-              <button
-                onClick={() => {
-                  setIsSubjectModalOpen(false);
-                  setEditingSubjectId(null);
-                  setNewSubject({ name: "", isActive: true });
-                }}
-                className="text-slate-400 hover:text-slate-600"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            <div className="p-6 space-y-6">
-              {/* Form Add/Edit */}
-              <div className="flex flex-col md:flex-row gap-4 items-end bg-slate-50 p-4 rounded-xl border border-slate-200">
-                <div className="flex-1 space-y-1 w-full">
-                  <label className="text-[10px] font-bold text-slate-500 uppercase">
-                    Subject Name
-                  </label>
-                  <input
-                    value={newSubject.name} // Diubah dari nameEn menjadi name
-                    onChange={(e) =>
-                      setNewSubject({ ...newSubject, name: e.target.value })
-                    }
-                    className="w-full px-3 py-2 rounded-lg border border-slate-200 text-sm focus:ring-2 focus:ring-daw-green/20 outline-none"
-                    placeholder="e.g. Careers & Internships"
-                  />
-                </div>
-                <div className="flex items-center gap-4 w-full md:w-auto">
-                  <label className="flex items-center gap-2 cursor-pointer h-10">
-                    <input
-                      type="checkbox"
-                      checked={newSubject.isActive}
-                      onChange={(e) =>
-                        setNewSubject({
-                          ...newSubject,
-                          isActive: e.target.checked,
-                        })
-                      }
-                      className="w-4 h-4 text-daw-green rounded border-slate-300 focus:ring-daw-green"
-                    />
-                    <span className="text-xs font-bold text-slate-600">
-                      Active
-                    </span>
-                  </label>
-                  <button
-                    onClick={async () => {
-                      if (!newSubject.name)
-                        return toast.error("Subject name cannot be empty");
-                      try {
-                        if (editingSubjectId) {
-                          await api.put(
-                            `/inquiries/subjects/${editingSubjectId}`,
-                            newSubject,
-                          );
-                          toast.success("Subject updated");
-                        } else {
-                          await api.post("/inquiries/subjects", newSubject);
-                          toast.success("Subject added");
-                        }
-                        setNewSubject({ name: "", isActive: true });
-                        setEditingSubjectId(null);
-                        fetchSubjects();
-                      } catch (error) {
-                        toast.error("Failed to save subject");
-                      }
-                    }}
-                    className="bg-daw-green text-white px-6 py-2 rounded-lg font-bold text-sm hover:bg-emerald-700 transition-all shadow-md shrink-0 h-10"
-                  >
-                    {editingSubjectId ? "Update" : "Add"}
-                  </button>
-                </div>
-              </div>
-
-              {/* Table List */}
-              <div className="max-h-60 overflow-y-auto rounded-xl border border-slate-200 custom-scrollbar">
-                <table className="w-full text-sm text-left">
-                  <thead className="bg-slate-50 text-[10px] uppercase font-bold text-slate-400 sticky top-0 z-10">
-                    <tr>
-                      <th className="px-4 py-3">Subject Name</th>
-                      <th className="px-4 py-3 text-center">Status</th>
-                      <th className="px-4 py-3 text-right">Action</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100">
-                    {subjects.length === 0 ? (
-                      <tr>
-                        <td
-                          colSpan={3}
-                          className="text-center py-6 text-slate-500 text-xs bg-white"
-                        >
-                          No subjects found. Add one above.
-                        </td>
-                      </tr>
-                    ) : (
-                      subjects.map((s) => (
-                        <tr
-                          key={s.id}
-                          className="hover:bg-slate-50 transition-colors bg-white"
-                        >
-                          <td className="px-4 py-3 font-medium text-slate-700">
-                            {s.name}
-                          </td>
-                          <td className="px-4 py-3 text-center">
-                            <span
-                              className={`px-2 py-0.5 rounded-full text-[9px] font-bold tracking-wider ${s.isActive ? "bg-emerald-100 text-emerald-700" : "bg-slate-100 text-slate-400"}`}
-                            >
-                              {s.isActive ? "ACTIVE" : "INACTIVE"}
-                            </span>
-                          </td>
-                          <td className="px-4 py-3 text-right space-x-3">
-                            <button
-                              onClick={() => {
-                                setNewSubject({
-                                  name: s.name,
-                                  isActive: s.isActive,
-                                });
-                                setEditingSubjectId(s.id);
-                              }}
-                              className="text-daw-green font-medium hover:underline text-xs"
-                            >
-                              Edit
-                            </button>
-                            <button
-                              onClick={async () => {
-                                if (
-                                  confirm(
-                                    "Are you sure you want to delete this subject?",
-                                  )
-                                ) {
-                                  try {
-                                    await api.delete(
-                                      `/inquiries/subjects/${s.id}`,
-                                    );
-                                    fetchSubjects();
-                                    toast.success("Subject deleted");
-                                  } catch (error) {
-                                    toast.error("Delete failed");
-                                  }
-                                }
-                              }}
-                              className="text-red-500 font-medium hover:underline text-xs"
-                            >
-                              Delete
-                            </button>
-                          </td>
-                        </tr>
-                      ))
-                    )}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+      <SubjectManagerModal
+        isOpen={isSubjectModalOpen}
+        onClose={() => setIsSubjectModalOpen(false)}
+        onRefresh={fetchSubjects} // Panggil fetchSubjects milik Inbox untuk update filter tab
+      />
     </>
   );
 }

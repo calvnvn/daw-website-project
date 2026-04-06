@@ -9,6 +9,8 @@ import {
   ChevronDown,
   ChevronRight,
   Mail,
+  Info,
+  LinkIcon,
 } from "lucide-react";
 import ScrollReveal from "@/components/ScrollReveal";
 import bannerImg from "@/assets/about-banner.jpg";
@@ -83,6 +85,7 @@ export default function ContactUs() {
     register,
     handleSubmit,
     reset,
+    watch,
     formState: { errors, isSubmitting },
   } = useForm<ContactFormValues>({
     resolver: zodResolver(contactSchema),
@@ -90,6 +93,13 @@ export default function ContactUs() {
       subject: "",
     },
   });
+
+  const selectedSubjectName = watch("subject");
+  const activeSubjectData = subjects.find(
+    (s) => s.name === selectedSubjectName,
+  );
+  const isRedirectActive = activeSubjectData?.is_redirect === true;
+  const redirectUrl = activeSubjectData?.redirect_url || "#";
 
   const onSubmit = async (data: ContactFormValues) => {
     try {
@@ -303,114 +313,14 @@ export default function ContactUs() {
                       onSubmit={handleSubmit(onSubmit)}
                       className="space-y-6"
                     >
-                      {/* Baris 1: Name & Phone */}
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <div className="space-y-2">
-                          <label className="text-xs font-bold text-slate-500 uppercase tracking-widest">
-                            {t("contactPage.form.name", "Full Name")}{" "}
-                            <span className="text-red-500">*</span>
-                          </label>
-                          <input
-                            {...register("name")}
-                            type="text"
-                            placeholder={t(
-                              "contactPage.form.namePlaceholder",
-                              "John Doe",
-                            )}
-                            className={`w-full bg-slate-50 border rounded-xl px-4 py-3.5 text-slate-900 font-sans focus:outline-none transition-all ${
-                              errors.name
-                                ? "border-red-400 focus:ring-2 focus:ring-red-100"
-                                : "border-slate-200 focus:ring-2 focus:ring-daw-green/20 focus:border-daw-green"
-                            }`}
-                          />
-                          {errors.name && (
-                            <p className="text-red-500 text-xs mt-1">
-                              {errors.name.message}
-                            </p>
-                          )}
-                        </div>
-                        <div className="space-y-2">
-                          <label className="text-xs font-bold text-slate-500 uppercase tracking-widest">
-                            {t("contactPage.form.phone", "Phone Number")}{" "}
-                            <span className="text-red-500">*</span>
-                          </label>
-                          <input
-                            {...register("phone")}
-                            type="tel"
-                            placeholder={t(
-                              "contactPage.form.phonePlaceholder",
-                              "+62 812...",
-                            )}
-                            className={`w-full bg-slate-50 border rounded-xl px-4 py-3.5 text-slate-900 font-sans focus:outline-none transition-all ${
-                              errors.phone
-                                ? "border-red-400 focus:ring-2 focus:ring-red-100"
-                                : "border-slate-200 focus:ring-2 focus:ring-daw-green/20 focus:border-daw-green"
-                            }`}
-                          />
-                          {errors.phone && (
-                            <p className="text-red-500 text-xs mt-1">
-                              {errors.phone.message}
-                            </p>
-                          )}
-                        </div>
-                      </div>
-
-                      {/* Baris 2: Email & Company */}
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <div className="space-y-2">
-                          <label className="text-xs font-bold text-slate-500 uppercase tracking-widest">
-                            {t("contactPage.form.email", "Email Address")}{" "}
-                            <span className="text-red-500">*</span>
-                          </label>
-                          <input
-                            {...register("email")}
-                            type="email"
-                            placeholder={t(
-                              "contactPage.form.emailPlaceholder",
-                              "john@example.com",
-                            )}
-                            className={`w-full bg-slate-50 border rounded-xl px-4 py-3.5 text-slate-900 font-sans focus:outline-none transition-all ${
-                              errors.email
-                                ? "border-red-400 focus:ring-2 focus:ring-red-100"
-                                : "border-slate-200 focus:ring-2 focus:ring-daw-green/20 focus:border-daw-green"
-                            }`}
-                          />
-                          {errors.email && (
-                            <p className="text-red-500 text-xs mt-1">
-                              {errors.email.message}
-                            </p>
-                          )}
-                        </div>
-                        <div className="space-y-2">
-                          <label className="text-xs font-bold text-slate-500 uppercase tracking-widest">
-                            {t(
-                              "contactPage.form.company",
-                              "Company / Organization",
-                            )}{" "}
-                            <span className="text-slate-400 font-normal lowercase tracking-normal">
-                              (Optional)
-                            </span>
-                          </label>
-                          <input
-                            {...register("company")}
-                            type="text"
-                            placeholder={t(
-                              "contactPage.form.companyPlaceholder",
-                              "Enter your organization",
-                            )}
-                            className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3.5 text-slate-900 font-sans focus:outline-none focus:ring-2 focus:ring-daw-green/20 focus:border-daw-green transition-all"
-                          />
-                        </div>
-                      </div>
-
-                      {/* Baris 3: Subject Dropdown */}
-                      <div className="space-y-2">
+                      {/* --- BAGIAN 1: SUBJECT (Trigger Utama) --- */}
+                      <div className="space-y-2 relative z-20">
                         <label className="text-xs font-bold text-slate-500 uppercase tracking-widest">
                           {t(
                             "contactPage.form.subjectLabel",
                             "Inquiry Subject",
                           )}{" "}
-                          <span className="text-red-500">*</span>
+                          <span className="text-daw-green">*</span>
                         </label>
                         <div className="relative">
                           <select
@@ -426,8 +336,6 @@ export default function ContactUs() {
                                 ? "Loading subjects..."
                                 : "Select a subject..."}
                             </option>
-
-                            {/* MAPPING DINAMIS DARI DATABASE */}
                             {subjects.map((sub) => (
                               <option key={sub.id} value={sub.name}>
                                 {sub.name}
@@ -443,36 +351,166 @@ export default function ContactUs() {
                             {errors.subject.message}
                           </p>
                         )}
-                      </div>
 
-                      {/* Baris 4: Message */}
-                      <div className="space-y-2">
-                        <label className="text-xs font-bold text-slate-500 uppercase tracking-widest">
-                          {t("contactPage.form.message", "Message")}{" "}
-                          <span className="text-red-500">*</span>
-                        </label>
-                        <textarea
-                          {...register("message")}
-                          rows={5}
-                          placeholder={t(
-                            "contactPage.form.messagePlaceholder",
-                            "How can we help you today?",
-                          )}
-                          className={`w-full bg-slate-50 border rounded-xl px-4 py-3.5 text-slate-900 font-sans resize-none focus:outline-none transition-all ${
-                            errors.message
-                              ? "border-red-400 focus:ring-2 focus:ring-red-100"
-                              : "border-slate-200 focus:ring-2 focus:ring-daw-green/20 focus:border-daw-green"
-                          }`}
-                        ></textarea>
-                        {errors.message && (
-                          <p className="text-red-500 text-xs mt-1">
-                            {errors.message?.message}
-                          </p>
+                        {/* 🔥 THE MICRO-COPY CARD (Elegan & User-Centric) */}
+                        {isRedirectActive && (
+                          <div className="mt-4 bg-daw-green/10 border border-daw-green/20 p-4 rounded-xl flex gap-3 animate-in fade-in slide-in-from-top-2 duration-300">
+                            <Info className="w-5 h-5 text-daw-green shrink-0 mt-0.5" />
+                            <div className="space-y-1">
+                              <h4 className="text-sm font-bold text-slate-900">
+                                {selectedSubjectName}
+                              </h4>
+                              <p className="text-xs font-medium text-slate-600 leading-relaxed">
+                                For information about{" "}
+                                <span className="font-bold text-daw-green">
+                                  {selectedSubjectName}
+                                </span>
+                                , please click the button below to continue.
+                              </p>
+                            </div>
+                          </div>
                         )}
                       </div>
 
+                      {/* --- BAGIAN 2: DATA DIRI (Name & Email) --- */}
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 relative z-10">
+                        <div className="space-y-2">
+                          <label className="text-xs font-bold text-slate-500 uppercase tracking-widest">
+                            {t("contactPage.form.name", "Full Name")}{" "}
+                            <span className="text-daw-green">*</span>
+                          </label>
+                          <input
+                            {...register("name")}
+                            type="text"
+                            placeholder={t(
+                              "contactPage.form.namePlaceholder",
+                              "John Doe",
+                            )}
+                            disabled={isRedirectActive}
+                            className={`w-full bg-slate-50 border rounded-xl px-4 py-3.5 text-slate-900 font-sans focus:outline-none transition-all disabled:opacity-40 disabled:cursor-not-allowed disabled:bg-slate-100 ${
+                              errors.name
+                                ? "border-red-400 focus:ring-2 focus:ring-red-100"
+                                : "border-slate-200 focus:ring-2 focus:ring-daw-green/20 focus:border-daw-green"
+                            }`}
+                          />
+                          {errors.name && (
+                            <p className="text-red-500 text-xs mt-1">
+                              {errors.name.message}
+                            </p>
+                          )}
+                        </div>
+                        <div className="space-y-2">
+                          <label className="text-xs font-bold text-slate-500 uppercase tracking-widest">
+                            {t("contactPage.form.email", "Email Address")}{" "}
+                            <span className="text-daw-green">*</span>
+                          </label>
+                          <input
+                            {...register("email")}
+                            type="email"
+                            placeholder={t(
+                              "contactPage.form.emailPlaceholder",
+                              "john@example.com",
+                            )}
+                            disabled={isRedirectActive}
+                            className={`w-full bg-slate-50 border rounded-xl px-4 py-3.5 text-slate-900 font-sans focus:outline-none transition-all disabled:opacity-40 disabled:cursor-not-allowed disabled:bg-slate-100 ${
+                              errors.email
+                                ? "border-red-400 focus:ring-2 focus:ring-red-100"
+                                : "border-slate-200 focus:ring-2 focus:ring-daw-green/20 focus:border-daw-green"
+                            }`}
+                          />
+                          {errors.email && (
+                            <p className="text-red-500 text-xs mt-1">
+                              {errors.email.message}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* --- BAGIAN 3: KONDISIONAL (Sembunyi jika Redirect) --- */}
+                      <div
+                        className={`transition-all duration-500 ease-in-out overflow-hidden ${
+                          isRedirectActive
+                            ? "max-h-0 opacity-0 pointer-events-none translate-y-4"
+                            : "max-h-[500px] opacity-100 translate-y-0"
+                        }`}
+                      >
+                        <div className="space-y-6">
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-1">
+                            <div className="space-y-2">
+                              <label className="text-xs font-bold text-slate-500 uppercase tracking-widest">
+                                {t("contactPage.form.phone", "Phone Number")}{" "}
+                                <span className="text-daw-green">*</span>
+                              </label>
+                              <input
+                                {...register("phone")}
+                                type="tel"
+                                placeholder={t(
+                                  "contactPage.form.phonePlaceholder",
+                                  "+62 812...",
+                                )}
+                                className={`w-full bg-slate-50 border rounded-xl px-4 py-3.5 text-slate-900 font-sans focus:outline-none transition-all ${
+                                  errors.phone
+                                    ? "border-red-400 focus:ring-2 focus:ring-red-100"
+                                    : "border-slate-200 focus:ring-2 focus:ring-daw-green/20 focus:border-daw-green"
+                                }`}
+                              />
+                              {errors.phone && (
+                                <p className="text-red-500 text-xs mt-1">
+                                  {errors.phone.message}
+                                </p>
+                              )}
+                            </div>
+                            <div className="space-y-2">
+                              <label className="text-xs font-bold text-slate-500 uppercase tracking-widest">
+                                {t(
+                                  "contactPage.form.company",
+                                  "Company / Organization",
+                                )}{" "}
+                                <span className="text-slate-400 font-normal lowercase tracking-normal">
+                                  (Optional)
+                                </span>
+                              </label>
+                              <input
+                                {...register("company")}
+                                type="text"
+                                placeholder={t(
+                                  "contactPage.form.companyPlaceholder",
+                                  "Enter your organization",
+                                )}
+                                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3.5 text-slate-900 font-sans focus:outline-none focus:ring-2 focus:ring-daw-green/20 focus:border-daw-green transition-all"
+                              />
+                            </div>
+                          </div>
+
+                          <div className="space-y-2">
+                            <label className="text-xs font-bold text-slate-500 uppercase tracking-widest">
+                              {t("contactPage.form.message", "Message")}{" "}
+                              <span className="text-daw-green">*</span>
+                            </label>
+                            <textarea
+                              {...register("message")}
+                              rows={5}
+                              placeholder={t(
+                                "contactPage.form.messagePlaceholder",
+                                "How can we help you today?",
+                              )}
+                              className={`w-full bg-slate-50 border rounded-xl px-4 py-3.5 text-slate-900 font-sans resize-none focus:outline-none transition-all ${
+                                errors.message
+                                  ? "border-red-400 focus:ring-2 focus:ring-red-100"
+                                  : "border-slate-200 focus:ring-2 focus:ring-daw-green/20 focus:border-daw-green"
+                              }`}
+                            ></textarea>
+                            {errors.message && (
+                              <p className="text-red-500 text-xs mt-1">
+                                {errors.message?.message}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+
                       {/* Notifikasi Sukses */}
-                      {isSuccess && (
+                      {isSuccess && !isRedirectActive && (
                         <div className="bg-emerald-50 border border-emerald-200 text-emerald-700 px-4 py-4 rounded-xl flex items-center gap-3 animate-in fade-in zoom-in duration-300">
                           <CheckCircle2 className="w-6 h-6 shrink-0" />
                           <span className="text-sm font-medium leading-tight">
@@ -484,28 +522,39 @@ export default function ContactUs() {
                         </div>
                       )}
 
-                      {/* Tombol Submit */}
-                      <button
-                        type="submit"
-                        disabled={isSubmitting}
-                        className="group w-full inline-flex items-center justify-center gap-3 bg-[#081C15] hover:bg-daw-green disabled:bg-slate-400 disabled:cursor-not-allowed text-white px-8 py-4 rounded-xl font-bold uppercase tracking-widest text-sm transition-all duration-300 shadow-md hover:shadow-lg"
-                      >
-                        {isSubmitting ? (
-                          <>
-                            <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                            <span>
-                              {t("contactPage.form.sending", "Sending...")}
-                            </span>
-                          </>
-                        ) : (
-                          <>
-                            <span>
-                              {t("contactPage.form.submit", "Submit Message")}
-                            </span>
-                            <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
-                          </>
-                        )}
-                      </button>
+                      {/* --- BAGIAN 4: DYNAMIC BUTTON --- */}
+                      {isRedirectActive ? (
+                        <button
+                          type="button"
+                          onClick={() => window.open(redirectUrl, "_blank")}
+                          className="group w-full inline-flex items-center justify-center gap-3 bg-daw-green hover:bg-daw-yellow text-white px-8 py-4 rounded-xl font-bold uppercase tracking-widest text-sm transition-all duration-300 shadow-[0_4px_14px_rgba(16,185,129,0.3)] hover:shadow-[0_6px_20px_rgba(16,185,129,0.4)]"
+                        >
+                          <span>More about {selectedSubjectName}</span>
+                          <LinkIcon className="w-4 h-4 group-hover:translate-x-1 group-hover:-translate-y-1 transition-transform" />
+                        </button>
+                      ) : (
+                        <button
+                          type="submit"
+                          disabled={isSubmitting}
+                          className="group w-full inline-flex items-center justify-center gap-3 bg-[#081C15] hover:bg-slate-800 disabled:bg-slate-400 disabled:cursor-not-allowed text-white px-8 py-4 rounded-xl font-bold uppercase tracking-widest text-sm transition-all duration-300 shadow-md hover:shadow-lg"
+                        >
+                          {isSubmitting ? (
+                            <>
+                              <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                              <span>
+                                {t("contactPage.form.sending", "Sending...")}
+                              </span>
+                            </>
+                          ) : (
+                            <>
+                              <span>
+                                {t("contactPage.form.submit", "Submit Message")}
+                              </span>
+                              <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+                            </>
+                          )}
+                        </button>
+                      )}
                     </form>
                   </div>
                 </ScrollReveal>
