@@ -40,7 +40,6 @@ export default function Login() {
       const response = await api.post("/auth/login", { email, password });
       const data = response.data;
 
-      // 🕵️ DEBUG: Minta Pak Rama liat ini di Console Browser (F12)
       // console.log("🔥 [DEBUG LOGIN] Data dari Server:", data);
 
       if (!data || !data.accessToken) {
