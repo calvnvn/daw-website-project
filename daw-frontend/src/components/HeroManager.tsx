@@ -162,8 +162,15 @@ export default function HeroManager() {
   const getDisplayImageUrl = (slide: EditableSlide) => {
     if (slide.previewUrl) return slide.previewUrl;
     if (slide.imageUrl) {
-      const cleanPath = slide.imageUrl.replace("/uploads", "");
-      return `${BASE_UPLOAD_URL}${cleanPath}`;
+      // Konsep "Split & Pop": Apapun isinya (path lengkap atau cuma nama),
+      // kita hanya ambil bagian paling ujung (nama filenya).
+      const filename = slide.imageUrl.split("/").pop();
+
+      // Konsep "Sanitized Join": Pastikan base URL tidak diakhiri slash,
+      // lalu kita tambahkan satu slash "/" secara manual agar konsisten.
+      const cleanBase = BASE_UPLOAD_URL.replace(/\/$/, "");
+
+      return `${cleanBase}/${filename}`;
     }
     return null;
   };

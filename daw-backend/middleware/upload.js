@@ -12,6 +12,7 @@ const fileFilter = (req, file, cb) => {
   }
 
   const allowedFields = [
+    "image",
     "cover_image",
     "gallery",
     "inline_image",

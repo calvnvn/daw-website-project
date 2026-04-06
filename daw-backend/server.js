@@ -88,8 +88,8 @@ app.use(
   express.static(uploadPath, {
     maxAge: "30d", // Menyuruh browser menyimpan cache selama 30 hari
     immutable: true, // Memberitahu browser bahwa file ini tidak akan berubah
-    setHeaders: function (res, path) {
-      res.setHeader("Cache-Control", "public, max-age=2592000, immutable");
+    setHeaders: (res) => {
+      res.setHeader("Access-Control-Allow-Origin", "*");
     },
   }),
 );
