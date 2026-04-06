@@ -145,7 +145,7 @@ export default function Hero() {
             </p>
 
             <div className="flex flex-col sm:flex-row gap-4 animate-fade-in-up animation-delay-400 mt-4">
-              <Link to="/businesses">
+              <Link to="/businesses" className="inline-block">
                 <Button
                   size="lg"
                   className="group bg-daw-green hover:bg-[#003b1c] text-white rounded-full px-8 py-6.5 text-[13px] tracking-wide font-bold shadow-lg transition-transform hover:-translate-y-1 border-0 flex items-center"
@@ -154,7 +154,7 @@ export default function Hero() {
                   <ArrowRight className="ml-2 h-4 w-4 transition-transform duration-300 group-hover:translate-x-1.5" />
                 </Button>
               </Link>
-              <Link to="/about?tab=company">
+              <Link to="/about?tab=company" className="inline-block">
                 <Button
                   size="lg"
                   variant="outline"

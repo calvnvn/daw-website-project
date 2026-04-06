@@ -281,6 +281,7 @@ export default function DynamicNavbar() {
               {t("nav.contact", "CONTACT US")}
             </Link>
             <button
+              aria-label={isMobileMenuOpen ? "Close menu" : "Open menu"}
               className={`md:hidden p-2 focus:outline-none ${textClass}`}
               onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
             >
@@ -373,6 +374,7 @@ export default function DynamicNavbar() {
                   {t("nav.businesses", "OUR BUSINESSES")}
                 </span>
                 <button
+                  aria-label="Toggle Our Businesses Submenu"
                   onClick={() => toggleMobileAccordion("static-business")}
                   className="p-2 ml-2 text-slate-400 hover:text-daw-green transition-colors active:scale-95"
                 >
@@ -433,12 +435,12 @@ export default function DynamicNavbar() {
                           {menu.label}
                         </Link>
                         <button
+                          aria-label="Toggle About Us Submenu"
                           onClick={(e) => {
                             e.preventDefault();
                             toggleMobileAccordion(menu.id);
                           }}
                           className="p-2 ml-2 transition-colors active:scale-95"
-                          aria-label="Toggle Submenu"
                         >
                           <ChevronDown
                             className={`h-5 w-5 text-slate-500 transition-transform duration-300 ${isOpen ? "rotate-180" : ""}`}

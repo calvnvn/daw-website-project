@@ -84,9 +84,9 @@ export default function Footer() {
                     <MapPin className="w-5 h-5 text-daw-green transition-colors" />
                   </div>
                   <div className="space-y-1">
-                    <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500">
+                    <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500">
                       {settings?.companyName || "PT Dharma Agung Wijaya"}
-                    </h4>
+                    </p>
                     <p className="text-slate-400 font-light text-sm leading-relaxed max-w-xs whitespace-pre-line">
                       {settings?.address || t("footer.address")}
                     </p>
@@ -97,9 +97,9 @@ export default function Footer() {
 
             {/* Column 2: Sitemap (Quick Links) */}
             <div className="md:col-span-3">
-              <h4 className="text-[11px] font-black uppercase tracking-[0.3em] text-white/40 mb-8">
+              <p className="text-[11px] font-black uppercase tracking-[0.3em] text-white/40 mb-8">
                 {t("footer.quickLinks", "Navigation")}
-              </h4>
+              </p>
               <ul className="flex flex-col gap-4">
                 {/* --- 1. RENDER HARDCODE (HAKIKAT) --- */}
                 {quickLinks.map((item) => (
@@ -182,9 +182,9 @@ export default function Footer() {
 
             {/* Column 3: Sector Presence */}
             <div className="md:col-span-4">
-              <h4 className="text-[11px] font-black uppercase tracking-[0.3em] text-white/40 mb-8">
+              <p className="text-[11px] font-black uppercase tracking-[0.3em] text-white/40 mb-8">
                 {t("footer.sectorsTitle", "Business Sectors")}
-              </h4>
+              </p>
               <div className="flex flex-wrap gap-3">
                 {businessSectors.map((sector) => (
                   <Link
@@ -204,7 +204,7 @@ export default function Footer() {
         {/* BOTTOM FOOTER: Copyright & Back to Top */}
         <div className="border-t border-white/5 bg-[#040804]/50 backdrop-blur-sm">
           <div className="container mx-auto px-6 py-8 max-w-7xl flex flex-col md:flex-row justify-between items-center gap-6">
-            <p className="text-[12px] text-slate-500 font-medium tracking-wide">
+            <p className="text-[12px] text-slate-400 font-medium tracking-wide">
               © {new Date().getFullYear()} PT Dharma Agung Wijaya.{" "}
               {t("All rights reserved.")}
             </p>
