@@ -1,25 +1,29 @@
 import { useState, useEffect, useMemo, memo } from "react";
 import mapBase from "@/assets/map-indonesia-base.svg";
 import { MapIcon, X } from "lucide-react";
+import { type MapCategory } from "@/contexts/BusinessContext";
 
 export interface MapMarker {
   id: string;
   title: string;
   desc: string;
-  type: "direct" | "tudung";
+  categoryId: string; // Ganti type jadi categoryId
   dotX: string;
   dotY: string;
   boxX: string;
   boxY: string;
   mapUrl?: string;
+  categoryData?: MapCategory;
 }
 
 interface InteractiveMapProps {
   markers: MapMarker[];
+  categories: MapCategory[];
 }
 
 const InteractiveMap = memo(function InteractiveMap({
   markers,
+  categories,
 }: InteractiveMapProps) {
   const [activeId, setActiveId] = useState<string | null>(null);
   const [isMobile, setIsMobile] = useState(false);
@@ -36,8 +40,8 @@ const InteractiveMap = memo(function InteractiveMap({
     if (!markers || markers.length === 0) return [];
 
     const nodes = markers.map((m, index) => {
-      const dX = parseFloat(m.dotX);
-      const dY = parseFloat(m.dotY);
+      const dX = parseFloat(m.dotX) || 0;
+      const dY = parseFloat(m.dotY) || 0;
 
       // 1. KUNCI ANTI NUMPUK: Alternating Direction (Ganjil ke Atas, Genap ke Bawah)
       // Jika index genap = -1 (Ke Atas). Jika ganjil = 1 (Ke Bawah).
@@ -121,6 +125,8 @@ const InteractiveMap = memo(function InteractiveMap({
     [activeId, smartMarkers],
   );
 
+  const DEFAULT_COLOR = "#94a3b8";
+
   if (smartMarkers.length === 0) return null;
 
   return (
@@ -128,18 +134,17 @@ const InteractiveMap = memo(function InteractiveMap({
       {/* Legend & Instruksi (Sembunyikan di mobile agar lebih clean, atau biarkan di atas) */}
       <div className="flex justify-between items-center mb-4 px-4 md:px-0 mt-4 md:mt-0">
         <div className="bg-white/95 backdrop-blur-sm p-2.5 rounded-xl border border-slate-200/60 shadow-sm flex flex-row gap-4 md:gap-6 relative z-10 w-full md:w-auto justify-center md:justify-start">
-          <div className="flex items-center gap-2">
-            <span className="w-2.5 h-2.5 rounded-full bg-[#004B23]"></span>
-            <span className="text-[9px] md:text-[10px] font-bold text-slate-700 uppercase tracking-wider">
-              DAW DIRECT
-            </span>
-          </div>
-          <div className="flex items-center gap-2">
-            <span className="w-2.5 h-2.5 rounded-full bg-[#D97706]"></span>
-            <span className="text-[9px] md:text-[10px] font-bold text-slate-700 uppercase tracking-wider">
-              TUDUNG GROUP
-            </span>
-          </div>
+          {(categories || []).map((cat) => (
+            <div key={cat.id} className="flex items-center gap-2">
+              <span
+                className="w-2.5 h-2.5 rounded-full"
+                style={{ backgroundColor: cat.color }}
+              ></span>
+              <span className="text-[9px] md:text-[10px] font-bold text-slate-700 uppercase tracking-wider">
+                {cat.name}
+              </span>
+            </div>
+          ))}{" "}
         </div>
       </div>
 
@@ -156,6 +161,7 @@ const InteractiveMap = memo(function InteractiveMap({
           <svg className="absolute inset-0 w-full h-full pointer-events-none z-10 overflow-visible">
             {smartMarkers.map((m) => {
               const isActive = activeId === m.id;
+              const strokeColor = m.categoryData?.color || DEFAULT_COLOR;
               return (
                 <line
                   key={`line-${m.id}`}
@@ -163,10 +169,10 @@ const InteractiveMap = memo(function InteractiveMap({
                   y1={`${m.dY}%`}
                   x2={`${m.bX}%`}
                   y2={`${m.bY}%`}
-                  stroke={m.type === "direct" ? "#004B23" : "#D97706"}
-                  strokeWidth="1.5"
+                  style={{ stroke: strokeColor }}
+                  strokeWidth={isActive ? "2" : "1.5"}
                   className={`transition-all duration-500 ease-out ${
-                    isActive ? "opacity-100 stroke-[2px]" : "opacity-40"
+                    isActive ? "opacity-100" : "opacity-40"
                   }`}
                 />
               );
@@ -175,14 +181,15 @@ const InteractiveMap = memo(function InteractiveMap({
         )}
 
         {/* LAYER TITIK & KOTAK */}
+        {/* LAYER TITIK & KOTAK */}
         {smartMarkers.map((m) => {
           const isActive = activeId === m.id;
+          // Gunakan variabel warna agar tidak find berkali-kali
+          const markerColor = m.categoryData?.color || DEFAULT_COLOR;
+
           return (
-            <div
-              key={m.id}
-              className={`absolute inset-0 w-full h-full pointer-events-none ${isActive ? "z-50" : "z-20"}`}
-            >
-              {/* THE DOT */}
+            <div key={m.id} className={isActive ? "z-50" : "z-20"}>
+              {/* THE DOT - Langsung beri koordinat di sini */}
               <div
                 className="absolute -translate-x-1/2 -translate-y-1/2 pointer-events-auto cursor-pointer"
                 style={{ left: `${m.dX}%`, top: `${m.dY}%` }}
@@ -191,14 +198,12 @@ const InteractiveMap = memo(function InteractiveMap({
                 onMouseLeave={() => !isMobile && setActiveId(null)}
               >
                 <span
-                  className={`animate-ping absolute inline-flex h-4 w-4 rounded-full opacity-40 ${
-                    m.type === "direct" ? "bg-[#004B23]" : "bg-[#D97706]"
-                  }`}
+                  className="animate-ping absolute inline-flex h-4 w-4 rounded-full opacity-40"
+                  style={{ backgroundColor: markerColor }}
                 ></span>
                 <span
-                  className={`relative inline-flex rounded-full h-3 w-3 border-[1.5px] border-white shadow-md transition-all duration-300 ${
-                    isActive ? "scale-150" : "scale-100 hover:scale-125"
-                  } ${m.type === "direct" ? "bg-[#004B23]" : "bg-[#D97706]"}`}
+                  className={`relative inline-flex rounded-full h-3 w-3 border-[1.5px] border-white shadow-md transition-all duration-300 ${isActive ? "scale-150" : "scale-100 hover:scale-125"}`}
+                  style={{ backgroundColor: markerColor }}
                 ></span>
               </div>
 
@@ -206,23 +211,22 @@ const InteractiveMap = memo(function InteractiveMap({
               {!isMobile && (
                 <div
                   className={`absolute bg-white/95 backdrop-blur-md border shadow-xl p-3 md:p-4 rounded-xl -translate-x-1/2 -translate-y-1/2 transition-all duration-500 ease-out flex flex-col justify-center pointer-events-auto
-                  ${m.type === "direct" ? "border-[#004B23]/30" : "border-[#D97706]/30"}
-                  ${isActive ? "opacity-100 scale-110 shadow-2xl z-50" : "opacity-90 scale-100 visible"}
-                  ${activeId !== null && !isActive ? "opacity-30 blur-[1px] grayscale-[30%]" : ""}
-                  `}
+          ${isActive ? "opacity-100 scale-110 shadow-2xl z-50" : "opacity-90 scale-100 visible"}
+          ${activeId !== null && !isActive ? "opacity-30 blur-[1px] grayscale-[30%]" : ""}
+          `}
                   style={{
                     left: `${m.bX}%`,
                     top: `${m.bY}%`,
                     minWidth: "150px",
                     maxWidth: "220px",
+                    borderColor: `${markerColor}4D`, // 4D = 30% opacity
                   }}
                   onMouseEnter={() => !isMobile && setActiveId(m.id)}
                   onMouseLeave={() => !isMobile && setActiveId(null)}
                 >
                   <h4
-                    className={`font-serif font-bold text-[13px] md:text-[14px] leading-tight mb-1.5 break-words ${
-                      m.type === "direct" ? "text-[#004B23]" : "text-[#D97706]"
-                    }`}
+                    className="font-serif font-bold text-[13px] md:text-[14px] leading-tight mb-1.5 break-words"
+                    style={{ color: markerColor }}
                   >
                     {m.title}
                   </h4>
@@ -252,11 +256,13 @@ const InteractiveMap = memo(function InteractiveMap({
             <div className="flex justify-between items-start">
               <div>
                 <span
-                  className={`text-[10px] font-bold uppercase tracking-[0.2em] px-2 py-1 rounded-md ${activeMarker.type === "direct" ? "bg-[#004B23]/10 text-[#004B23]" : "bg-[#D97706]/10 text-[#D97706]"}`}
+                  className="text-[10px] font-bold uppercase tracking-[0.2em] px-2 py-1 rounded-md"
+                  style={{
+                    backgroundColor: `${activeMarker.categoryData?.color || DEFAULT_COLOR}1A`, // 1A = 10% opacity
+                    color: activeMarker.categoryData?.color || DEFAULT_COLOR,
+                  }}
                 >
-                  {activeMarker.type === "direct"
-                    ? "DAW Direct Owns"
-                    : "Tudung Group"}
+                  {activeMarker.categoryData?.name || "Uncategorized"}
                 </span>
                 <h3 className="text-xl font-serif font-bold text-slate-900 mt-2">
                   {activeMarker.title}
@@ -279,7 +285,12 @@ const InteractiveMap = memo(function InteractiveMap({
                 href={activeMarker.mapUrl}
                 target="_blank"
                 rel="noopener noreferrer"
-                className={`flex items-center justify-center gap-2 w-full py-3.5 rounded-xl text-sm font-bold transition-all active:scale-95 ${activeMarker.type === "direct" ? "bg-[#004B23] text-white" : "bg-[#D97706] text-white"}`}
+                // PERBAIKAN: Tombol Link Map Dinamis
+                className="flex items-center justify-center gap-2 w-full py-3.5 rounded-xl text-sm font-bold transition-all active:scale-95 text-white"
+                style={{
+                  backgroundColor:
+                    activeMarker.categoryData?.color || DEFAULT_COLOR,
+                }}
               >
                 <MapIcon className="w-4 h-4" />
                 VIEW ON GOOGLE MAPS

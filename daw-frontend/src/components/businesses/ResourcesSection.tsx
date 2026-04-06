@@ -206,7 +206,10 @@ export default function ResourcesSection() {
 
         {/* Bawah: Peta Infografis Penuh (Full Width) */}
         <ScrollReveal direction="up" delay={300}>
-          <InteractiveMap />
+          <InteractiveMap
+            markers={section.mapMarkers}
+            categories={categories} // 🔥 TAMBAHKAN INI
+          />
         </ScrollReveal>
       </div>
 

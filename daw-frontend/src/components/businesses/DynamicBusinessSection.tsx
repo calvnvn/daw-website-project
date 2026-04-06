@@ -2,6 +2,7 @@ import ScrollReveal from "@/components/ScrollReveal";
 import BusinessGrid from "@/components/BusinessGrid";
 import InteractiveMap, { type MapMarker } from "./InteractiveMap";
 import { memo } from "react"; // <-- Tambahkan memo
+import { useBusiness } from "@/contexts/BusinessContext";
 export interface SectionData {
   id: string;
   category: "Resources" | "Energy";
@@ -15,6 +16,8 @@ const DynamicBusinessSection = memo(function DynamicBusinessSection({
 }: {
   data: SectionData;
 }) {
+  const { categories } = useBusiness();
+
   return (
     <div className="flex flex-col w-full relative bg-white overflow-x-hidden max-w-full">
       {/* 1. CINEMATIC BACKGROUND EFFECTS */}
@@ -83,7 +86,10 @@ const DynamicBusinessSection = memo(function DynamicBusinessSection({
               <div className="relative group">
                 <div className="absolute -inset-2 bg-gradient-to-r from-[#004B23]/10 via-[#10B981]/10 to-[#D97706]/10 rounded-[2.5rem] blur-[25px] opacity-40 group-hover:opacity-60 transition duration-700"></div>
                 <div className="relative bg-white/95 backdrop-blur-md rounded-[2rem] shadow-[0_15px_50px_-15px_rgba(0,0,0,0.1)] border border-slate-100/50 p-6 md:p-10 transition-transform duration-500 hover:-translate-y-1">
-                  <InteractiveMap markers={data.mapMarkers} />
+                  <InteractiveMap
+                    markers={data.mapMarkers || []}
+                    categories={categories || []}
+                  />
                 </div>
               </div>
             </ScrollReveal>

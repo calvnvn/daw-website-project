@@ -25,6 +25,7 @@ const businessRoutes = require("./routes/businessRoutes");
 const pageRoutes = require("./routes/pageRoutes");
 const menuRoutes = require("./routes/menuRoutes");
 const sitemapRoutes = require("./routes/sitemapRoutes");
+const mapCategoryRoutes = require("./routes/mapCategoryRoutes");
 
 // --- 3. MODELS IMPORT ---
 const User = require("./models/User");
@@ -41,6 +42,7 @@ require("./models/HeroSlide");
 require("./models/HomeSetting");
 require("./models/ImpactStat");
 const BusinessSection = require("./models/BusinessSection");
+const MapCategory = require("./models/MapCategory");
 const BusinessMapMarker = require("./models/BusinessMapMarker");
 require("./models/Page");
 require("./models/Menu");
@@ -108,6 +110,7 @@ app.use("/api/homepage", homeRoutes);
 app.use("/api/inquiries", inquiryRoutes);
 app.use("/api/dashboard", dashboardRoutes);
 app.use("/api/businesses", businessRoutes);
+app.use("/api/map-categories", mapCategoryRoutes);
 app.use("/api/pages", pageRoutes);
 app.use("/api/menus", menuRoutes);
 app.use("/", sitemapRoutes);
@@ -171,9 +174,19 @@ BusinessSection.hasMany(BusinessMapMarker, {
   onDelete: "CASCADE",
 });
 
+MapCategory.hasMany(BusinessMapMarker, {
+  foreignKey: "categoryId",
+  as: "markers",
+});
+
 BusinessMapMarker.belongsTo(BusinessSection, {
   foreignKey: "sectionId",
   targetKey: "id",
+});
+
+BusinessMapMarker.belongsTo(MapCategory, {
+  foreignKey: "categoryId",
+  as: "categoryData",
 });
 
 // BOOTSTRAP SERVER & DATABASE

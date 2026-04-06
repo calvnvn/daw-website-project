@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import ReactQuill from "react-quill-new";
 import "react-quill-new/dist/quill.snow.css";
 import { toast } from "sonner";
@@ -12,6 +12,9 @@ import {
   Zap,
   Maximize2,
   X,
+  Copy,
+  Edit,
+  Plus,
 } from "lucide-react";
 import mapBase from "@/assets/map-indonesia-base.svg";
 
@@ -24,11 +27,31 @@ import {
 
 export default function ManageBusinesses() {
   // Panggil data global dari Context
-  const { sections, isLoading, updateSection } = useBusiness();
+  const {
+    sections,
+    categories,
+    isLoading,
+    isProcessing,
+    updateSection,
+    addCategory,
+    updateCategory,
+    deleteCategory,
+  } = useBusiness();
+  // Ganti tipe activeTab agar mencakup categories
+  const [activeTab, setActiveTab] = useState<
+    "resources" | "energy" | "categories"
+  >("resources");
 
-  const [activeTab, setActiveTab] = useState<"resources" | "energy">(
-    "resources",
-  );
+  const [newCat, setNewCat] = useState({ id: "", name: "", color: "#004B23" });
+  const [editingCatId, setEditingCatId] = useState<string | null>(null);
+  const [editCatData, setEditCatData] = useState({ name: "", color: "" });
+  // UX Helper: Mempercepat pencarian warna (Dictionary Pattern)
+  const categoryMap = useMemo(() => {
+    return categories.reduce(
+      (acc, cat) => ({ ...acc, [cat.id]: cat.color }),
+      {} as Record<string, string>,
+    );
+  }, [categories]);
   const [isSaving, setIsSaving] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [isMapModalOpen, setIsMapModalOpen] = useState(false);
@@ -116,7 +139,8 @@ export default function ManageBusinesses() {
       id: Date.now().toString(),
       title: "New Location",
       desc: "Capacity / Details",
-      type: "direct",
+      // type: "direct",
+      categoryId: categories.length > 0 ? categories[0].id : "", //Ambil ID pertama dari daftar kategori sebagai default
       dotX: xPercentStr,
       dotY: yPercentStr,
       boxX: xPercentStr,
@@ -144,7 +168,7 @@ export default function ManageBusinesses() {
   // Sinkronisasi data dari Context ke Form Lokal setiap kali pindah Tab
   // Kecepatan Sinkronisasi: INSTAN (Tidak ada loading skeleton karena data sudah di memory!)
   useEffect(() => {
-    if (sections.length > 0) {
+    if (sections.length > 0 && activeTab !== ("categories" as any)) {
       const currentSection = sections.find((sec) => sec.id === activeTab);
       if (currentSection) {
         setFormData({
@@ -179,15 +203,22 @@ export default function ManageBusinesses() {
     window.addEventListener("beforeunload", handleBeforeUnload);
     return () => window.removeEventListener("beforeunload", handleBeforeUnload);
   }, [isEditing]);
-
+  useEffect(() => {
+    if (!isEditing) {
+      setEditingCatId(null);
+    }
+  }, [isEditing]);
   // --- THE UX GUARD (Limit Break Fitur) ---
-  const handleTabChange = (targetTab: "resources" | "energy") => {
+  const handleTabChange = (
+    targetTab: "resources" | "energy" | "categories",
+  ) => {
     if (isEditing) {
       // Tolak perpindahan tab jika admin belum nge-save!
       toast.error(
-        "LOCKED: Please Save or Lock your changes first before switching tabs!",
+        "LOCKED: Silakan simpan atau kunci perubahan Anda terlebih dahulu sebelum berpindah tab",
         {
-          description: "This prevents accidental data loss.",
+          description:
+            "Ini untuk mencegah hilangnya data secara tidak sengaja.",
         },
       );
       return;
@@ -212,6 +243,7 @@ export default function ManageBusinesses() {
 
   // Eksekusi Save via Context
   const handleSave = async () => {
+    if (activeTab === "categories") return;
     setIsSaving(true);
     const toastId = toast.loading("Saving changes...");
     try {
@@ -263,15 +295,20 @@ export default function ManageBusinesses() {
             )}
             <span>{isEditing ? "Editing Mode" : "Locked"}</span>
           </button>
-
-          <button
-            onClick={handleSave}
-            disabled={isSaving || !isEditing}
-            className="flex items-center gap-2 bg-daw-green hover:bg-[#003b1c] disabled:bg-slate-300 disabled:cursor-not-allowed text-white px-6 py-2.5 rounded-lg font-medium transition-colors shadow-sm"
-          >
-            <Save className="w-5 h-5" />
-            <span>{isSaving ? "Saving..." : "Save Changes"}</span>
-          </button>
+          {activeTab !== "categories" && (
+            <button
+              onClick={handleSave}
+              disabled={isSaving || !isEditing}
+              className="flex items-center gap-2 bg-daw-green hover:bg-[#003b1c] disabled:bg-slate-300 disabled:cursor-not-allowed text-white px-6 py-2.5 rounded-lg font-medium transition-colors shadow-sm"
+            >
+              <Save className="w-5 h-5" />
+              <span>
+                {isSaving
+                  ? "Saving..."
+                  : `Update ${activeTab.charAt(0).toUpperCase() + activeTab.slice(1)}`}
+              </span>
+            </button>
+          )}
         </div>
       </div>
 
@@ -297,6 +334,16 @@ export default function ManageBusinesses() {
         >
           <Zap className="w-4 h-4" /> Energy
         </button>
+        <button
+          onClick={() => handleTabChange("categories")} // Cast temporary
+          className={`flex items-center gap-2 px-6 py-3 font-bold text-sm uppercase tracking-wider border-b-2 transition-colors whitespace-nowrap ${
+            activeTab === ("categories" as any)
+              ? "border-daw-green text-daw-green"
+              : "border-transparent text-slate-400 hover:text-slate-700"
+          }`}
+        >
+          <Lock className="w-4 h-4" /> Categories
+        </button>
       </div>
 
       {/* --- TAB CONTENT AREA --- */}
@@ -306,196 +353,464 @@ export default function ManageBusinesses() {
         key={activeTab}
         className="bg-white rounded-b-xl border border-t-0 border-slate-200 shadow-sm p-6 lg:p-8 min-h-[500px]"
       >
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-          <div className="lg:col-span-7 space-y-6">
-            <div className="bg-slate-50 p-6 rounded-xl border border-slate-200">
-              <h3 className="text-base font-bold text-slate-900 mb-4 border-b border-slate-200 pb-2 flex justify-between items-center">
-                <span>Page Content</span>
-                <span className="text-xs text-daw-green uppercase tracking-wider bg-daw-green/10 px-2 py-1 rounded">
-                  {activeTab} SECTION
-                </span>
-              </h3>
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">
-                    {activeTab === "resources"
-                      ? "Resources Eyebrow Title"
-                      : "Energy Eyebrow Title"}
+        {activeTab === "categories" ? (
+          //  UI: MASTER CATEGORY MANAGER
+          <div className="space-y-8 animate-in slide-in-from-bottom-4 duration-500">
+            {/* Penjelasan Singkat untuk User Non-Teknis */}
+            <div className="bg-daw-green/5 border border-daw-green/20 p-4 rounded-xl">
+              <p className="text-sm text-daw-green font-medium flex items-center gap-2">
+                <MapIcon className="w-4 h-4" />
+                Informasi: Kategori di bawah ini menentukan label dan warna
+                titik (pin) pada peta bisnis di seluruh website.
+              </p>
+            </div>
+            {/* Form Tambah Kategori Baru */}
+            <div
+              className={`bg-slate-50 p-6 rounded-xl border border-slate-200 space-y-4 transition-opacity ${!isEditing ? "opacity-60 grayscale-[0.5]" : ""}`}
+            >
+              <div className="flex justify-between items-center">
+                <h3 className="font-bold text-slate-900 flex items-center gap-2 text-sm uppercase tracking-wider">
+                  <Plus className="w-4 h-4 text-daw-green" /> Tambah Kategori
+                  Baru
+                </h3>
+                {!isEditing && (
+                  <span className="text-[10px] bg-amber-100 text-amber-700 px-2 py-1 rounded font-bold flex items-center gap-1">
+                    <Lock className="w-3 h-3" /> AKTIFKAN MODE EDIT UNTUK
+                    MENAMBAH
+                  </span>
+                )}
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
+                <div className="md:col-span-1">
+                  <label className="text-[10px] font-bold text-slate-500 uppercase mb-1 block italic">
+                    Kode Unik (Internal ID)
                   </label>
                   <input
-                    type="text"
-                    value={formData.title}
-                    onChange={(e) =>
-                      setFormData({ ...formData, title: e.target.value })
-                    }
                     disabled={!isEditing}
-                    className={`w-full px-3 py-2 rounded-lg font-serif text-lg transition-all duration-300 ${isEditing ? "bg-white border border-slate-300 text-slate-900 focus:ring-2 focus:ring-daw-green/20 shadow-inner" : "bg-slate-100/50 border-transparent text-slate-500 cursor-not-allowed"}`}
+                    type="text"
+                    placeholder="contoh: bea"
+                    className="w-full px-3 py-2 rounded-lg border border-slate-300 text-sm focus:ring-2 focus:ring-daw-green/20 outline-none disabled:bg-slate-100"
+                    value={newCat.id}
+                    onChange={(e) =>
+                      setNewCat({
+                        ...newCat,
+                        id: e.target.value.toLowerCase().replace(/\s+/g, "-"),
+                      })
+                    }
+                  />
+                </div>
+                <div className="md:col-span-1">
+                  <label className="text-[10px] font-bold text-slate-500 uppercase mb-1 block">
+                    Nama Kategori (Tampilan)
+                  </label>
+                  <input
+                    disabled={!isEditing}
+                    type="text"
+                    placeholder="contoh: Berkah Energy Abadi"
+                    className="w-full px-3 py-2 rounded-lg border border-slate-300 text-sm focus:ring-2 focus:ring-daw-green/20 outline-none disabled:bg-slate-100"
+                    value={newCat.name}
+                    onChange={(e) =>
+                      setNewCat({ ...newCat, name: e.target.value })
+                    }
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">
-                    Main Article (Rich Text)
+                  <label className="text-[10px] font-bold text-slate-500 uppercase mb-1 block">
+                    Warna Penanda (Pin)
                   </label>
-                  <div
-                    className={`rounded-xl overflow-hidden border transition-colors ${isEditing ? "bg-white border-slate-300" : "bg-slate-100/50 border-transparent opacity-70 pointer-events-none"}`}
-                  >
-                    <ReactQuill
-                      theme="snow"
-                      value={formData.htmlContent}
-                      onChange={(val) =>
-                        setFormData({ ...formData, htmlContent: val })
+                  <div className="flex items-center gap-3 bg-white px-3 py-1.5 rounded-lg border border-slate-300">
+                    <input
+                      disabled={!isEditing}
+                      type="color"
+                      className="w-6 h-6 rounded-md cursor-pointer border-none bg-transparent disabled:cursor-not-allowed"
+                      value={newCat.color}
+                      onChange={(e) =>
+                        setNewCat({ ...newCat, color: e.target.value })
                       }
-                      readOnly={!isEditing}
-                      className="h-64 mb-12"
                     />
+                    <span className="text-xs font-mono font-bold text-slate-600">
+                      {newCat.color.toUpperCase()}
+                    </span>
+                  </div>
+                </div>
+                <button
+                  disabled={
+                    isProcessing || !newCat.id || !newCat.name || !isEditing
+                  }
+                  onClick={async () => {
+                    await addCategory(newCat);
+                    setNewCat({ id: "", name: "", color: "#004B23" });
+                  }}
+                  className="bg-daw-green text-white h-[38px] px-6 rounded-lg font-bold text-xs hover:bg-[#003b1c] disabled:bg-slate-300 transition-all flex items-center justify-center gap-2 shadow-sm"
+                >
+                  {isProcessing ? (
+                    <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                  ) : (
+                    <Save className="w-4 h-4" />
+                  )}
+                  SIMPAN KATEGORI
+                </button>
+              </div>
+            </div>
+
+            {/* Tabel Daftar Kategori */}
+            <div className="overflow-hidden border border-slate-200 rounded-xl shadow-sm bg-white">
+              <table className="w-full text-left text-sm">
+                <thead className="bg-slate-50 border-b border-slate-200 text-slate-500 uppercase text-[10px] font-bold">
+                  <tr>
+                    <th className="px-6 py-4">ID</th>
+                    <th className="px-6 py-4">Nama Label Peta</th>
+                    <th className="px-6 py-4">Warna Pin</th>
+                    <th className="px-6 py-4 text-right">Tindakan</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {categories.map((cat) => {
+                    const isEditingThis = editingCatId === cat.id;
+                    return (
+                      <tr
+                        key={cat.id}
+                        className="hover:bg-slate-50/50 transition-colors group"
+                      >
+                        <td className="px-6 py-4 font-mono text-xs text-slate-400">
+                          {cat.id}
+                        </td>
+                        <td className="px-6 py-4">
+                          {isEditingThis ? (
+                            <input
+                              className="w-full px-2 py-1 border rounded text-sm outline-none focus:ring-2 focus:ring-daw-green/20"
+                              value={editCatData.name}
+                              onChange={(e) =>
+                                setEditCatData({
+                                  ...editCatData,
+                                  name: e.target.value,
+                                })
+                              }
+                            />
+                          ) : (
+                            <span className="font-bold text-slate-700">
+                              {cat.name}
+                            </span>
+                          )}
+                        </td>
+                        <td className="px-6 py-4">
+                          <div className="flex items-center gap-3">
+                            {isEditingThis ? (
+                              <input
+                                type="color"
+                                className="w-5 h-5"
+                                value={editCatData.color}
+                                onChange={(e) =>
+                                  setEditCatData({
+                                    ...editCatData,
+                                    color: e.target.value,
+                                  })
+                                }
+                              />
+                            ) : (
+                              <div
+                                className="w-5 h-5 rounded-full border border-black/10 shadow-sm"
+                                style={{ backgroundColor: cat.color }}
+                              />
+                            )}
+                            <span className="text-xs font-mono text-slate-400">
+                              {isEditingThis ? editCatData.color : cat.color}
+                            </span>
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 text-right">
+                          {/* HANYA TAMPILKAN TOMBOL AKSI JIKA MODE EDIT AKTIF */}
+                          {isEditing ? (
+                            <div className="flex justify-end gap-2">
+                              {isEditingThis ? (
+                                <>
+                                  <button
+                                    onClick={async () => {
+                                      await updateCategory(cat.id, editCatData);
+                                      setEditingCatId(null);
+                                    }}
+                                    className="p-1.5 text-daw-green hover:bg-green-50 rounded"
+                                  >
+                                    <Save className="w-4 h-4" />
+                                  </button>
+                                  <button
+                                    onClick={() => setEditingCatId(null)}
+                                    className="p-1.5 text-slate-400 hover:bg-slate-50 rounded"
+                                  >
+                                    <X className="w-4 h-4" />
+                                  </button>
+                                </>
+                              ) : (
+                                <>
+                                  <button
+                                    onClick={() => {
+                                      setEditingCatId(cat.id);
+                                      setEditCatData({
+                                        name: cat.name,
+                                        color: cat.color,
+                                      });
+                                    }}
+                                    className="p-1.5 text-slate-300 hover:text-daw-green rounded transition-colors"
+                                  >
+                                    <Edit className="w-4 h-4" />
+                                  </button>
+                                  <button
+                                    onClick={() => {
+                                      if (
+                                        window.confirm(
+                                          `Hapus kategori "${cat.name}"?`,
+                                        )
+                                      )
+                                        deleteCategory(cat.id);
+                                    }}
+                                    className="p-1.5 text-slate-300 hover:text-red-600 rounded transition-colors"
+                                  >
+                                    <Trash2 className="w-4 h-4" />
+                                  </button>
+                                </>
+                              )}
+                            </div>
+                          ) : (
+                            <span className="text-[10px] text-slate-300 italic">
+                              Terkunci
+                            </span>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+            <div className="lg:col-span-7 space-y-6">
+              <div className="bg-slate-50 p-6 rounded-xl border border-slate-200">
+                <h3 className="text-base font-bold text-slate-900 mb-4 border-b border-slate-200 pb-2 flex justify-between items-center">
+                  <span>Page Content</span>
+                  <span className="text-xs text-daw-green uppercase tracking-wider bg-daw-green/10 px-2 py-1 rounded">
+                    {activeTab} SECTION
+                  </span>
+                </h3>
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">
+                      {activeTab === "resources"
+                        ? "Resources Eyebrow Title"
+                        : "Energy Eyebrow Title"}
+                    </label>
+                    <input
+                      type="text"
+                      value={formData.title}
+                      onChange={(e) =>
+                        setFormData({ ...formData, title: e.target.value })
+                      }
+                      disabled={!isEditing}
+                      className={`w-full px-3 py-2 rounded-lg font-serif text-lg transition-all duration-300 ${isEditing ? "bg-white border border-slate-300 text-slate-900 focus:ring-2 focus:ring-daw-green/20 shadow-inner" : "bg-slate-100/50 border-transparent text-slate-500 cursor-not-allowed"}`}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">
+                      Main Article (Rich Text)
+                    </label>
+                    <div
+                      className={`rounded-xl overflow-hidden border transition-colors ${isEditing ? "bg-white border-slate-300" : "bg-slate-100/50 border-transparent opacity-70 pointer-events-none"}`}
+                    >
+                      <ReactQuill
+                        theme="snow"
+                        value={formData.htmlContent}
+                        onChange={(val) =>
+                          setFormData({ ...formData, htmlContent: val })
+                        }
+                        readOnly={!isEditing}
+                        className="h-64 mb-12"
+                      />
+                    </div>
                   </div>
                 </div>
               </div>
             </div>
-          </div>
 
-          <div className="lg:col-span-5 space-y-6">
-            <div className="bg-slate-50 p-6 rounded-xl border border-slate-200">
-              <div className="flex justify-between items-center mb-4 border-b border-slate-200 pb-2">
-                <h3 className="text-base font-bold text-slate-900">
-                  Interactive Map
-                </h3>
-                <label
-                  className={`flex items-center ${isEditing ? "cursor-pointer" : "cursor-not-allowed opacity-60"}`}
-                >
-                  <div className="relative">
-                    <input
-                      type="checkbox"
-                      className="sr-only"
-                      checked={!!formData.hasMap}
-                      disabled={!isEditing}
-                      onChange={(e) =>
-                        setFormData({ ...formData, hasMap: e.target.checked })
-                      }
-                    />
-                    <div
-                      className={`block w-12 h-6 rounded-full transition-colors ${formData.hasMap ? "bg-daw-green" : "bg-slate-300"}`}
-                    ></div>
-                    <div
-                      className={`dot absolute left-1 top-1 bg-white w-4 h-4 rounded-full transition-transform ${formData.hasMap ? "transform translate-x-6" : ""}`}
-                    ></div>
-                  </div>
-                </label>
-              </div>
-
-              {formData.hasMap && (
-                <div className="space-y-4">
-                  <div className="relative">
-                    <div className="w-full aspect-[16/9] bg-white rounded-xl border border-slate-200 overflow-hidden relative">
-                      <img
-                        src={mapBase}
-                        alt="Map"
-                        className="absolute inset-0 w-full h-full object-contain opacity-70"
+            <div className="lg:col-span-5 space-y-6">
+              <div className="bg-slate-50 p-6 rounded-xl border border-slate-200">
+                <div className="flex justify-between items-center mb-4 border-b border-slate-200 pb-2">
+                  <h3 className="text-base font-bold text-slate-900">
+                    Interactive Map
+                  </h3>
+                  <label
+                    className={`flex items-center ${isEditing ? "cursor-pointer" : "cursor-not-allowed opacity-60"}`}
+                  >
+                    <div className="relative">
+                      <input
+                        type="checkbox"
+                        className="sr-only"
+                        checked={!!formData.hasMap}
+                        disabled={!isEditing}
+                        onChange={(e) =>
+                          setFormData({ ...formData, hasMap: e.target.checked })
+                        }
                       />
-                      {formData.mapMarkers.map((m, idx) => (
-                        <div
-                          key={idx}
-                          className="absolute w-2.5 h-2.5 rounded-full border-2 border-white -translate-x-1/2 -translate-y-1/2 shadow-sm"
-                          style={{
-                            left: m.dotX,
-                            top: m.dotY,
-                            backgroundColor:
-                              m.type === "direct" ? "#004B23" : "#D97706",
-                          }}
-                        ></div>
-                      ))}
-                    </div>
-                    {isEditing && (
-                      <button
-                        onClick={() => setIsMapModalOpen(true)}
-                        className="w-full mt-3 flex items-center justify-center gap-2 bg-daw-green/10 text-daw-green hover:bg-daw-green hover:text-white py-2.5 rounded-lg font-bold text-sm transition-colors border border-daw-green/20"
-                      >
-                        <Maximize2 className="w-4 h-4" /> Open Fullscreen Map
-                        Picker
-                      </button>
-                    )}
-                  </div>
-
-                  <div className="space-y-3 mt-4 max-h-[300px] overflow-y-auto pr-2 custom-scrollbar">
-                    {formData.mapMarkers.map((marker, index) => (
                       <div
-                        key={index}
-                        className="p-4 bg-white border border-slate-200 rounded-xl relative group shadow-sm"
-                      >
-                        {isEditing && (
-                          <button
-                            onClick={() => removeMarker(index)}
-                            className="absolute top-2 right-2 p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-md transition-colors"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
-                        )}
-                        <div className="grid grid-cols-2 gap-3 mb-3">
-                          <input
-                            type="text"
-                            value={marker.title}
-                            onChange={(e) =>
-                              updateMarker(index, "title", e.target.value)
-                            }
-                            disabled={!isEditing}
-                            className={`w-full px-2 py-1.5 text-sm font-bold rounded-md transition-all ${isEditing ? "bg-white border border-slate-300 text-slate-900 focus:ring-2 focus:ring-daw-green/20" : "bg-slate-100/50 border-transparent text-slate-500"}`}
-                            placeholder="Location Name"
-                          />
-                          <select
-                            value={marker.type}
-                            onChange={(e) =>
-                              updateMarker(index, "type", e.target.value)
-                            }
-                            disabled={!isEditing}
-                            className={`w-full px-2 py-1.5 text-xs rounded-md transition-all ${isEditing ? "bg-white border border-slate-300 text-slate-900 focus:ring-2 focus:ring-daw-green/20" : "bg-slate-100/50 border-transparent text-slate-500 appearance-none"}`}
-                          >
-                            <option value="direct">Direct (Green)</option>
-                            <option value="tudung">Tudung (Orange)</option>
-                          </select>
-                        </div>
-                        <input
-                          type="text"
-                          value={marker.desc}
-                          onChange={(e) =>
-                            updateMarker(index, "desc", e.target.value)
-                          }
-                          disabled={!isEditing}
-                          className={`w-full px-2 py-1.5 text-xs rounded-md transition-all mb-2 ${isEditing ? "bg-white border border-slate-300 text-slate-900 focus:ring-2 focus:ring-daw-green/20" : "bg-slate-100/50 border-transparent text-slate-500"}`}
-                          placeholder="Capacity (e.g. 45 ton/hour)"
+                        className={`block w-12 h-6 rounded-full transition-colors ${formData.hasMap ? "bg-daw-green" : "bg-slate-300"}`}
+                      ></div>
+                      <div
+                        className={`dot absolute left-1 top-1 bg-white w-4 h-4 rounded-full transition-transform ${formData.hasMap ? "transform translate-x-6" : ""}`}
+                      ></div>
+                    </div>
+                  </label>
+                </div>
+
+                {formData.hasMap && (
+                  <div className="space-y-4">
+                    <div className="relative">
+                      <div className="w-full aspect-[16/9] bg-white rounded-xl border border-slate-200 overflow-hidden relative">
+                        <img
+                          src={mapBase}
+                          alt="Map"
+                          className="absolute inset-0 w-full h-full object-contain opacity-70"
                         />
-                        {/* 👇 TAMBAHKAN KOTAK INPUT INI DI BAWAHNYA 👇 */}
-                        <div className="relative mt-2">
-                          <div className="absolute inset-y-0 left-0 pl-2.5 flex items-center pointer-events-none">
-                            <MapIcon className="w-3.5 h-3.5 text-slate-400" />
+                        {formData.mapMarkers.map((m, idx) => {
+                          // Cari warna dari state categories berdasarkan categoryId
+                          const catColor =
+                            categoryMap[m.categoryId] || "#94a3b8";
+
+                          return (
+                            <div
+                              key={idx}
+                              className="absolute w-2.5 h-2.5 rounded-full border-2 border-white -translate-x-1/2 -translate-y-1/2 shadow-sm"
+                              style={{
+                                left: m.dotX,
+                                top: m.dotY,
+                                backgroundColor: catColor,
+                              }}
+                            ></div>
+                          );
+                        })}{" "}
+                      </div>
+                      {isEditing && (
+                        <button
+                          onClick={() => setIsMapModalOpen(true)}
+                          className="w-full mt-3 flex items-center justify-center gap-2 bg-daw-green/10 text-daw-green hover:bg-daw-green hover:text-white py-2.5 rounded-lg font-bold text-sm transition-colors border border-daw-green/20"
+                        >
+                          <Maximize2 className="w-4 h-4" /> Open Fullscreen Map
+                          Picker
+                        </button>
+                      )}
+                    </div>
+
+                    <div className="space-y-3 mt-4 max-h-[300px] overflow-y-auto pr-2 custom-scrollbar">
+                      {formData.mapMarkers.map((marker, index) => (
+                        <div
+                          key={index}
+                          className="p-4 bg-white border border-slate-200 rounded-xl relative group shadow-sm"
+                        >
+                          <div className="absolute top-2 right-2 flex gap-1">
+                            <button
+                              disabled={!isEditing}
+                              onClick={() => {
+                                // Menyalin koordinat ke clipboard
+                                navigator.clipboard.writeText(
+                                  `X: ${marker.dotX}, Y: ${marker.dotY}`,
+                                );
+                                toast.success(
+                                  "Koordinat disalin ke clipboard!",
+                                );
+                              }}
+                              className="p-1.5 text-slate-400 hover:text-daw-green hover:bg-daw-green/10 rounded-md transition-colors"
+                              title="Copy Coordinates"
+                            >
+                              <Copy className="w-4 h-4" />{" "}
+                              {/* Pastikan import Copy dari lucide-react */}
+                            </button>
+                            {isEditing && (
+                              <button
+                                onClick={() => removeMarker(index)}
+                                className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-md transition-colors"
+                                title="Delete Marker"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                            )}
+                          </div>
+                          <div className="grid grid-cols-2 gap-3 mb-3">
+                            <input
+                              type="text"
+                              value={marker.title}
+                              onChange={(e) =>
+                                updateMarker(index, "title", e.target.value)
+                              }
+                              disabled={!isEditing}
+                              className={`w-full px-2 py-1.5 text-sm font-bold rounded-md transition-all ${isEditing ? "bg-white border border-slate-300 text-slate-900 focus:ring-2 focus:ring-daw-green/20" : "bg-slate-100/50 border-transparent text-slate-500"}`}
+                              placeholder="Location Name"
+                            />
+                            <select
+                              value={marker.categoryId}
+                              onChange={(e) =>
+                                updateMarker(
+                                  index,
+                                  "categoryId",
+                                  e.target.value,
+                                )
+                              }
+                              disabled={!isEditing}
+                              className={`w-full px-2 py-1.5 text-xs rounded-md transition-all ${isEditing ? "bg-white border border-slate-300 text-slate-900 focus:ring-2 focus:ring-daw-green/20" : "bg-slate-100/50 border-transparent text-slate-500 appearance-none"}`}
+                            >
+                              <option value="" disabled>
+                                Pilih Kategori
+                              </option>
+                              {categories.map((cat) => (
+                                <option key={cat.id} value={cat.id}>
+                                  {cat.name}
+                                </option>
+                              ))}
+                            </select>
                           </div>
                           <input
-                            type="url"
-                            value={marker.mapUrl || ""}
+                            type="text"
+                            value={marker.desc}
                             onChange={(e) =>
-                              updateMarker(index, "mapUrl", e.target.value)
+                              updateMarker(index, "desc", e.target.value)
                             }
                             disabled={!isEditing}
-                            className={`w-full pl-8 pr-2 py-1.5 text-xs rounded-md transition-all font-mono ${
-                              isEditing
-                                ? "bg-white border border-slate-300 text-blue-600 focus:ring-2 focus:ring-blue-500/20"
-                                : "bg-slate-100/50 border-transparent text-slate-400"
-                            }`}
-                            placeholder="https://maps.app.goo.gl/... (Optional)"
+                            className={`w-full px-2 py-1.5 text-xs rounded-md transition-all mb-2 ${isEditing ? "bg-white border border-slate-300 text-slate-900 focus:ring-2 focus:ring-daw-green/20" : "bg-slate-100/50 border-transparent text-slate-500"}`}
+                            placeholder="Capacity (e.g. 45 ton/hour)"
                           />
+                          {/* 👇 TAMBAHKAN KOTAK INPUT INI DI BAWAHNYA 👇 */}
+                          <div className="relative mt-2">
+                            <div className="absolute inset-y-0 left-0 pl-2.5 flex items-center pointer-events-none">
+                              <MapIcon className="w-3.5 h-3.5 text-slate-400" />
+                            </div>
+                            <input
+                              type="url"
+                              value={marker.mapUrl || ""}
+                              onChange={(e) =>
+                                updateMarker(index, "mapUrl", e.target.value)
+                              }
+                              disabled={!isEditing}
+                              className={`w-full pl-8 pr-2 py-1.5 text-xs rounded-md transition-all font-mono ${
+                                isEditing
+                                  ? "bg-white border border-slate-300 text-blue-600 focus:ring-2 focus:ring-blue-500/20"
+                                  : "bg-slate-100/50 border-transparent text-slate-400"
+                              }`}
+                              placeholder="https://maps.app.goo.gl/... (Optional)"
+                            />
+                          </div>
                         </div>
-                      </div>
-                    ))}
-                    {formData.mapMarkers.length === 0 && (
-                      <div className="text-center p-6 text-slate-400 border border-dashed border-slate-300 rounded-xl bg-white">
-                        No markers added. Open fullscreen map to pin.
-                      </div>
-                    )}
+                      ))}
+                      {formData.mapMarkers.length === 0 && (
+                        <div className="text-center p-6 text-slate-400 border border-dashed border-slate-300 rounded-xl bg-white">
+                          No markers added. Open fullscreen map to pin.
+                        </div>
+                      )}
+                    </div>
                   </div>
-                </div>
-              )}
+                )}
+              </div>
             </div>
           </div>
-        </div>
+        )}
       </div>
 
       {/* --- FULLSCREEN MAP MODAL --- */}
@@ -549,22 +864,34 @@ export default function ManageBusinesses() {
                 />
 
                 {/* Marker yang sudah ada (Ukurannya dikecilkan biar elegan) */}
-                {formData.mapMarkers.map((m, idx) => (
-                  <div
-                    key={idx}
-                    className="absolute -translate-x-1/2 -translate-y-1/2 group pointer-events-none z-20"
-                    style={{ left: m.dotX, top: m.dotY }}
-                  >
-                    {/* Core Dot (Super Kecil & Presisi) */}
+                {formData.mapMarkers.map((m, idx) => {
+                  // 1. CARI WARNA KATEGORI DARI STATE
+                  const catColor =
+                    categories.find((c) => c.id === m.categoryId)?.color ||
+                    "#94a3b8";
+
+                  return (
                     <div
-                      className={`w-2.5 h-2.5 md:w-3 md:h-3 rounded-full border-[1.5px] border-white shadow-md ${m.type === "direct" ? "bg-[#004B23]" : "bg-[#D97706]"}`}
-                    ></div>
-                    {/* Ghost Ring (Penanda area klik) */}
-                    <div
-                      className={`absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-8 h-8 rounded-full opacity-20 ${m.type === "direct" ? "bg-[#004B23]" : "bg-[#D97706]"}`}
-                    ></div>
-                  </div>
-                ))}
+                      key={idx}
+                      className="absolute -translate-x-1/2 -translate-y-1/2 group pointer-events-none z-20"
+                      style={{ left: m.dotX, top: m.dotY }}
+                    >
+                      {/* Core Dot (Super Kecil & Presisi) */}
+                      <div
+                        className="w-2.5 h-2.5 md:w-3 md:h-3 rounded-full border-[1.5px] border-white shadow-md"
+                        // 2. GUNAKAN INLINE STYLE UNTUK WARNA
+                        style={{ backgroundColor: catColor }}
+                      ></div>
+
+                      {/* Ghost Ring (Penanda area klik) */}
+                      <div
+                        className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-8 h-8 rounded-full opacity-20"
+                        // 2. GUNAKAN INLINE STYLE UNTUK WARNA
+                        style={{ backgroundColor: catColor }}
+                      ></div>
+                    </div>
+                  );
+                })}
 
                 {/* EFEK KACA PEMBESAR & CROSSHAIR (Muncul saat Hover) */}
                 {!isMobile && isHoveringMap && isEditing && (

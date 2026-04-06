@@ -1,5 +1,6 @@
 const BusinessSection = require("../models/BusinessSection");
 const BusinessMapMarker = require("../models/BusinessMapMarker");
+const MapCategory = require("../models/MapCategory");
 const sequelize = require("../config/database");
 
 // FUNGSI UNTUK PUBLIC FRONTEND
@@ -10,16 +11,12 @@ exports.getPublicBusinessData = async (req, res) => {
         {
           model: BusinessMapMarker,
           as: "mapMarkers",
-          attributes: [
-            "id",
-            "title",
-            "desc",
-            "type",
-            "dotX",
-            "dotY",
-            "boxX",
-            "boxY",
-            "mapUrl",
+          include: [
+            {
+              model: MapCategory,
+              as: "categoryData",
+              attributes: ["id", "name", "color"],
+            },
           ],
         },
       ],
@@ -72,7 +69,7 @@ exports.updateBusinessSection = async (req, res) => {
       const newMarkers = mapMarkers.map((marker) => ({
         title: marker.title,
         desc: marker.desc,
-        type: marker.type,
+        categoryId: marker.categoryId || marker.type,
         dotX: marker.dotX,
         dotY: marker.dotY,
         boxX: marker.boxX,

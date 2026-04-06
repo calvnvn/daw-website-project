@@ -17,9 +17,13 @@ const BusinessMapMarker = sequelize.define(
       type: DataTypes.STRING,
       allowNull: true,
     },
-    type: {
-      type: DataTypes.ENUM("direct", "tudung"),
+    categoryId: {
+      type: DataTypes.STRING(50),
       allowNull: false,
+      references: {
+        model: "MapCategories",
+        key: "id",
+      },
     },
     dotX: { type: DataTypes.STRING, allowNull: false },
     dotY: { type: DataTypes.STRING, allowNull: false },
