@@ -3,10 +3,90 @@ const BusinessMapMarker = require("../models/BusinessMapMarker");
 const MapCategory = require("../models/MapCategory");
 const sequelize = require("../config/database");
 
-// FUNGSI UNTUK PUBLIC FRONTEND
+// 🔥 TAMBAHKAN INI: Import the Security Shield
+const sanitizeHtml = require("sanitize-html");
+
+/**
+ * @constant sanitizeOptions
+ * Defines the strict rules for HTML content allowed from the WYSIWYG Editor.
+ * Custom-built to support rich typography, tables, and YouTube embeds.
+ */
+const sanitizeOptions = {
+  // 1. Allow all standard editorial tags including tables
+  allowedTags: sanitizeHtml.defaults.allowedTags.concat([
+    "img",
+    "h1",
+    "h2",
+    "h3",
+    "h4",
+    "h5",
+    "h6",
+    "table",
+    "thead",
+    "tbody",
+    "tr",
+    "th",
+    "td",
+    "iframe",
+    "u",
+    "s",
+    "span",
+    "br",
+  ]),
+
+  // 2. Allow specific styling attributes (used by ReactQuill)
+  allowedAttributes: {
+    ...sanitizeHtml.defaults.allowedAttributes,
+    "*": ["style", "class"], // Allows Tailwind classes and Quill inline styles
+    a: ["href", "name", "target", "rel"],
+    img: ["src", "alt", "title", "width", "height"],
+    // 🔥 CRITICAL: Allow iframes ONLY for YouTube
+    iframe: [
+      "src",
+      "width",
+      "height",
+      "frameborder",
+      "allow",
+      "allowfullscreen",
+      "style",
+      "class",
+      "title",
+    ],
+  },
+
+  // 3. The Enforcer: Ensure iframes only point to safe domains
+  allowedIframeHostnames: [
+    "www.youtube.com",
+    "youtube.com",
+    "www.youtube-nocookie.com",
+    "youtu.be", // Short link
+  ],
+
+  allowedSchemes: ["http", "https", "ftp", "mailto", "data"],
+
+  // 4. Prevent injection via inline CSS (e.g., style="background: url(javascript:...)")
+  allowedStyles: {
+    "*": {
+      color: [
+        /^#(0x)?[0-9a-f]+$/i,
+        /^rgb\(\s*(\d{1,3})\s*,\s*(\d{1,3})\s*,\s*(\d{1,3})\s*\)$/,
+      ],
+      "text-align": [/^left$/, /^right$/, /^center$/, /^justify$/],
+      "background-color": [/^#(0x)?[0-9a-f]+$/i],
+      "font-size": [/^\d+(px|em|rem|%)$/],
+    },
+  },
+};
+
+/**
+ * @desc    Fetch all business sections for the public-facing website
+ * @route   GET /api/businesses/public
+ * @access  Public
+ */
 exports.getPublicBusinessData = async (req, res) => {
   try {
     const sections = await BusinessSection.findAll({
+      // Eager load nested associations: Section -> Markers -> Category Details
       include: [
         {
           model: BusinessMapMarker,
@@ -20,7 +100,8 @@ exports.getPublicBusinessData = async (req, res) => {
           ],
         },
       ],
-      order: [["createdAt", "ASC"]],
+      // Maintain sequence based on creation time or orderIndex
+      order: [["orderIndex", "ASC"]],
     });
 
     res.status(200).json(sections);
@@ -30,35 +111,49 @@ exports.getPublicBusinessData = async (req, res) => {
   }
 };
 
+/**
+ * @desc    Update an existing business section and synchronize its map markers
+ * @route   PUT /api/businesses/admin/:id
+ * @access  Private (Admin)
+ */
 exports.updateBusinessSection = async (req, res) => {
-  const { id } = req.params; // ID section (contoh: 'resources' atau 'energy')
+  const { id } = req.params;
   const { title, htmlContent, hasMap, mapMarkers } = req.body;
+
+  // Normalize boolean/tinyint for database compatibility
   const isMapActive =
     hasMap === true || hasMap === "true" || hasMap === 1 ? 1 : 0;
-  // Memulai Transaksi Database
-  // Jika salah satu proses gagal, SEMUA proses dibatalkan (Rollback). Ini mencegah data setengah matang!
+
+  //Clean the incoming HTML
+  const cleanHtmlContent = htmlContent
+    ? sanitizeHtml(htmlContent, sanitizeOptions)
+    : "";
+
+  // Initialize a Database Transaction to ensure atomicity (all or nothing)
   const t = await sequelize.transaction();
 
   try {
-    // 1. Cek apakah Section-nya ada
     const section = await BusinessSection.findByPk(id);
     if (!section) {
       await t.rollback();
       return res.status(404).json({ message: "Business Section not found!" });
     }
 
-    // 2. Update Data Utama (Judul, HTML, dan Toggle Map)
+    // Update primary section attributes
     await section.update(
       {
         title: title,
-        htmlContent: htmlContent,
-        hasMap: isMapActive, // <-- Gunakan variabel baru ini!
+        htmlContent: cleanHtmlContent,
+        hasMap: isMapActive,
       },
       { transaction: t },
     );
 
-    // 3. Teknik "Wipe and Replace" untuk Map Markers
-    // Hapus SEMUA marker lama milik section ini
+    /**
+     * MARKER SYNCHRONIZATION LOGIC: "Wipe and Replace" Strategy
+     * 1. Remove all existing markers associated with this section
+     * 2. Re-insert the new set of markers provided by the client
+     */
     await BusinessMapMarker.destroy({
       where: { sectionId: id },
       transaction: t,
@@ -78,20 +173,105 @@ exports.updateBusinessSection = async (req, res) => {
         sectionId: id,
       }));
 
-      // Masukkan semua marker baru sekaligus (Bulk Create)
       await BusinessMapMarker.bulkCreate(newMarkers, { transaction: t });
     }
 
-    // 4. Jika semua berhasil, KUNCI PERUBAHANNYA (Commit)
+    // Persist all changes to the database
     await t.commit();
     res.status(200).json({ message: "Business Section updated successfully!" });
   } catch (error) {
-    // Jika ada error di tengah jalan, BATALKAN SEMUA PERUBAHAN (Rollback)
+    // Revert all changes if any step fails
     await t.rollback();
     console.error("Error updating business section:", error);
     res.status(500).json({
       message: "Failed to update business section",
       error: error.message,
     });
+  }
+};
+
+/**
+ * @desc    Utility function to generate URL-friendly slugs
+ * @example "Renewable Energy" -> "renewable-energy"
+ */
+const slugify = (text) => {
+  return text
+    .toString()
+    .toLowerCase()
+    .replace(/\s+/g, "-") // Replace spaces with -
+    .replace(/[^\w\-]+/g, "") // Remove all non-word chars
+    .replace(/\-\-+/g, "-") // Replace multiple - with single -
+    .trim(); // Trim whitespace
+};
+
+/**
+ * @desc    Create a new business section with auto-generated ID and ordering
+ * @route   POST /api/businesses/admin
+ * @access  Private (Admin)
+ */
+exports.createBusinessSection = async (req, res) => {
+  const t = await sequelize.transaction();
+  try {
+    const { category, title } = req.body;
+    const generatedId = slugify(category);
+
+    // Prevent duplicate sections by checking the slug ID
+    const existing = await BusinessSection.findByPk(generatedId, {
+      transaction: t,
+    });
+    if (existing) {
+      await t.rollback();
+      return res
+        .status(400)
+        .json({ message: "Sektor bisnis dengan kategori ini sudah ada!" });
+    }
+
+    // Auto-calculate the next order index for visual sequencing
+    const maxOrder =
+      (await BusinessSection.max("orderIndex", { transaction: t })) || 0;
+
+    const newSection = await BusinessSection.create(
+      {
+        id: generatedId,
+        category,
+        title,
+        htmlContent: "<p>Konten baru sedang disiapkan...</p>",
+        hasMap: false,
+        orderIndex: maxOrder + 1,
+      },
+      { transaction: t },
+    );
+    await t.commit();
+    res.status(201).json(newSection);
+  } catch (error) {
+    await t.rollback();
+    res.status(500).json({ message: error.message });
+  }
+};
+
+exports.deleteSection = async (req, res) => {
+  const { id } = req.params;
+  const t = await sequelize.transaction();
+
+  try {
+    const section = await BusinessSection.findByPk(id);
+    if (!section) {
+      return res.status(404).json({ message: "Sektor bisnis tidak ditemukan" });
+    }
+
+    // Hapus marker terkait terlebih dahulu (Opsional jika sudah pakai CASCADE di DB)
+    await BusinessMapMarker.destroy({
+      where: { sectionId: id },
+      transaction: t,
+    });
+
+    // Hapus seksi
+    await section.destroy({ transaction: t });
+
+    await t.commit();
+    res.status(200).json({ message: "Sektor bisnis berhasil dihapus" });
+  } catch (error) {
+    await t.rollback();
+    res.status(500).json({ message: error.message });
   }
 };

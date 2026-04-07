@@ -3,12 +3,14 @@ import BusinessGrid from "@/components/BusinessGrid";
 import InteractiveMap, { type MapMarker } from "./InteractiveMap";
 import { memo } from "react"; // <-- Tambahkan memo
 import { useBusiness } from "@/contexts/BusinessContext";
+import { type FilterOption } from "@/components/BusinessGrid";
 export interface SectionData {
   id: string;
-  category: "Resources" | "Energy";
+  category: string;
   title: string;
   htmlContent: string;
   hasMap: boolean;
+  orderIndex?: number;
   mapMarkers?: MapMarker[];
 }
 const DynamicBusinessSection = memo(function DynamicBusinessSection({
@@ -47,29 +49,33 @@ const DynamicBusinessSection = memo(function DynamicBusinessSection({
             </ScrollReveal>
           </div>
           {/* KOLOM KANAN: Rich Text Content (Tipografi Editorial) */}
-          {/* FIX KRUSIAL: min-w-0 wajib ada untuk mencegah CSS Grid Blowout! */}
+          {/* min-w-0 wajib ada untuk mencegah CSS Grid Blowout! */}
           <div className="lg:col-span-7 min-w-0 relative pt-4 lg:pt-0">
             <div className="hidden lg:block absolute left-0 top-2 bottom-8 w-[1px] bg-gradient-to-b from-daw-green/20 via-slate-200 to-transparent -ml-8 xl:-ml-12"></div>
             <ScrollReveal direction="up" delay={150}>
               <div
                 // PERUBAHAN 2 (KUNCI UTAMA): max-w-[65ch] untuk panjang baris bacaan yang sempurna!
-                className="w-full min-w-0 max-w-[65ch] selection:bg-[#004B23] selection:text-white
-                  [&_*]:overflow-wrap-anywhere [&_img]:rounded-2xl [&_img]:shadow-md [&_img]:transition-all [&_img]:duration-700 hover:[&_img]:scale-[1.02] hover:[&_img]:shadow-2xl [&_img]:ring-1 [&_img]:ring-slate-100
-                  
-                  prose prose-lg md:prose-xl max-w-none 
-                  prose-headings:font-serif prose-headings:font-bold prose-headings:tracking-tight prose-headings:mb-5 prose-headings:mt-8
-                  prose-h2:text-transparent prose-h2:bg-clip-text prose-h2:bg-gradient-to-r prose-h2:from-[#004B23] prose-h2:to-[#10B981]
-                  prose-h3:text-slate-800 prose-p:mb-12
+                className="w-full min-w-0 max-w-[65ch] text-left break-words selection:bg-[#004B23] selection:text-white
+    [&_img]:rounded-2xl [&_img]:shadow-md [&_img]:transition-all [&_img]:duration-700 
+    hover:[&_img]:scale-[1.02] hover:[&_img]:shadow-2xl [&_img]:ring-1 [&_img]:ring-slate-100
+    
+    prose prose-lg md:prose-xl max-w-none 
+    prose-headings:font-serif prose-headings:font-bold prose-headings:tracking-tight prose-headings:mb-5 prose-headings:mt-8
+    prose-h2:text-transparent prose-h2:bg-clip-text prose-h2:bg-gradient-to-r prose-h2:from-[#004B23] prose-h2:to-[#10B981]
+    prose-h3:text-slate-800 prose-p:mb-12
 
-                  /* Jarak antar baris (leading) dilegakan jadi 1.85 agar tidak sumpek */
-                  prose-p:font-sans prose-p:font-normal prose-p:text-slate-600 prose-p:leading-[1.85] prose-p:mb-6 prose-p:text-left prose-p:hyphens-none
-                  
-                  prose-strong:font-bold prose-strong:text-slate-900 
-                  prose-a:font-semibold prose-a:text-daw-green hover:prose-a:text-emerald-500 prose-a:transition-colors prose-a:underline-offset-4
-                  prose-ul:list-disc prose-ul:pl-5 prose-li:text-slate-600 prose-li:marker:text-[#10B981]
-                  prose-blockquote:border-l-4 prose-blockquote:border-daw-green prose-blockquote:bg-slate-50/80 prose-blockquote:py-4 prose-blockquote:px-6 prose-blockquote:text-slate-800 prose-blockquote:font-serif prose-blockquote:text-xl prose-blockquote:italic prose-blockquote:rounded-r-2xl prose-blockquote:shadow-sm"
+    /* Paksa text-left dan matikan hyphens di level prose juga */
+    prose-p:font-sans prose-p:font-normal prose-p:text-slate-600 prose-p:leading-[1.85] 
+    prose-p:mb-6 prose-p:text-left prose-p:hyphens-none
+    
+    prose-strong:font-bold prose-strong:text-slate-900 
+    prose-a:font-semibold prose-a:text-daw-green hover:prose-a:text-emerald-500 
+    prose-ul:list-disc prose-ul:pl-5 prose-li:text-slate-600 prose-li:marker:text-[#10B981]
+    prose-blockquote:border-l-4 prose-blockquote:border-daw-green prose-blockquote:bg-slate-50/80 
+    prose-blockquote:py-4 prose-blockquote:px-6 prose-blockquote:text-slate-800 prose-blockquote:font-serif 
+    prose-blockquote:text-xl prose-blockquote:italic prose-blockquote:rounded-r-2xl prose-blockquote:shadow-sm"
                 dangerouslySetInnerHTML={{
-                  __html: data.htmlContent.replace(/&nbsp;|\u00A0/g, " "),
+                  __html: data.htmlContent,
                 }}
               />
             </ScrollReveal>
@@ -115,11 +121,14 @@ const DynamicBusinessSection = memo(function DynamicBusinessSection({
         </div>
 
         <ScrollReveal direction="up" delay={200}>
-          <BusinessGrid filter={data.category} hideFilters />
+          <BusinessGrid
+            filter={data.category.toLowerCase() as FilterOption}
+            hideFilters
+          />
         </ScrollReveal>
       </div>
     </div>
   );
 });
 
-export default DynamicBusinessSection; // <-- Export-nya pindah ke bawah sini
+export default DynamicBusinessSection;

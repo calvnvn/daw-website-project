@@ -1,6 +1,5 @@
 const Inquiry = require("../models/Inquiry");
 const InquirySubject = require("../models/InquirySubject");
-// const nodemailer = require("nodemailer");
 const transporter = require("../utils/mailer");
 const Settings = require("../models/Settings");
 

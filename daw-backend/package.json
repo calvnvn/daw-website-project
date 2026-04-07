@@ -26,6 +26,7 @@
     "mysql2": "^3.20.0",
     "nodemailer": "^8.0.2",
     "react-quill": "^2.0.0",
+    "sanitize-html": "^2.17.2",
     "sequelize": "^6.37.8",
     "sharp": "^0.34.5",
     "swagger-jsdoc": "^6.2.8",

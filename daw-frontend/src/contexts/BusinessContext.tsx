@@ -27,14 +27,24 @@ export interface MapMarker {
   categoryData?: MapCategory;
 }
 
+/**
+ * @interface SectionData
+ * Represents a major business division (e.g., Resources, Energy).
+ */
 export interface SectionData {
-  id: string; // "resources" atau "energy"
-  title: string;
-  htmlContent: string;
-  hasMap: boolean;
+  id: string; // The slug-based unique identifier
+  category: string; // Display name of the sector
+  title: string; // The eyebrow/hero title
+  htmlContent: string; // Rich text editorial content
+  hasMap: boolean; // Toggle for interactive map visibility
+  orderIndex: number; // Sequence for frontend display sorting
   mapMarkers: MapMarker[];
 }
 
+/**
+ * @interface BusinessContextType
+ * Defines the global state and methods accessible throughout the business management module.
+ */
 interface BusinessContextType {
   sections: SectionData[];
   categories: MapCategory[];
@@ -42,6 +52,8 @@ interface BusinessContextType {
   isProcessing: boolean;
   refreshData: () => Promise<void>;
   updateSection: (id: string, data: Partial<SectionData>) => Promise<void>;
+  addSection: (category: string, title: string) => Promise<void>;
+  deleteSection: (id: string) => Promise<void>;
   addCategory: (data: MapCategory) => Promise<void>;
   updateCategory: (id: string, data: Partial<MapCategory>) => Promise<void>;
   deleteCategory: (id: string) => Promise<void>;
@@ -57,10 +69,14 @@ export const BusinessProvider = ({ children }: { children: ReactNode }) => {
   const [isLoading, setIsLoading] = useState(true);
   const [isProcessing, setIsProcessing] = useState(false);
 
-  // Fungsi untuk menarik data dari Backend (Dipanggil sekali saat aplikasi render)
+  /**
+   * @desc Synchronizes local memory with the remote database.
+   * Fetches both business sections and map categories concurrently for performance.
+   */
   const refreshData = async () => {
     setIsLoading(true);
     try {
+      // Execute parallel requests to minimize latency
       const [bizRes, catRes] = await Promise.all([
         api.get("/businesses/public"),
         api.get("/map-categories"),
@@ -68,8 +84,10 @@ export const BusinessProvider = ({ children }: { children: ReactNode }) => {
       setSections(bizRes.data);
       setCategories(catRes.data);
     } catch (error) {
-      console.error("Failed to fetch businesses data", error);
-      toast.error("Failed to connect to database");
+      console.error("[REFRESH_DATA_FAILURE]:", error);
+      toast.error(
+        "Connectivity issue: Unable to sync with the business database.",
+      );
     } finally {
       setIsLoading(false);
     }
@@ -138,6 +156,46 @@ export const BusinessProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
+  /**
+   * @desc Dispatches a POST request to initialize a new business unit.
+   * @param {string} category - The display name (e.g., "Logistics").
+   * @param {string} title - Initial eyebrow title.
+   */
+  const addSection = async (category: string, title: string) => {
+    setIsProcessing(true);
+    try {
+      await api.post("/businesses/admin", { category, title });
+      await refreshData(); // Sync local state with fresh DB records
+      toast.success(`Sektor ${category} berhasil dibuat!`);
+    } catch (error: unknown) {
+      const message =
+        error instanceof Error ? error.message : "Failed to create section";
+      console.error("[ADD_SECTION_ERROR]:", error);
+      toast.error(message);
+      throw error;
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  /**
+   * @desc Removes an entire business section and its associated map markers.
+   * @param {string} id - The slug-based ID of the section to be purged.
+   */
+  const deleteSection = async (id: string) => {
+    setIsProcessing(true);
+    try {
+      await api.delete(`/businesses/admin/${id}`);
+      await refreshData();
+      toast.success("Sektor bisnis berhasil dihapus");
+    } catch (error: any) {
+      toast.error("Gagal menghapus sektor bisnis");
+      throw error;
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
   useEffect(() => {
     refreshData();
   }, []);
@@ -154,6 +212,8 @@ export const BusinessProvider = ({ children }: { children: ReactNode }) => {
         addCategory,
         updateCategory,
         deleteCategory,
+        addSection,
+        deleteSection,
       }}
     >
       {children}

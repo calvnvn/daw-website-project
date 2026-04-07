@@ -1,8 +1,8 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useLocation } from "react-router-dom";
 import { useTranslation } from "react-i18next";
-import { ChevronRight } from "lucide-react"; // Ikon tambahan untuk dekorasi hero
-import bannerImg from "@/assets/about-banner.jpg"; // Ganti dengan gambar spesifik bisnis jika ada
+import { ChevronRight } from "lucide-react";
+import bannerImg from "@/assets/about-banner.jpg";
 import DynamicBusinessSection, {
   type SectionData,
 } from "@/components/businesses/DynamicBusinessSection";
@@ -15,98 +15,117 @@ export default function OurBusinesses() {
   const { t } = useTranslation();
   const { hash } = useLocation();
 
-  const [activeSection, setActiveSection] = useState("resources");
+  const [activeSection, setActiveSection] = useState("");
   const [pageData, setPageData] = useState<SectionData[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-
-  useEffect(() => {
-    if (!isLoading && hash) {
-      const targetId = hash.replace("#", "");
-
-      const timeoutId = setTimeout(() => {
-        scrollToSection(targetId);
-      }, 300);
-
-      return () => clearTimeout(timeoutId);
-    }
-  }, [isLoading, hash]);
-
-  // STATE UNTUK SCROLL PROGRESS BAR (Sama seperti Dynamic Page)
   const [scrollProgress, setScrollProgress] = useState(0);
 
-  // FETCH DATA DARI API PUBLIC
+  /**
+   * @desc Fetch dynamic business sections from the backend.
+   * Removes hardcoded sorting; relies on backend's orderIndex.
+   */
   useEffect(() => {
     const fetchPublicData = async () => {
       try {
         const response = await api.get("/businesses/public");
-        const desiredOrder = ["resources", "energy"];
-        const sortedData = response.data.sort(
-          (a: SectionData, b: SectionData) => {
-            return desiredOrder.indexOf(a.id) - desiredOrder.indexOf(b.id);
-          },
-        );
-        setPageData(sortedData);
+        setPageData(response.data);
+
+        // Auto-select the first section if no URL hash is present
+        if (response.data.length > 0 && !hash) {
+          setActiveSection(response.data[0].id);
+        }
       } catch (error) {
-        console.error("Failed to fetch business data", error);
+        console.error("[FETCH_BUSINESS_DATA_ERROR]:", error);
       } finally {
         setIsLoading(false);
       }
     };
     fetchPublicData();
-  }, []);
+  }, [hash]);
 
-  // 3. EVENT LISTENER SCROLL (Untuk Navigasi & Progress Bar)
+  /**
+   * @constant navItems
+   * Dynamically merges database sections with static sections (e.g., Investments)
+   * to create a unified navigation array for the Sticky Nav and Scroll Spy.
+   */
+  const navItems = useMemo(() => {
+    const dynamicTabs = pageData.map((sec) => ({
+      id: sec.id,
+      label: sec.category, // Fallback label directly from the database
+    }));
+
+    return [
+      ...dynamicTabs,
+      {
+        id: "investments",
+        label: t("businessesPage.nav.investments", "Strategic Investments"),
+      },
+    ];
+  }, [pageData, t]);
+
+  // Handle URL hash routing on initial load
   useEffect(() => {
-    let requestRunning = false; // Flag sebagai "penjaga pintu"
+    if (!isLoading && hash) {
+      const targetId = hash.replace("#", "");
+      const timeoutId = setTimeout(() => {
+        scrollToSection(targetId);
+      }, 300);
+      return () => clearTimeout(timeoutId);
+    }
+  }, [isLoading, hash]);
+
+  /**
+   * @desc Scroll Spy Engine
+   * Dynamically tracks the user's scroll position against the bounds of
+   * dynamically generated sections to update the active sticky nav state.
+   */
+  useEffect(() => {
+    if (navItems.length === 0) return;
+
+    let requestRunning = false;
 
     const handleScroll = () => {
-      // Jika browser masih sibuk menghitung scroll sebelumnya, abaikan scroll yang baru masuk
       if (requestRunning) return;
       requestRunning = true;
 
-      // requestAnimationFrame memastikan hitungan ini jalan sinkron dengan refresh rate monitor (60fps)
       requestAnimationFrame(() => {
-        // Hitung Progress Bar
+        // Calculate global scroll progress bar
         const totalHeight =
           document.documentElement.scrollHeight - window.innerHeight;
         const progress = (window.scrollY / totalHeight) * 100;
         setScrollProgress(progress);
 
-        // Hitung Active Section untuk Sticky Nav
-        const sections = ["resources", "energy", "investments"];
+        // Detect active section for Sticky Nav highlighting
         const scrollPosition = window.scrollY + 200;
-        for (const section of sections) {
-          const element = document.getElementById(section);
+
+        for (const item of navItems) {
+          const element = document.getElementById(item.id);
           if (
             element &&
             element.offsetTop <= scrollPosition &&
             element.offsetTop + element.offsetHeight > scrollPosition
           ) {
-            setActiveSection(section);
+            setActiveSection(item.id);
           }
         }
-
-        // Setelah selesai render, buka pintu lagi untuk scroll berikutnya
         requestRunning = false;
       });
     };
 
     window.addEventListener("scroll", handleScroll);
     return () => window.removeEventListener("scroll", handleScroll);
-  }, []);
+  }, [navItems]);
 
   const scrollToSection = (id: string) => {
     const element = document.getElementById(id);
     if (element) {
-      // Offset 100-120px biasanya pas untuk mengimbangi sticky navbar
-      const offset = 120;
+      const offset = 120; // Accounts for sticky navbar height
       const bodyRect = document.body.getBoundingClientRect().top;
       const elementRect = element.getBoundingClientRect().top;
       const elementPosition = elementRect - bodyRect;
-      const offsetPosition = elementPosition - offset;
 
       window.scrollTo({
-        top: offsetPosition,
+        top: elementPosition - offset,
         behavior: "smooth",
       });
     }
@@ -116,10 +135,10 @@ export default function OurBusinesses() {
     <>
       <SEO
         title={t("businessesPage.hero.title", "Our Businesses")}
-        description="Explore PT Dharma Agung Wijaya Group's diverse business portfolio in Renewable Energy and Natural Resources."
+        description="Explore PT Dharma Agung Wijaya Group's diverse business portfolio."
       />
       <div className="bg-white min-h-screen selection:bg-daw-green selection:text-white">
-        {/* PROGRESS BAR DARI DYNAMIC PAGE */}
+        {/* --- GLOBAL SCROLL PROGRESS BAR --- */}
         <div
           className="fixed top-0 left-0 h-1.5 bg-gradient-to-r from-daw-green via-emerald-400 to-daw-green z-[100] transition-all duration-150 ease-out shadow-[0_0_10px_rgba(16,185,129,0.5)]"
           style={{ width: `${scrollProgress}%` }}
@@ -127,19 +146,16 @@ export default function OurBusinesses() {
 
         {/* --- HERO BANNER --- */}
         <section className="relative h-[85vh] min-h-[600px] flex items-center justify-center overflow-hidden">
-          {/* Parallax Background */}
           <div
             className="absolute inset-0 bg-cover bg-center transition-transform duration-700 hover:scale-105"
             style={{
               backgroundImage: `url(${bannerImg})`,
-              backgroundAttachment: "fixed", // Efek Parallax
+              backgroundAttachment: "fixed",
             }}
           />
-          {/* Color Blending & Gradient Overlay */}
           <div className="absolute inset-0 bg-[#004B23]/70 mix-blend-multiply" />
           <div className="absolute inset-0 bg-gradient-to-b from-slate-900/60 via-slate-900/40 to-slate-900/80" />
 
-          {/* Text Content */}
           <ScrollReveal direction="up" delay={0}>
             <div className="relative z-10 text-center px-6 max-w-5xl mt-16 animate-in fade-in slide-in-from-bottom-12 duration-1000">
               <h1 className="text-5xl md:text-7xl lg:text-8xl font-serif font-bold text-white mb-10 leading-[1.1] tracking-tight drop-shadow-lg">
@@ -153,7 +169,6 @@ export default function OurBusinesses() {
             </div>
           </ScrollReveal>
 
-          {/* Scroll Indicator Decoration */}
           <div className="absolute bottom-12 left-1/2 -translate-x-1/2 flex flex-col items-center gap-2 text-white/50 animate-bounce">
             <span className="text-[10px] font-bold tracking-widest uppercase">
               Scroll to Explore
@@ -163,24 +178,23 @@ export default function OurBusinesses() {
         </section>
 
         <div className="relative">
-          {/* --- STICKY NAV --- */}
-          {/* top-[72px] disesuaikan dengan tinggi navbar utama kamu */}
+          {/* --- STICKY NAV: Dynamic Rendering --- */}
           <div className="sticky top-[72px] z-40 bg-white/90 backdrop-blur-md border-b border-slate-200 shadow-sm transition-all duration-300">
             <div className="container mx-auto px-6 max-w-5xl flex justify-center sm:justify-between items-center overflow-x-auto hide-scrollbar">
-              {["resources", "energy", "investments"].map((section) => (
+              {navItems.map((item) => (
                 <button
-                  key={section}
-                  onClick={() => scrollToSection(section)}
-                  className={`relative px-6 py-4 text-[13px] font-bold uppercase tracking-widest transition-all duration-300 ${
-                    activeSection === section
+                  key={item.id}
+                  onClick={() => scrollToSection(item.id)}
+                  className={`relative px-6 py-4 text-[13px] font-bold uppercase tracking-widest transition-all duration-300 whitespace-nowrap ${
+                    activeSection === item.id
                       ? "text-daw-green"
                       : "text-slate-400 hover:text-slate-800"
                   }`}
                 >
-                  {t(`businessesPage.nav.${section}`)}
+                  {/* Intelligent i18n Fallback Mechanism */}
+                  {t(`businessesPage.nav.${item.id}`, item.label)}
 
-                  {/* INDIKATOR AKTIF: Menggunakan DAW Yellow agar "Lampaui Batas" */}
-                  {activeSection === section && (
+                  {activeSection === item.id && (
                     <div className="absolute bottom-0 left-0 w-full h-[3px] bg-daw-green animate-in fade-in zoom-in-95 duration-300" />
                   )}
                 </button>
@@ -189,9 +203,7 @@ export default function OurBusinesses() {
           </div>
 
           {/* --- SECTIONS CONTAINER --- */}
-          {/* Semua konten di dalam sini adalah batas pergerakan Sticky Nav di atas */}
           <div className="flex flex-col relative">
-            {/* Ambient Blur Decoration */}
             <div className="absolute top-40 right-0 w-[500px] h-[500px] bg-daw-green/[0.03] rounded-full blur-[120px] -z-10 pointer-events-none" />
 
             {isLoading ? (
@@ -213,14 +225,17 @@ export default function OurBusinesses() {
               ))
             )}
 
-            {/* INVESTMENTS SECTION: Ini adalah batas paling bawah */}
+            {/* --- INVESTMENTS SECTION (Static Footer Bound) --- */}
             <section
               id="investments"
               className="pt-32 pb-40 bg-[#081C15] overflow-hidden relative"
             >
               <div className="container mx-auto px-6 max-w-7xl relative z-10">
                 <h2 className="text-4xl md:text-5xl lg:text-6xl font-serif font-bold text-white mb-20 text-center tracking-tight">
-                  {t("businessesPage.investments.title")}
+                  {t(
+                    "businessesPage.investments.title",
+                    "Strategic Investments",
+                  )}
                 </h2>
                 <InvestmentsSection />
               </div>

@@ -6,7 +6,7 @@ import ScrollReveal from "./ScrollReveal";
 import api from "@/lib/api";
 import { getCleanImageUrl } from "@/lib/utils";
 
-type FilterOption = "All" | "Resources" | "Energy";
+export type FilterOption = string;
 
 interface BusinessGridProps {
   filter?: FilterOption;
@@ -18,7 +18,7 @@ interface ProjectData {
   id: string;
   slug: string;
   title: string;
-  category: FilterOption;
+  category: string;
   excerpt: string;
   cover_image: string | null;
   createdAt: string;
@@ -84,9 +84,10 @@ export default function BusinessGrid({
     }
   }, [activeFilter, filters, hideFilters]);
 
-  const filteredProjects = projects.filter(
-    (project) => activeFilter === "All" || project.category === activeFilter,
-  );
+  const filteredProjects = projects.filter((project) => {
+    if (activeFilter === "All") return true;
+    return project.category.toLowerCase() === activeFilter.toLowerCase();
+  });
 
   const isFourItems = filteredProjects.length === 4;
 
