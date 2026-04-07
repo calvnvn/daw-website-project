@@ -6,6 +6,7 @@ import logoDaw from "@/assets/logo-daw.png";
 import api from "@/lib/api";
 import { useSettings } from "@/contexts/SettingsContext";
 import { getCleanImageUrl } from "@/lib/utils";
+import { useBusiness } from "@/contexts/BusinessContext";
 
 // --- BENTUK DATA DARI BACKEND ---
 interface MenuNode {
@@ -16,6 +17,15 @@ interface MenuNode {
   Page?: { slug: string };
   children: MenuNode[];
 }
+// --- THE MAGIC URL RESOLVER ---
+const resolveLink = (menu: MenuNode) => {
+  if (menu.type === "external" && menu.externalLink) return menu.externalLink;
+  if (menu.type === "page" && menu.Page?.slug) return `/page/${menu.Page.slug}`;
+  return "#";
+};
+
+const isLocalRoute = (url: string) =>
+  url.startsWith("/") || url.startsWith("#");
 
 export default function DynamicNavbar() {
   const { settings } = useSettings();
@@ -26,10 +36,12 @@ export default function DynamicNavbar() {
     Record<string, boolean>
   >({});
   const { t } = useTranslation();
+  const { sections: businessSections } = useBusiness();
 
   const displayLogo = settings?.logoUrl
     ? getCleanImageUrl(settings.logoUrl)
     : logoDaw;
+
   // --- FETCH MENU TREE ---
   useEffect(() => {
     const fetchMenus = async () => {
@@ -61,8 +73,11 @@ export default function DynamicNavbar() {
   };
 
   useEffect(() => {
-    const handleScroll = () => setIsScrolled(window.scrollY > 20);
-    window.addEventListener("scroll", handleScroll);
+    const handleScroll = () => {
+      const scrolled = window.scrollY > 20;
+      setIsScrolled((prev) => (prev !== scrolled ? scrolled : prev));
+    };
+    window.addEventListener("scroll", handleScroll, { passive: true });
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
 
@@ -88,17 +103,6 @@ export default function DynamicNavbar() {
     window.addEventListener("resize", handleResize);
     return () => window.removeEventListener("resize", handleResize);
   }, [isMobileMenuOpen]);
-  // --- THE MAGIC URL RESOLVER ---
-  const resolveLink = (menu: MenuNode) => {
-    if (menu.type === "external" && menu.externalLink) return menu.externalLink;
-    if (menu.type === "page" && menu.Page?.slug)
-      return `/page/${menu.Page.slug}`;
-    return "#";
-  };
-
-  // THE FIX: Deteksi apakah link ini adalah rute lokal (misal: /businesses atau #resources)
-  const isLocalRoute = (url: string) =>
-    url.startsWith("/") || url.startsWith("#");
 
   // --- STYLING LOGIC ---
   const isTransparent = !isScrolled && !isMobileMenuOpen;
@@ -161,28 +165,37 @@ export default function DynamicNavbar() {
 
             {/* 3. MENU STATIS: OUR BUSINESSES (Hardcoded original Abang) */}
             <div className="relative group py-2">
-              <span className={`cursor-pointer ${navLinkClass}`}>
+              <span
+                tabIndex={0}
+                className={`cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-daw-green rounded-sm ${navLinkClass}`}
+              >
                 {t("nav.businesses", "OUR BUSINESSES")}
                 <ChevronDown
-                  className={`h-4 w-4 transition-transform duration-300 group-hover:rotate-180 ${isTransparent ? "opacity-100" : "text-slate-500"}`}
+                  className={`h-4 w-4 ml-1 transition-transform duration-300 group-hover:rotate-180 ${isTransparent ? "opacity-100" : "text-slate-500"}`}
                 />
               </span>
-              <div className="absolute top-full left-0 mt-2 w-64 bg-white shadow-xl border border-slate-100 border-t-2 border-t-daw-green rounded-b-md opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-300 transform translate-y-2 group-hover:translate-y-0 flex flex-col overflow-hidden">
-                <Link to="/businesses#resources" className={dropdownItemClass}>
-                  {t("nav.resources", "Resources")}
-                </Link>
-                <Link to="/businesses#energy" className={dropdownItemClass}>
-                  {t("nav.energy", "Energy")}
-                </Link>
+              {/* FIX 3: Tambahkan focus-within untuk Aksesibilitas Keyboard */}
+              <div className="absolute top-full left-0 mt-2 w-64 bg-white shadow-xl border border-slate-100 border-t-2 border-t-daw-green rounded-b-md opacity-0 invisible group-hover:opacity-100 group-hover:visible focus-within:opacity-100 focus-within:visible transition-all duration-300 transform translate-y-2 group-hover:translate-y-0 focus-within:translate-y-0 flex flex-col overflow-hidden">
+                {/* Looping Sektor dari Database */}
+                {businessSections.map((sec) => (
+                  <Link
+                    key={sec.id}
+                    to={`/businesses#${sec.id}`}
+                    className={dropdownItemClass}
+                  >
+                    {sec.category}
+                  </Link>
+                ))}
+
+                {/* Fallback Static Menu (Jika dibutuhkan) */}
                 <Link
                   to="/businesses#investments"
                   className={dropdownItemClass}
                 >
-                  {t("nav.investments", "Other Investments")}
+                  {t("nav.investments", "Strategic Investments")}
                 </Link>
               </div>
             </div>
-
             {/* 4. MENU DINAMIS: (Dari Admin, contoh: ACHIEVEMENT) */}
             {menus.map((menu) => {
               const hasChildren = menu.children && menu.children.length > 0;
