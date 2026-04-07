@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import {
   Search,
   Plus,
@@ -41,29 +41,24 @@ export default function ProjectManagement() {
   );
 
   // 3. Logika Filter SEKARANG MENGGUNAKAN DATA ASLI (projects)
-  const filteredProjects = projects.filter((project) => {
-    const matchSearch = project.title
-      .toLowerCase()
-      .includes(searchTerm.toLowerCase());
+  const filteredProjects = useMemo(() => {
+    return projects.filter((project) => {
+      const matchSearch = project.title
+        .toLowerCase()
+        .includes(searchTerm.toLowerCase());
+      const isValidSector = sections.some((sec) => sec.id === project.category);
 
-    // Periksa apakah kategori proyek ini masih eksis di daftar sektor aktif
-    const isValidSector = sections.some((sec) => sec.id === project.category);
+      let matchCategory = false;
+      if (filterCategory === "All") matchCategory = true;
+      else if (filterCategory === "Uncategorized")
+        matchCategory = !isValidSector;
+      else
+        matchCategory =
+          project.category.toLowerCase() === filterCategory.toLowerCase();
 
-    // Jika filter diset ke "All", tampilkan semua.
-    // Jika filter diset ke "Orphaned", tampilkan proyek yang ID kategorinya tidak ada di 'sections'.
-    // Jika tidak, cocokkan dengan ID kategori yang dipilih.
-    let matchCategory = false;
-    if (filterCategory === "All") {
-      matchCategory = true;
-    } else if (filterCategory === "Uncategorized") {
-      matchCategory = !isValidSector;
-    } else {
-      matchCategory =
-        project.category.toLowerCase() === filterCategory.toLowerCase();
-    }
-
-    return matchSearch && matchCategory;
-  });
+      return matchSearch && matchCategory;
+    });
+  }, [projects, searchTerm, filterCategory, sections]);
 
   // 4. Fetch Data dari Backend
   useEffect(() => {
@@ -128,6 +123,22 @@ export default function ProjectManagement() {
     );
   };
 
+  const toggleStatus = async (id: string, currentStatus: string) => {
+    const newStatus = currentStatus === "Published" ? "Draft" : "Published";
+
+    toast.promise(api.put(`/projects/${id}`, { status: newStatus }), {
+      loading: "Memperbarui status...",
+      success: () => {
+        // Update state lokal biar UI langsung berubah tanpa reload
+        setProjects((prev) =>
+          prev.map((p) => (p.id === id ? { ...p, status: newStatus } : p)),
+        );
+        return `Proyek berhasil diubah menjadi ${newStatus}`;
+      },
+      error: (err) => err.response?.data?.message || "Gagal memperbarui status",
+    });
+  };
+
   return (
     <div className="max-w-6xl mx-auto space-y-6 animate-in fade-in duration-500 pb-12">
       {/* --- HEADER --- */}
@@ -149,7 +160,33 @@ export default function ProjectManagement() {
           </button>
         </Link>
       </div>
-
+      {/* --- QUICK STATS --- */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+        <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
+          <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">
+            Total Proyek
+          </p>
+          <p className="text-2xl font-serif font-bold text-slate-900">
+            {projects.length}
+          </p>
+        </div>
+        <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm border-l-4 border-l-green-500">
+          <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">
+            Telah Terbit
+          </p>
+          <p className="text-2xl font-serif font-bold text-green-600">
+            {projects.filter((p) => p.status === "Published").length}
+          </p>
+        </div>
+        <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm border-l-4 border-l-amber-500">
+          <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">
+            Draf / Revisi
+          </p>
+          <p className="text-2xl font-serif font-bold text-amber-600">
+            {projects.filter((p) => p.status === "Draft").length}
+          </p>
+        </div>
+      </div>
       {/* --- TOOLBAR (Search & Filter) --- */}
       <div className="flex flex-col sm:flex-row gap-4">
         {/* Search Bar */}
@@ -258,15 +295,17 @@ export default function ProjectManagement() {
                       })()}
                     </td>
                     <td className="px-6 py-4">
-                      <span
-                        className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold tracking-wide ${
+                      <button
+                        onClick={() => toggleStatus(project.id, project.status)}
+                        title="Klik untuk ubah status"
+                        className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold tracking-wide transition-all active:scale-95 hover:brightness-90 ${
                           project.status === "Published"
-                            ? "bg-green-100 text-green-700"
-                            : "bg-amber-100 text-amber-700"
+                            ? "bg-green-100 text-green-700 border border-green-200"
+                            : "bg-amber-100 text-amber-700 border border-amber-200"
                         }`}
                       >
                         {project.status}
-                      </span>
+                      </button>
                     </td>
                     <td className="px-6 py-4">
                       <p className="text-sm text-slate-600">

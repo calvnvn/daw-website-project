@@ -22,6 +22,10 @@ export const compressImage = async (
   file: File,
   customConfig: CompressionConfig = {},
 ): Promise<File> => {
+  if (file.type === "image/svg+xml" || file.type === "image/gif") {
+    return file;
+  }
+
   const options = { ...DEFAULT_CONFIG, ...customConfig };
 
   try {
@@ -33,9 +37,14 @@ export const compressImage = async (
       `Compressed size: ${(compressedFile.size / 1024 / 1024).toFixed(2)} MB`,
     );
 
-    // Kembalikan file baru dengan nama yang sama agar backend tidak bingung
-    return new File([compressedFile], file.name, {
-      type: file.type,
+    let newFilename = file.name;
+    if (file.type !== compressedFile.type) {
+      const newExtension = compressedFile.type.split("/")[1]; // e.g., 'jpeg'
+      newFilename = newFilename.replace(/\.[^/.]+$/, `.${newExtension}`);
+    }
+
+    return new File([compressedFile], newFilename, {
+      type: compressedFile.type,
       lastModified: Date.now(),
     });
   } catch (error) {

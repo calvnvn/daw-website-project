@@ -23,6 +23,7 @@ import {
   X,
   Link as LinkIcon,
   Plus,
+  Link,
 } from "lucide-react";
 import { useDropzone } from "react-dropzone";
 import api, { BASE_UPLOAD_URL } from "@/lib/api";
@@ -340,13 +341,23 @@ export default function ProjectForm() {
   };
 
   // --- DROPZONE HANDLERS ---
+  const MAX_FILE_SIZE = 10 * 1024 * 1024; // Limit 10MB per file
   const {
     getRootProps: getRootCoverProps,
     getInputProps: getInputCoverProps,
     isDragActive: isCoverDragActive,
   } = useDropzone({
-    onDrop: (files) => files.length > 0 && setCoverFile(files[0]),
-    accept: { "image/*": [] },
+    onDrop: (files) => {
+      if (files.length === 0) return;
+      
+      if (files[0].size > MAX_FILE_SIZE) {
+        toast.error("Ukuran gambar sampul maksimal 10MB.");
+        return;
+      }
+      setCoverFile(files[0]);
+    },
+    // Hanya terima format gambar standar web yang aman dikompres
+    accept: { "image/jpeg": [], "image/png": [], "image/webp": [] }, 
     multiple: false,
   });
 
@@ -355,8 +366,27 @@ export default function ProjectForm() {
     getInputProps: getInputGalleryProps,
     isDragActive: isGalleryDragActive,
   } = useDropzone({
-    onDrop: (files) => setGalleryFiles((prev) => [...prev, ...files]),
-    accept: { "image/*": [] },
+    onDrop: (files) => {
+      if (files.length === 0) return;
+
+      const validFiles = files.filter(f => f.size <= MAX_FILE_SIZE);
+      if (validFiles.length < files.length) {
+        toast.error("Beberapa gambar diabaikan karena lebih dari 10MB.");
+      }
+      
+      setGalleryFiles((prev) => {
+        const newFiles = validFiles.filter(
+          (vf) => !prev.some((pf) => pf.name === vf.name)
+        );
+        
+        if (newFiles.length < validFiles.length) {
+          toast.warning("Gambar duplikat dibuang dari antrean.");
+        }
+        
+        return [...prev, ...newFiles];
+      });
+    },
+    accept: { "image/jpeg": [], "image/png": [], "image/webp": [] },
     multiple: true,
   });
 
@@ -388,11 +418,10 @@ export default function ProjectForm() {
             </h1>
             {formData.title && (
               <p className="text-[10px] font-mono text-slate-400 uppercase tracking-tighter mt-1 flex items-center gap-1">
-                <LinkIcon className="w-2.5 h-2.5" /> daw.co.id/page/
-                {generatedSlug}
+                <LinkIcon className="w-2.5 h-2.5" /> preview: daw.co.id/page/{generatedSlug}*
               </p>
             )}
-          </div>
+            </div>
         </div>
         <div className="flex gap-3">
           <button
@@ -520,63 +549,55 @@ export default function ProjectForm() {
           </div>
         </div>
 
-        {/* KANAN: SIDEBAR */}
-        <div className="lg:col-span-1 space-y-6">
+{/* KANAN: SIDEBAR */}
           <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm">
             <h3 className="text-xs font-black uppercase tracking-widest text-slate-800 mb-4">
               Kategori Proyek
             </h3>
-
-            {/* FIX 5: Render Dropdown Dinamis & Deteksi Yatim */}
-            {(() => {
-              const isCurrentCategoryValid = sections.some(
-                (sec) => sec.id === formData.category,
-              );
-
-              return (
+            
+            {/* Tampilkan Loading, Empty State, atau Dropdown */}
+            {isLoading || sections.length === 0 ? (
+              <div className="p-4 border-2 border-dashed border-slate-200 rounded-xl text-center bg-slate-50">
+                <p className="text-sm font-bold text-slate-500">Belum ada sektor aktif</p>
+                <p className="text-xs text-slate-400 mt-1 mb-3">Buat sektor bisnis terlebih dahulu.</p>
+                <Link to="/admin/businesses" className="text-xs font-bold text-daw-green hover:underline">
+                  &rarr; Kelola Sektor
+                </Link>
+              </div>
+            ) : (
+              <>
                 <select
                   className={`w-full p-3 bg-slate-50 border rounded-xl font-bold outline-none transition-colors ${
-                    !isCurrentCategoryValid && formData.category
+                    formData.category && !sections.some((sec) => sec.id === formData.category)
                       ? "border-red-500 text-red-600 focus:ring-2 focus:ring-red-200"
                       : "border-slate-100 text-slate-700 focus:ring-2 focus:ring-daw-green/20"
                   }`}
                   value={formData.category}
-                  onChange={(e) =>
-                    setFormData({ ...formData, category: e.target.value })
-                  }
+                  onChange={(e) => setFormData({ ...formData, category: e.target.value })}
                 >
-                  {/* Munculkan peringatan merah HANYA jika kategori tidak valid (Yatim) */}
-                  {!isCurrentCategoryValid && formData.category && (
-                    <option
-                      value={formData.category}
-                      disabled
-                      className="text-red-500 font-bold"
-                    >
+                  {/* Peringatan jika edit proyek yang sektornya sudah dihapus admin lain */}
+                  {formData.category && !sections.some((sec) => sec.id === formData.category) && (
+                    <option value={formData.category} disabled className="text-red-500 font-bold">
                       ⚠️ Sektor Terhapus (Pilih Ulang)
                     </option>
                   )}
-
-                  {/* Render data dinamis */}
+                  
+                  {/* Render Data Dinamis */}
                   {sections.map((sec) => (
-                    <option
-                      key={sec.id}
-                      value={sec.id}
-                      className="text-slate-700"
-                    >
+                    <option key={sec.id} value={sec.id} className="text-slate-700">
                       {sec.category}
                     </option>
                   ))}
                 </select>
-              );
-            })()}
 
-            {!sections.some((sec) => sec.id === formData.category) &&
-              formData.category && (
-                <p className="text-[10px] text-red-500 font-bold mt-2 leading-tight">
-                  Sektor sebelumnya telah dihapus. Anda wajib memilih sektor
-                  baru sebelum menyimpan.
-                </p>
-              )}
+                {/* Pesan Error Bantuan Visual */}
+                {formData.category && !sections.some((sec) => sec.id === formData.category) && (
+                  <p className="text-[10px] text-red-500 font-bold mt-2 leading-tight">
+                    Sektor asal telah dihapus. Anda wajib memilih sektor baru sebelum menyimpan.
+                  </p>
+                )}
+              </>
+            )}
           </div>
 
           <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm">
