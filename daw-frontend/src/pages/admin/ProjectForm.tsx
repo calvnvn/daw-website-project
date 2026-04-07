@@ -9,7 +9,7 @@
  */
 
 import { useState, useRef, useMemo, useCallback, useEffect } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams } from "react-router-dom";
 import ReactQuill from "react-quill-new";
 import "react-quill-new/dist/quill.snow.css";
 import { toast } from "sonner";
@@ -23,7 +23,6 @@ import {
   X,
   Link as LinkIcon,
   Plus,
-  Link,
 } from "lucide-react";
 import { useDropzone } from "react-dropzone";
 import api, { BASE_UPLOAD_URL } from "@/lib/api";
@@ -349,7 +348,7 @@ export default function ProjectForm() {
   } = useDropzone({
     onDrop: (files) => {
       if (files.length === 0) return;
-      
+
       if (files[0].size > MAX_FILE_SIZE) {
         toast.error("Ukuran gambar sampul maksimal 10MB.");
         return;
@@ -357,7 +356,7 @@ export default function ProjectForm() {
       setCoverFile(files[0]);
     },
     // Hanya terima format gambar standar web yang aman dikompres
-    accept: { "image/jpeg": [], "image/png": [], "image/webp": [] }, 
+    accept: { "image/jpeg": [], "image/png": [], "image/webp": [] },
     multiple: false,
   });
 
@@ -369,20 +368,20 @@ export default function ProjectForm() {
     onDrop: (files) => {
       if (files.length === 0) return;
 
-      const validFiles = files.filter(f => f.size <= MAX_FILE_SIZE);
+      const validFiles = files.filter((f) => f.size <= MAX_FILE_SIZE);
       if (validFiles.length < files.length) {
         toast.error("Beberapa gambar diabaikan karena lebih dari 10MB.");
       }
-      
+
       setGalleryFiles((prev) => {
         const newFiles = validFiles.filter(
-          (vf) => !prev.some((pf) => pf.name === vf.name)
+          (vf) => !prev.some((pf) => pf.name === vf.name),
         );
-        
+
         if (newFiles.length < validFiles.length) {
           toast.warning("Gambar duplikat dibuang dari antrean.");
         }
-        
+
         return [...prev, ...newFiles];
       });
     },
@@ -418,10 +417,11 @@ export default function ProjectForm() {
             </h1>
             {formData.title && (
               <p className="text-[10px] font-mono text-slate-400 uppercase tracking-tighter mt-1 flex items-center gap-1">
-                <LinkIcon className="w-2.5 h-2.5" /> preview: daw.co.id/page/{generatedSlug}*
+                <LinkIcon className="w-2.5 h-2.5" /> preview: daw.co.id/page/
+                {generatedSlug}*
               </p>
             )}
-            </div>
+          </div>
         </div>
         <div className="flex gap-3">
           <button
@@ -549,164 +549,179 @@ export default function ProjectForm() {
           </div>
         </div>
 
-{/* KANAN: SIDEBAR */}
-          <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm">
-            <h3 className="text-xs font-black uppercase tracking-widest text-slate-800 mb-4">
-              Kategori Proyek
-            </h3>
-            
-            {/* Tampilkan Loading, Empty State, atau Dropdown */}
-            {isLoading || sections.length === 0 ? (
-              <div className="p-4 border-2 border-dashed border-slate-200 rounded-xl text-center bg-slate-50">
-                <p className="text-sm font-bold text-slate-500">Belum ada sektor aktif</p>
-                <p className="text-xs text-slate-400 mt-1 mb-3">Buat sektor bisnis terlebih dahulu.</p>
-                <Link to="/admin/businesses" className="text-xs font-bold text-daw-green hover:underline">
-                  &rarr; Kelola Sektor
-                </Link>
-              </div>
-            ) : (
-              <>
-                <select
-                  className={`w-full p-3 bg-slate-50 border rounded-xl font-bold outline-none transition-colors ${
-                    formData.category && !sections.some((sec) => sec.id === formData.category)
-                      ? "border-red-500 text-red-600 focus:ring-2 focus:ring-red-200"
-                      : "border-slate-100 text-slate-700 focus:ring-2 focus:ring-daw-green/20"
-                  }`}
-                  value={formData.category}
-                  onChange={(e) => setFormData({ ...formData, category: e.target.value })}
-                >
-                  {/* Peringatan jika edit proyek yang sektornya sudah dihapus admin lain */}
-                  {formData.category && !sections.some((sec) => sec.id === formData.category) && (
-                    <option value={formData.category} disabled className="text-red-500 font-bold">
+        {/* KANAN: SIDEBAR */}
+        <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm">
+          <h3 className="text-xs font-black uppercase tracking-widest text-slate-800 mb-4">
+            Kategori Proyek
+          </h3>
+
+          {/* Tampilkan Loading, Empty State, atau Dropdown */}
+          {isLoading || sections.length === 0 ? (
+            <div className="p-4 border-2 border-dashed border-slate-200 rounded-xl text-center bg-slate-50">
+              <p className="text-sm font-bold text-slate-500">
+                Belum ada sektor aktif
+              </p>
+              <p className="text-xs text-slate-400 mt-1 mb-3">
+                Buat sektor bisnis terlebih dahulu.
+              </p>
+              <Link
+                to="/admin/businesses"
+                className="text-xs font-bold text-daw-green hover:underline"
+              >
+                &rarr; Kelola Sektor
+              </Link>
+            </div>
+          ) : (
+            <>
+              <select
+                className={`w-full p-3 bg-slate-50 border rounded-xl font-bold outline-none transition-colors ${
+                  formData.category &&
+                  !sections.some((sec) => sec.id === formData.category)
+                    ? "border-red-500 text-red-600 focus:ring-2 focus:ring-red-200"
+                    : "border-slate-100 text-slate-700 focus:ring-2 focus:ring-daw-green/20"
+                }`}
+                value={formData.category}
+                onChange={(e) =>
+                  setFormData({ ...formData, category: e.target.value })
+                }
+              >
+                {/* Peringatan jika edit proyek yang sektornya sudah dihapus admin lain */}
+                {formData.category &&
+                  !sections.some((sec) => sec.id === formData.category) && (
+                    <option
+                      value={formData.category}
+                      disabled
+                      className="text-red-500 font-bold"
+                    >
                       ⚠️ Sektor Terhapus (Pilih Ulang)
                     </option>
                   )}
-                  
-                  {/* Render Data Dinamis */}
-                  {sections.map((sec) => (
-                    <option key={sec.id} value={sec.id} className="text-slate-700">
-                      {sec.category}
-                    </option>
-                  ))}
-                </select>
 
-                {/* Pesan Error Bantuan Visual */}
-                {formData.category && !sections.some((sec) => sec.id === formData.category) && (
+                {/* Render Data Dinamis */}
+                {sections.map((sec) => (
+                  <option
+                    key={sec.id}
+                    value={sec.id}
+                    className="text-slate-700"
+                  >
+                    {sec.category}
+                  </option>
+                ))}
+              </select>
+
+              {/* Pesan Error Bantuan Visual */}
+              {formData.category &&
+                !sections.some((sec) => sec.id === formData.category) && (
                   <p className="text-[10px] text-red-500 font-bold mt-2 leading-tight">
-                    Sektor asal telah dihapus. Anda wajib memilih sektor baru sebelum menyimpan.
+                    Sektor asal telah dihapus. Anda wajib memilih sektor baru
+                    sebelum menyimpan.
                   </p>
                 )}
-              </>
-            )}
-          </div>
+            </>
+          )}
+        </div>
 
-          <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm">
-            <h3 className="text-xs font-black uppercase tracking-widest mb-4 flex items-center gap-2">
-              <ImageIcon className="w-4 h-4 text-daw-green" /> Gambar Sampul
-            </h3>
-            <div
-              {...getRootCoverProps()}
-              className={`aspect-video rounded-xl border-2 border-dashed flex items-center justify-center cursor-pointer transition-all overflow-hidden ${isCoverDragActive ? "border-daw-green bg-green-50" : "border-slate-100 bg-slate-50 hover:bg-slate-100"}`}
-            >
-              <input {...getInputCoverProps()} />
-              {coverPreview ? (
-                <img
-                  src={coverPreview}
-                  className="w-full h-full object-cover"
-                  alt="Cover Preview"
-                />
-              ) : formData.cover_image ? (
-                <img
-                  src={`${BASE_UPLOAD_URL}/${formData.cover_image}`}
-                  className="w-full h-full object-cover"
-                  alt="Server Cover"
-                />
-              ) : (
-                <div className="text-center p-4">
-                  <ImageIcon className="w-8 h-8 text-slate-200 mx-auto mb-2" />
-                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-tighter">
-                    Upload Cover
-                  </p>
-                </div>
-              )}
-            </div>
-          </div>
-
-          <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm">
-            <h3 className="text-xs font-black uppercase tracking-widest mb-4 flex items-center gap-2">
-              <Images className="w-4 h-4 text-daw-green" /> Galeri
-            </h3>
-
-            {/* GRID PREVIEW: Existing Server Images + New Files */}
-            {(galleryFiles.length > 0 ||
-              (formData.gallery &&
-                JSON.parse(formData.gallery).length > 0)) && (
-              <div className="grid grid-cols-3 gap-2 mb-4">
-                {/* 1. Server Images (Edit Mode) */}
-                {isEditMode &&
-                  formData.gallery &&
-                  JSON.parse(formData.gallery || "[]").map(
-                    (imgName: string, idx: number) => (
-                      <div
-                        key={`old-${idx}`}
-                        className="relative aspect-square group rounded-xl overflow-hidden border border-slate-100 shadow-sm"
-                      >
-                        <img
-                          src={`${BASE_UPLOAD_URL}/${imgName}`}
-                          className="w-full h-full object-cover"
-                          alt="Saved"
-                        />
-                        <div className="absolute inset-0 bg-black/10 group-hover:bg-black/20 flex items-center justify-center pointer-events-none">
-                          <span className="text-[9px] text-white font-black uppercase bg-daw-green/80 px-2 py-0.5 rounded-full shadow-sm tracking-tighter">
-                            Saved
-                          </span>
-                        </div>
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            removeOldGalleryImage(idx);
-                          }}
-                          className="absolute top-1.5 right-1.5 bg-red-500 hover:bg-red-600 text-white rounded-full p-1.5 shadow-lg opacity-0 group-hover:opacity-100 transition-all transform hover:scale-110 z-30"
-                        >
-                          <X className="w-3 h-3" />
-                        </button>
-                      </div>
-                    ),
-                  )}
-
-                {/* 2. New Local Images */}
-                {galleryFiles.map((file, idx) => (
-                  <GalleryPreviewItem
-                    key={`new-${idx}`}
-                    file={file}
-                    onRemove={() =>
-                      setGalleryFiles((prev) =>
-                        prev.filter((_, i) => i !== idx),
-                      )
-                    }
-                  />
-                ))}
+        <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm">
+          <h3 className="text-xs font-black uppercase tracking-widest mb-4 flex items-center gap-2">
+            <ImageIcon className="w-4 h-4 text-daw-green" /> Gambar Sampul
+          </h3>
+          <div
+            {...getRootCoverProps()}
+            className={`aspect-video rounded-xl border-2 border-dashed flex items-center justify-center cursor-pointer transition-all overflow-hidden ${isCoverDragActive ? "border-daw-green bg-green-50" : "border-slate-100 bg-slate-50 hover:bg-slate-100"}`}
+          >
+            <input {...getInputCoverProps()} />
+            {coverPreview ? (
+              <img
+                src={coverPreview}
+                className="w-full h-full object-cover"
+                alt="Cover Preview"
+              />
+            ) : formData.cover_image ? (
+              <img
+                src={`${BASE_UPLOAD_URL}/${formData.cover_image}`}
+                className="w-full h-full object-cover"
+                alt="Server Cover"
+              />
+            ) : (
+              <div className="text-center p-4">
+                <ImageIcon className="w-8 h-8 text-slate-200 mx-auto mb-2" />
+                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-tighter">
+                  Upload Cover
+                </p>
               </div>
             )}
+          </div>
+        </div>
 
-            <div
-              {...getRootGalleryProps()}
-              className={`p-6 border-2 border-dashed rounded-lg text-center cursor-pointer transition-all ${isGalleryDragActive ? "border-daw-green bg-green-50" : "border-slate-200 hover:bg-slate-50"}`}
-            >
-              <input {...getInputGalleryProps()} />
-              <Plus
-                className={`w-6 h-6 mx-auto mb-2 transition-transform ${isGalleryDragActive ? "scale-150 text-daw-green" : "text-slate-300"}`}
-              />
-              <p className="text-[11px] font-bold text-slate-600 uppercase tracking-tight">
-                {isGalleryDragActive
-                  ? "Lepaskan gambar!"
-                  : "Tambah Foto Galeri"}
-              </p>
-              <p className="text-[10px] text-slate-400 mt-1">
-                Tarik atau klik area ini.
-              </p>
+        <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm">
+          <h3 className="text-xs font-black uppercase tracking-widest mb-4 flex items-center gap-2">
+            <Images className="w-4 h-4 text-daw-green" /> Galeri
+          </h3>
+
+          {/* GRID PREVIEW: Existing Server Images + New Files */}
+          {(galleryFiles.length > 0 ||
+            (formData.gallery && JSON.parse(formData.gallery).length > 0)) && (
+            <div className="grid grid-cols-3 gap-2 mb-4">
+              {/* 1. Server Images (Edit Mode) */}
+              {isEditMode &&
+                formData.gallery &&
+                JSON.parse(formData.gallery || "[]").map(
+                  (imgName: string, idx: number) => (
+                    <div
+                      key={`old-${idx}`}
+                      className="relative aspect-square group rounded-xl overflow-hidden border border-slate-100 shadow-sm"
+                    >
+                      <img
+                        src={`${BASE_UPLOAD_URL}/${imgName}`}
+                        className="w-full h-full object-cover"
+                        alt="Saved"
+                      />
+                      <div className="absolute inset-0 bg-black/10 group-hover:bg-black/20 flex items-center justify-center pointer-events-none">
+                        <span className="text-[9px] text-white font-black uppercase bg-daw-green/80 px-2 py-0.5 rounded-full shadow-sm tracking-tighter">
+                          Saved
+                        </span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          removeOldGalleryImage(idx);
+                        }}
+                        className="absolute top-1.5 right-1.5 bg-red-500 hover:bg-red-600 text-white rounded-full p-1.5 shadow-lg opacity-0 group-hover:opacity-100 transition-all transform hover:scale-110 z-30"
+                      >
+                        <X className="w-3 h-3" />
+                      </button>
+                    </div>
+                  ),
+                )}
+
+              {/* 2. New Local Images */}
+              {galleryFiles.map((file, idx) => (
+                <GalleryPreviewItem
+                  key={`new-${idx}`}
+                  file={file}
+                  onRemove={() =>
+                    setGalleryFiles((prev) => prev.filter((_, i) => i !== idx))
+                  }
+                />
+              ))}
             </div>
+          )}
+
+          <div
+            {...getRootGalleryProps()}
+            className={`p-6 border-2 border-dashed rounded-lg text-center cursor-pointer transition-all ${isGalleryDragActive ? "border-daw-green bg-green-50" : "border-slate-200 hover:bg-slate-50"}`}
+          >
+            <input {...getInputGalleryProps()} />
+            <Plus
+              className={`w-6 h-6 mx-auto mb-2 transition-transform ${isGalleryDragActive ? "scale-150 text-daw-green" : "text-slate-300"}`}
+            />
+            <p className="text-[11px] font-bold text-slate-600 uppercase tracking-tight">
+              {isGalleryDragActive ? "Lepaskan gambar!" : "Tambah Foto Galeri"}
+            </p>
+            <p className="text-[10px] text-slate-400 mt-1">
+              Tarik atau klik area ini.
+            </p>
           </div>
         </div>
       </div>

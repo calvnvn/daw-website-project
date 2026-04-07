@@ -1,10 +1,11 @@
 import { useState, useEffect, useRef, useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import { ArrowRight, ImageIcon } from "lucide-react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link } from "react-router-dom";
 import ScrollReveal from "./ScrollReveal";
 import api from "@/lib/api";
 import { getCleanImageUrl } from "@/lib/utils";
+import { useBusiness } from "@/contexts/BusinessContext";
 
 export type FilterOption = string;
 
@@ -13,7 +14,6 @@ interface BusinessGridProps {
   hideFilters?: boolean;
 }
 
-// Interface untuk data dari backend
 interface ProjectData {
   id: string;
   slug: string;
@@ -29,7 +29,7 @@ export default function BusinessGrid({
   hideFilters = false,
 }: BusinessGridProps) {
   const { t } = useTranslation();
-  const navigate = useNavigate();
+  const { sections, isLoading: isSectionsLoading } = useBusiness(); // FIX 2: Ambil data sektor dinamis
 
   const [projects, setProjects] = useState<ProjectData[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -37,6 +37,7 @@ export default function BusinessGrid({
   const [activeFilter, setActiveFilter] = useState<FilterOption>(filter);
   const [prevFilter, setPrevFilter] = useState<FilterOption>(filter);
 
+  // Sync prop filter ke state internal
   if (filter !== prevFilter) {
     setPrevFilter(filter);
     setActiveFilter(filter);
@@ -45,18 +46,28 @@ export default function BusinessGrid({
   const [underlineStyle, setUnderlineStyle] = useState({ left: 0, width: 0 });
   const tabsRef = useRef<(HTMLButtonElement | null)[]>([]);
 
-  const filters = useMemo<{ label: string; value: FilterOption }[]>(
-    () => [
+  // FIX 3: Bangun daftar filter secara dinamis dari database
+  const filters = useMemo(() => {
+    const baseFilters = [
       { label: t("business.filterAll", "All Projects"), value: "All" },
-      { label: t("business.filterResources", "Resources"), value: "Resources" },
-      { label: t("business.filterEnergy", "Energy"), value: "Energy" },
-    ],
-    [t],
-  );
+    ];
+
+    const dynamicFilters = sections.map((sec) => ({
+      label: sec.category, // Nama asli (e.g., "Resources")
+      value: sec.id, // ID/Slug (e.g., "resources")
+    }));
+
+    return [...baseFilters, ...dynamicFilters];
+  }, [sections, t]);
+
+  // FIX 4: Buat lookup map untuk menampilkan "Pretty Name" di kartu proyek
+  const sectorLookup = useMemo(() => {
+    const map: Record<string, string> = {};
+    sections.forEach((s) => (map[s.id] = s.category));
+    return map;
+  }, [sections]);
 
   useEffect(() => {
-    const controller = new AbortController();
-
     const fetchProjects = async () => {
       try {
         const response = await api.get("/projects/public");
@@ -67,27 +78,32 @@ export default function BusinessGrid({
         setIsLoading(false);
       }
     };
-
     fetchProjects();
-    return () => controller.abort();
   }, []);
 
+  // Update underline position saat filter berubah
   useEffect(() => {
-    if (hideFilters) return;
+    if (hideFilters || isSectionsLoading) return;
     const activeIndex = filters.findIndex((f) => f.value === activeFilter);
-    const activeTab = tabsRef.current[activeIndex];
-    if (activeTab) {
-      setUnderlineStyle({
-        left: activeTab.offsetLeft,
-        width: activeTab.clientWidth,
-      });
+    if (activeIndex !== -1) {
+      const activeTab = tabsRef.current[activeIndex];
+      if (activeTab) {
+        setUnderlineStyle({
+          left: activeTab.offsetLeft,
+          width: activeTab.clientWidth,
+        });
+      }
     }
-  }, [activeFilter, filters, hideFilters]);
+  }, [activeFilter, filters, hideFilters, isSectionsLoading]);
 
-  const filteredProjects = projects.filter((project) => {
-    if (activeFilter === "All") return true;
-    return project.category.toLowerCase() === activeFilter.toLowerCase();
-  });
+  // FIX 5: Logic filter yang lebih robust
+  const filteredProjects = useMemo(() => {
+    return projects.filter((project) => {
+      if (activeFilter === "All") return true;
+      // Cocokkan ID sektor (case-insensitive untuk keamanan)
+      return project.category.toLowerCase() === activeFilter.toLowerCase();
+    });
+  }, [projects, activeFilter]);
 
   const isFourItems = filteredProjects.length === 4;
 
@@ -96,14 +112,12 @@ export default function BusinessGrid({
       className={`pb-24 ${hideFilters ? "pt-0 bg-transparent" : "pt-12 bg-[#F8F9FA]"} overflow-hidden`}
     >
       <div className="container mx-auto px-6">
-        {!hideFilters && (
+        {!hideFilters && sections.length > 0 && (
           <ScrollReveal direction="up" delay={0}>
             <div className="flex flex-col items-center text-center gap-10 mb-12">
-              <div className="max-w-3xl">
-                <h2 className="text-4xl md:text-5xl font-serif text-slate-900 tracking-tight">
-                  {t("business.sectionTitle", "Our Businesses")}
-                </h2>
-              </div>
+              <h2 className="text-4xl md:text-5xl font-serif text-slate-900 tracking-tight">
+                {t("business.sectionTitle", "Our Businesses")}
+              </h2>
 
               <div className="relative flex justify-center">
                 <div className="relative flex items-center gap-10 border-b border-slate-200">
@@ -125,7 +139,7 @@ export default function BusinessGrid({
                       className={`relative pb-4 text-[14px] font-bold uppercase tracking-[0.15em] transition-colors duration-300 z-10 ${
                         activeFilter === f.value
                           ? "text-daw-green"
-                          : "text-slate-400 hover:text-daw-yellow"
+                          : "text-slate-400 hover:text-daw-green/60"
                       }`}
                     >
                       {f.label}
@@ -137,7 +151,7 @@ export default function BusinessGrid({
           </ScrollReveal>
         )}
 
-        {isLoading ? (
+        {isLoading || isSectionsLoading ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
             {[1, 2, 3].map((i) => (
               <div
@@ -148,62 +162,61 @@ export default function BusinessGrid({
           </div>
         ) : filteredProjects.length > 0 ? (
           <div className="flex flex-wrap justify-center gap-8">
-            {filteredProjects.map((project, index) => {
-              return (
-                <ScrollReveal
-                  key={project.id}
-                  direction="up"
-                  delay={index * 150}
-                  className={`w-full md:w-[calc(50%-16px)] min-w-[320px] ${
-                    isFourItems
-                      ? "lg:w-[calc(50%-16px)] lg:max-w-[500px]"
-                      : "lg:w-[calc(33.333%-22px)]"
-                  }`}
+            {filteredProjects.map((project, index) => (
+              <ScrollReveal
+                key={project.id}
+                direction="up"
+                delay={index * 100}
+                className={`w-full md:w-[calc(50%-16px)] min-w-[320px] ${
+                  isFourItems
+                    ? "lg:w-[calc(50%-16px)] lg:max-w-[500px]"
+                    : "lg:w-[calc(33.333%-22px)]"
+                }`}
+              >
+                <Link
+                  to={`/projects/${project.slug || project.id}`}
+                  className="group bg-white rounded-[12px] border border-slate-100 shadow-[0_4px_20px_rgba(0,0,0,0.03)] hover:shadow-[0_20px_40px_rgba(0,0,0,0.08)] overflow-hidden transition-all duration-500 flex flex-col h-full hover:-translate-y-2"
                 >
-                  <Link
-                    to={`/projects/${project.slug || project.id}`}
-                    aria-label={`Read more details about the ${project.title} project`}
-                    className="group bg-white rounded-[8px] border border-slate-100 shadow-[0_4px_20px_rgba(0,0,0,0.03)] hover:shadow-[0_8px_30px_rgba(0,0,0,0.08)] overflow-hidden transition-all duration-500 flex flex-col h-full cursor-pointer hover:-translate-y-1"
-                  >
-                    <div className="relative w-full aspect-[3/2] overflow-hidden bg-slate-100 flex items-center justify-center">
-                      {project.cover_image ? (
-                        <img
-                          src={getCleanImageUrl(project.cover_image)}
-                          alt={project.title}
-                          className="w-full h-full object-cover transition-transform duration-[800ms] ease-out group-hover:scale-105"
-                        />
-                      ) : (
-                        <ImageIcon className="w-10 h-10 text-slate-300" />
-                      )}
-                      <div className="absolute top-4 left-4 bg-white/95 backdrop-blur-sm px-3 py-1.5 rounded-[4px] text-[11px] uppercase tracking-wider font-bold text-slate-700 shadow-sm">
-                        {project.category}
+                  <div className="relative w-full aspect-[3/2] overflow-hidden bg-slate-100">
+                    {project.cover_image ? (
+                      <img
+                        src={getCleanImageUrl(project.cover_image)}
+                        alt={project.title}
+                        className="w-full h-full object-cover transition-transform duration-[1000ms] group-hover:scale-110"
+                        loading="lazy"
+                      />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center text-slate-300">
+                        <ImageIcon />
                       </div>
+                    )}
+                    {/* FIX 6: Tampilkan Pretty Name dari Lookup Map */}
+                    <div className="absolute top-4 left-4 bg-white/95 backdrop-blur-sm px-3 py-1.5 rounded-md text-[10px] uppercase tracking-wider font-black text-daw-green shadow-sm border border-slate-100">
+                      {sectorLookup[project.category] || "Portfolio"}
                     </div>
+                  </div>
 
-                    <div className="p-6 flex flex-col flex-1">
-                      <h3 className="text-xl font-serif text-slate-900 mb-3 leading-snug group-hover:text-daw-green transition-colors duration-300 line-clamp-2">
-                        {project.title}
-                      </h3>
-
-                      <p className="text-slate-500 text-[14px] font-light leading-relaxed mb-6 flex-1 line-clamp-3">
-                        {project.excerpt || "No description available."}
-                      </p>
-
-                      <div className="mt-auto inline-flex items-center gap-2 text-daw-green group-hover:text-daw-yellow font-semibold text-[14px] transition-colors duration-300">
-                        <span>{t("business.readMore", "Read More")}</span>
-                        <ArrowRight className="w-4 h-4 transform group-hover:translate-x-1.5 transition-transform duration-300" />
-                      </div>
+                  <div className="p-8 flex flex-col flex-1">
+                    <h3 className="text-xl font-serif text-slate-900 mb-3 leading-snug group-hover:text-daw-green transition-colors duration-300 line-clamp-2">
+                      {project.title}
+                    </h3>
+                    <p className="text-slate-500 text-[14px] leading-relaxed mb-6 line-clamp-3">
+                      {project.excerpt}
+                    </p>
+                    <div className="mt-auto flex items-center gap-2 text-daw-green font-bold text-[12px] uppercase tracking-widest">
+                      <span>{t("business.readMore", "View Details")}</span>
+                      <ArrowRight className="w-4 h-4 transition-transform group-hover:translate-x-2" />
                     </div>
-                  </Link>
-                </ScrollReveal>
-              );
-            })}
+                  </div>
+                </Link>
+              </ScrollReveal>
+            ))}
           </div>
         ) : (
-          <div className="text-center py-20">
+          <div className="text-center py-32 bg-slate-50 rounded-3xl border-2 border-dashed border-slate-200">
             <ImageIcon className="w-12 h-12 text-slate-200 mx-auto mb-4" />
-            <p className="text-slate-500 italic">
-              No projects found in this category.
+            <p className="text-slate-400 font-medium">
+              No assets found in this sector.
             </p>
           </div>
         )}

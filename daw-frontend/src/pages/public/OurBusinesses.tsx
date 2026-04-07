@@ -1,57 +1,64 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { useLocation } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { ChevronRight } from "lucide-react";
 import bannerImg from "@/assets/about-banner.jpg";
-import DynamicBusinessSection, {
-  type SectionData,
-} from "@/components/businesses/DynamicBusinessSection";
 import InvestmentsSection from "@/components/businesses/InvestmentsSection";
-import api from "@/lib/api";
 import ScrollReveal from "@/components/ScrollReveal";
 import SEO from "@/components/SEO";
+import { useBusiness } from "@/contexts/BusinessContext";
 
 export default function OurBusinesses() {
   const { t } = useTranslation();
   const { hash } = useLocation();
+  const { sections: pageData, isLoading, refreshData } = useBusiness();
 
   const [activeSection, setActiveSection] = useState("");
-  const [pageData, setPageData] = useState<SectionData[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
   const [scrollProgress, setScrollProgress] = useState(0);
 
-  /**
-   * @desc Fetch dynamic business sections from the backend.
-   * Removes hardcoded sorting; relies on backend's orderIndex.
-   */
-  useEffect(() => {
-    const fetchPublicData = async () => {
-      try {
-        const response = await api.get("/businesses/public");
-        setPageData(response.data);
+  // FIX 3: PINDAHKAN scrollToSection KE ATAS & BUNGKUS DENGAN useCallback
+  // Membungkus dengan useCallback mencegah fungsi ini diciptakan ulang di setiap re-render,
+  // sehingga aman dimasukkan ke dalam dependency array useEffect.
+  const scrollToSection = useCallback((id: string) => {
+    const element = document.getElementById(id);
+    if (element) {
+      const offset = 120; // Accounts for sticky navbar height
+      const bodyRect = document.body.getBoundingClientRect().top;
+      const elementRect = element.getBoundingClientRect().top;
+      const elementPosition = elementRect - bodyRect;
 
-        // Auto-select the first section if no URL hash is present
-        if (response.data.length > 0 && !hash) {
-          setActiveSection(response.data[0].id);
-        }
-      } catch (error) {
-        console.error("[FETCH_BUSINESS_DATA_ERROR]:", error);
-      } finally {
-        setIsLoading(false);
+      window.scrollTo({
+        top: elementPosition - offset,
+        behavior: "smooth",
+      });
+    }
+  }, []);
+
+  // Efek untuk sinkronisasi hash awal
+  useEffect(() => {
+    if (!isLoading && pageData.length > 0) {
+      if (!hash) {
+        setActiveSection(pageData[0].id);
+      } else {
+        const targetId = hash.replace("#", "");
+        setActiveSection(targetId);
       }
-    };
-    fetchPublicData();
-  }, [hash]);
+    }
+  }, [isLoading, hash, pageData]);
+
+  // FIX 4: Masukkan refreshData ke dalam dependency array
+  useEffect(() => {
+    refreshData();
+  }, [refreshData]);
 
   /**
    * @constant navItems
-   * Dynamically merges database sections with static sections (e.g., Investments)
-   * to create a unified navigation array for the Sticky Nav and Scroll Spy.
+   * Dynamically merges database sections with static sections
    */
   const navItems = useMemo(() => {
     const dynamicTabs = pageData.map((sec) => ({
       id: sec.id,
-      label: sec.category, // Fallback label directly from the database
+      label: sec.category,
     }));
 
     return [
@@ -72,12 +79,10 @@ export default function OurBusinesses() {
       }, 300);
       return () => clearTimeout(timeoutId);
     }
-  }, [isLoading, hash]);
+  }, [isLoading, hash, scrollToSection]); // FIX 5: Masukkan scrollToSection dengan aman
 
   /**
    * @desc Scroll Spy Engine
-   * Dynamically tracks the user's scroll position against the bounds of
-   * dynamically generated sections to update the active sticky nav state.
    */
   useEffect(() => {
     if (navItems.length === 0) return;
@@ -89,47 +94,37 @@ export default function OurBusinesses() {
       requestRunning = true;
 
       requestAnimationFrame(() => {
-        // Calculate global scroll progress bar
-        const totalHeight =
-          document.documentElement.scrollHeight - window.innerHeight;
-        const progress = (window.scrollY / totalHeight) * 100;
-        setScrollProgress(progress);
+        // 1. Progress Bar Logic
+        const winScroll =
+          window.pageYOffset || document.documentElement.scrollTop;
+        const height =
+          document.documentElement.scrollHeight -
+          document.documentElement.clientHeight;
 
-        // Detect active section for Sticky Nav highlighting
-        const scrollPosition = window.scrollY + 200;
+        // Safety check untuk menghindari NaN/Infinity jika body terlalu pendek
+        const scrolled = height > 0 ? (winScroll / height) * 100 : 0;
+        setScrollProgress(scrolled);
 
-        for (const item of navItems) {
-          const element = document.getElementById(item.id);
-          if (
-            element &&
-            element.offsetTop <= scrollPosition &&
-            element.offsetTop + element.offsetHeight > scrollPosition
-          ) {
-            setActiveSection(item.id);
-          }
+        // 2. Advanced Scroll Spy Logic
+        const offsetThreshold = 250;
+
+        const currentActive = navItems.find((item) => {
+          const el = document.getElementById(item.id);
+          if (!el) return false;
+          const rect = el.getBoundingClientRect();
+          return rect.top <= offsetThreshold && rect.bottom > offsetThreshold;
+        });
+
+        if (currentActive && currentActive.id !== activeSection) {
+          setActiveSection(currentActive.id);
         }
         requestRunning = false;
       });
     };
 
-    window.addEventListener("scroll", handleScroll);
+    window.addEventListener("scroll", handleScroll, { passive: true });
     return () => window.removeEventListener("scroll", handleScroll);
-  }, [navItems]);
-
-  const scrollToSection = (id: string) => {
-    const element = document.getElementById(id);
-    if (element) {
-      const offset = 120; // Accounts for sticky navbar height
-      const bodyRect = document.body.getBoundingClientRect().top;
-      const elementRect = element.getBoundingClientRect().top;
-      const elementPosition = elementRect - bodyRect;
-
-      window.scrollTo({
-        top: elementPosition - offset,
-        behavior: "smooth",
-      });
-    }
-  };
+  }, [navItems, activeSection]);
 
   return (
     <>
@@ -204,21 +199,40 @@ export default function OurBusinesses() {
 
           {/* --- SECTIONS CONTAINER --- */}
           <div className="flex flex-col relative">
+            {/* Dekorasi Background */}
             <div className="absolute top-40 right-0 w-[500px] h-[500px] bg-daw-green/[0.03] rounded-full blur-[120px] -z-10 pointer-events-none" />
 
             {isLoading ? (
-              <div className="py-32 text-center flex flex-col items-center justify-center gap-4">
-                <div className="w-12 h-12 border-4 border-daw-green border-t-transparent rounded-full animate-spin"></div>
-                <p className="text-slate-400 font-bold tracking-[0.2em] uppercase text-xs">
-                  Loading Business Data...
+              // FIX 1: Tampilan Loading yang lebih smooth dan proporsional
+              <div className="py-40 flex flex-col items-center justify-center gap-6 min-h-[50vh]">
+                <div className="relative w-16 h-16 md:w-20 md:h-20">
+                  <div className="absolute inset-0 border-4 border-daw-green/10 rounded-full"></div>
+                  <div className="absolute inset-0 border-4 border-daw-green border-t-transparent rounded-full animate-spin"></div>
+                </div>
+                <p className="text-daw-green font-bold animate-pulse tracking-[0.2em] text-[10px] md:text-xs uppercase">
+                  Synchronizing Portfolio...
+                </p>
+              </div>
+            ) : pageData.length === 0 ? (
+              // FIX 2: Penanganan Jika Database Kosong
+              <div className="py-40 text-center min-h-[40vh] flex flex-col items-center justify-center">
+                <div className="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center mb-4">
+                  <span className="text-slate-300 font-bold text-2xl">!</span>
+                </div>
+                <p className="text-slate-500 font-bold">
+                  No divisions available.
+                </p>
+                <p className="text-slate-400 text-sm mt-1">
+                  Please check back later for updates.
                 </p>
               </div>
             ) : (
+              // FIX 3: Tambahkan scroll-mt-32 agar judul tidak tertutup sticky nav
               pageData.map((sectionData) => (
                 <section
                   key={sectionData.id}
                   id={sectionData.id}
-                  className="bg-transparent"
+                  className="bg-transparent scroll-mt-32 relative"
                 >
                   <DynamicBusinessSection data={sectionData} />
                 </section>
@@ -228,7 +242,7 @@ export default function OurBusinesses() {
             {/* --- INVESTMENTS SECTION (Static Footer Bound) --- */}
             <section
               id="investments"
-              className="pt-32 pb-40 bg-[#081C15] overflow-hidden relative"
+              className="pt-32 pb-40 bg-[#081C15] overflow-hidden relative scroll-mt-10" // Tambahan scroll-mt-10 di sini juga bagus
             >
               <div className="container mx-auto px-6 max-w-7xl relative z-10">
                 <h2 className="text-4xl md:text-5xl lg:text-6xl font-serif font-bold text-white mb-20 text-center tracking-tight">

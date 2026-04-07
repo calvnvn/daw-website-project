@@ -3,7 +3,8 @@ import BusinessGrid from "@/components/BusinessGrid";
 import InteractiveMap, { type MapMarker } from "./InteractiveMap";
 import { memo } from "react"; // <-- Tambahkan memo
 import { useBusiness } from "@/contexts/BusinessContext";
-import { type FilterOption } from "@/components/BusinessGrid";
+import { Link } from "react-router-dom";
+import { ArrowRight } from "lucide-react";
 export interface SectionData {
   id: string;
   category: string;
@@ -104,7 +105,7 @@ const DynamicBusinessSection = memo(function DynamicBusinessSection({
       )}
 
       {/* --- BAGIAN 3: PORTFOLIO GRID --- */}
-      <div className="container mx-auto px-6 max-w-7xl pt-16 pb-5 relative z-10">
+      <div className="container mx-auto px-6 max-w-7xl pt-16 pb-20 relative z-10">
         <div className="text-center max-w-3xl mx-auto mb-12">
           <ScrollReveal direction="up" delay={0}>
             <div className="flex items-center justify-center gap-4 mb-4">
@@ -121,14 +122,35 @@ const DynamicBusinessSection = memo(function DynamicBusinessSection({
         </div>
 
         <ScrollReveal direction="up" delay={200}>
+          {/* FIX 1: Gunakan data.id sebagai filter, BUKAN category name! */}
+          {/* Note: Pastikan file BusinessGrid Anda juga sudah di-update untuk menerima tipe data string dinamis, bukan sekadar "resources" | "energy" */}
           <BusinessGrid
-            filter={data.category.toLowerCase() as FilterOption}
+            filter={data.id as any} // Cast sementara jika interface BusinessGrid belum diupdate
             hideFilters
           />
+        </ScrollReveal>
+
+        {/* FIX 2: THE DEEP LINK CTA (UX Premium) */}
+        <ScrollReveal direction="up" delay={300}>
+          <div className="mt-16 flex justify-center">
+            <Link
+              to={`/projects?category=${data.id}`}
+              className="group relative inline-flex items-center gap-4 px-8 py-4 bg-daw-green text-white text-[11px] font-black uppercase tracking-[0.2em] rounded-full overflow-hidden transition-all duration-300 hover:scale-105 hover:shadow-[0_10px_40px_-10px_rgba(16,185,129,0.6)]"
+            >
+              <span className="relative z-10">
+                Explore All {data.category} Assets
+              </span>
+              <div className="relative z-10 w-8 h-8 flex items-center justify-center bg-white/20 rounded-full group-hover:bg-white transition-colors duration-300">
+                <ArrowRight className="w-4 h-4 text-white group-hover:text-daw-green transition-transform duration-300 group-hover:translate-x-1" />
+              </div>
+
+              {/* Hover Fill Effect */}
+              <div className="absolute inset-0 h-full w-0 bg-[#003b1c] transition-all duration-500 ease-out group-hover:w-full z-0"></div>
+            </Link>
+          </div>
         </ScrollReveal>
       </div>
     </div>
   );
 });
-
 export default DynamicBusinessSection;
