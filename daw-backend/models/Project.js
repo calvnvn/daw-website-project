@@ -27,7 +27,7 @@ const Project = sequelize.define(
       allowNull: true,
     },
     category: {
-      type: DataTypes.ENUM("Resources", "Energy"),
+      type: DataTypes.STRING(255),
       allowNull: false,
     },
     status: {

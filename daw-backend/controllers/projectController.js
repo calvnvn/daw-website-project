@@ -1,4 +1,5 @@
 const Project = require("../models/Project");
+const BusinessSection = require("../models/BusinessSection");
 const { deleteSingleFile } = require("../utils/fileRemover");
 const { Op } = require("sequelize");
 
@@ -29,12 +30,18 @@ const generateUniqueProjectSlug = async (title, id = null) => {
 exports.getAllProjects = async (req, res) => {
   try {
     const projects = await Project.findAll({
+      include: [
+        {
+          model: BusinessSection,
+          as: "sectorData",
+          attributes: ["category"],
+        },
+      ],
       order: [["createdAt", "DESC"]],
     });
 
     res.status(200).json(projects);
   } catch (error) {
-    console.error("🚨 ERROR DARI BACKEND GET PROJECTS:", error);
     res.status(500).json({ message: error.message });
   }
 };

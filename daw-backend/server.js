@@ -32,8 +32,7 @@ const User = require("./models/User");
 const Role = require("./models/Role");
 const Permission = require("./models/Permission");
 const RolePermission = require("./models/RolePermission");
-
-require("./models/Project");
+const Project = require("./models/Project");
 require("./models/Management");
 require("./models/Settings");
 require("./models/AboutInfo");
@@ -187,6 +186,19 @@ BusinessMapMarker.belongsTo(BusinessSection, {
 BusinessMapMarker.belongsTo(MapCategory, {
   foreignKey: "categoryId",
   as: "categoryData",
+});
+
+BusinessSection.hasMany(Project, {
+  foreignKey: "category", // Kolom di tabel Project
+  sourceKey: "id", // Kolom id (slug) di BusinessSection
+  as: "projects",
+});
+
+// Satu Proyek merujuk ke satu Sektor
+Project.belongsTo(BusinessSection, {
+  foreignKey: "category",
+  targetKey: "id",
+  as: "sectorData", // Alias agar rapi saat dipanggil (e.g. project.sectorData.category)
 });
 
 // BOOTSTRAP SERVER & DATABASE

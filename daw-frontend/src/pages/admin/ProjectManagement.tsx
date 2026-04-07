@@ -8,10 +8,12 @@ import {
   Trash2,
   Eye,
   FileText,
+  AlertTriangle,
 } from "lucide-react";
 import { Link } from "react-router-dom";
 import { toast } from "sonner";
 import api from "@/lib/api";
+import { useBusiness } from "@/contexts/BusinessContext";
 
 // 1. Sesuaikan Interface dengan kolom tabel MySQL kita
 interface AdminProject {
@@ -30,17 +32,36 @@ export default function ProjectManagement() {
   const [projects, setProjects] = useState<AdminProject[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
-  const [filterCategory, setFilterCategory] = useState<
-    "All" | "Resources" | "Energy"
-  >("All");
+  const [filterCategory, setFilterCategory] = useState<string>("All");
+  const { sections } = useBusiness();
+
+  // Deteksi apakah ada proyek yang sektornya sudah terhapus di database
+  const hasUncategorizedProjects = projects.some(
+    (project) => !sections.some((sec) => sec.id === project.category),
+  );
 
   // 3. Logika Filter SEKARANG MENGGUNAKAN DATA ASLI (projects)
   const filteredProjects = projects.filter((project) => {
     const matchSearch = project.title
       .toLowerCase()
       .includes(searchTerm.toLowerCase());
-    const matchCategory =
-      filterCategory === "All" || project.category === filterCategory;
+
+    // Periksa apakah kategori proyek ini masih eksis di daftar sektor aktif
+    const isValidSector = sections.some((sec) => sec.id === project.category);
+
+    // Jika filter diset ke "All", tampilkan semua.
+    // Jika filter diset ke "Orphaned", tampilkan proyek yang ID kategorinya tidak ada di 'sections'.
+    // Jika tidak, cocokkan dengan ID kategori yang dipilih.
+    let matchCategory = false;
+    if (filterCategory === "All") {
+      matchCategory = true;
+    } else if (filterCategory === "Uncategorized") {
+      matchCategory = !isValidSector;
+    } else {
+      matchCategory =
+        project.category.toLowerCase() === filterCategory.toLowerCase();
+    }
+
     return matchSearch && matchCategory;
   });
 
@@ -153,15 +174,19 @@ export default function ProjectManagement() {
           <select
             className="w-full pl-10 pr-8 py-2.5 bg-white border border-slate-200 rounded-lg appearance-none focus:outline-none focus:ring-2 focus:ring-daw-green/20 focus:border-daw-green cursor-pointer text-slate-700"
             value={filterCategory}
-            onChange={(e) =>
-              setFilterCategory(
-                e.target.value as "All" | "Resources" | "Energy",
-              )
-            }
+            onChange={(e) => setFilterCategory(e.target.value)}
           >
             <option value="All">Semua Kategori</option>
-            <option value="Resources">Resources</option>
-            <option value="Energy">Energy</option>
+            {sections.map((sec) => (
+              <option key={sec.id} value={sec.id}>
+                {sec.category}
+              </option>
+            ))}
+            {hasUncategorizedProjects && (
+              <option value="Uncategorized" className="text-red-500 font-bold">
+                ⚠️ Sektor Terhapus
+              </option>
+            )}
           </select>
         </div>
       </div>
@@ -212,9 +237,25 @@ export default function ProjectManagement() {
                       </div>
                     </td>
                     <td className="px-6 py-4">
-                      <span className="text-sm text-slate-600 font-medium">
-                        {project.category}
-                      </span>
+                      {(() => {
+                        const matchedSector = sections.find(
+                          (sec) => sec.id === project.category,
+                        );
+                        if (matchedSector) {
+                          return (
+                            <span className="text-sm text-slate-600 font-medium">
+                              {matchedSector.category}
+                            </span>
+                          );
+                        } else {
+                          return (
+                            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-red-50 text-red-600 text-xs font-bold border border-red-100">
+                              <AlertTriangle className="w-3 h-3" />
+                              Sektor Terhapus
+                            </span>
+                          );
+                        }
+                      })()}
                     </td>
                     <td className="px-6 py-4">
                       <span

@@ -28,6 +28,7 @@ import { useDropzone } from "react-dropzone";
 import api, { BASE_UPLOAD_URL } from "@/lib/api";
 import { compressImage } from "@/utils/imageHelper";
 import { useAuth } from "@/contexts/AuthContext";
+import { useBusiness } from "@/contexts/BusinessContext";
 
 // --- SUB-COMPONENT: GALLERY PREVIEW ---
 const GalleryPreviewItem = ({
@@ -76,6 +77,7 @@ export default function ProjectForm() {
   const isEditMode = !!id;
   const quillRef = useRef<ReactQuill>(null);
   const { user, can } = useAuth();
+  const { sections } = useBusiness(); // FIX 1: Panggil Business Context
   const [isLoading, setIsLoading] = useState(false);
   const [isFetching, setIsFetching] = useState(isEditMode); // Fetching hanya aktif jika Edit Mode
 
@@ -83,7 +85,7 @@ export default function ProjectForm() {
     title: "",
     excerpt: "",
     content: "",
-    category: "Resources",
+    category: "",
     status: "Draft",
     cover_image: "",
     gallery: "[]",
@@ -125,6 +127,12 @@ export default function ProjectForm() {
     return () => URL.revokeObjectURL(objectUrl);
   }, [coverFile]);
 
+  useEffect(() => {
+    if (!isEditMode && sections.length > 0 && !formData.category) {
+      setFormData((prev) => ({ ...prev, category: sections[0].id }));
+    }
+  }, [sections, isEditMode, formData.category]);
+
   // --- LOGIC: FETCH EXISTING DATA (EDIT MODE ONLY) ---
   useEffect(() => {
     if (!isEditMode) {
@@ -132,7 +140,7 @@ export default function ProjectForm() {
         title: "",
         excerpt: "",
         content: "",
-        category: "Resources",
+        category: "",
         status: "Draft",
         cover_image: "",
         gallery: "[]",
@@ -154,7 +162,7 @@ export default function ProjectForm() {
           title: data.title || "",
           excerpt: data.excerpt || "",
           content: data.content || "",
-          category: data.category || "Resources",
+          category: data.category || "",
           status: data.status || "Draft",
           cover_image: data.cover_image || "",
           gallery:
@@ -173,7 +181,7 @@ export default function ProjectForm() {
       }
     };
     fetchProject();
-  }, [id, isEditMode]);
+  }, [id, isEditMode, navigate]);
 
   // Remove existing gallery image (Edit Mode)
   const removeOldGalleryImage = (indexToRemove: number) => {
@@ -242,10 +250,21 @@ export default function ProjectForm() {
   const handleSave = async (targetStatus: string) => {
     if (!formData.title.trim())
       return toast.error("Judul proyek tidak boleh kosong.");
+
     const plainTextContent = formData.content.replace(/<[^>]*>?/gm, "").trim();
     if (!formData.content || plainTextContent.length === 0) {
       return toast.error("Isi artikel wajib diisi.");
     }
+
+    const isCategoryValid = sections.some(
+      (sec) => sec.id === formData.category,
+    );
+    if (!isCategoryValid) {
+      return toast.error(
+        "Kategori proyek tidak valid atau telah terhapus. Silakan pilih kategori yang baru.",
+      );
+    }
+
     if (targetStatus === "Published" && !coverFile && !formData.cover_image) {
       return toast.error("Gambar sampul wajib ada untuk publikasi.");
     }
@@ -507,16 +526,57 @@ export default function ProjectForm() {
             <h3 className="text-xs font-black uppercase tracking-widest text-slate-800 mb-4">
               Kategori Proyek
             </h3>
-            <select
-              className="w-full p-3 bg-slate-50 border border-slate-100 rounded-xl font-bold text-slate-700 outline-none"
-              value={formData.category}
-              onChange={(e) =>
-                setFormData({ ...formData, category: e.target.value })
-              }
-            >
-              <option value="Resources">Resources Sector</option>
-              <option value="Energy">Energy Sector</option>
-            </select>
+
+            {/* FIX 5: Render Dropdown Dinamis & Deteksi Yatim */}
+            {(() => {
+              const isCurrentCategoryValid = sections.some(
+                (sec) => sec.id === formData.category,
+              );
+
+              return (
+                <select
+                  className={`w-full p-3 bg-slate-50 border rounded-xl font-bold outline-none transition-colors ${
+                    !isCurrentCategoryValid && formData.category
+                      ? "border-red-500 text-red-600 focus:ring-2 focus:ring-red-200"
+                      : "border-slate-100 text-slate-700 focus:ring-2 focus:ring-daw-green/20"
+                  }`}
+                  value={formData.category}
+                  onChange={(e) =>
+                    setFormData({ ...formData, category: e.target.value })
+                  }
+                >
+                  {/* Munculkan peringatan merah HANYA jika kategori tidak valid (Yatim) */}
+                  {!isCurrentCategoryValid && formData.category && (
+                    <option
+                      value={formData.category}
+                      disabled
+                      className="text-red-500 font-bold"
+                    >
+                      ⚠️ Sektor Terhapus (Pilih Ulang)
+                    </option>
+                  )}
+
+                  {/* Render data dinamis */}
+                  {sections.map((sec) => (
+                    <option
+                      key={sec.id}
+                      value={sec.id}
+                      className="text-slate-700"
+                    >
+                      {sec.category}
+                    </option>
+                  ))}
+                </select>
+              );
+            })()}
+
+            {!sections.some((sec) => sec.id === formData.category) &&
+              formData.category && (
+                <p className="text-[10px] text-red-500 font-bold mt-2 leading-tight">
+                  Sektor sebelumnya telah dihapus. Anda wajib memilih sektor
+                  baru sebelum menyimpan.
+                </p>
+              )}
           </div>
 
           <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm">
