@@ -34,7 +34,9 @@ const UserManagement = lazy(() => import("./pages/admin/UserManagement"));
 const InvestmentsManager = lazy(
   () => import("./pages/admin/InvestmentsManager"),
 );
-const ManageBusinesses = lazy(() => import("./pages/admin/ManageBusinesses"));
+const ManageBusinesses = lazy(
+  () => import("./pages/admin/business/ManageBusinesses"),
+);
 const ContentManager = lazy(() => import("./pages/admin/ContentManager"));
 const ProjectForm = lazy(() => import("./pages/admin/ProjectForm"));
 const RoleManagement = lazy(() => import("./pages/admin/RoleManagement"));
