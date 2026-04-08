@@ -243,7 +243,7 @@ exports.createBusinessSection = async (req, res) => {
         id: generatedId,
         category,
         title,
-        htmlContent: "<p>Konten baru sedang disiapkan...</p>",
+        htmlContent: "",
         hasMap: false,
         orderIndex: maxOrder + 1,
       },

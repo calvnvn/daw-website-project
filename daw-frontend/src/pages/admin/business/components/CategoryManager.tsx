@@ -87,9 +87,19 @@ export default function CategoryManager() {
                   setNewCat({ ...newCat, color: e.target.value })
                 }
               />
-              <span className="text-xs font-mono font-bold text-slate-600">
-                {newCat.color.toUpperCase()}
-              </span>
+              <input
+                type="text"
+                maxLength={7}
+                className="w-20 text-xs font-mono font-bold text-slate-600 bg-transparent outline-none border-b border-transparent focus:border-slate-300 transition-colors"
+                value={newCat.color.toUpperCase()}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  // Allow typing, but only update state if it represents a valid hex sequence flow
+                  if (/^#[0-9A-Fa-f]{0,6}$/.test(val)) {
+                    setNewCat({ ...newCat, color: val });
+                  }
+                }}
+              />
             </div>
           </div>
           <button
@@ -153,25 +163,50 @@ export default function CategoryManager() {
                   <td className="px-6 py-4">
                     <div className="flex items-center gap-3">
                       {isEditingThis ? (
-                        <input
-                          type="color"
-                          value={editCatData.color}
-                          onChange={(e) =>
-                            setEditCatData({
-                              ...editCatData,
-                              color: e.target.value,
-                            })
-                          }
-                        />
+                        <>
+                          {/* Visual Color Picker */}
+                          <input
+                            type="color"
+                            className="w-6 h-6 rounded cursor-pointer border-none bg-transparent"
+                            value={editCatData.color}
+                            onChange={(e) =>
+                              setEditCatData({
+                                ...editCatData,
+                                color: e.target.value.toUpperCase(),
+                              })
+                            }
+                          />
+                          {/* Manual Hex Input - Senior UX implementation */}
+                          <input
+                            type="text"
+                            maxLength={7}
+                            className="w-20 px-1 py-0.5 text-xs font-mono font-bold text-slate-700 bg-white border border-slate-200 rounded outline-none focus:border-daw-green transition-all"
+                            value={editCatData.color.toUpperCase()}
+                            spellCheck={false}
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              // REGEX: Allows '#' followed by up to 6 hex characters
+                              if (/^#[0-9A-Fa-f]{0,6}$/.test(val)) {
+                                setEditCatData({
+                                  ...editCatData,
+                                  color: val,
+                                });
+                              }
+                            }}
+                          />
+                        </>
                       ) : (
-                        <div
-                          className="w-5 h-5 rounded-full border border-black/10"
-                          style={{ backgroundColor: cat.color }}
-                        />
+                        <>
+                          {/* Static View Mode */}
+                          <div
+                            className="w-5 h-5 rounded-full border border-black/10 shadow-sm"
+                            style={{ backgroundColor: cat.color }}
+                          />
+                          <span className="text-xs font-mono font-bold text-slate-400">
+                            {cat.color.toUpperCase()}
+                          </span>
+                        </>
                       )}
-                      <span className="text-xs font-mono text-slate-400">
-                        {isEditingThis ? editCatData.color : cat.color}
-                      </span>
                     </div>
                   </td>
                   <td className="px-6 py-4 text-right">

@@ -1,7 +1,7 @@
-import React, { useState, useRef, useCallback } from "react";
+import { useState, useRef, useCallback } from "react";
 import { X, MousePointerClick } from "lucide-react";
 import mapBase from "@/assets/map-indonesia-base.svg";
-import { type MapMarker, type MapCategory } from "@/contexts/BusinessContext";
+import { type MapMarker } from "@/contexts/BusinessContext";
 
 interface MapPickerModalProps {
   isOpen: boolean;
@@ -33,37 +33,63 @@ export default function MapPickerModal({
 
   /**
    * Method: updatePointerPos
-   * Menghitung koordinat persentase berdasarkan posisi kursor/sentuhan terhadap boks peta.
+   * Menghitung koordinat kursor dan menerapkan "Pixel-Perfect Math"
+   * agar background kaca pembesar (loupe/radar) sejajar presisi 100% dengan kursor asli.
    */
   const updatePointerPos = useCallback(
     (clientX: number, clientY: number) => {
       if (!mapContainerRef.current) return;
 
+      // Dapatkan dimensi dan posisi absolut kontainer peta di layar
       const rect = mapContainerRef.current.getBoundingClientRect();
-      const xP = Math.max(
-        0,
-        Math.min(100, ((clientX - rect.left) / rect.width) * 100),
-      );
-      const yP = Math.max(
-        0,
-        Math.min(100, ((clientY - rect.top) / rect.height) * 100),
-      );
+
+      // Hitung posisi mouse dalam PIKSEL relatif terhadap kiri-atas kontainer
+      const xPx = clientX - rect.left;
+      const yPx = clientY - rect.top;
+
+      // Hitung posisi persentase (0-100%) untuk disimpan di database
+      const xP = Math.max(0, Math.min(100, (xPx / rect.width) * 100));
+      const yP = Math.max(0, Math.min(100, (yPx / rect.height) * 100));
 
       lastCoords.current = { x: `${xP.toFixed(2)}%`, y: `${yP.toFixed(2)}%` };
 
-      // Injeksi style langsung ke DOM (bypass React render) untuk performa 60fps
+      // Injeksi style langsung ke DOM (bypass React render cycle untuk 60fps)
       if (!isMobile) {
         if (crosshairRef.current) {
           crosshairRef.current.style.left = `${xP}%`;
           crosshairRef.current.style.top = `${yP}%`;
         }
         if (loupeRef.current) {
+          // 1. Posisikan kontainer loupe mengikuti kursor
           loupeRef.current.style.left = `${xP}%`;
           loupeRef.current.style.top = `${yP}%`;
-          loupeRef.current.style.backgroundPosition = `${xP}% ${yP}%`;
+
+          // 2. PIXEL-PERFECT MATH (Memperbaiki Bug Meleset)
+          const zoomScale = 2; // Skala zoom 400%
+          const loupeRadius = 80; // Jari-jari loupe (Tailwind w-40 = 160px, maka tengahnya 80px)
+
+          // Paksa ukuran gambar background menjadi piksel absolut (lebar container asli x skala zoom)
+          loupeRef.current.style.backgroundSize = `${rect.width * zoomScale}px ${rect.height * zoomScale}px`;
+
+          // Kalkulasi pergeseran gambar.
+          // Rumus: Titik Tengah Kaca Pembesar - (Posisi Mouse * Skala Zoom)
+          const bgPosX = loupeRadius - xPx * zoomScale;
+          const bgPosY = loupeRadius - yPx * zoomScale;
+
+          loupeRef.current.style.backgroundPosition = `${bgPosX}px ${bgPosY}px`;
         }
       } else if (radarRef.current) {
-        radarRef.current.style.backgroundPosition = `${xP}% ${yP}%`;
+        // Terapkan Pixel-Perfect Math yang sama untuk Mobile Radar
+        const radarScale = 2; // Skala zoom 600% (sesuai kode Anda sebelumnya)
+        const radarRadius = 64; // Jari-jari radar (Tailwind w-32 = 128px, maka tengahnya 64px)
+
+        radarRef.current.style.backgroundSize = `${rect.width * radarScale}px ${rect.height * radarScale}px`;
+
+        const bgPosX = radarRadius - xPx * radarScale;
+        const bgPosY = radarRadius - yPx * radarScale;
+
+        radarRef.current.style.backgroundPosition = `${bgPosX}px ${bgPosY}px`;
+
         const textNode = radarRef.current.querySelector(".radar-coord");
         if (textNode)
           textNode.innerHTML = `X:${xP.toFixed(0)} Y:${yP.toFixed(0)}`;

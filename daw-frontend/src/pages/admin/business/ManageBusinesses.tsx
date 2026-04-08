@@ -218,7 +218,7 @@ export default function ManageBusinesses() {
         onAddClick={() => setIsAddModalOpen(true)}
       />
 
-      <main className="bg-white p-6 lg:p-8 rounded-b-xl border border-t-0 shadow-sm min-h-[500px]">
+      <main className="bg-white rounded-b-xl border border-t-0 border-slate-200 shadow-sm p-6 lg:p-8 min-h-[500px]">
         {activeTab === "categories" ? (
           <CategoryManager />
         ) : (
