@@ -407,7 +407,7 @@ export default function ProjectForm() {
 
   if (isFetching) {
     return (
-      <div className="min-h-screen flex items-center justify-center text-slate-500">
+      <div className="h-[60vh] flex items-center justify-center text-slate-500">
         <div className="animate-pulse flex flex-col items-center gap-4">
           <div className="w-10 h-10 border-4 border-daw-green border-t-transparent rounded-full animate-spin"></div>
           Memuat data proyek...
@@ -462,7 +462,7 @@ export default function ProjectForm() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
         {/* KIRI: CONTENT AREA */}
         <div className="lg:col-span-2 space-y-6">
           <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden flex flex-col p-0 md:p-8 space-y-8">
@@ -503,14 +503,14 @@ export default function ProjectForm() {
               <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
                 Isi Artikel Utama
               </label>
-              <div className="flex-1 min-h-[400px] max-h-[600px] border border-slate-100 rounded-xl overflow-hidden shadow-inner flex flex-col bg-white">
+              <div className="min-h-[400px] max-h-[600px] border border-slate-100 rounded-xl overflow-hidden shadow-inner flex flex-col bg-white">
                 <ReactQuill
                   ref={quillRef}
                   theme="snow"
                   modules={modules}
                   value={formData.content}
                   onChange={(v) => setFormData({ ...formData, content: v })}
-                  className="flex-1 overflow-y-auto"
+                  className="min-h-[300px]"
                 />
               </div>
             </div>
@@ -566,176 +566,175 @@ export default function ProjectForm() {
         </div>
 
         {/* KANAN: SIDEBAR */}
-        <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm">
-          <h3 className="text-xs font-black uppercase tracking-widest text-slate-800 mb-4">
-            Kategori Proyek
-          </h3>
+        {/* FIX: Wrapped all sidebar elements inside a single column container to prevent grid breaking */}
+        <div className="space-y-6">
+          {/* 1. KATEGORI PROYEK */}
+          <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm">
+            <h3 className="text-xs font-black uppercase tracking-widest text-slate-800 mb-4">
+              Kategori Proyek
+            </h3>
 
-          {/* Tampilkan Loading, Empty State, atau Dropdown */}
-          {isLoading || sections.length === 0 ? (
-            <div className="p-4 border-2 border-dashed border-slate-200 rounded-xl text-center bg-slate-50">
-              <p className="text-sm font-bold text-slate-500">
-                Belum ada sektor aktif
-              </p>
-              <p className="text-xs text-slate-400 mt-1 mb-3">
-                Buat sektor bisnis terlebih dahulu.
-              </p>
-              <Link
-                to="/admin/businesses"
-                className="text-xs font-bold text-daw-green hover:underline"
-              >
-                &rarr; Kelola Sektor
-              </Link>
-            </div>
-          ) : (
-            <>
-              <select
-                className={`w-full p-3 bg-slate-50 border rounded-xl font-bold outline-none transition-all ${
-                  formData.category && !validSectorIds.has(formData.category)
-                    ? "border-red-500 text-red-600 ring-2 ring-red-100"
-                    : "border-slate-100 text-slate-700 focus:ring-2 focus:ring-daw-green/20"
-                }`}
-                value={formData.category}
-                onChange={(e) =>
-                  setFormData({ ...formData, category: e.target.value })
-                }
-              >
-                {/* Peringatan jika edit proyek yang sektornya sudah dihapus admin lain */}
+            {isLoading || sections.length === 0 ? (
+              <div className="p-4 border-2 border-dashed border-slate-200 rounded-xl text-center bg-slate-50">
+                <p className="text-sm font-bold text-slate-500">
+                  Belum ada sektor aktif
+                </p>
+                <p className="text-xs text-slate-400 mt-1 mb-3">
+                  Buat sektor bisnis terlebih dahulu.
+                </p>
+                <Link
+                  to="/admin/businesses"
+                  className="text-xs font-bold text-daw-green hover:underline"
+                >
+                  &rarr; Kelola Sektor
+                </Link>
+              </div>
+            ) : (
+              <>
+                <select
+                  className={`w-full p-3 bg-slate-50 border rounded-xl font-bold outline-none transition-all ${
+                    formData.category && !validSectorIds.has(formData.category)
+                      ? "border-red-500 text-red-600 ring-2 ring-red-100"
+                      : "border-slate-100 text-slate-700 focus:ring-2 focus:ring-daw-green/20"
+                  }`}
+                  value={formData.category}
+                  onChange={(e) =>
+                    setFormData({ ...formData, category: e.target.value })
+                  }
+                >
+                  {formData.category &&
+                    !validSectorIds.has(formData.category) && (
+                      <option
+                        value={formData.category}
+                        disabled
+                        className="text-red-500 font-bold"
+                      >
+                        ⚠️ Sektor Terhapus
+                      </option>
+                    )}
+                  {sections.map((sec) => (
+                    <option
+                      key={sec.id}
+                      value={sec.id}
+                      className="text-slate-700"
+                    >
+                      {sec.category}
+                    </option>
+                  ))}
+                </select>
                 {formData.category &&
                   !validSectorIds.has(formData.category) && (
-                    <option
-                      value={formData.category}
-                      disabled
-                      className="text-red-500 font-bold"
-                    >
-                      ⚠️ Sektor Terhapus (Pilih Ulang)
-                    </option>
+                    <p className="text-[10px] text-red-500 font-bold mt-2 leading-tight">
+                      Sektor asal telah dihapus. Anda wajib memilih sektor baru.
+                    </p>
                   )}
-
-                {/* Render Data Dinamis */}
-                {sections.map((sec) => (
-                  <option
-                    key={sec.id}
-                    value={sec.id}
-                    className="text-slate-700"
-                  >
-                    {sec.category}
-                  </option>
-                ))}
-              </select>
-
-              {/* Pesan Error Bantuan Visual */}
-              {formData.category && !validSectorIds.has(formData.category) && (
-                <p className="text-[10px] text-red-500 font-bold mt-2 leading-tight">
-                  Sektor asal telah dihapus. Anda wajib memilih sektor baru
-                  sebelum menyimpan.
-                </p>
-              )}
-            </>
-          )}
-        </div>
-
-        <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm">
-          <h3 className="text-xs font-black uppercase tracking-widest mb-4 flex items-center gap-2">
-            <ImageIcon className="w-4 h-4 text-daw-green" /> Gambar Sampul
-          </h3>
-          <div
-            {...getRootCoverProps()}
-            className={`aspect-video rounded-xl border-2 border-dashed flex items-center justify-center cursor-pointer transition-all overflow-hidden ${isCoverDragActive ? "border-daw-green bg-green-50" : "border-slate-100 bg-slate-50 hover:bg-slate-100"}`}
-          >
-            <input {...getInputCoverProps()} />
-            {coverPreview ? (
-              <img
-                src={coverPreview}
-                className="w-full h-full object-cover"
-                alt="Cover Preview"
-              />
-            ) : formData.cover_image ? (
-              <img
-                src={`${BASE_UPLOAD_URL}/${formData.cover_image}`}
-                className="w-full h-full object-cover"
-                alt="Server Cover"
-              />
-            ) : (
-              <div className="text-center p-4">
-                <ImageIcon className="w-8 h-8 text-slate-200 mx-auto mb-2" />
-                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-tighter">
-                  Upload Cover
-                </p>
-              </div>
+              </>
             )}
           </div>
-        </div>
 
-        <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm">
-          <h3 className="text-xs font-black uppercase tracking-widest mb-4 flex items-center gap-2">
-            <Images className="w-4 h-4 text-daw-green" /> Galeri
-          </h3>
-
-          {/* GRID PREVIEW: Existing Server Images + New Files */}
-          {(galleryFiles.length > 0 ||
-            (formData.gallery && JSON.parse(formData.gallery).length > 0)) && (
-            <div className="grid grid-cols-3 gap-2 mb-4">
-              {/* 1. Server Images (Edit Mode) */}
-              {isEditMode &&
-                formData.gallery &&
-                JSON.parse(formData.gallery || "[]").map(
-                  (imgName: string, idx: number) => (
-                    <div
-                      key={`old-${idx}`}
-                      className="relative aspect-square group rounded-xl overflow-hidden border border-slate-100 shadow-sm"
-                    >
-                      <img
-                        src={`${BASE_UPLOAD_URL}/${imgName}`}
-                        className="w-full h-full object-cover"
-                        alt="Saved"
-                      />
-                      <div className="absolute inset-0 bg-black/10 group-hover:bg-black/20 flex items-center justify-center pointer-events-none">
-                        <span className="text-[9px] text-white font-black uppercase bg-daw-green/80 px-2 py-0.5 rounded-full shadow-sm tracking-tighter">
-                          Saved
-                        </span>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          removeOldGalleryImage(idx);
-                        }}
-                        className="absolute top-1.5 right-1.5 bg-red-500 hover:bg-red-600 text-white rounded-full p-1.5 shadow-lg opacity-0 group-hover:opacity-100 transition-all transform hover:scale-110 z-30"
-                      >
-                        <X className="w-3 h-3" />
-                      </button>
-                    </div>
-                  ),
-                )}
-
-              {/* 2. New Local Images */}
-              {galleryFiles.map((file, idx) => (
-                <GalleryPreviewItem
-                  key={`new-${idx}`}
-                  file={file}
-                  onRemove={() =>
-                    setGalleryFiles((prev) => prev.filter((_, i) => i !== idx))
-                  }
+          {/* 2. GAMBAR SAMPUL */}
+          <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm">
+            <h3 className="text-xs font-black uppercase tracking-widest mb-4 flex items-center gap-2">
+              <ImageIcon className="w-4 h-4 text-daw-green" /> Gambar Sampul
+            </h3>
+            <div
+              {...getRootCoverProps()}
+              className={`aspect-video rounded-xl border-2 border-dashed flex items-center justify-center cursor-pointer transition-all overflow-hidden ${isCoverDragActive ? "border-daw-green bg-green-50" : "border-slate-100 bg-slate-50 hover:bg-slate-100"}`}
+            >
+              <input {...getInputCoverProps()} />
+              {coverPreview ? (
+                <img
+                  src={coverPreview}
+                  className="w-full h-full object-cover"
+                  alt="Cover Preview"
                 />
-              ))}
+              ) : formData.cover_image ? (
+                <img
+                  src={`${BASE_UPLOAD_URL}/${formData.cover_image}`}
+                  className="w-full h-full object-cover"
+                  alt="Server Cover"
+                />
+              ) : (
+                <div className="text-center p-4">
+                  <ImageIcon className="w-8 h-8 text-slate-200 mx-auto mb-2" />
+                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-tighter">
+                    Upload Cover
+                  </p>
+                </div>
+              )}
             </div>
-          )}
+          </div>
 
-          <div
-            {...getRootGalleryProps()}
-            className={`p-6 border-2 border-dashed rounded-lg text-center cursor-pointer transition-all ${isGalleryDragActive ? "border-daw-green bg-green-50" : "border-slate-200 hover:bg-slate-50"}`}
-          >
-            <input {...getInputGalleryProps()} />
-            <Plus
-              className={`w-6 h-6 mx-auto mb-2 transition-transform ${isGalleryDragActive ? "scale-150 text-daw-green" : "text-slate-300"}`}
-            />
-            <p className="text-[11px] font-bold text-slate-600 uppercase tracking-tight">
-              {isGalleryDragActive ? "Lepaskan gambar!" : "Tambah Foto Galeri"}
-            </p>
-            <p className="text-[10px] text-slate-400 mt-1">
-              Tarik atau klik area ini.
-            </p>
+          {/* 3. GALERI */}
+          <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm">
+            <h3 className="text-xs font-black uppercase tracking-widest mb-4 flex items-center gap-2">
+              <Images className="w-4 h-4 text-daw-green" /> Galeri
+            </h3>
+
+            {(galleryFiles.length > 0 ||
+              (formData.gallery &&
+                JSON.parse(formData.gallery).length > 0)) && (
+              <div className="grid grid-cols-3 gap-2 mb-4">
+                {isEditMode &&
+                  formData.gallery &&
+                  JSON.parse(formData.gallery || "[]").map(
+                    (imgName: string, idx: number) => (
+                      <div
+                        key={`old-${idx}`}
+                        className="relative aspect-square group rounded-xl overflow-hidden border border-slate-100 shadow-sm"
+                      >
+                        <img
+                          src={`${BASE_UPLOAD_URL}/${imgName}`}
+                          className="w-full h-full object-cover"
+                          alt="Saved"
+                        />
+                        <div className="absolute inset-0 bg-black/10 group-hover:bg-black/20 flex items-center justify-center pointer-events-none">
+                          <span className="text-[9px] text-white font-black uppercase bg-daw-green/80 px-2 py-0.5 rounded-full shadow-sm tracking-tighter">
+                            Saved
+                          </span>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            removeOldGalleryImage(idx);
+                          }}
+                          className="absolute top-1.5 right-1.5 bg-red-500 hover:bg-red-600 text-white rounded-full p-1.5 shadow-lg opacity-0 group-hover:opacity-100 transition-all transform hover:scale-110 z-30"
+                        >
+                          <X className="w-3 h-3" />
+                        </button>
+                      </div>
+                    ),
+                  )}
+
+                {galleryFiles.map((file, idx) => (
+                  <GalleryPreviewItem
+                    key={`new-${idx}`}
+                    file={file}
+                    onRemove={() =>
+                      setGalleryFiles((prev) =>
+                        prev.filter((_, i) => i !== idx),
+                      )
+                    }
+                  />
+                ))}
+              </div>
+            )}
+
+            <div
+              {...getRootGalleryProps()}
+              className={`p-6 border-2 border-dashed rounded-lg text-center cursor-pointer transition-all ${isGalleryDragActive ? "border-daw-green bg-green-50" : "border-slate-200 hover:bg-slate-50"}`}
+            >
+              <input {...getInputGalleryProps()} />
+              <Plus
+                className={`w-6 h-6 mx-auto mb-2 transition-transform ${isGalleryDragActive ? "scale-150 text-daw-green" : "text-slate-300"}`}
+              />
+              <p className="text-[11px] font-bold text-slate-600 uppercase tracking-tight">
+                {isGalleryDragActive
+                  ? "Lepaskan gambar!"
+                  : "Tambah Foto Galeri"}
+              </p>
+            </div>
           </div>
         </div>
       </div>
