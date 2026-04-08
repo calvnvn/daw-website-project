@@ -86,10 +86,19 @@ exports.getPublicBusinessData = async (req, res) => {
   try {
     const sections = await BusinessSection.findAll({
       // Eager load nested associations: Section -> Markers -> Category Details
+      attributes: [
+        "id",
+        "category",
+        "title",
+        "htmlContent",
+        "hasMap",
+        "orderIndex",
+      ],
       include: [
         {
           model: BusinessMapMarker,
           as: "mapMarkers",
+          required: false,
           include: [
             {
               model: MapCategory,
