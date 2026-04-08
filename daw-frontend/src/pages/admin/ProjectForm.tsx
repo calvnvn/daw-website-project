@@ -77,9 +77,19 @@ export default function ProjectForm() {
   const isEditMode = !!id;
   const quillRef = useRef<ReactQuill>(null);
   const { user, can } = useAuth();
-  const { sections } = useBusiness(); // FIX 1: Panggil Business Context
+  const { sections } = useBusiness();
   const [isLoading, setIsLoading] = useState(false);
   const [isFetching, setIsFetching] = useState(isEditMode); // Fetching hanya aktif jika Edit Mode
+
+  /**
+   * @memo validSectorIds
+   * Optimization: Converts sections array into a Set for O(1) validation.
+   * Essential for detecting if a project's existing category has been deleted.
+   */
+  const validSectorIds = useMemo(
+    () => new Set(sections.map((s) => s.id)),
+    [sections],
+  );
 
   const [formData, setFormData] = useState({
     title: "",
@@ -127,11 +137,17 @@ export default function ProjectForm() {
     return () => URL.revokeObjectURL(objectUrl);
   }, [coverFile]);
 
+  /**
+   * EFFECT: Default Category Initialization
+   * Handles setting the initial category for NEW projects only.
+   * Dependency guard prevents overwriting existing data during Edit Mode.
+   */
   useEffect(() => {
     if (!isEditMode && sections.length > 0 && !formData.category) {
       setFormData((prev) => ({ ...prev, category: sections[0].id }));
     }
-  }, [sections, isEditMode, formData.category]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sections, isEditMode]);
 
   // --- LOGIC: FETCH EXISTING DATA (EDIT MODE ONLY) ---
   useEffect(() => {
@@ -574,10 +590,9 @@ export default function ProjectForm() {
           ) : (
             <>
               <select
-                className={`w-full p-3 bg-slate-50 border rounded-xl font-bold outline-none transition-colors ${
-                  formData.category &&
-                  !sections.some((sec) => sec.id === formData.category)
-                    ? "border-red-500 text-red-600 focus:ring-2 focus:ring-red-200"
+                className={`w-full p-3 bg-slate-50 border rounded-xl font-bold outline-none transition-all ${
+                  formData.category && !validSectorIds.has(formData.category)
+                    ? "border-red-500 text-red-600 ring-2 ring-red-100"
                     : "border-slate-100 text-slate-700 focus:ring-2 focus:ring-daw-green/20"
                 }`}
                 value={formData.category}
@@ -587,7 +602,7 @@ export default function ProjectForm() {
               >
                 {/* Peringatan jika edit proyek yang sektornya sudah dihapus admin lain */}
                 {formData.category &&
-                  !sections.some((sec) => sec.id === formData.category) && (
+                  !validSectorIds.has(formData.category) && (
                     <option
                       value={formData.category}
                       disabled
@@ -610,13 +625,12 @@ export default function ProjectForm() {
               </select>
 
               {/* Pesan Error Bantuan Visual */}
-              {formData.category &&
-                !sections.some((sec) => sec.id === formData.category) && (
-                  <p className="text-[10px] text-red-500 font-bold mt-2 leading-tight">
-                    Sektor asal telah dihapus. Anda wajib memilih sektor baru
-                    sebelum menyimpan.
-                  </p>
-                )}
+              {formData.category && !validSectorIds.has(formData.category) && (
+                <p className="text-[10px] text-red-500 font-bold mt-2 leading-tight">
+                  Sektor asal telah dihapus. Anda wajib memilih sektor baru
+                  sebelum menyimpan.
+                </p>
+              )}
             </>
           )}
         </div>

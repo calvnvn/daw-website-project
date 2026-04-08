@@ -128,23 +128,6 @@ const DynamicBusinessSection = memo(function DynamicBusinessSection({
           <ScrollReveal direction="up" delay={200}>
             <BusinessGrid filter={data.id as any} hideFilters />
           </ScrollReveal>
-
-          <ScrollReveal direction="up" delay={300}>
-            <div className="mt-16 flex justify-center">
-              <Link
-                to={`/projects?category=${data.id}`}
-                className="group relative inline-flex items-center gap-4 px-8 py-4 bg-daw-green text-white text-[11px] font-black uppercase tracking-[0.2em] rounded-full overflow-hidden transition-all duration-300 hover:scale-105 hover:shadow-[0_10px_40px_-10px_rgba(16,185,129,0.6)]"
-              >
-                <span className="relative z-10">
-                  Explore All {data.category} Assets
-                </span>
-                <div className="relative z-10 w-8 h-8 flex items-center justify-center bg-white/20 rounded-full group-hover:bg-white transition-colors duration-300">
-                  <ArrowRight className="w-4 h-4 text-white group-hover:text-daw-green transition-transform duration-300 group-hover:translate-x-1" />
-                </div>
-                <div className="absolute inset-0 h-full w-0 bg-[#003b1c] transition-all duration-500 ease-out group-hover:w-full z-0"></div>
-              </Link>
-            </div>
-          </ScrollReveal>
         </div>
       )}
     </div>

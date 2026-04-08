@@ -1,5 +1,10 @@
 const sequelize = require("../config/database");
 
+/**
+ * @desc    Fetch aggregated data for the Admin Dashboard
+ * @route   GET /api/dashboard/stats
+ * @access  Private (Admin)
+ */
 exports.getDashboardStats = async (req, res) => {
   try {
     // 1. Hitung pesan yang belum dibaca (Unread Inquiries)
@@ -14,6 +19,17 @@ exports.getDashboardStats = async (req, res) => {
         SUM(CASE WHEN status = 'Draft' THEN 1 ELSE 0 END) as draftCount,
         SUM(views) as totalViews
        FROM Projects`,
+      { type: sequelize.QueryTypes.SELECT },
+    );
+
+    const projectDistribution = await sequelize.query(
+      `SELECT 
+        bs.category as label, 
+        COUNT(p.id) as value 
+       FROM BusinessSections bs
+       LEFT JOIN Projects p ON p.category = bs.id
+       GROUP BY bs.id, bs.category
+       ORDER BY value DESC`,
       { type: sequelize.QueryTypes.SELECT },
     );
 
@@ -40,6 +56,7 @@ exports.getDashboardStats = async (req, res) => {
           unreadInquiries: unreadCount,
           draftProjects: draftCount,
           totalViews: totalViews,
+          projectDistribution: projectDistribution,
         },
         recentInquiries: recentInquiries,
       },

@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useMemo } from "react";
+import { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import ReactQuill from "react-quill-new";
 import "react-quill-new/dist/quill.snow.css";
 import { toast } from "sonner";
@@ -25,6 +25,17 @@ import {
   type MapMarker,
 } from "@/contexts/BusinessContext";
 
+const normalizeBool = (val) => Boolean(val) || val === 1 || val === "true";
+
+const initialFormData = {
+  category: "",
+  title: "",
+  htmlContent: "",
+  hasMap: false,
+  orderIndex: 0,
+  mapMarkers: [],
+};
+
 export default function ManageBusinesses() {
   // Context & State Management
   const {
@@ -40,33 +51,63 @@ export default function ManageBusinesses() {
     deleteCategory,
   } = useBusiness();
 
-  // Primary state to track the current active view (Section ID or "categories")
+  // --- PRIMARY STATES ---
   const [activeTab, setActiveTab] = useState<string>("");
+  const [formData, setFormData] = useState<Omit<SectionData, "id">>({
+    category: "",
+    title: "",
+    htmlContent: "",
+    hasMap: false,
+    orderIndex: 0,
+    mapMarkers: [] as MapMarker[],
+  });
 
-  // Local state for the category creation form
-  const [newCat, setNewCat] = useState({ id: "", name: "", color: "#004B23" });
-
-  // State for managing category inline editing
-  const [editingCatId, setEditingCatId] = useState<string | null>(null);
-  const [editCatData, setEditCatData] = useState({ name: "", color: "" });
-
-  // Persistence and UI state toggles
+  // UI Toggles & Modals
   const [isSaving, setIsSaving] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [isMapModalOpen, setIsMapModalOpen] = useState(false);
+  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [isDiscardModalOpen, setIsDiscardModalOpen] = useState(false);
+
+  // Local Buffers
+  const [newSectionName, setNewSectionName] = useState("");
+  const [pendingTab, setPendingTab] = useState<string | null>(null);
+  const [newCat, setNewCat] = useState({ id: "", name: "", color: "#004B23" });
+  const [editingCatId, setEditingCatId] = useState<string | null>(null);
+  const [editCatData, setEditCatData] = useState({ name: "", color: "" });
+  const [deleteConfirmText, setDeleteConfirmText] = useState("");
 
   // Responsive and interaction states
   const [isMobile, setIsMobile] = useState(false);
   const [isHoveringMap, setIsHoveringMap] = useState(false);
   const [isTouching, setIsTouching] = useState(false);
 
-  // New UX States
-  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
-  const [newSectionName, setNewSectionName] = useState("");
+  /**
+   * --- DOM REFERENCES ---
+   * Used to bypass React's render cycle for smooth 60fps UI interactions.
+   */
+  const mapContainerRef = useRef<HTMLDivElement>(null);
+  const crosshairRef = useRef<HTMLDivElement>(null);
+  const loupeRef = useRef<HTMLDivElement>(null);
+  const radarRef = useRef<HTMLDivElement>(null);
+  const lastMousePos = useRef({ xPercent: 0, yPercent: 0 });
 
-  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
-  const [deleteConfirmText, setDeleteConfirmText] = useState("");
+  // MEMOIZED UTILITIES
+  /**
+   * @constant categoryMap
+   * Optimized dictionary for O(1) color lookup based on Category ID.
+   * Prevents repeated array searching during marker rendering.
+   */
+  const categoryMap = useMemo(
+    () => Object.fromEntries(categories.map((cat) => [cat.id, cat.color])),
+    [categories],
+  );
 
+  /**
+   * Stabilized Quill Modules to prevent unnecessary re-initialization
+   * of the rich text editor instance.
+   */
   const quillModules = {
     toolbar: [
       [{ header: [1, 2, 3, false] }],
@@ -80,61 +121,10 @@ export default function ManageBusinesses() {
     },
   };
 
-  // MEMOIZED UTILITIES
   /**
-   * @constant categoryMap
-   * Optimized dictionary for O(1) color lookup based on Category ID.
-   * Prevents repeated array searching during marker rendering.
+   * EFFECT: Tab Synchronization
+   * Centralized logic to sync form with selected section.
    */
-  const categoryMap = useMemo(() => {
-    return categories.reduce(
-      (acc, cat) => ({ ...acc, [cat.id]: cat.color }),
-      {} as Record<string, string>,
-    );
-  }, [categories]);
-
-  /**
-   * --- DOM REFERENCES ---
-   * Used to bypass React's render cycle for smooth 60fps UI interactions.
-   */
-  const mapContainerRef = useRef<HTMLDivElement>(null);
-  const crosshairRef = useRef<HTMLDivElement>(null);
-  const loupeRef = useRef<HTMLDivElement>(null);
-  const radarRef = useRef<HTMLDivElement>(null);
-  const lastMousePos = useRef({ xPercent: 0, yPercent: 0 });
-
-  /**
-   * --- SIDE EFFECTS & INITIALIZATION ---
-   */
-  useEffect(() => {
-    // Jika activeTab belum ada tapi sections sudah ada, jangan reset, tunggu efek inisialisasi tab
-    if (!activeTab && sections.length > 0) return;
-
-    const currentSection = sections.find((sec) => sec.id === activeTab);
-
-    if (currentSection) {
-      setFormData({
-        category: currentSection.category || "",
-        title: currentSection.title || "",
-        htmlContent: currentSection.htmlContent || "",
-        hasMap:
-          Boolean(currentSection.hasMap) || Number(currentSection.hasMap) === 1,
-        orderIndex: currentSection.orderIndex || 0,
-        mapMarkers: currentSection.mapMarkers || [],
-      });
-    } else if (activeTab && activeTab !== "categories") {
-      // Hanya reset jika activeTab memang sudah terisi tapi section tidak ditemukan
-      setFormData({
-        category: "",
-        title: "",
-        htmlContent: "",
-        hasMap: false,
-        orderIndex: 0,
-        mapMarkers: [],
-      });
-    }
-  }, [activeTab, sections]);
-  // Window resize listener to toggle mobile/desktop UI modes
   useEffect(() => {
     const checkMobile = () => setIsMobile(window.innerWidth < 768);
     checkMobile();
@@ -142,12 +132,31 @@ export default function ManageBusinesses() {
     return () => window.removeEventListener("resize", checkMobile);
   }, []);
 
-  // Auto-select the first available business section on initial load
+  /**
+   * EFFECT: Unified Tab & Data Synchronization
+   * Handles initial selection and keeps form buffer in sync with the global dataset.
+   */
   useEffect(() => {
+    // Auto-select first section if no tab is active
     if (sections.length > 0 && !activeTab) {
       setActiveTab(sections[0].id);
+      return;
     }
-  }, [sections, activeTab]);
+
+    const currentSection = sections.find((sec) => sec.id === activeTab);
+    if (currentSection) {
+      setFormData({
+        category: currentSection.category || "",
+        title: currentSection.title || "",
+        htmlContent: currentSection.htmlContent || "",
+        hasMap: normalizeBool(currentSection.hasMap),
+        orderIndex: currentSection.orderIndex || 0,
+        mapMarkers: currentSection.mapMarkers || [],
+      });
+    } else if (activeTab && activeTab !== "categories") {
+      setFormData(initialFormData);
+    }
+  }, [activeTab, sections]);
 
   /**
    * @desc Synchronizes the local form buffer with the global section data
@@ -180,9 +189,12 @@ export default function ManageBusinesses() {
     }
   }, [activeTab, sections]);
 
-  // Prevents data loss by warning the user before they leave with unsaved changes
+  /**
+   * EFFECT: Data Persistence Guard
+   * Prevents accidental data loss when the user attempts to close the tab or refresh.
+   */
   useEffect(() => {
-    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+    const handleBeforeUnload = (e) => {
       if (isEditing) {
         e.preventDefault();
         e.returnValue = "";
@@ -192,53 +204,50 @@ export default function ManageBusinesses() {
     return () => window.removeEventListener("beforeunload", handleBeforeUnload);
   }, [isEditing]);
 
-  // Reset editing states when locking the form
-  useEffect(() => {
-    if (!isEditing) setEditingCatId(null);
-  }, [isEditing]);
-
   /**
-   * --- HANDLERS & LOGIC ---
+   * --- HANDLERS ---
    */
 
   /**
    * @method updatePointerPos
-   * Directly manipulates the DOM elements for the magnifier and radar tools.
-   * Calculates coordinates as percentage values relative to the map container.
+   * High-performance DOM manipulation for 60fps tracking.
+   * Calculates relative percentage coordinates for geographical precision.
    */
-  const updatePointerPos = (clientX: number, clientY: number) => {
-    if (!mapContainerRef.current) return;
-    const rect = mapContainerRef.current.getBoundingClientRect();
-    const xP = Math.max(
-      0,
-      Math.min(100, ((clientX - rect.left) / rect.width) * 100),
-    );
-    const yP = Math.max(
-      0,
-      Math.min(100, ((clientY - rect.top) / rect.height) * 100),
-    );
+  const updatePointerPos = useCallback(
+    (clientX, clientY) => {
+      if (!mapContainerRef.current) return;
+      const rect = mapContainerRef.current.getBoundingClientRect();
+      const xP = Math.max(
+        0,
+        Math.min(100, ((clientX - rect.left) / rect.width) * 100),
+      );
+      const yP = Math.max(
+        0,
+        Math.min(100, ((clientY - rect.top) / rect.height) * 100),
+      );
 
-    lastMousePos.current = { xPercent: xP, yPercent: yP };
+      lastMousePos.current = { xPercent: xP, yPercent: yP };
 
-    if (!isMobile) {
-      if (crosshairRef.current) {
-        crosshairRef.current.style.left = `${xP}%`;
-        crosshairRef.current.style.top = `${yP}%`;
+      // Direct style injection bypasses React render cycle for smoothness
+      if (!isMobile) {
+        if (crosshairRef.current) {
+          crosshairRef.current.style.left = `${xP}%`;
+          crosshairRef.current.style.top = `${yP}%`;
+        }
+        if (loupeRef.current) {
+          loupeRef.current.style.left = `${xP}%`;
+          loupeRef.current.style.top = `${yP}%`;
+          loupeRef.current.style.backgroundPosition = `${xP}% ${yP}%`;
+        }
+      } else if (radarRef.current) {
+        radarRef.current.style.backgroundPosition = `${xP}% ${yP}%`;
+        const textNode = radarRef.current.querySelector(".radar-coord");
+        if (textNode)
+          textNode.innerHTML = `X:${xP.toFixed(0)} Y:${yP.toFixed(0)}`;
       }
-      if (loupeRef.current) {
-        loupeRef.current.style.left = `${xP}%`;
-        loupeRef.current.style.top = `${yP}%`;
-        loupeRef.current.style.backgroundPosition = `${xP}% ${yP}%`;
-      }
-    } else if (radarRef.current) {
-      radarRef.current.style.backgroundPosition = `${xP}% ${yP}%`;
-      const textNode = radarRef.current.querySelector(
-        ".radar-coord",
-      ) as HTMLSpanElement | null;
-      if (textNode)
-        textNode.innerHTML = `X:${xP.toFixed(0)} Y:${yP.toFixed(0)}`;
-    }
-  };
+    },
+    [isMobile],
+  );
 
   const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
     if (!isMobile) updatePointerPos(e.clientX, e.clientY);
@@ -252,22 +261,19 @@ export default function ManageBusinesses() {
    * @method handleMapClick
    * Commits the current pointer coordinates as a new Map Marker.
    */
-  const handleMapClick = () => {
+  const handleMapClick = useCallback(() => {
     if (!isEditing) return;
 
     const { xPercent, yPercent } = lastMousePos.current;
-    const xStr = xPercent.toFixed(2) + "%";
-    const yStr = yPercent.toFixed(2) + "%";
-
     const newMarker: MapMarker = {
-      id: Date.now().toString(),
+      id: `new-${Date.now()}`,
       title: "New Location",
       desc: "Capacity / Details",
       categoryId: categories.length > 0 ? categories[0].id : "",
-      dotX: xStr,
-      dotY: yStr,
-      boxX: xStr,
-      boxY: Math.max(0, yPercent - 15).toFixed(2) + "%",
+      dotX: `${xPercent.toFixed(2)}%`,
+      dotY: `${yPercent.toFixed(2)}%`,
+      boxX: `${xPercent.toFixed(2)}%`,
+      boxY: `${Math.max(0, yPercent - 15).toFixed(2)}%`,
       mapUrl: "",
     };
 
@@ -277,47 +283,43 @@ export default function ManageBusinesses() {
     }));
 
     toast.success("Marker dropped at precision point.");
-    if (isMapModalOpen) setIsMapModalOpen(false);
-  };
-
-  const [formData, setFormData] = useState<Omit<SectionData, "id">>({
-    category: "",
-    title: "",
-    htmlContent: "",
-    hasMap: false,
-    orderIndex: 0,
-    mapMarkers: [],
-  });
+    setIsMapModalOpen(false);
+  }, [isEditing, categories]);
 
   /**
    * @method handleTabChange
    * Guarded navigation to prevent data loss across dynamic tabs.
    */
-  const handleTabChange = (targetTab: string) => {
+  const handleTabChange = (targetTab) => {
+    // Avoid unnecessary guards if clicking the same tab
+    if (targetTab === activeTab) return;
+
     if (isEditing) {
-      setPendingTab(targetTab); // Simpan tujuan tab yang diklik
-      setIsDiscardModalOpen(true); // Buka modal konfirmasi buang data
-      return;
+      setPendingTab(targetTab);
+      setIsDiscardModalOpen(true);
+    } else {
+      setActiveTab(targetTab);
     }
-    setActiveTab(targetTab);
   };
 
-  const updateMarker = (
-    index: number,
-    field: keyof MapMarker,
-    value: string,
-  ) => {
-    const updatedMarkers = [...formData.mapMarkers];
-    updatedMarkers[index] = { ...updatedMarkers[index], [field]: value };
-    setFormData({ ...formData, mapMarkers: updatedMarkers });
-  };
+  const updateMarker = useCallback(
+    (index: number, field: keyof MapMarker, value: string) => {
+      setFormData((prev) => {
+        const updated = [...prev.mapMarkers];
+        // Pastikan field yang diupdate sesuai dengan keyof MapMarker
+        updated[index] = { ...updated[index], [field]: value };
+        return { ...prev, mapMarkers: updated };
+      });
+    },
+    [],
+  );
 
-  const removeMarker = (index: number) => {
-    setFormData({
-      ...formData,
-      mapMarkers: formData.mapMarkers.filter((_, i) => i !== index),
-    });
-  };
+  const removeMarker = useCallback((index: number) => {
+    setFormData((prev) => ({
+      ...prev,
+      mapMarkers: prev.mapMarkers.filter((_, i) => i !== index),
+    }));
+  }, []);
 
   /**
    * @method handleSave
@@ -333,17 +335,13 @@ export default function ManageBusinesses() {
         id: toastId,
       });
       setIsEditing(false);
-    } catch (error: unknown) {
+    } catch (error) {
       console.error("[SAVE_ACTION_FAILED]:", error);
       toast.error("Critical: Database sync failed.", { id: toastId });
     } finally {
       setIsSaving(false);
     }
   };
-
-  // 1. Tambahkan state modal baru di kumpulan state atas
-  const [isDiscardModalOpen, setIsDiscardModalOpen] = useState(false);
-  const [pendingTab, setPendingTab] = useState<string | null>(null);
 
   // 3. Fungsi untuk mengeksekusi "Buang Perubahan"
   const confirmDiscard = () => {
@@ -353,17 +351,19 @@ export default function ManageBusinesses() {
     setPendingTab(null);
     toast.info("Changes discarded.");
   };
-  if (isLoading && sections.length === 0)
+
+  if (isLoading && sections.length === 0) {
     return (
       <div className="p-12 text-center text-slate-500 font-bold animate-pulse flex flex-col items-center gap-4">
         <div className="w-10 h-10 border-4 border-daw-green border-t-transparent rounded-full animate-spin"></div>
         Syncing with Content Memory...
       </div>
     );
+  }
 
   return (
     <div className="max-w-6xl mx-auto space-y-6 animate-in fade-in duration-500 pb-12">
-      {/* --- HEADER: Control Panel --- */}
+      {/* HEADER CONTROL */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white p-6 rounded-xl border border-slate-200 shadow-sm top-0 z-20">
         <div>
           <h1 className="text-2xl font-serif font-bold text-slate-900">
@@ -426,7 +426,7 @@ export default function ManageBusinesses() {
         </div>
       </div>
 
-      {/* --- TABS NAVIGATION: Full Dynamic Loop --- */}
+      {/* TABS */}
       {/* Menggunakan struktur tab flat-design yang konsisten dengan halaman Manajemen lainnya */}
       <div className="flex items-end overflow-x-auto border border-slate-200 border-b-0 shadow-sm bg-white rounded-t-xl px-2 pt-2 hide-scrollbar">
         {/* Render Tabs from Database Sections */}

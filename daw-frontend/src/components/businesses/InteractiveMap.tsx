@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo, memo } from "react";
 import mapBase from "@/assets/map-indonesia-base.svg";
-import { X, ExternalLink } from "lucide-react"; // Ditambahkan ExternalLink untuk UX yang lebih jelas
+import { X, ExternalLink } from "lucide-react";
 import { type MapCategory } from "@/contexts/BusinessContext";
 
 /**
@@ -176,7 +176,13 @@ const InteractiveMap = memo(function InteractiveMap({
                   y2={`${m.bY}%`}
                   style={{ stroke: m.color }}
                   strokeWidth={isActive ? "2" : "1.5"}
-                  className={`transition-all duration-500 ease-out ${isActive ? "opacity-100" : isFaded ? "opacity-5" : "opacity-40"}`}
+                  className={`transition-all duration-500 ease-[cubic-bezier(0.34,1.56,0.64,1)] ${
+                    isActive
+                      ? "opacity-100 drop-shadow-[0_0_5px_rgba(0,0,0,0.3)]"
+                      : isFaded
+                        ? "opacity-30"
+                        : "opacity-60"
+                  }`}
                 />
               );
             })}
@@ -213,31 +219,93 @@ const InteractiveMap = memo(function InteractiveMap({
                 ></span>
               </div>
 
-              {/* FLOATING DATA BOX (Desktop Only) */}
+              {/* FLOATING DATA BOX (Desktop Only) - TIER S DESIGN */}
               {!isMobile && (
                 <div
-                  className={`absolute bg-white/95 backdrop-blur-md border shadow-xl p-4 rounded-2xl -translate-x-1/2 transition-all duration-500 ease-out flex flex-col justify-center pointer-events-auto
-                    ${isActive ? "opacity-100 translate-y-[-60%] scale-105 z-50" : "opacity-0 translate-y-0 pointer-events-none"}
-                    ${isFaded ? "blur-md" : ""}`}
+                  className={`absolute group flex flex-col justify-center pointer-events-auto transform -translate-x-1/2 -translate-y-1/2 transition-all duration-500 ease-[cubic-bezier(0.34,1.56,0.64,1)] overflow-hidden rounded-2xl
+                    ${
+                      isActive
+                        ? "z-[60] scale-110 bg-white shadow-[0_20px_60px_-15px_rgba(0,0,0,0.3)] ring-2 ring-offset-4 ring-offset-slate-50/50"
+                        : isFaded
+                          ? "z-10 scale-95 bg-white/70 backdrop-blur-md opacity-80 border-slate-200 shadow-sm pointer-events-none"
+                          : "z-30 scale-100 bg-white/90 backdrop-blur-md border-white/50 shadow-xl hover:shadow-2xl"
+                    }
+                  `}
                   style={{
                     left: `${m.bX}%`,
                     top: `${m.bY}%`,
-                    minWidth: "180px",
-                    maxWidth: "240px",
-                    borderColor: `${markerColor}33`,
+                    minWidth: "190px",
+                    maxWidth: "260px",
+                    borderWidth: "1px",
+                    // Apply ring color dynamically
+                    ...(isActive
+                      ? ({
+                          "--tw-ring-color": markerColor,
+                        } as React.CSSProperties)
+                      : {}),
+                    borderColor: isActive ? "transparent" : `${markerColor}30`,
                   }}
                   onMouseEnter={() => setActiveId(m.id)}
                   onMouseLeave={() => setActiveId(null)}
                 >
-                  <h4
-                    className="font-serif font-bold text-[14px] leading-tight mb-1.5"
-                    style={{ color: markerColor }}
-                  >
-                    {m.title}
-                  </h4>
-                  <p className="font-sans text-[11px] font-medium text-slate-600 leading-relaxed">
-                    {m.desc}
-                  </p>
+                  {/* AESTHETIC: Dynamic Top Accent Line */}
+                  <div
+                    className={`absolute top-0 left-0 w-full transition-all duration-500 ease-out ${
+                      isActive ? "h-1.5" : "h-0.5"
+                    }`}
+                    style={{ backgroundColor: markerColor }}
+                  />
+
+                  {/* AESTHETIC: Ambient Inner Glow */}
+                  <div
+                    className={`absolute inset-0 transition-opacity duration-700 pointer-events-none ${
+                      isActive ? "opacity-15" : "opacity-0"
+                    }`}
+                    style={{
+                      background: `radial-gradient(circle at top right, ${markerColor}, transparent 70%)`,
+                    }}
+                  />
+
+                  {/* CONTENT WRAPPER */}
+                  <div className="relative z-10 p-5 flex flex-col gap-2">
+                    <div>
+                      <h4
+                        className="font-serif font-bold text-[14px] leading-tight mb-1 transition-colors duration-300"
+                        style={{ color: isActive ? "#0f172a" : markerColor }}
+                      >
+                        {m.title}
+                      </h4>
+                      <p className="font-sans text-[11px] font-medium text-slate-600 leading-relaxed">
+                        {m.desc}
+                      </p>
+                    </div>
+
+                    {/* MICRO-INTERACTION: Expanding Action Link (View on Maps) */}
+                    {/* Menggunakan Grid template rows untuk transisi ekspansi yang lebih mulus tanpa magic number max-height */}
+                    <div
+                      className={`grid transition-all duration-500 ease-[cubic-bezier(0.4,0,0.2,1)] ${
+                        isActive && m.mapUrl
+                          ? "grid-rows-[1fr] opacity-100 mt-2"
+                          : "grid-rows-[0fr] opacity-0 mt-0"
+                      }`}
+                    >
+                      <div className="overflow-hidden">
+                        {m.mapUrl && (
+                          <a
+                            href={m.mapUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-1.5 text-[10px] font-black uppercase tracking-[0.15em] hover:opacity-70 transition-opacity bg-slate-50 py-2 px-3 rounded-lg border border-slate-100 w-full"
+                            style={{ color: markerColor }}
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            <ExternalLink className="w-3 h-3" />
+                            <span>View on Maps</span>
+                          </a>
+                        )}
+                      </div>
+                    </div>
+                  </div>
                 </div>
               )}
             </div>

@@ -29,54 +29,86 @@ interface AdminProject {
 
 export default function ProjectManagement() {
   // 2. Gunakan Interface pada State
+  // --- STATE & HOOKS ---
   const [projects, setProjects] = useState<AdminProject[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [filterCategory, setFilterCategory] = useState<string>("All");
-  const { sections } = useBusiness();
 
-  // Deteksi apakah ada proyek yang sektornya sudah terhapus di database
-  const hasUncategorizedProjects = projects.some(
-    (project) => !sections.some((sec) => sec.id === project.category),
+  // Get business context data
+  const { sections, isLoading: isSectionsLoading } = useBusiness();
+
+  /**
+   * @memo validSectorIds
+   * Optimization: Converts sections array to a Set for O(1) lookup performance.
+   * This prevents expensive array traversal inside the filter loops.
+   */
+  const validSectorIds = useMemo(
+    () => new Set(sections.map((s) => s.id)),
+    [sections],
   );
 
-  // 3. Logika Filter SEKARANG MENGGUNAKAN DATA ASLI (projects)
+  /**
+   * @memo hasUncategorizedProjects
+   * Integrity Check: Detects if any existing project belongs to a sector
+   * that has been deleted from the database.
+   * Guard: Returns false if sections are still loading to prevent UI flickering.
+   */
+  const hasUncategorizedProjects = useMemo(() => {
+    if (isSectionsLoading || projects.length === 0) return false;
+    return projects.some((p) => !validSectorIds.has(p.category));
+  }, [projects, validSectorIds, isSectionsLoading]);
+
+  /**
+   * @memo filteredProjects
+   * Primary Filtering Engine:
+   * 1. Search: Matches trimmed, case-insensitive title.
+   * 2. Category: Supports 'All', 'Uncategorized' (Orphaned data), and specific slugs.
+   */
   const filteredProjects = useMemo(() => {
+    // Return empty if data is still fetching to avoid mismatched calculations
+    if (isLoading) return [];
+
     return projects.filter((project) => {
+      // 1. Search logic
+      const normalizedSearch = searchTerm.trim().toLowerCase();
       const matchSearch = project.title
         .toLowerCase()
-        .includes(searchTerm.toLowerCase());
-      const isValidSector = sections.some((sec) => sec.id === project.category);
+        .includes(normalizedSearch);
 
+      // 2. Category logic
       let matchCategory = false;
-      if (filterCategory === "All") matchCategory = true;
-      else if (filterCategory === "Uncategorized")
-        matchCategory = !isValidSector;
-      else
-        matchCategory =
-          project.category.toLowerCase() === filterCategory.toLowerCase();
+      if (filterCategory === "All") {
+        matchCategory = true;
+      } else if (filterCategory === "Uncategorized") {
+        matchCategory = !validSectorIds.has(project.category);
+      } else {
+        // Standard slug comparison
+        matchCategory = project.category === filterCategory;
+      }
 
       return matchSearch && matchCategory;
     });
-  }, [projects, searchTerm, filterCategory, sections]);
+  }, [projects, searchTerm, filterCategory, validSectorIds, isLoading]);
 
-  // 4. Fetch Data dari Backend
+  // --- DATA FETCHING ---
   useEffect(() => {
     const fetchProjects = async () => {
       try {
         const response = await api.get("/projects");
 
-        // Handle double nesting dari backend DAW
-        if (response.data && response.data.success) {
-          setProjects(response.data.data);
-        } else if (Array.isArray(response.data)) {
-          setProjects(response.data);
+        // Data Normalization for different backend response structures
+        const data = response.data?.success
+          ? response.data.data
+          : response.data;
+        if (Array.isArray(data)) {
+          setProjects(data);
         }
       } catch (error: any) {
-        console.error("Fetch Projects Error:", error);
-        toast.error("Connection Error", {
+        console.error("[FETCH_PROJECTS_ERROR]:", error);
+        toast.error("Gagal sinkronisasi data proyek", {
           description:
-            error.response?.data?.message || "Cannot connect to server.",
+            error.response?.data?.message || "Kesalahan koneksi server.",
         });
       } finally {
         setIsLoading(false);

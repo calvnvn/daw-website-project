@@ -1,9 +1,8 @@
 const BusinessSection = require("../models/BusinessSection");
 const BusinessMapMarker = require("../models/BusinessMapMarker");
+const Project = require("../models/Project");
 const MapCategory = require("../models/MapCategory");
 const sequelize = require("../config/database");
-
-// 🔥 TAMBAHKAN INI: Import the Security Shield
 const sanitizeHtml = require("sanitize-html");
 
 /**
@@ -249,9 +248,13 @@ exports.createBusinessSection = async (req, res) => {
   }
 };
 
+/**
+ * @desc    Safely deletes a business section. Rejects deletion if projects are still attached.
+ * @route   DELETE /api/businesses/admin/:id
+ * @access  Private (Admin)
+ */
 exports.deleteSection = async (req, res) => {
   const { id } = req.params;
-  const t = await sequelize.transaction();
 
   try {
     const section = await BusinessSection.findByPk(id);
@@ -259,19 +262,47 @@ exports.deleteSection = async (req, res) => {
       return res.status(404).json({ message: "Sektor bisnis tidak ditemukan" });
     }
 
-    // Hapus marker terkait terlebih dahulu (Opsional jika sudah pakai CASCADE di DB)
-    await BusinessMapMarker.destroy({
-      where: { sectionId: id },
-      transaction: t,
+    // THE SECURITY SHIELD: Check for Orphaned Projects Risk
+    // Hitung apakah ada proyek di tabel Project yang kolom 'category'-nya sama dengan ID sektor ini
+    const attachedProjectsCount = await Project.count({
+      where: { category: id },
     });
 
-    // Hapus seksi
-    await section.destroy({ transaction: t });
+    // Jika ada, TOLAK proses penghapusan
+    if (attachedProjectsCount > 0) {
+      return res.status(400).json({
+        message: `Penghapusan ditolak! Sektor ini masih memiliki ${attachedProjectsCount} proyek aktif. Silakan pindahkan atau hapus proyek tersebut terlebih dahulu.`,
+      });
+    }
 
-    await t.commit();
-    res.status(200).json({ message: "Sektor bisnis berhasil dihapus" });
+    // Mulai transaksi hanya setelah lolos pengecekan keamanan
+    const t = await sequelize.transaction();
+
+    try {
+      // Hapus marker terkait terlebih dahulu (Menghindari constraint error)
+      await BusinessMapMarker.destroy({
+        where: { sectionId: id },
+        transaction: t,
+      });
+
+      // Hapus sektor bisnis
+      await section.destroy({ transaction: t });
+
+      // Persetujui perubahan
+      await t.commit();
+      res.status(200).json({
+        message:
+          "Sektor bisnis beserta markernya berhasil dihapus dengan aman.",
+      });
+    } catch (transactionError) {
+      await t.rollback();
+      throw transactionError; // Lempar ke outer catch block
+    }
   } catch (error) {
-    await t.rollback();
-    res.status(500).json({ message: error.message });
+    console.error("[DELETE_SECTION_ERROR]:", error);
+    res.status(500).json({
+      message: "Terjadi kesalahan server saat mencoba menghapus sektor.",
+      error: error.message,
+    });
   }
 };
