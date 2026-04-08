@@ -1,6 +1,7 @@
 const Role = require("../models/Role");
 const Permission = require("../models/Permission");
-const sequelize = require("../config/database"); // Import sequelize untuk transaksi
+const sequelize = require("../config/database");
+const User = require("../models/User");
 
 // Get All Roles (dengan list permission-nya)
 exports.getAllRoles = async (req, res) => {
@@ -113,6 +114,17 @@ exports.deleteRole = async (req, res) => {
       return res
         .status(403)
         .json({ message: `System role '${role.name}' cannot be deleted.` });
+    }
+
+    // Mencari apakah ada user yang masih terhubung ke role ini
+    const userCount = await User.count({ where: { roleId: id } });
+
+    if (userCount > 0) {
+      return res.status(400).json({
+        message: `Cannot delete role. There are still ${userCount} user(s) assigned to this role.`,
+        description:
+          "Please reassign these users to a different role before deleting.",
+      });
     }
 
     await role.destroy();
