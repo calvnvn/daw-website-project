@@ -25,6 +25,30 @@ interface Role {
   permissions: { id: string; name: string }[];
 }
 
+/**
+ * PERMISSION GROUP CONFIGURATION
+ * @description Maps raw permission keys to logical business domains.
+ * This ensures the Role Management UI matches the Sidebar Navigation UI.
+ */
+const PERMISSION_GROUPS = [
+  {
+    label: "Main Desk (Operations)",
+    keys: ["manage_inbox"],
+  },
+  {
+    label: "Corporate Portfolio",
+    keys: ["manage_businesses", "manage_projects", "manage_investments"],
+  },
+  {
+    label: "Web Content & CMS",
+    keys: ["manage_content", "manage_homepage", "manage_about"],
+  },
+  {
+    label: "System Administration",
+    keys: ["manage_users", "manage_settings"],
+  },
+];
+
 export default function RoleManagement() {
   const { can } = useAuth();
   const [roles, setRoles] = useState<Role[]>([]);
@@ -262,9 +286,9 @@ export default function RoleManagement() {
       {/* CREATE / EDIT MODAL */}
       {isModalOpen && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/60 animate-in fade-in duration-200">
-          {" "}
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl flex flex-col max-h-[90vh] overflow-hidden">
-            <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50">
+            {/* --- 1. MODAL HEADER --- */}
+            <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50 shrink-0">
               <h2 className="text-lg font-bold text-slate-800">
                 {editingRole
                   ? `Edit Role: ${editingRole.name}`
@@ -277,8 +301,9 @@ export default function RoleManagement() {
                 <X className="w-5 h-5" />
               </button>
             </div>
-
+            {/* --- 2. MODAL BODY (SCROLLABLE AREA) --- */}
             <div className="p-6 overflow-y-auto flex-1 custom-scrollbar space-y-6">
+              {/* Name & Description Fields */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="col-span-1 md:col-span-2">
                   <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">
@@ -309,11 +334,12 @@ export default function RoleManagement() {
                   />
                 </div>
               </div>
-
+              {/* Permissions Section */}
               <div>
                 <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-3">
                   Module Permissions
                 </label>
+
                 {editingRole?.name === "Superadmin" ? (
                   <div className="p-4 bg-purple-50 border border-purple-200 rounded-xl text-purple-700 text-sm font-medium flex items-start gap-3">
                     <Shield className="w-5 h-5 shrink-0 mt-0.5" />
@@ -321,49 +347,131 @@ export default function RoleManagement() {
                     Checkboxes are disabled.
                   </div>
                 ) : (
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    {permissionsList.map((perm) => {
-                      const isChecked = formData.permissionIds.includes(
-                        perm.id,
+                  <div className="space-y-6">
+                    {/* Map explicitly defined permission groups */}
+                    {PERMISSION_GROUPS.map((group) => {
+                      const groupPerms = permissionsList.filter((p) =>
+                        group.keys.includes(p.name),
                       );
+
+                      if (groupPerms.length === 0) return null;
+
                       return (
                         <div
-                          key={perm.id}
-                          onClick={() => togglePermission(perm.id)}
-                          className={`flex items-start gap-3 p-3 rounded-lg border-2 cursor-pointer transition-all duration-200 ${
-                            isChecked
-                              ? "border-daw-green bg-daw-green/5"
-                              : "border-slate-100 bg-white hover:border-slate-200"
-                          }`}
+                          key={group.label}
+                          className="bg-slate-50/50 p-4 rounded-xl border border-slate-100"
                         >
-                          <div
-                            className={`mt-0.5 ${isChecked ? "text-daw-green" : "text-slate-300"}`}
-                          >
-                            {isChecked ? (
-                              <CheckSquare className="w-5 h-5" />
-                            ) : (
-                              <Square className="w-5 h-5" />
-                            )}
-                          </div>
-                          <div>
-                            <p
-                              className={`text-sm font-bold ${isChecked ? "text-slate-900" : "text-slate-600"}`}
-                            >
-                              {formatPermName(perm.name)}
-                            </p>
-                            <p className="text-[10px] text-slate-400 mt-0.5 leading-tight">
-                              {perm.description}
-                            </p>
+                          <h4 className="text-[11px] font-black text-slate-400 uppercase tracking-[0.15em] mb-3">
+                            {group.label}
+                          </h4>
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                            {groupPerms.map((perm) => {
+                              const isChecked = formData.permissionIds.includes(
+                                perm.id,
+                              );
+
+                              return (
+                                <div
+                                  key={perm.id}
+                                  onClick={() => togglePermission(perm.id)}
+                                  className={`flex items-start gap-3 p-3 rounded-lg border-2 cursor-pointer transition-all duration-200 ${
+                                    isChecked
+                                      ? "border-daw-green bg-daw-green/5"
+                                      : "border-slate-100 bg-white hover:border-slate-200"
+                                  }`}
+                                >
+                                  <div
+                                    className={`mt-0.5 ${isChecked ? "text-daw-green" : "text-slate-300"}`}
+                                  >
+                                    {isChecked ? (
+                                      <CheckSquare className="w-5 h-5" />
+                                    ) : (
+                                      <Square className="w-5 h-5" />
+                                    )}
+                                  </div>
+                                  <div>
+                                    <p
+                                      className={`text-sm font-bold ${isChecked ? "text-slate-900" : "text-slate-600"}`}
+                                    >
+                                      {formatPermName(perm.name)}
+                                    </p>
+                                    <p className="text-[10px] text-slate-400 mt-0.5 leading-tight">
+                                      {perm.description}
+                                    </p>
+                                  </div>
+                                </div>
+                              );
+                            })}
                           </div>
                         </div>
                       );
                     })}
+
+                    {/* Catch-all for any unmapped permissions */}
+                    {(() => {
+                      const mappedKeys = PERMISSION_GROUPS.flatMap(
+                        (g) => g.keys,
+                      );
+                      const unmappedPerms = permissionsList.filter(
+                        (p) => !mappedKeys.includes(p.name),
+                      );
+
+                      if (unmappedPerms.length === 0) return null;
+
+                      return (
+                        <div className="bg-orange-50/50 p-4 rounded-xl border border-orange-100">
+                          <h4 className="text-[11px] font-black text-orange-400 uppercase tracking-[0.15em] mb-3">
+                            Other Permissions
+                          </h4>
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                            {unmappedPerms.map((perm) => {
+                              const isChecked = formData.permissionIds.includes(
+                                perm.id,
+                              );
+                              return (
+                                <div
+                                  key={perm.id}
+                                  onClick={() => togglePermission(perm.id)}
+                                  className={`flex items-start gap-3 p-3 rounded-lg border-2 cursor-pointer transition-all duration-200 ${
+                                    isChecked
+                                      ? "border-orange-500 bg-orange-50"
+                                      : "border-slate-100 bg-white hover:border-slate-200"
+                                  }`}
+                                >
+                                  <div
+                                    className={`mt-0.5 ${isChecked ? "text-orange-500" : "text-slate-300"}`}
+                                  >
+                                    {isChecked ? (
+                                      <CheckSquare className="w-5 h-5" />
+                                    ) : (
+                                      <Square className="w-5 h-5" />
+                                    )}
+                                  </div>
+                                  <div>
+                                    <p
+                                      className={`text-sm font-bold ${isChecked ? "text-slate-900" : "text-slate-600"}`}
+                                    >
+                                      {formatPermName(perm.name)}
+                                    </p>
+                                    <p className="text-[10px] text-slate-400 mt-0.5 leading-tight">
+                                      {perm.description}
+                                    </p>
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      );
+                    })()}
                   </div>
                 )}
-              </div>
-            </div>
-
-            <div className="px-6 py-4 border-t border-slate-100 flex items-center justify-end gap-3 bg-slate-50">
+              </div>{" "}
+              {/* <-- FIX: Penutup dari pembungkus 'Module Permissions' yang hilang */}
+            </div>{" "}
+            {/* <-- FIX: Penutup dari Modal Body (Scrollable) */}
+            {/* --- 3. MODAL FOOTER (FIXED) --- */}
+            <div className="px-6 py-4 border-t border-slate-100 flex items-center justify-end gap-3 bg-slate-50 shrink-0">
               <button
                 onClick={handleCloseModal}
                 className="px-5 py-2.5 text-sm font-bold text-slate-600 hover:bg-slate-200 rounded-lg transition-colors"
@@ -380,7 +488,7 @@ export default function RoleManagement() {
                 }`}
               >
                 Save Role Config
-              </button>{" "}
+              </button>
             </div>
           </div>
         </div>

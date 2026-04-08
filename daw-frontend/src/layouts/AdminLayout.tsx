@@ -36,57 +36,92 @@ interface InquiryData {
   [key: string]: unknown;
 }
 
-const MASTER_MENU_CONFIG = [
-  { name: "Dashboard", path: "/admin", icon: LayoutDashboard },
+/**
+ * MENU CONFIGURATION (DOMAIN-DRIVEN)
+ * @description Groups navigation items into logical business domains.
+ * Headers will automatically hide if a user lacks permissions for all items in a group.
+ */
+const MENU_GROUPS = [
   {
-    name: "Homepage",
-    path: "/admin/home",
-    icon: MonitorPlay,
-    perm: "manage_homepage",
+    label: "Main Desk",
+    items: [
+      { name: "Dashboard", path: "/admin", icon: LayoutDashboard },
+      {
+        name: "Inbox",
+        path: "/admin/inbox",
+        icon: Inbox,
+        perm: "manage_inbox",
+      },
+    ],
   },
   {
-    name: "Projects",
-    path: "/admin/projects",
-    icon: FolderTree,
-    perm: "manage_projects",
+    label: "Corporate",
+    items: [
+      {
+        name: "Businesses",
+        path: "/admin/businesses",
+        icon: Building2,
+        perm: "manage_businesses",
+      },
+      {
+        name: "Projects",
+        path: "/admin/projects",
+        icon: FolderTree,
+        perm: "manage_projects",
+      },
+      {
+        name: "Investments",
+        path: "/admin/investments",
+        icon: Briefcase,
+        perm: "manage_investments",
+      },
+    ],
   },
   {
-    name: "Businesses",
-    path: "/admin/businesses",
-    icon: Building2,
-    perm: "manage_businesses",
+    label: "Content",
+    items: [
+      {
+        name: "Content Manager",
+        path: "/admin/content",
+        icon: FileText,
+        perm: "manage_content",
+      },
+      {
+        name: "Homepage",
+        path: "/admin/home",
+        icon: MonitorPlay,
+        perm: "manage_homepage",
+      },
+      {
+        name: "About Us",
+        path: "/admin/about",
+        icon: Users,
+        perm: "manage_about",
+      },
+    ],
   },
   {
-    name: "Investments",
-    path: "/admin/investments",
-    icon: Briefcase,
-    perm: "manage_investments",
-  },
-  { name: "About Us", path: "/admin/about", icon: Users, perm: "manage_about" },
-  { name: "Inbox", path: "/admin/inbox", icon: Inbox, perm: "manage_inbox" },
-  {
-    name: "Content Manager",
-    path: "/admin/content",
-    icon: FileText,
-    perm: "manage_content",
-  },
-  {
-    name: "Role Management",
-    path: "/admin/roles",
-    icon: Key,
-    perm: "manage_users",
-  },
-  {
-    name: "User Access",
-    path: "/admin/users",
-    icon: Shield,
-    perm: "manage_users",
-  },
-  {
-    name: "Settings",
-    path: "/admin/settings",
-    icon: Settings,
-    perm: "manage_settings",
+    label: "System",
+    items: [
+      {
+        name: "User Access",
+        path: "/admin/users",
+        icon: Shield,
+        perm: "manage_users",
+      },
+      {
+        name: "Role Management",
+        path: "/admin/roles",
+        icon: Key,
+        perm: "manage_users",
+      },
+      {
+        name: "Settings",
+        path: "/admin/settings",
+        icon: Settings,
+        perm: "manage_settings",
+      },
+    ],
   },
 ];
 
@@ -167,11 +202,14 @@ export default function AdminLayout() {
   };
 
   // Hanya tampilkan menu yang user punya akses (atau jika menu itu public/dashboard)
-  const filteredMenu = useMemo(
-    () => MASTER_MENU_CONFIG.filter((item) => !item.perm || can(item.perm)),
+  const filteredMenuGroups = useMemo(() => {
+    return MENU_GROUPS.map((group) => ({
+      ...group,
+      // Filter out items the user doesn't have permission to see
+      items: group.items.filter((item) => !item.perm || can(item.perm)),
+    })).filter((group) => group.items.length > 0); // Drop the group if it's empty
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [user, can],
-  );
+  }, [user, can]);
 
   return (
     <div className="h-[100dvh] bg-slate-50 flex font-sans text-slate-900 overflow-hidden">
@@ -201,58 +239,80 @@ export default function AdminLayout() {
           />
         </div>
 
-        {/* MENU NAVIGASI */}
-        <nav className="flex-1 py-8 flex flex-col gap-2 overflow-y-auto custom-scrollbar px-3">
-          <p
-            className={`text-xs font-bold tracking-[0.2em] text-slate-400 uppercase mb-2 transition-all duration-300 ${isDesktopCollapsed ? "text-center text-[9px] opacity-0 md:opacity-100" : "px-2"}`}
-          >
-            {isDesktopCollapsed ? "Menu" : "Main Menu"}
-          </p>
-
-          {filteredMenu.map((item) => {
-            const isActive = location.pathname === item.path;
-            const Icon = item.icon;
-
-            const dynamicBadge =
-              item.name === "Inbox" && unreadInquiries.length > 0
-                ? unreadInquiries.length
-                : undefined;
-
-            return (
-              <Link
-                key={item.name}
-                to={item.path}
-                onClick={() => setIsMobileMenuOpen(false)}
-                className={`
-                  relative flex items-center px-3 py-3 rounded-xl transition-all duration-200 group
-                  ${isActive ? "bg-daw-green/10 text-daw-green font-bold" : "text-slate-600 hover:bg-slate-50 hover:text-daw-green"}
-                  ${isDesktopCollapsed ? "justify-center" : "justify-between"}
-                `}
+        {/* NAVIGATION MENU */}
+        <nav className="flex-1 py-6 flex flex-col gap-1 overflow-y-auto custom-scrollbar px-3">
+          {filteredMenuGroups.map((group, groupIndex) => (
+            <div key={group.label} className={groupIndex > 0 ? "mt-4" : ""}>
+              {/* GROUP HEADER */}
+              <p
+                className={`text-[10px] font-black tracking-[0.2em] text-slate-400 uppercase mb-2 px-3 transition-all duration-300 ${
+                  isDesktopCollapsed
+                    ? "h-0 overflow-hidden opacity-0 m-0 p-0"
+                    : "opacity-100"
+                }`}
               >
-                {/* Aksen garis kiri */}
-                {isActive && (
-                  <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-6 bg-daw-green rounded-r-full"></div>
-                )}
+                {group.label}
+              </p>
 
-                <div className="flex items-center">
-                  <Icon
-                    className={`w-5 h-5 shrink-0 transition-colors ${isActive ? "text-daw-green" : "text-slate-400 group-hover:text-daw-green"}`}
-                  />
-                  <span
-                    className={`whitespace-nowrap overflow-hidden transition-all duration-300 ${isDesktopCollapsed ? "md:w-0 md:opacity-0 ml-0" : "w-auto opacity-100 ml-3"}`}
-                  >
-                    {item.name}
-                  </span>
-                </div>
-                {/* Badge Notifikasi */}
-                {dynamicBadge && (
-                  <span className="bg-red-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full shadow-sm">
-                    {dynamicBadge}
-                  </span>
-                )}
-              </Link>
-            );
-          })}
+              {/* GROUP ITEMS */}
+              <div className="flex flex-col gap-1">
+                {group.items.map((item) => {
+                  const isActive = location.pathname === item.path;
+                  const Icon = item.icon;
+
+                  // Dynamic badge assignment
+                  const dynamicBadge =
+                    item.name === "Inbox" && unreadInquiries.length > 0
+                      ? unreadInquiries.length
+                      : undefined;
+
+                  return (
+                    <Link
+                      key={item.name}
+                      to={item.path}
+                      onClick={() => setIsMobileMenuOpen(false)}
+                      className={`
+                        relative flex items-center px-3 py-3 rounded-xl transition-all duration-200 group
+                        ${isActive ? "bg-daw-green/10 text-daw-green font-bold" : "text-slate-600 hover:bg-slate-50 hover:text-daw-green"}
+                        ${isDesktopCollapsed ? "justify-center" : "justify-between"}
+                      `}
+                    >
+                      {/* Active Left Border Accent */}
+                      {isActive && (
+                        <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-6 bg-daw-green rounded-r-full" />
+                      )}
+
+                      <div className="flex items-center">
+                        <Icon
+                          className={`w-5 h-5 shrink-0 transition-colors ${
+                            isActive
+                              ? "text-daw-green"
+                              : "text-slate-400 group-hover:text-daw-green"
+                          }`}
+                        />
+                        <span
+                          className={`whitespace-nowrap overflow-hidden transition-all duration-300 ${
+                            isDesktopCollapsed
+                              ? "md:w-0 md:opacity-0 ml-0"
+                              : "w-auto opacity-100 ml-3"
+                          }`}
+                        >
+                          {item.name}
+                        </span>
+                      </div>
+
+                      {/* Notification Badge */}
+                      {dynamicBadge && (
+                        <span className="bg-red-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full shadow-sm">
+                          {dynamicBadge}
+                        </span>
+                      )}
+                    </Link>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
         </nav>
 
         {/* AREA PROFIL & LOGOUT */}
