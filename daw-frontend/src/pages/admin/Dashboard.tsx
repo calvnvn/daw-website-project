@@ -112,7 +112,7 @@ export default function Dashboard() {
   return (
     <div className="max-w-6xl mx-auto space-y-8 animate-in fade-in duration-500 pb-12">
       {/* --- 1. HEADER --- */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-end gap-4 border-b border-slate-200 pb-6">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white p-6 rounded-xl border border-slate-200 shadow-sm top-0 z-20">
         <div>
           <h1 className="text-3xl font-bold text-slate-900 tracking-tight">
             Welcome back, {firstName}!

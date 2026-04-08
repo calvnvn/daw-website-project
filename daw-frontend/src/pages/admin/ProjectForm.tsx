@@ -419,7 +419,7 @@ export default function ProjectForm() {
   return (
     <div className="max-w-7xl mx-auto animate-in fade-in duration-500">
       {/* TOOLBAR HEADER */}
-      <div className="flex items-center justify-between mb-6 top-0 bg-[#F8FAFC]/90 backdrop-blur-md z-[40] py-4 border-b border-slate-200">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white p-6 rounded-xl border border-slate-200 shadow-sm top-0 z-20">
         <div className="flex items-center gap-4">
           <button
             onClick={() => navigate("/admin/projects")}
@@ -462,7 +462,7 @@ export default function ProjectForm() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
+      <div className="mt-4 grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
         {/* KIRI: CONTENT AREA */}
         <div className="lg:col-span-2 space-y-6">
           <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden flex flex-col p-0 md:p-8 space-y-8">
