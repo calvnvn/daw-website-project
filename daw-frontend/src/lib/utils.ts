@@ -6,19 +6,31 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
+/**
+ * REFACTORED: getCleanImageUrl
+ * @description Safely resolves image paths for local previews (blob),
+ * external links (http), and server-hosted assets (uploads).
+ */
 export const getCleanImageUrl = (path: string | null | undefined): string => {
+  // 1. Fallback jika path kosong (Sangat disarankan memakai path gambar default)
   if (!path) return "";
 
-  // 1. Kalau sudah full URL (http...), langsung balikin
-  if (path.startsWith("http")) return path;
+  // 2. Jika path adalah Blob URL (Hasil dari URL.createObjectURL untuk preview)
+  // atau sudah berupa Full URL (http/https), langsung kembalikan as-is.
+  if (path.startsWith("blob:") || path.startsWith("http")) {
+    return path;
+  }
 
-  // 2. Bersihkan path dari prefix "uploads" atau "/uploads" biar gak double
+  // 3. Sanitasi path dari prefix "uploads" atau "/uploads" secara presisi menggunakan Regex
+  // Ini mencegah double "uploads/uploads" di URL akhir.
   const cleanPath = path.replace(/^\/?uploads\/?/, "");
 
-  // 3. Gabungkan BASE_UPLOAD_URL dengan path yang sudah bersih
-  // Pastikan tidak ada double slash di antara BASE_UPLOAD_URL dan path
-  const baseUrl = BASE_UPLOAD_URL.replace(/\/$/, ""); // Buang slash di akhir base url kalau ada
-  const finalPath = cleanPath.startsWith("/") ? cleanPath : `/${cleanPath}`;
+  // 4. Konstruksi URL Akhir
+  // Menghapus slash di akhir BASE_UPLOAD_URL jika ada, lalu menggabungkannya dengan path bersih.
+  const baseUrl = BASE_UPLOAD_URL.replace(/\/$/, "");
+  const normalizedPath = cleanPath.startsWith("/")
+    ? cleanPath
+    : `/${cleanPath}`;
 
-  return `${baseUrl}${finalPath}`;
+  return `${baseUrl}${normalizedPath}`;
 };

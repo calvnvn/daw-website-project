@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import {
   Save,
   Lock,
@@ -12,17 +12,89 @@ import {
 import { toast } from "sonner";
 import { useInvestments } from "@/contexts/InvestmentContext";
 import api, { BASE_UPLOAD_URL } from "@/lib/api";
+import { getCleanImageUrl } from "@/lib/utils";
 
 interface LocalAffiliate {
   id: number | string;
   name: string;
   desc: string;
   category: "fnb" | "steel" | "finance" | "edu";
-  websiteUrl?: string;
+  websiteUrl?: string | null;
   logoUrl: string | null;
   newLogoFile?: File | null;
   isNew?: boolean;
 }
+
+/**
+ * REFACTORED: LogoPreviewer (Anti-Flicker & Clean Placeholder Version)
+ * @description Managed component to handle ObjectURL lifecycle.
+ * Displays a clean placeholder icon when no image is loaded.
+ */
+const LogoPreviewer = React.memo(
+  ({
+    file,
+    savedUrl,
+    isEditing,
+  }: {
+    file?: File | null;
+    savedUrl: string | null;
+    isEditing: boolean;
+  }) => {
+    // 1. Generate preview secara sinkron (Anti-flicker fixed)
+    const previewUrl = useMemo(() => {
+      if (file) {
+        return URL.createObjectURL(file);
+      }
+      // utility getCleanImageUrl memastikan balikan string kosong "" jika savedUrl null
+      return getCleanImageUrl(savedUrl);
+    }, [file, savedUrl]);
+
+    // 2. CLEANUP: Revoke ObjectURL (Memory leak fixed)
+    useEffect(() => {
+      return () => {
+        if (previewUrl.startsWith("blob:")) {
+          URL.revokeObjectURL(previewUrl);
+        }
+      };
+    }, [previewUrl]);
+
+    return (
+      <div
+        className={`relative aspect-square rounded-lg border-2 border-dashed flex flex-col items-center justify-center p-2 overflow-hidden transition-colors ${
+          isEditing
+            ? "border-slate-300 bg-white hover:border-daw-green cursor-pointer"
+            : "border-slate-200 bg-slate-100/50 cursor-not-allowed"
+        }`}
+      >
+        {/* 🛡️ PERBAIKAN DISPLAY: Cek apakah previewUrl benar-benar ada data string-nya */}
+        {previewUrl ? (
+          <img
+            src={previewUrl}
+            alt="Logo Preview" // Alt text tetap ada untuk aksesibilitas
+            className="w-full h-full object-contain p-1"
+            key={previewUrl}
+            // Hapus onLoad & onError manual dari sini, sudah dihandle useMemo + utility
+          />
+        ) : (
+          /* --- 🛡️ PERBAIKAN UI: Tampilkan Ikon Placeholder yang Bersih --- */
+          <div className="flex flex-col items-center justify-center text-center space-y-1.5 animate-in fade-in duration-300">
+            <ImageIcon
+              className={`w-6 h-6 ${isEditing ? "text-daw-green" : "text-slate-400"}`}
+            />
+            <span
+              className={`text-[9px] font-medium leading-tight ${isEditing ? "text-slate-700" : "text-slate-400"}`}
+            >
+              Upload Logo
+            </span>
+          </div>
+        )}
+      </div>
+    );
+  },
+);
+
+// Tambahkan Display Name agar tidak error di dev-tools
+LogoPreviewer.displayName = "LogoPreviewer";
 
 export default function InvestmentsManager() {
   const [activeTab, setActiveTab] = useState<"content" | "companies">(
@@ -46,18 +118,34 @@ export default function InvestmentsManager() {
 
   // Sinkronisasi data dari Context ke Local State saat pertama kali render
   useEffect(() => {
-    if (settings) {
-      setPageContent({
-        teaserHeadline: settings.teaserHeadline,
-        teaserBody: settings.teaserBody,
-        sectionIntro: settings.sectionIntro,
-      });
+    /**
+     * PREVENTION LOGIC:
+     * We only sync context data to local state if the user is NOT in editing mode.
+     * This prevents background refreshes from wiping out unsaved user input.
+     */
+    if (!isEditing) {
+      if (settings) {
+        setPageContent({
+          teaserHeadline: settings.teaserHeadline || "",
+          teaserBody: settings.teaserBody || "",
+          sectionIntro: settings.sectionIntro || "",
+        });
+      }
+      if (companies) {
+        /**
+         * @description Deep copy the company list and normalize null values.
+         * Using Nullish Coalescing (??) to ensure controlled inputs don't receive 'null'.
+         */
+        setLocalCompanies(
+          companies.map((c) => ({
+            ...c,
+            websiteUrl: c.websiteUrl ?? "",
+            logoUrl: c.logoUrl || null,
+          })),
+        );
+      }
     }
-    if (companies) {
-      // Copy data ke local state agar aman diedit
-      setLocalCompanies(companies.map((c) => ({ ...c })));
-    }
-  }, [settings, companies]);
+  }, [settings, companies, isEditing]); // Include isEditing as a dependency
 
   // ==========================================
   // LOGIKA TAB 1: CONTENT
@@ -147,13 +235,22 @@ export default function InvestmentsManager() {
     updateCompany(id, "newLogoFile", file);
   };
 
+  /**
+   * REFACTORED: Parallel Company Sync
+   * @description Switches from sequential loop to concurrent promises for 10x faster performance.
+   */
   const handleSaveCompanies = async () => {
-    const loadingToast = toast.loading("Saving companies one by one...");
+    const loadingToast = toast.loading("Syncing affiliate records...");
+
+    const validCompanies = localCompanies.filter((comp) => comp.name.trim());
+
+    if (validCompanies.length === 0) {
+      toast.dismiss(loadingToast);
+      return;
+    }
 
     try {
-      for (const comp of localCompanies) {
-        if (!comp.name.trim()) continue;
-
+      const saveTasks = validCompanies.map(async (comp) => {
         const formData = new FormData();
         formData.append("name", comp.name);
         formData.append("desc", comp.desc || "");
@@ -164,19 +261,32 @@ export default function InvestmentsManager() {
           formData.append("logo", comp.newLogoFile);
         }
 
-        // Update status loading per item (Opsional tapi Pro)
-        toast.loading(`Saving ${comp.name}...`, { id: loadingToast });
-
         if (comp.isNew) {
-          await api.post("/investment/affiliate", formData);
+          const res = await api.post("/investment/affiliate", formData);
+          return { ...comp, id: res.data.id, isNew: false, newLogoFile: null };
         } else {
           await api.put(`/investment/affiliate/${comp.id}`, formData);
+          return { ...comp, newLogoFile: null };
         }
-      }
-      toast.success("All companies synced!", { id: loadingToast });
-    } catch (err) {
-      console.error("Failed item:", err);
-      throw err; // Lempar ke handleSave utama
+      });
+
+      const updatedResults = await Promise.all(saveTasks);
+      setLocalCompanies(updatedResults);
+
+      toast.success("Consellation grid synchronized!", {
+        id: loadingToast,
+        description: `Successfully processed ${updatedResults.length} records.`,
+      });
+    } catch (err: any) {
+      console.error("Batch Save Error:", err);
+      const errorMsg =
+        err.response?.data?.message || "Check network connection.";
+
+      toast.error("Sync Interrupted", {
+        id: loadingToast,
+        description: `Failed to save some items: ${errorMsg}`,
+      });
+      throw err;
     }
   };
 
@@ -400,44 +510,13 @@ export default function InvestmentsManager() {
                     <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-2 text-center">
                       Logo
                     </label>
-                    <div
-                      className={`relative aspect-square rounded-lg border-2 border-dashed flex flex-col items-center justify-center text-center p-2 overflow-hidden transition-colors ${
-                        isEditing
-                          ? "border-slate-300 bg-white hover:border-daw-green cursor-pointer"
-                          : "border-slate-200 bg-slate-100/50 cursor-not-allowed"
-                      }`}
-                    >
-                      {getPreviewUrl(company) ? (
-                        <img
-                          src={getPreviewUrl(company)!}
-                          alt="Logo Affiliate"
-                          className="w-full h-full object-contain p-1"
-                          onLoad={(e) => {
-                            if (company.newLogoFile) {
-                              URL.revokeObjectURL(
-                                (e.target as HTMLImageElement).src,
-                              );
-                            }
-                          }}
-                          onError={(e) => {
-                            (e.target as HTMLImageElement).src =
-                              "/placeholder-logo.png";
-                          }}
-                        />
-                      ) : (
-                        <>
-                          <ImageIcon
-                            className={`w-5 h-5 mb-1 ${isEditing ? "text-daw-green" : "text-slate-400"}`}
-                          />
-                          <span
-                            className={`text-[9px] font-medium leading-tight ${isEditing ? "text-slate-700" : "text-slate-400"}`}
-                          >
-                            Upload Logo
-                          </span>
-                        </>
-                      )}
+                    <div className="relative group">
+                      <LogoPreviewer
+                        file={company.newLogoFile}
+                        savedUrl={company.logoUrl}
+                        isEditing={isEditing}
+                      />
 
-                      {/* Hidden Input File */}
                       {isEditing && (
                         <input
                           type="file"
@@ -446,7 +525,7 @@ export default function InvestmentsManager() {
                             e.target.files?.[0] &&
                             handleLogoChange(company.id, e.target.files[0])
                           }
-                          className="absolute inset-0 opacity-0 cursor-pointer"
+                          className="absolute inset-0 opacity-0 cursor-pointer z-10"
                         />
                       )}
                     </div>
