@@ -181,7 +181,7 @@ export default function BusinessGrid({
                     )}
 
                     {/* DISPLAY PRETTY SECTOR NAME */}
-                    <div className="absolute top-4 left-4 bg-white/95 backdrop-blur-sm px-3 py-1.5 rounded-md text-[10px] uppercase tracking-wider font-black text-daw-green shadow-sm border border-slate-100">
+                    <div className="absolute top-4 left-4 bg-white/95 px-3 py-1.5 rounded-md text-[10px] uppercase tracking-wider font-black text-daw-green shadow-sm border border-slate-100">
                       {sectorLookup[project.category] || "Portfolio"}
                     </div>
                   </div>

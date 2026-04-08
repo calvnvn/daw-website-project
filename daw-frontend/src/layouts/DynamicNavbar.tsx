@@ -544,7 +544,7 @@ export default function DynamicNavbar() {
 
       {isMobileMenuOpen && (
         <div
-          className="fixed inset-0 bg-black/20 backdrop-blur-sm z-40 md:hidden transition-opacity"
+          className="fixed inset-0 bg-black/20 z-40 md:hidden transition-opacity"
           onClick={closeMenu}
         />
       )}

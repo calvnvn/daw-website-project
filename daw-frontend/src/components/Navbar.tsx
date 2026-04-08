@@ -182,7 +182,7 @@ export default function Navbar() {
 
         {/* MENU MOBILE (HP) */}
         <div
-          className={`md:hidden absolute top-full left-0 right-0 bg-white/90 backdrop-blur-md border-b border-slate-200 shadow-xl overflow-hidden transition-all duration-300 ease-in-out ${
+          className={`md:hidden absolute top-full left-0 right-0 bg-white/90 border-b border-slate-200 shadow-xl overflow-hidden transition-all duration-300 ease-in-out ${
             isMobileMenuOpen
               ? "max-h-[800px] opacity-100"
               : "max-h-0 opacity-0 pointer-events-none"

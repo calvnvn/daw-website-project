@@ -127,7 +127,7 @@ const InteractiveMap = memo(function InteractiveMap({
     <div className="relative w-full bg-white md:bg-slate-50/50 md:rounded-3xl md:border border-slate-200 shadow-sm p-0 md:p-8 overflow-hidden">
       {/* --- INTERACTIVE LEGEND --- */}
       <div className="flex justify-between items-center mb-4 px-4 md:px-0 mt-4 md:mt-0">
-        <div className="bg-white/95 backdrop-blur-sm p-3 rounded-2xl border border-slate-200/60 shadow-sm flex flex-wrap gap-4 md:gap-8 relative z-10 w-full md:w-auto justify-center">
+        <div className="bg-white/95  p-3 rounded-2xl border border-slate-200/60 shadow-sm flex flex-wrap gap-4 md:gap-8 relative z-10 w-full md:w-auto justify-center">
           {categories.map((cat) => (
             <div
               key={cat.id}

@@ -1,6 +1,13 @@
-// LOKASI: src/components/admin/SubjectManagerModal.tsx
 import { useState, useEffect, useCallback } from "react";
-import { X, Mail, Link as LinkIcon, Send, Info, Save } from "lucide-react";
+import {
+  X,
+  Mail,
+  Link as LinkIcon,
+  Send,
+  Info,
+  Save,
+  AlertCircle,
+} from "lucide-react";
 import api from "@/lib/api";
 import { toast } from "sonner";
 
@@ -108,16 +115,26 @@ export default function SubjectManagerModal({
   };
 
   // 3. Logic: Hapus Subjek
-  const handleDelete = async (id: number) => {
-    if (!confirm("Are you sure you want to delete this subject?")) return;
-    try {
-      await api.delete(`/inquiries/subjects/${id}`);
-      toast.success("Subject deleted");
-      fetchSubjects();
-      onRefresh();
-    } catch (error: any) {
-      toast.error(error.response?.data?.message || "Delete failed");
-    }
+  const handleDelete = (id: number, name: string) => {
+    toast(`Delete "${name}"?`, {
+      description: "This will remove the routing logic and cannot be undone.",
+      icon: <AlertCircle className="w-5 h-5 text-red-500" />,
+      action: {
+        label: "Confirm Delete",
+        onClick: async () => {
+          const loadingToast = toast.loading(`Terminating ${name}...`);
+          try {
+            await api.delete(`/inquiries/subjects/${id}`);
+            toast.success("Subject Deleted", { id: loadingToast });
+            fetchSubjects();
+            onRefresh();
+          } catch (error: any) {
+            toast.error("Delete Failed", { id: loadingToast });
+          }
+        },
+      },
+      cancel: { label: "Abort", onClick: () => {} },
+    });
   };
 
   // 4. Render UI: Jika modal ditutup, return null agar tidak dirender di DOM
