@@ -16,21 +16,29 @@ const ProjectDetail = lazy(() => import("./pages/public/ProjectDetail"));
 const DynamicPage = lazy(() => import("./pages/public/DynamicPage"));
 
 // Lazy Import Auth
-const Login = lazy(() => import("./pages/admin/Login"));
+const Login = lazy(() => import("./pages/admin/system/auth/Login"));
 const ForceChangePassword = lazy(
   () => import("./pages/admin/ForceChangePassword"),
 );
-const ForgotPassword = lazy(() => import("./pages/admin/ForgotPassword"));
-const ResetPassword = lazy(() => import("./pages/admin/ResetPassword"));
+const ForgotPassword = lazy(
+  () => import("./pages/admin/system/auth/ForgotPassword"),
+);
+const ResetPassword = lazy(
+  () => import("./pages/admin/system/auth/ResetPassword"),
+);
 
 // Lazy Import Admin Dashboard
 const Dashboard = lazy(() => import("./pages/admin/Dashboard"));
 const ProjectManagement = lazy(() => import("./pages/admin/ProjectManagement"));
-const GlobalSettings = lazy(() => import("./pages/admin/GlobalSettings"));
+const GlobalSettings = lazy(
+  () => import("./pages/admin/system/GlobalSettings"),
+);
 const AboutUsManager = lazy(() => import("./pages/admin/AboutUsManager"));
 const Inbox = lazy(() => import("./pages/admin/Inbox"));
 const HomepageManager = lazy(() => import("./pages/admin/HomePageManager"));
-const UserManagement = lazy(() => import("./pages/admin/UserManagement"));
+const UserManagement = lazy(
+  () => import("./pages/admin/system/UserManagement"),
+);
 const InvestmentsManager = lazy(
   () => import("./pages/admin/InvestmentsManager"),
 );
@@ -41,7 +49,9 @@ const ContentManager = lazy(
   () => import("./pages/admin/content/ContentManager"),
 );
 const ProjectForm = lazy(() => import("./pages/admin/ProjectForm"));
-const RoleManagement = lazy(() => import("./pages/admin/RoleManagement"));
+const RoleManagement = lazy(
+  () => import("./pages/admin/system/RoleManagement"),
+);
 
 const PageLoader = () => (
   <div className="flex h-screen w-full items-center justify-center bg-slate-50">
