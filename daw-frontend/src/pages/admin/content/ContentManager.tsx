@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { FileText, Map } from "lucide-react";
-import NavigationBuilder from "./content/NavigationBuilder";
-import PageBuilder from "./content/PageBuilder";
+import NavigationBuilder from "./builder/NavigationBuilder";
+import PageBuilder from "./builder/PageBuilder";
 
 export default function ContentManager() {
   // --- MASTER TAB STATE ---

@@ -16,6 +16,7 @@ import {
   Link as LinkIcon,
   ImagePlus,
   PenTool,
+  Search,
 } from "lucide-react";
 // Tambahkan BASE_UPLOAD_URL
 import api, { BASE_UPLOAD_URL } from "@/lib/api";
@@ -48,12 +49,19 @@ export default function PageBuilder() {
     content: "",
     showDropCap: true,
     sidebarLinks: [] as { label: string; url: string }[],
+    metaDescription: "",
   });
   const [heroFile, setHeroFile] = useState<File | null>(null);
   const [heroImage, setHeroImage] = useState<string>("");
   const quillRef = useRef<ReactQuill>(null);
 
+  /**
+   * Refactored Image Handler (Enterprise Standard)
+   * @description Migrates from local Base64 string to persistent server-side hosting.
+   * Logic: Compress (Client) -> Upload (Server) -> Optimized WebP Link (Quill).
+   */
   const imageHandler = useCallback(() => {
+    // 1. Create a dynamic hidden input for file selection
     const input = document.createElement("input");
     input.setAttribute("type", "file");
     input.setAttribute("accept", "image/*");
@@ -62,31 +70,57 @@ export default function PageBuilder() {
     input.onchange = async () => {
       const file = input.files?.[0];
       if (file && quillRef.current) {
-        const toastId = toast.loading("Optimizing article image...");
+        // Feedback visual segera menggunakan Sonner
+        const toastId = toast.loading("Optimizing & Uploading to server...");
+
         try {
-          const options = {
-            maxSizeMB: 0.5,
-            maxWidthOrHeight: 1200,
+          // 2. Client-side compression (Layer 1 Optimization)
+          // We target a slightly higher quality as Sharp on backend will do the final WebP conversion.
+          const compressionOptions = {
+            maxSizeMB: 0.8,
+            maxWidthOrHeight: 1600,
             useWebWorker: true,
           };
-          const compressedFile = await imageCompression(file, options);
-          const reader = new FileReader();
+          const compressedFile = await imageCompression(
+            file,
+            compressionOptions,
+          );
 
-          reader.onloadend = () => {
-            const base64data = reader.result as string;
-            const editor = quillRef.current?.getEditor();
-            const range = editor?.getSelection();
+          // 3. Construct Multipart Payload
+          // Important: Key must match 'inline_image' as defined in backend/middleware/upload.js
+          const uploadPayload = new FormData();
+          uploadPayload.append("inline_image", compressedFile);
 
-            if (editor) {
-              const cursorIndex = range ? range.index : editor.getLength();
-              editor.insertEmbed(cursorIndex, "image", base64data);
-            }
-            toast.success("Image added & optimized!", { id: toastId });
-          };
-          reader.readAsDataURL(compressedFile);
-        } catch (error) {
-          toast.error("Failed to process image", { id: toastId });
-          console.error("Error: ", error);
+          // 4. API Request to dedicated Pages upload endpoint
+          const response = await api.post(
+            "/pages/upload-inline",
+            uploadPayload,
+          );
+
+          // 5. Integration with Quill Editor
+          const editor = quillRef.current.getEditor();
+          const range = editor.getSelection();
+
+          // Fallback: If editor is not focused, append to the end
+          const cursorIndex = range ? range.index : editor.getLength();
+
+          // FIX: Insert the URL returned by server instead of Base64 string
+          if (response.data.url) {
+            editor.insertEmbed(cursorIndex, "image", response.data.url);
+
+            // UX Improvement: Move cursor after the inserted image for seamless typing
+            editor.setSelection(cursorIndex + 1);
+
+            toast.success("Image added to document!", { id: toastId });
+          } else {
+            throw new Error("Invalid response from server.");
+          }
+        } catch (error: any) {
+          // Comprehensive error reporting
+          const errorMsg =
+            error.response?.data?.message || "Internal Upload Error";
+          toast.error(`Failed to process asset: ${errorMsg}`, { id: toastId });
+          console.error("Rich Text Upload Error:", error);
         }
       }
     };
@@ -163,6 +197,7 @@ export default function PageBuilder() {
       content: "",
       showDropCap: true,
       sidebarLinks: [],
+      metaDescription: "",
     });
   };
 
@@ -183,6 +218,7 @@ export default function PageBuilder() {
         templateType: exactData.templateType || "classic",
         content: exactData.content || "",
         showDropCap: exactData.showDropCap ?? true,
+        metaDescription: exactData.metaDescription || "",
         sidebarLinks:
           typeof exactData.sidebarLinks === "string"
             ? JSON.parse(exactData.sidebarLinks)
@@ -243,6 +279,7 @@ export default function PageBuilder() {
       payload.append("subtitle", formData.subtitle || "");
       payload.append("templateType", formData.templateType);
       payload.append("content", formData.content);
+      payload.append("metaDescription", formData.metaDescription || "");
       payload.append("showDropCap", String(formData.showDropCap));
 
       // Array harus di-stringified karena FormData hanya menerima string/blob
@@ -297,6 +334,25 @@ export default function PageBuilder() {
       toast.error("Compression failed.", { id: toastId });
       console.error("Error: ", error);
     }
+  };
+
+  /**
+   * Helper: Generate SEO Preview Description
+   * Priority: Manual Meta Description -> Subtitle -> Content Excerpt
+   */
+  const getDynamicSeoDescription = () => {
+    // FIX: Menggunakan nama properti yang benar 'metaDescription'
+    if (formData.metaDescription && formData.metaDescription.trim() !== "") {
+      return formData.metaDescription;
+    }
+
+    if (formData.subtitle && formData.subtitle.trim() !== "") {
+      return formData.subtitle;
+    }
+
+    // Jika keduanya kosong, ambil 150 karakter pertama dari konten artikel (tanpa tag HTML)
+    const plainText = formData.content.replace(/<[^>]*>?/gm, "").trim();
+    return plainText.slice(0, 150) + (plainText.length > 150 ? "..." : "");
   };
 
   return (
@@ -602,6 +658,83 @@ export default function PageBuilder() {
                 </div>
               </div>
             )}
+
+            {/* SECTION 1.5: SEARCH ENGINE OPTIMIZATION (SEO) */}
+            <div className="space-y-6 bg-slate-50/50 p-6 rounded-[2rem] border border-slate-200 shadow-inner">
+              <div className="flex items-center gap-2 border-b border-slate-100 pb-2">
+                <Search className="w-4 h-4 text-blue-500" />
+                <h3 className="text-sm font-bold text-slate-900">
+                  Search Engine Optimization (SEO)
+                </h3>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                {/* A. SEO Input Field */}
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <div className="flex justify-between items-center px-1">
+                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                        Custom Meta Description
+                      </label>
+                      <span
+                        className={`text-[9px] font-bold ${formData.metaDescription?.length > 160 ? "text-red-500" : "text-slate-400"}`}
+                      >
+                        {formData.metaDescription?.length || 0}/160
+                      </span>
+                    </div>
+                    <textarea
+                      placeholder={
+                        formData.subtitle ||
+                        "Tulis deskripsi SEO manual di sini..."
+                      }
+                      className={`w-full p-4 rounded-2xl bg-white border outline-none text-sm text-slate-600 h-28 resize-none transition-all focus:ring-4 focus:ring-blue-500/5 ${
+                        formData.metaDescription?.length > 160
+                          ? "border-red-300 focus:border-red-500"
+                          : "border-slate-200 focus:border-blue-400"
+                      }`}
+                      value={formData.metaDescription}
+                      onChange={(e) =>
+                        setFormData({
+                          ...formData,
+                          metaDescription: e.target.value,
+                        })
+                      }
+                    />
+                    <p className="text-[9px] text-slate-400 italic ml-1 leading-relaxed">
+                      *Jika dikosongkan, sistem akan otomatis menggunakan{" "}
+                      <strong>Subtitle</strong> atau ringkasan{" "}
+                      <strong>Konten</strong> sebagai fallback.
+                    </p>
+                  </div>
+                </div>
+
+                {/* B. Visual Google Preview Card */}
+                <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm flex flex-col justify-center relative overflow-hidden group">
+                  {/* Dekorasi Card */}
+                  <div className="absolute top-0 left-0 w-1 h-full bg-blue-500 opacity-0 group-hover:opacity-100 transition-opacity" />
+
+                  <p className="text-[10px] font-black text-slate-300 uppercase mb-3 flex items-center gap-2">
+                    <Globe className="w-3 h-3" /> Pratinjau Tampilan Google
+                  </p>
+
+                  {/* Google Search Result Simulation */}
+                  <div className="space-y-1">
+                    <p className="text-[#1a0dab] text-xl font-medium truncate hover:underline cursor-pointer">
+                      {formData.title || "Untitled Document"}
+                    </p>
+                    <p className="text-[#006621] text-sm truncate mb-1 flex items-center gap-1 font-mono">
+                      daw.co.id{" "}
+                      <span className="text-slate-400 text-xs">› page ›</span>{" "}
+                      {formData.slug || "..."}
+                    </p>
+                    <p className="text-[#545454] text-sm line-clamp-2 leading-relaxed break-words">
+                      {getDynamicSeoDescription() ||
+                        "Mulai menulis subtitle atau konten untuk melihat deskripsi otomatis di sini."}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
 
             {/* SECTION 2: VISUAL ASSET */}
             <div className="space-y-6">

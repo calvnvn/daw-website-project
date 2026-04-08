@@ -6,9 +6,19 @@ const window = new JSDOM("").window;
 const dompurify = createDOMPurify(window);
 const { deleteSingleFile } = require("../utils/fileRemover");
 
+/**
+ * Helper: Strip HTML tags to get plain text
+ * Used for generating SEO meta descriptions automatically
+ */
 const stripHtml = (html) => html.replace(/<[^>]*>?/gm, "");
 
-// --- HELPER: GENERATE UNIQUE SLUG ---
+/**
+ * Helper: Generate a unique slug for the page
+ * Recursively checks if slug exists and appends a counter if necessary
+ * @param {string} title - Page title
+ * @param {string} slug - Manually entered slug (optional)
+ * @param {string} id - Current page ID to exclude during update checks
+ */
 const generateUniqueSlug = async (title, slug, id = null) => {
   let baseSlug = (slug || title)
     .toLowerCase()
@@ -32,13 +42,15 @@ const generateUniqueSlug = async (title, slug, id = null) => {
   return finalSlug;
 };
 
-// 1. Get All Pages (Untuk Sidebar List Admin)
+/**
+ * Controller: Get all pages (Admin Sidebar List)
+ * Optimizes performance by excluding heavy content fields
+ */
 exports.getAllPages = async (req, res) => {
   try {
     const pages = await Page.findAll({
       order: [["createdAt", "DESC"]],
-      //  Tetap ringan, jangan tarik content & sidebarLinks untuk list
-      attributes: ["id", "title", "slug"],
+      attributes: ["id", "title", "slug"], // Lightweight fetch
     });
     res.status(200).json(pages);
   } catch (error) {
@@ -48,7 +60,9 @@ exports.getAllPages = async (req, res) => {
   }
 };
 
-// 2. Get Page By Slug (Untuk Publik & Load Detail Edit)
+/**
+ * Controller: Get page by slug (Public view & Edit loader)
+ */
 exports.getPageBySlug = async (req, res) => {
   try {
     const { slug } = req.params;
@@ -62,7 +76,34 @@ exports.getPageBySlug = async (req, res) => {
   }
 };
 
-// 3. Create Page
+/**
+ * Controller: Upload Inline Image
+ * Specifically handles images pasted or uploaded within the Quill Editor
+ */
+exports.uploadInlineImage = async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ message: "No image file provided." });
+    }
+
+    // Construct the absolute URL to be stored in the HTML content
+    const fileUrl = `${req.protocol}://${req.get("host")}/uploads/${req.file.filename}`;
+
+    res.status(200).json({
+      message: "Image uploaded successfully",
+      url: fileUrl,
+      filename: req.file.filename,
+    });
+  } catch (error) {
+    console.error("🚨 Inline Upload Error:", error);
+    res.status(500).json({ message: "Failed to process editor image." });
+  }
+};
+
+/**
+ * Controller: Create Page
+ * Handles slug generation, content sanitization, and SEO fallbacks
+ */
 exports.createPage = async (req, res) => {
   try {
     const {
@@ -78,15 +119,20 @@ exports.createPage = async (req, res) => {
 
     const finalSlug = await generateUniqueSlug(title, slug);
     const sanitizedContent = dompurify.sanitize(content);
-
     const heroImage = req.file ? req.file.filename : null;
 
-    // SEO Automation
+    // SEO Automation: Generate meta description from content if empty
     let finalMetaDesc = metaDescription;
     if (!finalMetaDesc || finalMetaDesc.trim() === "") {
-      const cleanText = stripHtml(sanitizedContent);
-      finalMetaDesc =
-        cleanText.substring(0, 150) + (cleanText.length > 150 ? "..." : "");
+      if (subtitle && subtitle.trim() !== "") {
+        // Fallback ke Subtitle jika ada
+        finalMetaDesc = subtitle.trim();
+      } else {
+        // Terakhir: Fallback ke konten (strip HTML dan ambil 150 char)
+        const cleanText = stripHtml(sanitizedContent);
+        finalMetaDesc =
+          cleanText.substring(0, 150) + (cleanText.length > 150 ? "..." : "");
+      }
     }
 
     const newPage = await Page.create({
@@ -114,7 +160,10 @@ exports.createPage = async (req, res) => {
   }
 };
 
-// 4. Update Page
+/**
+ * Controller: Update Page
+ * Manages image replacement and slug re-syncing
+ */
 exports.updatePage = async (req, res) => {
   try {
     const { id } = req.params;
@@ -135,8 +184,9 @@ exports.updatePage = async (req, res) => {
 
     const finalSlug = await generateUniqueSlug(title, slug, id);
     const sanitizedContent = dompurify.sanitize(content);
-    let heroImageName = page.heroImage; // Default pakai gambar lama
+    let heroImageName = page.heroImage;
 
+    // If a new hero image is uploaded, delete the old physical file
     if (req.file) {
       deleteSingleFile(page.heroImage);
       heroImageName = req.file.filename;
@@ -173,23 +223,26 @@ exports.updatePage = async (req, res) => {
   }
 };
 
-// 5. Delete Page
+/**
+ * Controller: Delete Page
+ * Triggers cascading cleanup of physical hero image and editor inline images
+ */
 exports.deletePage = async (req, res) => {
   try {
     const { id } = req.params;
     const page = await Page.findByPk(id);
     if (!page) return res.status(404).json({ message: "Page not found" });
 
-    // Hapus Hero Image fisik
+    // Step 1: Physical removal of Hero Image
     deleteSingleFile(page.heroImage);
 
-    // Hapus Gambar Inline di dalam Content (Rich Text)
+    // Step 2: Physical removal of all hosted images found in the Rich Text content
     if (page.content) {
-      // Regex untuk mencari nama file di folder uploads dalam tag <img>
+      // Regex detects filenames within src attributes that point to our uploads folder
       const imgRegex = /src="[^"]*\/uploads\/([^"'\s>]+)"/g;
       let match;
       while ((match = imgRegex.exec(page.content)) !== null) {
-        deleteSingleFile(match[1]); // match[1] adalah nama filenya
+        deleteSingleFile(match[1]); // match[1] extracts the specific filename
       }
     }
     await page.destroy();
