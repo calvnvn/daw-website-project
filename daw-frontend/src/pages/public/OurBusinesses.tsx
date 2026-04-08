@@ -7,6 +7,7 @@ import InvestmentsSection from "@/components/businesses/InvestmentsSection";
 import ScrollReveal from "@/components/ScrollReveal";
 import SEO from "@/components/SEO";
 import { useBusiness } from "@/contexts/BusinessContext";
+import DynamicBusinessSection from "@/components/businesses/DynamicBusinessSection";
 
 export default function OurBusinesses() {
   const { t } = useTranslation();
@@ -49,7 +50,7 @@ export default function OurBusinesses() {
   // FIX 4: Masukkan refreshData ke dalam dependency array
   useEffect(() => {
     refreshData();
-  }, [refreshData]);
+  }, []);
 
   /**
    * @constant navItems

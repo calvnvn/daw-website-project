@@ -3,7 +3,6 @@ import { useTranslation } from "react-i18next";
 import { ArrowRight, ImageIcon } from "lucide-react";
 import { Link } from "react-router-dom";
 import ScrollReveal from "./ScrollReveal";
-import api from "@/lib/api";
 import { getCleanImageUrl } from "@/lib/utils";
 import { useBusiness } from "@/contexts/BusinessContext";
 
@@ -14,77 +13,62 @@ interface BusinessGridProps {
   hideFilters?: boolean;
 }
 
-interface ProjectData {
-  id: string;
-  slug: string;
-  title: string;
-  category: string;
-  excerpt: string;
-  cover_image: string | null;
-  createdAt: string;
-}
-
 export default function BusinessGrid({
   filter = "All",
   hideFilters = false,
 }: BusinessGridProps) {
   const { t } = useTranslation();
-  const { sections, isLoading: isSectionsLoading } = useBusiness(); // FIX 2: Ambil data sektor dinamis
 
-  const [projects, setProjects] = useState<ProjectData[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  // 1. CONNECT TO GLOBAL CONTEXT
+  // We extract sections, publicProjects, and loading state directly from context
+  // to avoid redundant API calls per sector component.
+  const {
+    sections,
+    publicProjects,
+    isLoading: isContextLoading,
+  } = useBusiness();
 
+  // 2. INTERNAL UI STATES
   const [activeFilter, setActiveFilter] = useState<FilterOption>(filter);
   const [prevFilter, setPrevFilter] = useState<FilterOption>(filter);
+  const [underlineStyle, setUnderlineStyle] = useState({ left: 0, width: 0 });
+  const tabsRef = useRef<(HTMLButtonElement | null)[]>([]);
 
-  // Sync prop filter ke state internal
+  // Sync external prop changes to internal state
   if (filter !== prevFilter) {
     setPrevFilter(filter);
     setActiveFilter(filter);
   }
 
-  const [underlineStyle, setUnderlineStyle] = useState({ left: 0, width: 0 });
-  const tabsRef = useRef<(HTMLButtonElement | null)[]>([]);
-
-  // FIX 3: Bangun daftar filter secara dinamis dari database
+  // 3. BUILD DYNAMIC FILTERS
+  // Generate tab options based on the active business sections in the DB.
   const filters = useMemo(() => {
     const baseFilters = [
       { label: t("business.filterAll", "All Projects"), value: "All" },
     ];
 
     const dynamicFilters = sections.map((sec) => ({
-      label: sec.category, // Nama asli (e.g., "Resources")
-      value: sec.id, // ID/Slug (e.g., "resources")
+      label: sec.category,
+      value: sec.id,
     }));
 
     return [...baseFilters, ...dynamicFilters];
   }, [sections, t]);
 
-  // FIX 4: Buat lookup map untuk menampilkan "Pretty Name" di kartu proyek
+  // 4. CATEGORY LOOKUP MAP
+  // O(1) lookup dictionary to translate raw slugs (e.g., 'renewable-energy')
+  // into formatted display names for the project cards.
   const sectorLookup = useMemo(() => {
     const map: Record<string, string> = {};
     sections.forEach((s) => (map[s.id] = s.category));
     return map;
   }, [sections]);
 
+  // 5. TAB UNDERLINE ANIMATION LOGIC
   useEffect(() => {
-    const fetchProjects = async () => {
-      try {
-        const response = await api.get("/projects/public");
-        setProjects(response.data);
-      } catch (err) {
-        console.error("Gagal memuat projects:", err);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-    fetchProjects();
-  }, []);
-
-  // Update underline position saat filter berubah
-  useEffect(() => {
-    if (hideFilters || isSectionsLoading) return;
+    if (hideFilters || isContextLoading) return;
     const activeIndex = filters.findIndex((f) => f.value === activeFilter);
+
     if (activeIndex !== -1) {
       const activeTab = tabsRef.current[activeIndex];
       if (activeTab) {
@@ -94,16 +78,17 @@ export default function BusinessGrid({
         });
       }
     }
-  }, [activeFilter, filters, hideFilters, isSectionsLoading]);
+  }, [activeFilter, filters, hideFilters, isContextLoading]);
 
-  // FIX 5: Logic filter yang lebih robust
+  // 6. PROJECT FILTERING ENGINE
+  // Filters the global publicProjects array based on the selected tab/filter prop.
   const filteredProjects = useMemo(() => {
-    return projects.filter((project) => {
+    return publicProjects.filter((project) => {
       if (activeFilter === "All") return true;
-      // Cocokkan ID sektor (case-insensitive untuk keamanan)
+      // Use case-insensitive comparison for safety
       return project.category.toLowerCase() === activeFilter.toLowerCase();
     });
-  }, [projects, activeFilter]);
+  }, [publicProjects, activeFilter]);
 
   const isFourItems = filteredProjects.length === 4;
 
@@ -112,6 +97,7 @@ export default function BusinessGrid({
       className={`pb-24 ${hideFilters ? "pt-0 bg-transparent" : "pt-12 bg-[#F8F9FA]"} overflow-hidden`}
     >
       <div className="container mx-auto px-6">
+        {/* --- OPTIONAL HEADER & TABS --- */}
         {!hideFilters && sections.length > 0 && (
           <ScrollReveal direction="up" delay={0}>
             <div className="flex flex-col items-center text-center gap-10 mb-12">
@@ -151,7 +137,9 @@ export default function BusinessGrid({
           </ScrollReveal>
         )}
 
-        {isLoading || isSectionsLoading ? (
+        {/* --- CONTENT AREA --- */}
+        {isContextLoading ? (
+          // SKELETON LOADER
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
             {[1, 2, 3].map((i) => (
               <div
@@ -161,6 +149,7 @@ export default function BusinessGrid({
             ))}
           </div>
         ) : filteredProjects.length > 0 ? (
+          // PROJECT GRID
           <div className="flex flex-wrap justify-center gap-8">
             {filteredProjects.map((project, index) => (
               <ScrollReveal
@@ -190,7 +179,8 @@ export default function BusinessGrid({
                         <ImageIcon />
                       </div>
                     )}
-                    {/* FIX 6: Tampilkan Pretty Name dari Lookup Map */}
+
+                    {/* DISPLAY PRETTY SECTOR NAME */}
                     <div className="absolute top-4 left-4 bg-white/95 backdrop-blur-sm px-3 py-1.5 rounded-md text-[10px] uppercase tracking-wider font-black text-daw-green shadow-sm border border-slate-100">
                       {sectorLookup[project.category] || "Portfolio"}
                     </div>
@@ -213,6 +203,7 @@ export default function BusinessGrid({
             ))}
           </div>
         ) : (
+          // EMPTY STATE
           <div className="text-center py-32 bg-slate-50 rounded-3xl border-2 border-dashed border-slate-200">
             <ImageIcon className="w-12 h-12 text-slate-200 mx-auto mb-4" />
             <p className="text-slate-400 font-medium">

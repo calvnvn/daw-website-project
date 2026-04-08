@@ -8,17 +8,7 @@ import { useSettings } from "@/contexts/SettingsContext";
 import { getCleanImageUrl } from "@/lib/utils";
 import { useBusiness } from "@/contexts/BusinessContext";
 
-// --- BENTUK DATA DARI BACKEND ---
-interface MenuNode {
-  id: string;
-  label: string;
-  type: "page" | "external";
-  externalLink: string | null;
-  Page?: { slug: string };
-  children: MenuNode[];
-}
-// --- THE MAGIC URL RESOLVER ---
-const resolveLink = (menu: MenuNode) => {
+const resolveLink = (menu: any) => {
   if (menu.type === "external" && menu.externalLink) return menu.externalLink;
   if (menu.type === "page" && menu.Page?.slug) return `/page/${menu.Page.slug}`;
   return "#";
@@ -29,14 +19,17 @@ const isLocalRoute = (url: string) =>
 
 export default function DynamicNavbar() {
   const { settings } = useSettings();
-  const [menus, setMenus] = useState<MenuNode[]>([]);
+  const { t } = useTranslation();
+
+  // FIX 2: Destructuring dengan Alias untuk sinkronisasi sektor bisnis
+  const { sections: businessSections } = useBusiness();
+
+  const [menus, setMenus] = useState<any[]>([]);
   const [isScrolled, setIsScrolled] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [openMobileAccordions, setOpenMobileAccordions] = useState<
     Record<string, boolean>
   >({});
-  const { t } = useTranslation();
-  const { sections: businessSections } = useBusiness();
 
   const displayLogo = settings?.logoUrl
     ? getCleanImageUrl(settings.logoUrl)

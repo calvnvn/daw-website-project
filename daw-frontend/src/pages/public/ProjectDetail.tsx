@@ -13,9 +13,12 @@ import api from "@/lib/api";
 import { getCleanImageUrl } from "@/lib/utils";
 import DOMPurify from "dompurify";
 import SEO from "@/components/SEO";
+import { useBusiness } from "@/contexts/BusinessContext";
 
-// 1. Interface untuk menghilangkan warning 'any'
-// Cari interface ini di bagian atas
+/**
+ * @interface ProjectData
+ * Defines the strict structure for project entities returned from the API.
+ */
 interface ProjectData {
   excerpt: string;
   id: string;
@@ -35,41 +38,60 @@ export default function ProjectDetail() {
   const { slug } = useParams<{ slug: string }>();
   const navigate = useNavigate();
 
-  // Menggunakan interface yang sudah dikunci bentuknya
-  const [project, setProject] = useState<ProjectData | null>(null);
-  const [otherProjects, setOtherProjects] = useState<ProjectData[]>([]);
-  const [galleryUrls, setGalleryUrls] = useState<string[]>([]);
+  // 1. GLOBAL CONTEXT CONSUMPTION
+  // Injecting global business data to avoid redundant API calls and enable slug-to-name mapping.
+  const { sections, publicProjects } = useBusiness();
 
+  // 2. CORE STATE DECLARATIONS
+  // Declared before useMemo to prevent "Cannot access before initialization" errors.
+  const [project, setProject] = useState<ProjectData | null>(null);
+  const [galleryUrls, setGalleryUrls] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [selectedImageIndex, setSelectedImageIndex] = useState<number | null>(
     null,
   );
-  const hasFetched = useRef<string | null>(null);
 
-  // Progress Bar & Parallax
+  // 3. UI & TRACKING STATES
+  const hasFetched = useRef<string | null>(null);
   const [scrollProgress, setScrollProgress] = useState(0);
   const [offsetY, setOffsetY] = useState(0);
 
+  // 4. CATEGORY LOOKUP MAP
+  // Translates technical slug IDs (e.g., 'energy-division') into editorial names (e.g., 'Energy Division').
+  const sectorLookup = useMemo(() => {
+    const map: Record<string, string> = {};
+    sections.forEach((s) => (map[s.id] = s.category));
+    return map;
+  }, [sections]);
+
+  // 5. SMART RELATED PROJECTS ENGINE
+  // Filters projects from global memory that share the same category, excluding current project.
+  const relatedProjects = useMemo(() => {
+    if (!project) return [];
+    return publicProjects
+      .filter(
+        (p) => p.category === project.category && (p.slug || p.id) !== slug,
+      )
+      .slice(0, 4);
+  }, [publicProjects, project, slug]);
+
+  // 6. CONTENT NORMALIZATION
+  // Sanitizes and fixes local/development image paths within the HTML content.
   const cleanContent = useMemo(() => {
     if (!project?.content) return "";
-
-    // Regex ini akan mencari src="http://localhost:5000/uploads/..."
-    // atau IP 172.30... dan mengubahnya menjadi src="/uploads/..."
     return project.content.replace(
       /src="https?:\/\/(localhost:5000|localhost:5550|172\.30\.1\.20:5550)\/uploads\//g,
       'src="/uploads/',
     );
   }, [project?.content]);
 
+  // SCROLL EVENT LISTENERS
   useEffect(() => {
     const handleScroll = () => {
-      // Progress Bar
       const totalHeight =
         document.documentElement.scrollHeight - window.innerHeight;
       const progress = (window.scrollY / totalHeight) * 100;
       setScrollProgress(progress);
-
-      // Parallax Offset
       setOffsetY(window.scrollY);
     };
     window.addEventListener("scroll", handleScroll);
@@ -80,59 +102,39 @@ export default function ProjectDetail() {
   useEffect(() => {
     if (hasFetched.current === slug) return;
 
-    const preparePage = setTimeout(() => {
-      setIsLoading(true);
-      window.scrollTo({ top: 0, behavior: "smooth" });
-      setSelectedImageIndex(null);
-    }, 0);
-
+    setIsLoading(true);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+    setSelectedImageIndex(null);
     hasFetched.current = slug || null;
 
-    // Fetch Data Utama
     const fetchData = async () => {
       try {
-        const [projectRes, otherProjectsRes] = await Promise.all([
-          api.get(`/projects/public/s/${slug}`),
-          api.get("/projects/public"),
-        ]);
-
-        // Setup Project Utama
+        // Optimized: Only fetching the current project.
+        // List for 'Related Projects' is already provided by BusinessContext.
+        const projectRes = await api.get(`/projects/public/s/${slug}`);
         const data: ProjectData = projectRes.data;
         setProject(data);
 
-        // Setup Gallery dengan Path Normalization
-        // Setup Gallery dengan Path Normalization (BULLETPROOF)
+        // Gallery parsing logic
         if (data.gallery) {
           let parsedGallery: string[] = [];
-
           if (Array.isArray(data.gallery)) {
-            // Kondisi 1: Kalau dari backend sudah otomatis jadi Array
             parsedGallery = data.gallery;
           } else if (typeof data.gallery === "string") {
-            // Kondisi 2: Kalau bentuknya masih String
             try {
-              parsedGallery = JSON.parse(data.gallery); // Coba parse jadi array
+              parsedGallery = JSON.parse(data.gallery);
             } catch {
-              parsedGallery = [data.gallery]; // Kalau gagal (karena teks biasa), jadikan array isi 1
+              parsedGallery = [data.gallery];
             }
           }
-
-          // Bersihkan URL gambar dan masukkan ke State
           setGalleryUrls(
             parsedGallery.map((img: string) => getCleanImageUrl(img)),
           );
         } else {
           setGalleryUrls([]);
         }
-
-        // Setup Other Projects
-        const otherData: ProjectData[] = otherProjectsRes.data;
-        const filtered = otherData
-          .filter((p) => (p.slug || p.id) !== slug)
-          .slice(0, 4);
-        setOtherProjects(filtered);
       } catch (err) {
-        console.error("Error fetching data:", err);
+        console.error("Error fetching project:", err);
         hasFetched.current = null;
       } finally {
         setIsLoading(false);
@@ -140,12 +142,10 @@ export default function ProjectDetail() {
     };
 
     fetchData();
-
-    return () => clearTimeout(preparePage);
   }, [slug]);
 
+  // LIGHTBOX HANDLERS
   const closeLightbox = () => setSelectedImageIndex(null);
-
   const nextImage = (e: React.MouseEvent) => {
     e.stopPropagation();
     if (galleryUrls.length > 0 && selectedImageIndex !== null) {
@@ -184,8 +184,11 @@ export default function ProjectDetail() {
   return (
     <>
       <SEO
-        title={project.title}
-        description={project.excerpt || "Project Detail of DAW Group"} // Pakai excerpt kalau ada
+        title={`${project.title} | ${sectorLookup[project.category] || "Project"}`}
+        description={
+          project.excerpt ||
+          `Detailed portfolio of ${project.title} under ${sectorLookup[project.category]} division.`
+        }
         image={
           project.cover_image
             ? getCleanImageUrl(project.cover_image)
@@ -193,12 +196,14 @@ export default function ProjectDetail() {
         }
         type="article"
       />
+
+      {/* GLOBAL SCROLL PROGRESS BAR */}
       <div
         className="fixed top-0 left-0 h-1.5 bg-gradient-to-r from-daw-green via-emerald-400 to-daw-green z-[100] transition-all duration-150 ease-out shadow-[0_0_10px_rgba(16,185,129,0.5)]"
         style={{ width: `${scrollProgress}%` }}
       />
       <div className="min-h-screen bg-white pb-20 selection:bg-daw-green selection:text-white">
-        {/* --- HERO BANNER SECTION (Konsisten dengan Desain Asli) --- */}
+        {/* --- HERO BANNER --- */}
         <section className="relative h-[85vh] min-h-[600px] flex items-center justify-center overflow-hidden bg-slate-900">
           {/* Layer 1: Parallax Wrapper */}
           <div
@@ -223,7 +228,7 @@ export default function ProjectDetail() {
           <div className="relative z-10 text-center px-6 mt-16 max-w-4xl mx-auto">
             <ScrollReveal direction="up" delay={0}>
               <p className="text-sm md:text-base text-white/80 font-bold tracking-[0.2em] uppercase mb-4">
-                {project.category} Portfolio
+                {sectorLookup[project.category] || project.category} Portfolio
               </p>
               <h1 className="text-4xl md:text-5xl lg:text-6xl font-serif text-white tracking-tight drop-shadow-lg mb-6 leading-tight">
                 {project.title}
@@ -241,7 +246,8 @@ export default function ProjectDetail() {
             <ChevronRight className="rotate-90 w-4 h-4" />
           </div>
         </section>
-        {/* --- BREADCRUMBS (Konsisten dengan Desain Asli) --- */}
+
+        {/* --- DYNAMIC BREADCRUMBS --- */}
         <div className="bg-slate-50 border-b border-slate-100 py-4 mb-10">
           <div className="container mx-auto px-6 max-w-7xl">
             <div className="flex items-center gap-2 text-[12px] font-bold tracking-widest uppercase text-slate-400">
@@ -256,20 +262,26 @@ export default function ProjectDetail() {
                 Our Businesses
               </Link>
               <ChevronRight className="w-3 h-3" />
+              {/* Sector Deep Link */}
+              <Link
+                to={`/businesses#${project.category}`}
+                className="hover:text-daw-green transition-colors"
+              >
+                {sectorLookup[project.category] || "Sector"}
+              </Link>
+              <ChevronRight className="w-3 h-3" />
               <span className="text-daw-green line-clamp-1">
                 {project.title}
               </span>
             </div>
           </div>
         </div>
-        {/* --- MAIN CONTENT & SIDEBAR --- */}
+        {/* --- CONTENT LAYOUT --- */}
         <div className="container mx-auto px-6 max-w-7xl">
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 lg:gap-16 items-start">
-            {/* KOLOM KIRI: ARTIKEL UTAMA (8 Kolom) */}
+            {/* MAIN COLUMN */}
             <div className="lg:col-span-8 space-y-10">
-              {/* --- HEADER ARTIKEL & METADATA --- */}
               <ScrollReveal direction="up" delay={0}>
-                {/* 1. Tombol Back to Directory (Dibuat lebih subtle dengan hover effect) */}
                 <button
                   onClick={() => navigate("/businesses")}
                   className="group flex items-center gap-2 text-slate-400 hover:text-daw-green font-bold text-[11px] uppercase tracking-[0.2em] mb-8 transition-all"
@@ -278,22 +290,13 @@ export default function ProjectDetail() {
                   Back to Directory
                 </button>
 
-                {/* 2. Judul Utama */}
                 <h1 className="text-3xl md:text-5xl lg:text-[52px] font-serif text-slate-900 leading-[1.15] mb-8">
                   {project.title}
                 </h1>
               </ScrollReveal>
-              {/* TEXT CONTENT */}
               <ScrollReveal direction="up" delay={150}>
                 <div
-                  className="
-      daw-editorial-content
-      max-w-none 
-      text-slate-600 
-      leading-relaxed 
-      text-lg md:text-[1.125rem] 
-      tracking-[-0.01em]
-    "
+                  className="daw-editorial-content max-w-none text-slate-600 leading-relaxed text-lg md:text-[1.125rem] tracking-[-0.01em]"
                   dangerouslySetInnerHTML={{
                     //  WAJIB PAKAI DOMPURIFY DI PRODUCTION!
                     __html: DOMPurify.sanitize(
@@ -342,7 +345,7 @@ export default function ProjectDetail() {
                     Our Projects
                   </h3>
                   <div className="space-y-6">
-                    {otherProjects.map((other) => (
+                    {relatedProjects.map((other) => (
                       <Link
                         key={other.id}
                         to={`/projects/${other.slug || other.id}`}
@@ -364,7 +367,7 @@ export default function ProjectDetail() {
                             {other.title}
                           </h4>
                           <span className="text-[10px] uppercase tracking-[0.15em] font-bold text-slate-400 mt-1.5 block">
-                            {other.category}
+                            {sectorLookup[other.category] || other.category}
                           </span>
                         </div>
                       </Link>

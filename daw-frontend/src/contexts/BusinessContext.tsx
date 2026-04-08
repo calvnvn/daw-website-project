@@ -3,6 +3,7 @@ import {
   useContext,
   useState,
   useEffect,
+  useCallback,
   type ReactNode,
 } from "react";
 import api from "@/lib/api"; // Sesuaikan dengan instance axios Anda
@@ -48,6 +49,7 @@ export interface SectionData {
 interface BusinessContextType {
   sections: SectionData[];
   categories: MapCategory[];
+  publicProjects: any[];
   isLoading: boolean;
   isProcessing: boolean;
   refreshData: () => Promise<void>;
@@ -66,6 +68,7 @@ const BusinessContext = createContext<BusinessContextType | undefined>(
 export const BusinessProvider = ({ children }: { children: ReactNode }) => {
   const [sections, setSections] = useState<SectionData[]>([]);
   const [categories, setCategories] = useState<MapCategory[]>([]);
+  const [publicProjects, setPublicProjects] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isProcessing, setIsProcessing] = useState(false);
 
@@ -73,16 +76,18 @@ export const BusinessProvider = ({ children }: { children: ReactNode }) => {
    * @desc Synchronizes local memory with the remote database.
    * Fetches both business sections and map categories concurrently for performance.
    */
-  const refreshData = async () => {
+  const refreshData = useCallback(async () => {
     setIsLoading(true);
     try {
-      // Execute parallel requests to minimize latency
-      const [bizRes, catRes] = await Promise.all([
+      // FIX 5: Tarik data proyek publik secara paralel bersama data bisnis lainnya
+      const [bizRes, catRes, projRes] = await Promise.all([
         api.get("/businesses/public"),
         api.get("/map-categories"),
+        api.get("/projects/public"), // Nambah 1 API Call ini bikin sisa web kenceng banget
       ]);
       setSections(bizRes.data);
       setCategories(catRes.data);
+      setPublicProjects(projRes.data); // Simpan ke state global
     } catch (error) {
       console.error("[REFRESH_DATA_FAILURE]:", error);
       toast.error(
@@ -91,120 +96,140 @@ export const BusinessProvider = ({ children }: { children: ReactNode }) => {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, []);
 
   // Fungsi untuk menyimpan data ke Backend
-  const updateSection = async (id: string, data: Partial<SectionData>) => {
-    setIsProcessing(true);
-    try {
-      await api.put(`/businesses/admin/${id}`, data);
-      await refreshData();
-      toast.success("Data bisnis berhasil diperbarui!");
-    } catch (error: any) {
-      console.error("Save error:", error);
-      toast.error(error.response?.data?.message || "Gagal menyimpan perubahan");
-      throw error; // Re-throw agar komponen bisa menangani state loading lokalnya
-    } finally {
-      setIsProcessing(false);
-    }
-  };
+  const updateSection = useCallback(
+    async (id: string, data: Partial<SectionData>) => {
+      setIsProcessing(true);
+      try {
+        await api.put(`/businesses/admin/${id}`, data);
+        await refreshData();
+        toast.success("Data bisnis berhasil diperbarui!");
+      } catch (error: any) {
+        console.error("Save error:", error);
+        toast.error(
+          error.response?.data?.message || "Gagal menyimpan perubahan",
+        );
+        throw error;
+      } finally {
+        setIsProcessing(false);
+      }
+    },
+    [refreshData],
+  );
 
-  const addCategory = async (data: MapCategory) => {
-    setIsProcessing(true);
-    try {
-      await api.post("/map-categories", data);
-      await refreshData(); // Sinkronisasi ulang data global
-      toast.success("Kategori baru berhasil ditambahkan!");
-    } catch (error: any) {
-      toast.error(error.response?.data?.message || "Gagal menambah kategori");
-      throw error;
-    } finally {
-      setIsProcessing(false);
-    }
-  };
+  const addCategory = useCallback(
+    async (data: MapCategory) => {
+      setIsProcessing(true);
+      try {
+        await api.post("/map-categories", data);
+        await refreshData();
+        toast.success("Kategori baru berhasil ditambahkan!");
+      } catch (error: any) {
+        toast.error(error.response?.data?.message || "Gagal menambah kategori");
+        throw error;
+      } finally {
+        setIsProcessing(false);
+      }
+    },
+    [refreshData],
+  );
 
   // 2. Update Kategori (Warna/Nama)
-  const updateCategory = async (id: string, data: Partial<MapCategory>) => {
-    setIsProcessing(true);
-    try {
-      await api.put(`/map-categories/${id}`, data);
-      await refreshData();
-      toast.success("Kategori berhasil diperbarui!");
-    } catch (error: any) {
-      toast.error("Gagal memperbarui kategori");
-      throw error;
-    } finally {
-      setIsProcessing(false);
-    }
-  };
+  const updateCategory = useCallback(
+    async (id: string, data: Partial<MapCategory>) => {
+      setIsProcessing(true);
+      try {
+        await api.put(`/map-categories/${id}`, data);
+        await refreshData();
+        toast.success("Kategori berhasil diperbarui!");
+      } catch (error: any) {
+        toast.error("Gagal memperbarui kategori");
+        throw error;
+      } finally {
+        setIsProcessing(false);
+      }
+    },
+    [refreshData],
+  );
 
   // 3. Hapus Kategori
-  const deleteCategory = async (id: string) => {
-    setIsProcessing(true);
-
-    try {
-      await api.delete(`/map-categories/${id}`);
-      await refreshData();
-      toast.success("Kategori telah dihapus");
-    } catch (error: any) {
-      toast.error(
-        "Gagal menghapus (Kategori mungkin masih digunakan oleh marker)",
-      );
-      throw error;
-    } finally {
-      setIsProcessing(false);
-    }
-  };
+  const deleteCategory = useCallback(
+    async (id: string) => {
+      setIsProcessing(true);
+      try {
+        await api.delete(`/map-categories/${id}`);
+        await refreshData();
+        toast.success("Kategori telah dihapus");
+      } catch (error: any) {
+        toast.error(
+          "Gagal menghapus (Kategori mungkin masih digunakan oleh marker)",
+        );
+        throw error;
+      } finally {
+        setIsProcessing(false);
+      }
+    },
+    [refreshData],
+  );
 
   /**
    * @desc Dispatches a POST request to initialize a new business unit.
    * @param {string} category - The display name (e.g., "Logistics").
    * @param {string} title - Initial eyebrow title.
    */
-  const addSection = async (category: string, title: string) => {
-    setIsProcessing(true);
-    try {
-      await api.post("/businesses/admin", { category, title });
-      await refreshData(); // Sync local state with fresh DB records
-      toast.success(`Sektor ${category} berhasil dibuat!`);
-    } catch (error: unknown) {
-      const message =
-        error instanceof Error ? error.message : "Failed to create section";
-      console.error("[ADD_SECTION_ERROR]:", error);
-      toast.error(message);
-      throw error;
-    } finally {
-      setIsProcessing(false);
-    }
-  };
+  const addSection = useCallback(
+    async (category: string, title: string) => {
+      setIsProcessing(true);
+      try {
+        await api.post("/businesses/admin", { category, title });
+        await refreshData();
+        toast.success(`Sektor ${category} berhasil dibuat!`);
+      } catch (error: unknown) {
+        const message =
+          error instanceof Error ? error.message : "Failed to create section";
+        console.error("[ADD_SECTION_ERROR]:", error);
+        toast.error(message);
+        throw error;
+      } finally {
+        setIsProcessing(false);
+      }
+    },
+    [refreshData],
+  );
 
   /**
    * @desc Removes an entire business section and its associated map markers.
    * @param {string} id - The slug-based ID of the section to be purged.
    */
-  const deleteSection = async (id: string) => {
-    setIsProcessing(true);
-    try {
-      await api.delete(`/businesses/admin/${id}`);
-      await refreshData();
-      toast.success("Sektor bisnis berhasil dihapus");
-    } catch (error: any) {
-      toast.error("Gagal menghapus sektor bisnis");
-      throw error;
-    } finally {
-      setIsProcessing(false);
-    }
-  };
+  const deleteSection = useCallback(
+    async (id: string) => {
+      setIsProcessing(true);
+      try {
+        await api.delete(`/businesses/admin/${id}`);
+        await refreshData();
+        toast.success("Sektor bisnis berhasil dihapus");
+      } catch (error: any) {
+        toast.error("Gagal menghapus sektor bisnis");
+        throw error;
+      } finally {
+        setIsProcessing(false);
+      }
+    },
+    [refreshData],
+  );
 
   useEffect(() => {
     refreshData();
-  }, []);
+  }, [refreshData]);
 
   return (
     <BusinessContext.Provider
       value={{
         sections,
         categories,
+        publicProjects, // FIX 6: Export ini ke luar supaya bisa dipakai komponen lain
         isLoading,
         isProcessing,
         refreshData,
