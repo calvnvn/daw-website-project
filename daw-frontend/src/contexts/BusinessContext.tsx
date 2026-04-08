@@ -6,7 +6,7 @@ import {
   useCallback,
   type ReactNode,
 } from "react";
-import api from "@/lib/api";
+import api from "@/lib/api"; // Sesuaikan dengan instance axios Anda
 import { toast } from "sonner";
 
 export interface MapCategory {
