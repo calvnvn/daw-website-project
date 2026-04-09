@@ -1,10 +1,9 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import {
   Save,
   Users,
   Target,
   BookOpen,
-  Image as ImageIcon,
   ImageOff,
   Edit,
   Trash2,
@@ -14,7 +13,9 @@ import {
   Unlock,
 } from "lucide-react";
 import { toast } from "sonner";
-import api, { BASE_UPLOAD_URL } from "@/lib/api";
+import api from "@/lib/api";
+import { getCleanImageUrl } from "@/lib/utils";
+import React, { useMemo } from "react";
 
 // Philosophy Pillar
 interface PhilosophyPillar {
@@ -34,6 +35,110 @@ interface ManagementMember {
   photoUrl: string | null;
 }
 
+/**
+ * COMPONENT: PhotoPreviewer (Anti-Flicker & Memory Safe)
+ * @description Menangani lifecycle ObjectURL secara sinkron untuk foto profil
+ */
+const PhotoPreviewer = React.memo(
+  ({ file, savedUrl }: { file?: File | null; savedUrl?: string | null }) => {
+    const [isDecoding, setIsDecoding] = React.useState(false);
+    const [hasError, setHasError] = React.useState(false); // 👈 Tambah state error
+
+    const previewUrl = useMemo(() => {
+      if (file) return URL.createObjectURL(file);
+      return getCleanImageUrl(savedUrl);
+    }, [file, savedUrl]);
+
+    // Reset error state jika file/savedUrl berubah
+    React.useEffect(() => {
+      setHasError(false);
+    }, [previewUrl]);
+
+    React.useEffect(() => {
+      if (file) setIsDecoding(true);
+    }, [file]);
+
+    React.useEffect(() => {
+      return () => {
+        if (previewUrl?.startsWith("blob:")) {
+          URL.revokeObjectURL(previewUrl);
+        }
+      };
+    }, [previewUrl]);
+
+    return (
+      <div className="relative w-24 h-24 rounded-full border-4 border-slate-100 bg-white flex items-center justify-center overflow-hidden shadow-sm group shrink-0">
+        {/* 💡 LOGIKA FALLBACK: Jika tidak ada URL atau ada error, tampilkan Ikon, bukan request file */}
+        {previewUrl && !hasError ? (
+          <img
+            src={previewUrl}
+            alt="Preview"
+            className="w-full h-full object-cover"
+            onError={() => setHasError(true)} // 👈 Set error jika gagal
+            onLoad={() => setIsDecoding(false)}
+          />
+        ) : (
+          <div className="flex flex-col items-center animate-in fade-in duration-300">
+            <ImageOff className="w-6 h-6 text-slate-300 mb-1" />
+            <span className="text-[8px] font-bold text-slate-400 uppercase">
+              No Image
+            </span>
+          </div>
+        )}
+
+        {/* Overlay Loading (Opsional) */}
+        {isDecoding && (
+          <div className="absolute inset-0 flex items-center justify-center bg-white/40">
+            <div className="w-4 h-4 border-2 border-daw-green border-t-transparent rounded-full animate-spin" />
+          </div>
+        )}
+
+        <div className="absolute inset-0 bg-slate-900/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center pointer-events-none">
+          <Edit className="w-5 h-5 text-white" />
+        </div>
+      </div>
+    );
+  },
+);
+
+const ManagementImage = ({ src, alt }: { src: string | null; alt: string }) => {
+  const [hasError, setHasError] = React.useState(false);
+
+  // Reset error state jika src berubah
+  useEffect(() => {
+    setHasError(false);
+  }, [src]);
+
+  // Gunakan utility agar logic path selalu sama dengan bagian preview
+  const finalSrc = getCleanImageUrl(src ?? "");
+
+  // Jika src null atau terjadi error, tampilkan placeholder Ikon
+  if (!src || hasError) {
+    return (
+      <div className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center text-slate-400 shrink-0 border border-slate-200">
+        <ImageOff className="w-4 h-4" />
+      </div>
+    );
+  }
+
+  return (
+    <div className="w-10 h-10 rounded-full overflow-hidden border border-slate-200 shrink-0 bg-white">
+      <img
+        src={finalSrc}
+        alt={alt}
+        className="w-full h-full object-cover"
+        decoding="async"
+        onError={() => {
+          console.error(`Gagal memuat gambar untuk: ${alt}`);
+          setHasError(true);
+        }}
+      />
+    </div>
+  );
+};
+
+PhotoPreviewer.displayName = "PhotoPreviewer";
+
 export default function AboutUsManager() {
   const [activeTab, setActiveTab] = useState<
     "info" | "history" | "philosophy" | "management"
@@ -41,12 +146,12 @@ export default function AboutUsManager() {
   const [isSaving, setIsSaving] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // --- STATE 1: MANAGEMENT ---
   const [managementTeam, setManagementTeam] = useState<ManagementMember[]>([]);
   const [isPersonModalOpen, setIsPersonModalOpen] = useState(false);
   const [editingPersonId, setEditingPersonId] = useState<number | null>(null);
-  const [photoPreview, setPhotoPreview] = useState<string | null>(null);
   const [personForm, setPersonForm] = useState({
     name: "",
     role: "",
@@ -54,7 +159,8 @@ export default function AboutUsManager() {
     level: "division",
     order: 1,
     photo: null as File | null,
-    removePhoto: false, // 👈 TAMBAH INI
+    removePhoto: false,
+    savedPhotoUrl: null as string | null,
   });
 
   // --- STATE 2: COMPANY INFO (Core Identity) ---
@@ -214,12 +320,9 @@ export default function AboutUsManager() {
         order: person.order,
         photo: null,
         removePhoto: false,
+        // Kita titipkan URL lama di sini (atau ambil dari person saat render)
+        savedPhotoUrl: person.photoUrl,
       });
-
-      const cleanPhotoPath = person.photoUrl?.replace("/uploads", "");
-      setPhotoPreview(
-        person.photoUrl ? `${BASE_UPLOAD_URL}${cleanPhotoPath}` : null,
-      );
     } else {
       setEditingPersonId(null);
       setPersonForm({
@@ -230,8 +333,8 @@ export default function AboutUsManager() {
         order: 1,
         photo: null,
         removePhoto: false,
+        savedPhotoUrl: null,
       });
-      setPhotoPreview(null);
     }
     setIsPersonModalOpen(true);
   };
@@ -239,9 +342,10 @@ export default function AboutUsManager() {
   const handlePhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
       const file = e.target.files[0];
-      setPersonForm({ ...personForm, photo: file, removePhoto: false });
-      // Buat URL sementara untuk preview gambar di browser
-      setPhotoPreview(URL.createObjectURL(file));
+      // Gunakan startTransition agar render UI modal tidak kalah prioritas dengan decoding gambar
+      React.startTransition(() => {
+        setPersonForm((prev) => ({ ...prev, photo: file, removePhoto: false }));
+      });
     }
   };
 
@@ -721,23 +825,10 @@ export default function AboutUsManager() {
                       className="hover:bg-slate-50/50 transition-colors"
                     >
                       <td className="px-6 py-4">
-                        {person.photoUrl ? (
-                          <div className="w-10 h-10 rounded-full overflow-hidden border border-slate-200">
-                            <img
-                              src={`${BASE_UPLOAD_URL}${person.photoUrl?.replace("/uploads", "")}`}
-                              alt={person.name}
-                              className="w-full h-full object-cover"
-                              onError={(e) => {
-                                (e.target as HTMLImageElement).src =
-                                  "/placeholder-user.png";
-                              }}
-                            />
-                          </div>
-                        ) : (
-                          <div className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center text-slate-400">
-                            <ImageOff className="w-4 h-4" />
-                          </div>
-                        )}
+                        <ManagementImage
+                          src={person.photoUrl}
+                          alt={person.name}
+                        />
                       </td>
                       <td className="px-6 py-4">
                         <p className="text-sm font-bold text-slate-900">
@@ -790,7 +881,7 @@ export default function AboutUsManager() {
 
             {/* MODAL / POPUP FORM */}
             {isPersonModalOpen && (
-              <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-sm p-4">
+              <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50  p-4">
                 <div className="bg-white rounded-2xl shadow-xl w-full max-w-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200">
                   <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
                     <h3 className="font-bold text-lg text-slate-900">
@@ -906,54 +997,51 @@ export default function AboutUsManager() {
                         Profile Photo (Optional)
                       </label>
                       <div className="flex items-center gap-4">
-                        {photoPreview ? (
-                          <div className="relative group shrink-0">
-                            <div className="w-16 h-16 rounded-full overflow-hidden border border-slate-200">
-                              <img
-                                src={photoPreview}
-                                alt="Preview"
-                                className="w-full h-full object-cover"
-                              />
-                            </div>
+                        {/* 1. KOTAK PREVIEW (Anti-Flicker) */}
+                        <div className="relative shrink-0">
+                          <PhotoPreviewer
+                            file={personForm.photo}
+                            // Jika user klik remove, paksa savedUrl jadi null agar gambar hilang
+                            savedUrl={
+                              personForm.removePhoto
+                                ? null
+                                : personForm.savedPhotoUrl
+                            }
+                          />
+                        </div>
+
+                        {/* 2. KONTROL UPLOAD & REMOVE */}
+                        <div className="flex flex-col gap-2">
+                          <input
+                            type="file"
+                            accept="image/*"
+                            ref={fileInputRef}
+                            onChange={handlePhotoChange}
+                            className="w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-daw-green/10 file:text-daw-green hover:file:bg-daw-green/20 transition-colors cursor-pointer"
+                          />
+
+                          {/* Tombol Remove HANYA muncul jika ada foto (file baru atau file dari database) */}
+                          {(personForm.photo ||
+                            (personForm.savedPhotoUrl &&
+                              !personForm.removePhoto)) && (
                             <button
                               type="button"
                               onClick={() => {
-                                setPhotoPreview(null);
                                 setPersonForm({
                                   ...personForm,
-                                  photo: null,
-                                  removePhoto: true,
+                                  photo: null, // Buang foto draf
+                                  removePhoto: true, // Beri tanda backend untuk hapus foto lama
                                 });
+                                if (fileInputRef.current) {
+                                  fileInputRef.current.value = "";
+                                }
                               }}
-                              className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity shadow-sm hover:bg-red-600"
-                              title="Remove Photo"
+                              className="text-xs text-red-500 hover:text-red-700 text-left font-medium w-max px-2 py-1 bg-red-50 hover:bg-red-100 rounded transition-colors"
                             >
-                              <svg
-                                className="w-3 h-3"
-                                fill="none"
-                                stroke="currentColor"
-                                viewBox="0 0 24 24"
-                              >
-                                <path
-                                  strokeLinecap="round"
-                                  strokeLinejoin="round"
-                                  strokeWidth="2"
-                                  d="M6 18L18 6M6 6l12 12"
-                                ></path>
-                              </svg>
+                              Remove Photo
                             </button>
-                          </div>
-                        ) : (
-                          <div className="w-16 h-16 rounded-full bg-slate-100 flex items-center justify-center shrink-0">
-                            <ImageIcon className="w-6 h-6 text-slate-400" />
-                          </div>
-                        )}
-                        <input
-                          type="file"
-                          accept="image/*"
-                          onChange={handlePhotoChange}
-                          className="w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-daw-green/10 file:text-daw-green hover:file:bg-daw-green/20 transition-colors cursor-pointer"
-                        />
+                          )}
+                        </div>
                       </div>
                     </div>
 
