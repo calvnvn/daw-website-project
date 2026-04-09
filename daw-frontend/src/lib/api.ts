@@ -12,7 +12,11 @@ export const API_URL =
 
 // URL untuk OWL
 export const OWL_API_URL =
-  import.meta.env.VITE_OWL_API_URL || "http://172.30.1.x:xxxx/api";
+  import.meta.env.VITE_OWL_API_URL || "https://erp-aziz.daw.co.id/node";
+
+const cleanOwlUrl = OWL_API_URL.endsWith("/")
+  ? OWL_API_URL.slice(0, -1)
+  : OWL_API_URL;
 
 // URL untuk akses file assets
 export const BASE_UPLOAD_URL = API_URL.replace("/api", "") + "/uploads";
@@ -28,7 +32,7 @@ const api = axios.create({
 
 // Instance 2: untuk nembak OWL (Login & Approval)
 export const owlApi = axios.create({
-  baseURL: OWL_API_URL,
+  baseURL: cleanOwlUrl,
 });
 
 /**

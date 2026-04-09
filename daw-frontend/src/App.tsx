@@ -1,4 +1,4 @@
-import { Routes, Route } from "react-router-dom";
+import { Routes, Route, Navigate } from "react-router-dom";
 import { lazy, Suspense } from "react";
 import { Toaster } from "sonner";
 import { AuthProvider } from "./contexts/AuthContext";
@@ -17,15 +17,15 @@ const DynamicPage = lazy(() => import("./pages/public/DynamicPage"));
 
 // Lazy Import Auth
 const Login = lazy(() => import("./pages/admin/system/auth/Login"));
-const ForceChangePassword = lazy(
-  () => import("./pages/admin/system/auth/ForceChangePassword"),
-);
-const ForgotPassword = lazy(
-  () => import("./pages/admin/system/auth/ForgotPassword"),
-);
-const ResetPassword = lazy(
-  () => import("./pages/admin/system/auth/ResetPassword"),
-);
+// const ForceChangePassword = lazy(
+//   () => import("./pages/admin/system/auth/ForceChangePassword"),
+// );
+// const ForgotPassword = lazy(
+//   () => import("./pages/admin/system/auth/ForgotPassword"),
+// );
+// const ResetPassword = lazy(
+//   () => import("./pages/admin/system/auth/ResetPassword"),
+// );
 
 // Lazy Import Admin Dashboard
 const Dashboard = lazy(() => import("./pages/admin/Dashboard"));
@@ -62,16 +62,10 @@ const PageLoader = () => (
 function App() {
   return (
     <AuthProvider>
-      <Toaster
-        position="top-center"
-        richColors
-        toastOptions={{
-          style: { border: "1px solid #004B23" },
-        }}
-      />
+      <Toaster position="top-center" richColors />
       <Suspense fallback={<PageLoader />}>
         <Routes>
-          {/* Public Route */}
+          {/* 1. Public Routes */}
           <Route element={<MainLayout />}>
             <Route path="/" element={<Home />} />
             <Route path="/about" element={<AboutUs />} />
@@ -81,25 +75,24 @@ function App() {
             <Route path="page/:slug" element={<DynamicPage />} />
           </Route>
 
-          {/* Auth Route */}
+          {/* 2. Authentication Route (SSO OWL) */}
           <Route path="/admin/login" element={<Login />} />
-          <Route
-            path="/force-change-password"
-            element={<ForceChangePassword />}
-          />
-          <Route path="/forgot-password" element={<ForgotPassword />} />
-          <Route path="/reset-password/:token" element={<ResetPassword />} />
+          {/* Note: Password management routes commented out as per OWL integration */}
 
-          {/* Admin Route */}
+          {/* 3. Admin Routes (Protected) */}
           <Route element={<ProtectedRoute />}>
             <Route path="/admin" element={<AdminLayout />}>
+              {/* Dashboard - Terbuka untuk semua Authenticated User */}
               <Route index element={<Dashboard />} />
-              <Route path="projects" element={<ProjectManagement />} />
-              <Route path="/admin/projects/create" element={<ProjectForm />} />
-              <Route
-                path="/admin/projects/edit/:id"
-                element={<ProjectForm />}
-              />
+
+              {/* Projects - Relative Paths */}
+              <Route path="projects">
+                <Route index element={<ProjectManagement />} />
+                <Route path="create" element={<ProjectForm />} />
+                <Route path="edit/:id" element={<ProjectForm />} />
+              </Route>
+
+              {/* Module-Specific Permissions */}
               <Route element={<ProtectedRoute permission="manage_content" />}>
                 <Route path="content" element={<ContentManager />} />
               </Route>
@@ -132,13 +125,15 @@ function App() {
                 <Route path="investments" element={<InvestmentsManager />} />
               </Route>
 
-              {/* User & Role Management (Kunci dengan manage_users) */}
               <Route element={<ProtectedRoute permission="manage_users" />}>
                 <Route path="users" element={<UserManagement />} />
                 <Route path="roles" element={<RoleManagement />} />
               </Route>
             </Route>
           </Route>
+
+          {/* 4. Catch-all 404 Route */}
+          <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </Suspense>
     </AuthProvider>

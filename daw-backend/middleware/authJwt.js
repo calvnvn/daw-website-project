@@ -1,61 +1,48 @@
+const axios = require("axios");
 const jwt = require("jsonwebtoken");
 
 const verifyToken = (req, res, next) => {
   try {
-    // 1. Ambil header (Standardisasi: prioritaskan Authorization)
     const authHeader =
       req.headers["authorization"] || req.headers["x-access-token"];
-
-    // DEBUG 1: Liat apa yang dikirim Frontend
 
     if (!authHeader) {
       return res.status(403).json({ message: "No token provided!" });
     }
 
-    // 2. Ekstraksi token yang lebih cerdas (Handle case-insensitive "bearer")
     let token = authHeader;
     if (authHeader.toLowerCase().startsWith("bearer ")) {
-      token = authHeader.split(" ")[1]; // Ambil kata kedua setelah spasi
+      token = authHeader.split(" ")[1];
     }
 
-    // DEBUG 2: Liat token setelah dibersihin
-    // 3. Pastikan token tidak kosong atau string "undefined"
     if (!token || token === "undefined" || token === "null") {
-      console.error("[ERROR] Token formatnya sampah (undefined/null/empty)");
       return res.status(401).json({ message: "Invalid token format!" });
     }
 
-    const secretKey = process.env.JWT_SECRET;
-    if (!secretKey) {
-      console.error("[FATAL ERROR]: JWT_SECRET is missing!");
-      return res.status(500).json({ message: "Server configuration error" });
+    // 3. LOCAL DECODING (The Magic Bypass)
+    // jwt.decode() HANYA membaca isi paket, TANPA mengecek tanda tangan (Secret)
+    const decoded = jwt.decode(token);
+
+    if (!decoded) {
+      console.error(
+        "❌ [OWL ERROR] Gagal membaca isi token. Struktur token bukan JWT yang valid.",
+      );
+      return res.status(401).json({ message: "Invalid token payload!" });
     }
 
-    // 4. Verifikasi
-    jwt.verify(token, secretKey, (err, decoded) => {
-      if (err) {
-        // Bedakan log antara expired dan malformed buat mempermudah debugging
-        const errorType =
-          err.name === "TokenExpiredError" ? "EXPIRED" : "INVALID/MALFORMED";
-        console.error(`[JWT ERROR] ${errorType}:`, err.message);
+    // 4. Sinkronisasi Data (Mapping field dari Payload JWT Mas Umar ke CMS)
+    // Pastikan key-nya sesuai dengan yang ada di payload Mas Umar
+    req.userId = decoded.userid;
+    req.userRole = decoded.role; // Akan berisi "admin"
+    req.userName = decoded.name || "User OWL";
+    req.userPermissions = decoded.permissions || [];
 
-        return res.status(401).json({
-          message: `Unauthorized! Token is ${err.name === "TokenExpiredError" ? "expired" : "invalid"}.`,
-        });
-      }
+    // Debugging di terminal backend
+    // console.log(
+    //   `🔓 [LOCAL DECODE SUCCESS] User: ${req.userName} | Role: ${req.userRole}`,
+    // );
 
-      // 5. Validasi isi payload (Jangan langsung percaya decoded)
-      if (!decoded.id || !decoded.role) {
-        return res
-          .status(401)
-          .json({ message: "Unauthorized! Token payload is incomplete." });
-      }
-
-      req.userId = decoded.id;
-      req.userRole = decoded.role;
-      req.userPermissions = decoded.permissions || [];
-      next();
-    });
+    next();
   } catch (error) {
     console.error("[MIDDLEWARE CRASH]", error);
     return res
@@ -66,34 +53,22 @@ const verifyToken = (req, res, next) => {
 
 /**
  * Middleware untuk mengecek hak akses spesifik
- * @param {string} requiredPermission - Nama permission (contoh: 'manage_projects')
  */
 const checkPermission = (requiredPermission) => {
   return (req, res, next) => {
-    // Jika role-nya adalah Superadmin, langsung izinkan tanpa cek permission
-    if (req.userRole === "Superadmin") {
+    // 1. Logic bypass untuk Role 'admin' (karena dari OWL rolenya 'admin')
+    if (req.userRole === "admin" || req.userRole === "Superadmin") {
       return next();
     }
-    // Cek apakah permission yang diminta ada di dalam array permissions user
+
+    // 2. Cek permission jika ada sistem permission khusus
     if (!req.userPermissions.includes(requiredPermission)) {
       return res.status(403).json({
-        message: `Forbidden! You don't have permission to: ${requiredPermission}`,
+        message: `Forbidden! Access denied for: ${requiredPermission}`,
       });
     }
     next();
   };
 };
 
-const authorizeRoles = (...allowedRoles) => {
-  return (req, res, next) => {
-    // req.userRole didapat dari fungsi verifyToken sebelumnya
-    if (!req.userRole || !allowedRoles.includes(req.userRole)) {
-      return res.status(403).json({
-        message: `Forbidden! Role '${req.userRole}' does not have access.`,
-      });
-    }
-    next();
-  };
-};
-
-module.exports = { verifyToken, authorizeRoles, checkPermission };
+module.exports = { verifyToken, checkPermission };

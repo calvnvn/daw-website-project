@@ -1,0 +1,7 @@
+# Use this workspace to collaborate
+workspace:
+  id: 9f41d284-c7b6-40fb-8ea4-fdee4ae3b475
+
+localResources:
+  specs:
+    - ..\daw-backend\docs\openapi.yaml

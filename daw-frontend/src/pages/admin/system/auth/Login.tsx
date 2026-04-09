@@ -4,17 +4,19 @@ import { Mail, Lock, Eye, EyeOff, ArrowRight, ShieldCheck } from "lucide-react";
 import { toast } from "sonner";
 import logoDaw from "@/assets/logo-daw.png";
 import bgImage from "@/assets/hero-bg.jpg";
-import api from "@/lib/api";
+import { owlApi } from "@/lib/api";
 import { Link } from "react-router-dom";
 import { useSettings } from "@/contexts/SettingsContext";
 import { getCleanImageUrl } from "@/lib/utils";
 import { useAuth } from "@/contexts/AuthContext";
+import { jwtDecode } from "jwt-decode";
 
 export default function Login() {
   const { settings } = useSettings();
 
   const navigate = useNavigate();
   const location = useLocation(); //  Tangkap lokasi asal dari ProtectedRoute
+  const from = location.state?.from?.pathname || "/admin"; // Ambil alamat asal, kalau tidak ada default ke /admin
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -22,12 +24,10 @@ export default function Login() {
   const [isLoading, setIsLoading] = useState(false);
   const { login } = useAuth();
 
-  // Ambil alamat asal, kalau tidak ada default ke /admin
-  const from = location.state?.from?.pathname || "/admin";
-
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
 
+    // Client-side Validation
     if (!email || !password) {
       toast.warning("Missing Credentials", {
         description: "Please enter both email and password.",
@@ -36,40 +36,68 @@ export default function Login() {
     }
 
     setIsLoading(true);
+
     try {
-      const response = await api.post("/auth/login", { email, password });
-      const data = response.data;
+      const response = await owlApi.post("/auth/login", {
+        uname: email,
+        password: password,
+      });
 
-      // console.log("🔥 [DEBUG LOGIN] Data dari Server:", data);
+      const resData = response.data; // Structure: { error: boolean, response: string, data: string }
 
-      if (!data || !data.accessToken) {
-        throw new Error("Token tidak diterima dari server.");
+      if (resData.error) {
+        throw new Error(
+          resData.response || "Token tidak diterima dari server.",
+        );
       }
 
-      if (data.needsPasswordChange) {
-        localStorage.setItem("daw_token", data.accessToken);
-        localStorage.setItem("userId", data.id || "");
+      const token = resData.data; // JWT String
 
-        toast.info("Security Check", {
-          description: "Please change your password.",
-        });
-        navigate("/force-change-password");
+      if (token) {
+        // Decode JWT to Extract User Identity
+        // The server is stateless, so extract name and role from the token payload
+        const decoded: any = jwtDecode(token);
+
+        const userData = {
+          id: decoded.userid,
+          name: decoded.name,
+          email: decoded.email || email,
+          role: decoded.role,
+          permissions:
+            decoded.role === "admin"
+              ? [
+                  "manage_projects",
+                  "manage_content",
+                  "manage_settings",
+                  "manage_homepage",
+                  "manage_businesses",
+                  "manage_about",
+                  "manage_inbox",
+                  "manage_investments",
+                  "manage_users",
+                ]
+              : [],
+        };
+
+        // Update Global Auth State
+        // login() handles localStorage and setting the 'user' state in AuthContext
+        login(userData, token);
+
+        toast.success(`Welcome back, ${decoded.name}!`);
+
+        // Intelligent Redirection
+        // Redirects user to their intended destination or default to /admin
+        navigate(from, { replace: true });
       } else {
-        if (data.accessToken && data.name) {
-          const { accessToken, ...userData } = data;
-
-          login(userData, accessToken);
-
-          toast.success(`Welcome, ${data.name}!`);
-          navigate(from, { replace: true });
-        } else {
-          console.error("Data user tidak lengkap:", data);
-          toast.error("Data user tidak lengkap dari server.");
-        }
+        toast.error("Authentication Error", {
+          description: "Token was not provided by the server.",
+        });
       }
     } catch (err: any) {
+      console.error("Login Error:", err);
       toast.error("Authentication Failed", {
-        description: err.response?.data?.message || "Invalid credentials",
+        description:
+          err.response?.data?.response || err.message || "Something went wrong",
       });
     } finally {
       setIsLoading(false);
@@ -94,21 +122,21 @@ export default function Login() {
             Admin Portal
           </h1>
           <p className="text-slate-500 text-sm">
-            Sign in to manage DAW Group content.
+            Sign in using your <strong>OWL Account</strong> to manage content.
           </p>
         </div>
 
         <form onSubmit={handleLogin} className="space-y-5">
           <div>
             <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">
-              Email Address
+              Username
             </label>
             <div className="relative">
               <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none">
                 <Mail className="w-5 h-5 text-slate-400" />
               </div>
               <input
-                type="email"
+                type="text"
                 required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
@@ -148,14 +176,14 @@ export default function Login() {
               </button>
             </div>
           </div>
-          <div className="flex justify-end mb-4">
+          {/* <div className="flex justify-end mb-4">
             <Link
               to="/forgot-password"
               className="text-xs font-bold text-emerald-700 hover:text-emerald-800 transition-colors"
             >
               Forgot Password?
             </Link>
-          </div>
+          </div> */}
 
           <div className="pt-4">
             <button
@@ -167,14 +195,14 @@ export default function Login() {
                 <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
               ) : (
                 <>
-                  <span>Authenticate</span>
+                  <span>Sign In via OWL</span>
                   <ArrowRight className="w-4 h-4 transform group-hover:translate-x-1 transition-transform" />
                 </>
               )}
             </button>
             <div className="mt-6 flex items-center justify-center gap-2 text-[11px] font-bold uppercase tracking-wider text-slate-400">
               <ShieldCheck className="w-3.5 h-3.5" />
-              <span>Restricted Access</span>
+              <span>Authenticated by OWL System</span>
             </div>
           </div>
         </form>

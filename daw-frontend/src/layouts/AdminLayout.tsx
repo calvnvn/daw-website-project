@@ -201,14 +201,30 @@ export default function AdminLayout() {
     logout();
   };
 
-  // Hanya tampilkan menu yang user punya akses (atau jika menu itu public/dashboard)
+  /**
+   * FILTERED MENU LOGIC
+   * @concept: "Superadmin Bypass"
+   * If the user role is 'admin' (from OWL), they get access to everything.
+   * Otherwise, we strictly check their specific permissions.
+   */
   const filteredMenuGroups = useMemo(() => {
-    return MENU_GROUPS.map((group) => ({
-      ...group,
-      // Filter out items the user doesn't have permission to see
-      items: group.items.filter((item) => !item.perm || can(item.perm)),
-    })).filter((group) => group.items.length > 0); // Drop the group if it's empty
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    return MENU_GROUPS.map((group) => {
+      return {
+        ...group,
+        items: group.items.filter((item) => {
+          // 1. Dashboard/Public items (no perm required)
+          if (!item.perm) return true;
+
+          // 2. OWL Admin Bypass (The "Master Key")
+          // If the role from Mas Umar is "admin", show all menus.
+          if (user?.role === "admin") return true;
+
+          // 3. Specific Permission Check
+          // If not an admin, check if their permissions array has the required string.
+          return can(item.perm);
+        }),
+      };
+    }).filter((group) => group.items.length > 0); // Hide empty headers
   }, [user, can]);
 
   return (

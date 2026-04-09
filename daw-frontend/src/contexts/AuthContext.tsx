@@ -5,10 +5,9 @@ import React, {
   useEffect,
   useCallback,
 } from "react";
-import api from "@/lib/api";
 
 interface User {
-  id: string;
+  id: string | number;
   name: string;
   email: string;
   role: string;
@@ -22,7 +21,7 @@ interface AuthContextType {
   login: (userData: any, token: string) => void;
   logout: () => void;
   can: (permission: string) => boolean;
-  refreshUser: () => Promise<void>;
+  refreshUser: () => Promise<void>; // Kita biarkan sebagai placeholder agar komponen lain tidak error
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -46,47 +45,34 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
     setUser(userData);
   };
 
-  const refreshUser = useCallback(async () => {
-    try {
-      const response = await api.get("/auth/me");
-      const userData = response.data;
-      setUser(userData);
-      localStorage.setItem("daw_user", JSON.stringify(userData));
-    } catch (error) {
-      console.error("Session sync failed:", error);
-      logout();
-    } finally {
-      setIsLoading(false);
-    }
-  }, [logout]);
-
-  useEffect(() => {
+  /**
+   * SYNC SESSION LOGIC
+   * @concept: "Local Trust"
+   * Kita tidak lagi nembak API /auth/me ke backend.
+   * Kita cukup sinkronkan state 'user' dengan data yang ada di LocalStorage.
+   */
+  const syncUserSession = useCallback(() => {
     const token = localStorage.getItem("daw_token");
     const storedUser = localStorage.getItem("daw_user");
 
     if (token && storedUser) {
-      // PROTEKSI: Hindari Crash jika LocalStorage Korup
       try {
         const parsedUser = JSON.parse(storedUser);
         setUser(parsedUser);
-        refreshUser();
       } catch {
-        console.error("Corrupted local storage data. Logging out...");
         logout();
       }
-    } else {
-      setIsLoading(false);
     }
-  }, [refreshUser, logout]);
+    setIsLoading(false);
+  }, [logout]);
 
-  // PROTEKSI: Superadmin kebal, yang lain dipastikan array-nya aman
+  useEffect(() => {
+    syncUserSession();
+  }, [syncUserSession]);
+
   const can = (permission: string) => {
     if (!user) return false;
-
-    // Superadmin bypass
-    if (user.role === "Superadmin") return true;
-
-    // Pastikan permissions adalah array sebelum memanggil .includes()
+    if (user.role === "admin" || user.role === "Superadmin") return true;
     return (
       Array.isArray(user.permissions) && user.permissions.includes(permission)
     );
@@ -101,7 +87,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
         login,
         logout,
         can,
-        refreshUser,
+        refreshUser: async () => {},
       }}
     >
       {children}
