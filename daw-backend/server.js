@@ -1,8 +1,9 @@
 require("dotenv").config();
 const express = require("express");
 const cors = require("cors");
-const path = require("path");
+const yaml = require("js-yaml");
 const fs = require("fs");
+const path = require("path");
 const swaggerUi = require("swagger-ui-express");
 const swaggerJsDoc = require("swagger-jsdoc");
 
@@ -125,28 +126,39 @@ app.get("/", (req, res) => {
 });
 
 // SWAGGER API DOCS SETUP
-const swaggerOptions = {
-  definition: {
-    openapi: "3.0.0",
-    info: {
-      title: "DAW Group CMS API",
-      version: "1.0.0",
-      description: "REST API Documentation for PT Dharma Agung Wijaya CMS",
+try {
+  // 1. Tentukan path ke file openapi.yaml
+  const yamlPath = path.join(__dirname, "./docs/openapi.yaml");
+
+  // 2. Baca dan parsing file YAML
+  const swaggerDocument = yaml.load(fs.readFileSync(yamlPath, "utf8"));
+
+  // 3. Masukkan konfigurasi server dinamis (opsional, agar tetap fleksibel)
+  swaggerDocument.servers = [
+    {
+      url:
+        process.env.BACKEND_URL ||
+        `http://localhost:${process.env.PORT || 5550}`,
+      description: "Current Environment",
     },
-    servers: [
-      {
-        url:
-          process.env.API_URL || `http://localhost:${process.env.PORT || 5000}`,
-        description: "Current Environment",
+  ];
+
+  // 4. Jalankan Swagger UI
+  app.use(
+    "/api-docs",
+    swaggerUi.serve,
+    swaggerUi.setup(swaggerDocument, {
+      swaggerOptions: {
+        persistAuthorization: true, // Biar token OWL gak hilang saat di-refresh
       },
-    ],
-  },
-  apis: ["./routes/*.js"],
-};
+      customSiteTitle: "DAW Group CMS API Documentation",
+    }),
+  );
 
-const swaggerDocs = swaggerJsDoc(swaggerOptions);
-app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(swaggerDocs));
-
+  console.log("Swagger Docs loaded from openapi.yaml");
+} catch (e) {
+  console.error("Gagal memuat file Swagger YAML:", e.message);
+}
 // DATABASE ASSOCIATIONS (Relationships)
 
 // 1. User & Role Relations

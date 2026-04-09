@@ -1,0 +1,250 @@
+openapi: 3.0.0
+info:
+  title: DAW Group CMS API
+  version: 1.0.0
+  description: Dokumentasi API terpusat untuk PT Dharma Agung Wijaya CMS.
+servers:
+  - url: http://localhost:5550
+    description: Current Environment
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+paths:
+  # --- AUTHENTICATION ---
+  /api/auth/login:
+    post:
+      tags: [Authentication]
+      summary: Login via OWL Centralized System
+      responses:
+        200:
+          description: OK
+  /api/auth/me:
+    get:
+      tags: [Authentication]
+      security: [{ bearerAuth: [] }]
+      summary: Get current user session
+      responses:
+        200:
+          description: OK
+
+  # --- ABOUT & HISTORY ---
+  /api/about:
+    get:
+      tags: [About]
+      summary: Get About Info
+      responses:
+        200:
+          description: OK
+    put:
+      tags: [About]
+      security: [{ bearerAuth: [] }]
+      summary: Update About Info
+      responses:
+        200:
+          description: OK
+  /api/history:
+    get:
+      tags: [About]
+      summary: Get Company Histories
+      responses:
+        200:
+          description: OK
+    put:
+      tags: [About]
+      security: [{ bearerAuth: [] }]
+      summary: Update Company Histories
+      responses:
+        200:
+          description: OK
+
+  # --- MANAGEMENT ---
+  /api/management:
+    get:
+      tags: [Management]
+      summary: Get all management team members
+      responses:
+        200:
+          description: OK
+    post:
+      tags: [Management]
+      security: [{ bearerAuth: [] }]
+      summary: Create new management member
+      responses:
+        201:
+          description: Created
+
+  # --- BUSINESSES ---
+  /api/businesses/public:
+    get:
+      tags: [Businesses]
+      summary: Get public business data
+      responses:
+        200:
+          description: OK
+  /api/businesses/admin:
+    post:
+      tags: [Businesses]
+      security: [{ bearerAuth: [] }]
+      summary: Create business section
+      responses:
+        201:
+          description: Created
+  /api/map-categories:
+    get:
+      tags: [Businesses]
+      summary: Get all map categories
+      responses:
+        200:
+          description: OK
+
+  # --- HOMEPAGE ---
+  /api/home:
+    get:
+      tags: [Homepage]
+      summary: Get homepage data
+      responses:
+        200:
+          description: OK
+  /api/home/hero:
+    post:
+      tags: [Homepage]
+      security: [{ bearerAuth: [] }]
+      summary: Create Hero Slide
+      responses:
+        201:
+          description: Created
+  /api/home/stats:
+    post:
+      tags: [Homepage]
+      security: [{ bearerAuth: [] }]
+      summary: Create Impact Stat
+      responses:
+        201:
+          description: Created
+
+  # --- PROJECTS ---
+  /api/projects/public:
+    get:
+      tags: [Projects]
+      summary: Get public projects
+      responses:
+        200:
+          description: OK
+  /api/projects:
+    get:
+      tags: [Projects]
+      security: [{ bearerAuth: [] }]
+      summary: Get all projects (Admin)
+      responses:
+        200:
+          description: OK
+    post:
+      tags: [Projects]
+      security: [{ bearerAuth: [] }]
+      summary: Create project
+      responses:
+        201:
+          description: Created
+
+  # --- INBOX & INQUIRIES ---
+  /api/inquiries:
+    get:
+      tags: [Inbox]
+      security: [{ bearerAuth: [] }]
+      summary: Get all inquiries
+      responses:
+        200:
+          description: OK
+    post:
+      tags: [Inbox]
+      summary: Submit new inquiry
+      responses:
+        200:
+          description: Sent
+  /api/inquiries/subjects/active:
+    get:
+      tags: [Inbox]
+      summary: Get active inquiry subjects
+      responses:
+        200:
+          description: OK
+
+  # --- INVESTMENTS ---
+  /api/investments:
+    get:
+      tags: [Investments]
+      summary: Get investment page data
+      responses:
+        200:
+          description: OK
+  /api/investments/affiliate:
+    post:
+      tags: [Investments]
+      security: [{ bearerAuth: [] }]
+      summary: Create affiliate
+      responses:
+        201:
+          description: Created
+
+  # --- CONTENT BUILDER (PAGES & MENUS) ---
+  /api/pages:
+    get:
+      tags: [Content Builder]
+      summary: List all dynamic pages
+      responses:
+        200:
+          description: OK
+  /api/menus/tree:
+    get:
+      tags: [Content Builder]
+      summary: Get navigation menu tree
+      responses:
+        200:
+          description: OK
+
+  # --- SYSTEM ---
+  /api/dashboard/stats:
+    get:
+      tags: [System]
+      security: [{ bearerAuth: [] }]
+      summary: Get dashboard summary stats
+      responses:
+        200:
+          description: OK
+  /api/settings:
+    get:
+      tags: [System]
+      summary: Get global settings
+      responses:
+        200:
+          description: OK
+  /api/users:
+    get:
+      tags: [System]
+      security: [{ bearerAuth: [] }]
+      summary: List all admin users
+      responses:
+        200:
+          description: OK
+  /api/roles:
+    get:
+      tags: [System]
+      security: [{ bearerAuth: [] }]
+      summary: List roles and permissions
+      responses:
+        200:
+          description: OK
+
+  # --- SEO ---
+  /sitemap.xml:
+    get:
+      tags: [SEO]
+      summary: Generate sitemap xml
+      responses:
+        200:
+          description: XML File

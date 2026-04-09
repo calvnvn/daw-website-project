@@ -65,7 +65,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
     const storedUser = localStorage.getItem("daw_user");
 
     if (token && storedUser) {
-      // 🛡️ PROTEKSI: Hindari Crash jika LocalStorage Korup
+      // PROTEKSI: Hindari Crash jika LocalStorage Korup
       try {
         const parsedUser = JSON.parse(storedUser);
         setUser(parsedUser);
@@ -79,7 +79,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
     }
   }, [refreshUser, logout]);
 
-  // 🛡️ PROTEKSI: Superadmin kebal, yang lain dipastikan array-nya aman
+  // PROTEKSI: Superadmin kebal, yang lain dipastikan array-nya aman
   const can = (permission: string) => {
     if (!user) return false;
 
