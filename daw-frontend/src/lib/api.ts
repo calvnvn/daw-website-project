@@ -7,12 +7,10 @@ import axios, { type InternalAxiosRequestConfig } from "axios";
  */
 
 // URL untuk Backend CMS Pribadi
-export const API_URL =
-  import.meta.env.VITE_API_URL || "http://localhost:5550/api";
+export const API_URL = import.meta.env.VITE_API_URL;
 
 // URL untuk OWL
-export const OWL_API_URL =
-  import.meta.env.VITE_OWL_API_URL || "https://erp-aziz.daw.co.id/node";
+export const OWL_API_URL = import.meta.env.VITE_OWL_API_URL;
 
 const cleanOwlUrl = OWL_API_URL.endsWith("/")
   ? OWL_API_URL.slice(0, -1)
