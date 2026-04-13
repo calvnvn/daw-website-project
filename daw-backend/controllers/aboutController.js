@@ -1,8 +1,7 @@
 const sequelize = require("../config/database");
 const ErpApprovalService = require("../services/erpApprovalService");
 
-// 🔴 Asumsi sementara untuk kode approval CMS.
-const JENIS_APP_CMS = process.env.CMS_APPROVAL_CODE || "040101";
+const JENIS_APP_CMS = process.env.CMS_APPROVAL_CODE;
 // GET: Data Info & Philosophu
 exports.getAboutInfo = async (req, res) => {
   try {

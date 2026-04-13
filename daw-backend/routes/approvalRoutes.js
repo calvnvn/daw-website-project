@@ -17,4 +17,10 @@ router.post(
   approvalController.executeDecision,
 );
 
+router.get(
+  "/original-data",
+  verifyToken,
+  checkPermission("manage_approvals"),
+  approvalController.getOriginalData,
+);
 module.exports = router;

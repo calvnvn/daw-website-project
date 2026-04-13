@@ -192,30 +192,38 @@
   border-radius: 12px;
   background: #f1f5f9; /* Loading placeholder color */
 }
-/* --- 5. TYPOGRAPHY GUARDRAILS (XSS & OVERFLOW DEFENSE) --- 
- * Ensures robust text behavior across all rich-text containers.
- */
+
+/* --- 5. THE NUCLEAR RESET (Pusat Kendali Teks) --- */
 .prose,
 .daw-editorial-content,
-.ql-editor {
+.prose *,
+.daw-editorial-content * {
+  /* 1. Hancurkan Rata Kanan (Justify) */
   text-align: left !important;
 
-  /* Mencegah pemutusan kata di tengah (Anti-Sect-or) */
+  /* 2. Kunci Kata (Dilarang potong huruf di tengah kata) */
   word-break: normal !important;
-  overflow-wrap: break-word !important;
+  word-wrap: normal !important;
 
-  /* Matikan fitur pemenggalan kata otomatis browser */
+  /* 3. Matikan Pemenggalan (Anti "busi-ness") */
   hyphens: none !important;
   -webkit-hyphens: none !important;
+  -moz-hyphens: none !important;
+  -ms-hyphens: none !important;
 
-  /* Mencegah kata sendirian di baris terakhir (Standard Premium) */
-  text-wrap: pretty !important;
+  /* 4. Bungkus Teks (Biar nggak lewat layar) */
+  /* Kita pakai 'break-word', JANGAN 'anywhere' karena anywhere suka potong huruf */
+  overflow-wrap: break-word !important;
+
+  /* 5. Jaga Lebar */
+  max-width: 100% !important;
 }
 
-/* Memastikan tag di dalam prose tidak mewarisi behavior break-all dari parent manapun */
-.prose * {
-  word-break: normal !important;
-  overflow-wrap: break-word !important;
-  hyphens: none !important;
-  text-align: left !important;
+/* --- 6. FIX KHUSUS SPAN & INLINE STYLE --- 
+ * Karena database kamu isinya banyak <span style="color:...">
+ */
+.prose span,
+.daw-editorial-content span {
+  display: inline !important; /* Mencegah span jadi block yang merusak aliran teks */
+  word-break: keep-all !important; /* Tambahan perlindungan agar kata tetap utuh */
 }

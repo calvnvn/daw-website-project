@@ -6,6 +6,7 @@ import { AuthProvider } from "./contexts/AuthContext";
 import MainLayout from "./layouts/MainLayout";
 import AdminLayout from "./layouts/AdminLayout";
 import ProtectedRoute from "./components/ProtectedRoute";
+import ApprovalCenter from "./pages/admin/ApprovalCenter";
 
 // Lazy Import Public Frontend
 const Home = lazy(() => import("./pages/public/Home"));
@@ -128,6 +129,9 @@ function App() {
               <Route element={<ProtectedRoute permission="manage_users" />}>
                 <Route path="users" element={<UserManagement />} />
                 <Route path="roles" element={<RoleManagement />} />
+              </Route>
+              <Route element={<ProtectedRoute permission="manage_approvals" />}>
+                <Route path="approvals" element={<ApprovalCenter />} />
               </Route>
             </Route>
           </Route>

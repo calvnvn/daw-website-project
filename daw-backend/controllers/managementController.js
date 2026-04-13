@@ -2,8 +2,7 @@ const Management = require("../models/Management");
 const { deleteSingleFile } = require("../utils/fileRemover");
 const ErpApprovalService = require("../services/erpApprovalService");
 
-// 🔴 Asumsi sementara untuk kode approval CMS.
-const JENIS_APP_CMS = process.env.CMS_APPROVAL_CODE || "040101";
+const JENIS_APP_CMS = process.env.CMS_APPROVAL_CODE;
 
 // 1. GET Data
 exports.getAllManagements = async (req, res) => {

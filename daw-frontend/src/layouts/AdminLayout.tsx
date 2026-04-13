@@ -20,6 +20,8 @@ import {
   Building2,
   FileText,
   Key,
+  ClipboardCheck,
+  ArrowRight,
 } from "lucide-react";
 import api from "@/lib/api";
 import logoDaw from "@/assets/logo-daw.png";
@@ -46,6 +48,12 @@ const MENU_GROUPS = [
     label: "Main Desk",
     items: [
       { name: "Dashboard", path: "/admin", icon: LayoutDashboard },
+      {
+        name: "Approval Queue",
+        path: "/admin/approvals",
+        icon: ClipboardCheck,
+        perm: "manage_approvals",
+      },
       {
         name: "Inbox",
         path: "/admin/inbox",
@@ -135,6 +143,7 @@ export default function AdminLayout() {
   const [isLogoutModalOpen, setIsLogoutModalOpen] = useState(false);
 
   const [unreadInquiries, setUnreadInquiries] = useState<InquiryData[]>([]);
+  const [unreadApprovals, setUnreadApprovals] = useState<any[]>([]);
   const [isNotifOpen, setIsNotifOpen] = useState(false);
 
   const location = useLocation();
@@ -142,6 +151,7 @@ export default function AdminLayout() {
 
   const breadcrumbLabels: Record<string, string> = {
     admin: "Dashboard",
+    approvals: "Approval Center",
     projects: "Project List",
     users: "User Management",
     roles: "Access Control",
@@ -168,25 +178,29 @@ export default function AdminLayout() {
         } catch (error) {
           console.error("Failed to fetch notifications:", error);
         }
-      } else {
-        setUnreadInquiries([]);
+      }
+
+      if (can("manage_approvals")) {
+        try {
+          const response = await api.get("/approval/list");
+          const rows = response.data?.data?.rows || [];
+          setUnreadApprovals(rows);
+        } catch (error) {
+          console.error("Approval fetch failed", error);
+        }
       }
     };
 
-    // 2. UI Resets (Hanya dijalankan saat pindah rute)
     setIsNotifOpen(false);
     setIsMobileMenuOpen(false);
-
-    // 3. Jalankan fetch pertama kali (langsung)
     fetchNotifications();
 
-    // 4. Pasang Interval untuk polling (misal: setiap 2 menit)
     const interval = setInterval(
       () => {
         fetchNotifications();
       },
       1000 * 60 * 2,
-    );
+    ); // 2 menit
 
     // 5. CLEANUP FUNCTION (Sangat Penting!)
     return () => clearInterval(interval);
@@ -280,7 +294,10 @@ export default function AdminLayout() {
                   const dynamicBadge =
                     item.name === "Inbox" && unreadInquiries.length > 0
                       ? unreadInquiries.length
-                      : undefined;
+                      : item.name === "Approval Queue" &&
+                          unreadApprovals.length > 0
+                        ? unreadApprovals.length
+                        : undefined;
 
                   return (
                     <Link
@@ -423,7 +440,7 @@ export default function AdminLayout() {
               className={`p-2 rounded-full transition-colors relative ${isNotifOpen ? "bg-daw-green/10 text-daw-green" : "text-slate-400 hover:text-daw-green hover:bg-slate-50"}`}
             >
               <Bell className="w-5 h-5" />
-              {unreadInquiries.length > 0 && (
+              {(unreadInquiries.length > 0 || unreadApprovals.length > 0) && (
                 <span className="absolute top-1 right-1.5 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-white animate-pulse"></span>
               )}
             </button>
@@ -440,7 +457,31 @@ export default function AdminLayout() {
                   )}
                 </div>
 
-                <div className="max-h-[300px] overflow-y-auto custom-scrollbar">
+                <div className="max-h-[300px] overflow-y-auto">
+                  {unreadApprovals.length > 0 && (
+                    <div className="p-3 bg-blue-50/50 border-b border-blue-100">
+                      <p className="text-[10px] font-black text-blue-500 uppercase tracking-widest mb-2">
+                        Pending Approvals
+                      </p>
+                      <div
+                        onClick={() => {
+                          navigate("/admin/approvals");
+                          setIsNotifOpen(false);
+                        }}
+                        className="flex items-center justify-between bg-white p-3 rounded-xl border border-blue-100 shadow-sm cursor-pointer hover:bg-blue-50 transition-colors"
+                      >
+                        <div className="flex items-center gap-3">
+                          <div className="p-2 bg-blue-500 text-white rounded-lg">
+                            <ClipboardCheck className="w-4 h-4" />
+                          </div>
+                          <span className="text-sm font-bold text-slate-700">
+                            {unreadApprovals.length} Draf revisi masuk
+                          </span>
+                        </div>
+                        <ArrowRight className="w-4 h-4 text-blue-300" />
+                      </div>
+                    </div>
+                  )}
                   {unreadInquiries.length > 0 ? (
                     <div className="divide-y divide-slate-50">
                       {unreadInquiries.slice(0, 5).map((inq) => (

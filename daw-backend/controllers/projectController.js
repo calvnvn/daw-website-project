@@ -4,7 +4,6 @@ const { deleteSingleFile } = require("../utils/fileRemover");
 const { Op } = require("sequelize");
 const ErpApprovalService = require("../services/erpApprovalService");
 
-// 🔴 Asumsi sementara untuk kode approval CMS.
 const JENIS_APP_CMS = process.env.CMS_APPROVAL_CODE;
 
 // Slug Generator
@@ -241,7 +240,7 @@ exports.updateProject = async (req, res) => {
     } else if (title && title !== project.title) {
       finalSlug = await generateUniqueProjectSlug(title, id);
     }
-    // 🔴 Gatekeeper: Pemisahan Logic Flow
+    // Gatekeeper: Pemisahan Logic Flow
     // JALUR 1: Jika Editor klik "Publish" (Kirim ke ERP DAW)
     if (
       req.userRole &&

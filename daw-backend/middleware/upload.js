@@ -63,7 +63,7 @@ const optimizeImage = async (req, res, next) => {
     const uniqueSuffix = Date.now() + "-" + Math.round(Math.random() * 1e9);
     const safeFieldName = file.fieldname.replace(/[^a-zA-Z0-9]/g, "");
 
-    // 🔴 Gatekeeper: Cek Role dari JWT (req.userRole diset di authJwt.js)
+    // Gatekeeper: Cek Role dari JWT (req.userRole diset di authJwt.js)
     const prefix = req.userRole === "Editor" ? "TEMP_" : "";
 
     // Paksa ekstensi jadi .webp untuk kompresi terbaik

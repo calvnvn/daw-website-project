@@ -198,3 +198,111 @@ exports.executeDecision = async (req, res) => {
       .json({ message: "Gagal mengeksekusi approval.", error: error.message });
   }
 };
+
+// GET: Mengambil data asli (Live) dari database lokal untuk komparasi (Diff Viewer)
+exports.getOriginalData = async (req, res) => {
+  try {
+    const { module, targetId } = req.query;
+
+    if (!module || !targetId) {
+      return res
+        .status(400)
+        .json({ message: "Module dan targetId wajib diisi." });
+    }
+
+    let data = null;
+
+    switch (module) {
+      case "Project":
+        data = await Project.findByPk(targetId);
+        break;
+
+      case "Management":
+        data = await Management.findByPk(targetId);
+        break;
+
+      case "Affiliate":
+        data = await Affiliate.findByPk(targetId);
+        break;
+
+      case "Page":
+        data = await Page.findByPk(targetId);
+        break;
+
+      case "Menu":
+        if (targetId === "ALL_TREE") {
+          const menus = await Menu.findAll({ order: [["orderIndex", "ASC"]] });
+          data = { updatedMenus: menus };
+        } else {
+          data = await Menu.findByPk(targetId);
+        }
+        break;
+
+      case "BusinessSection":
+        const section = await BusinessSection.findByPk(targetId, { raw: true });
+        if (section) {
+          const markers = await BusinessMapMarker.findAll({
+            where: { sectionId: targetId },
+            raw: true,
+          });
+          data = { ...section, mapMarkers: markers };
+        }
+        break;
+
+      case "MapCategory":
+        data = await MapCategory.findByPk(targetId);
+        break;
+
+      case "AboutInfo":
+        const aboutData = await sequelize.query(
+          "SELECT * FROM AboutInfo LIMIT 1",
+          { type: sequelize.QueryTypes.SELECT },
+        );
+        data = aboutData.length > 0 ? aboutData[0] : null;
+        // Parse kembali JSON string agar formatnya sama dengan payload
+        if (
+          data &&
+          data.philosophyPillars &&
+          typeof data.philosophyPillars === "string"
+        ) {
+          try {
+            data.philosophyPillars = JSON.parse(data.philosophyPillars);
+          } catch (e) {
+            data.philosophyPillars = [];
+          }
+        }
+        break;
+
+      case "History":
+        const histories = await sequelize.query(
+          "SELECT year, description as text FROM Histories ORDER BY year ASC",
+          { type: sequelize.QueryTypes.SELECT },
+        );
+        data = { histories: histories };
+        break;
+
+      default:
+        return res
+          .status(404)
+          .json({
+            message: `Modul ${module} tidak dikenali untuk fetching data asli.`,
+          });
+    }
+
+    if (!data) {
+      return res
+        .status(404)
+        .json({ message: "Data asli tidak ditemukan di sistem live." });
+    }
+
+    res.status(200).json(data);
+  } catch (error) {
+    console.error("🚨 [FETCH ORIGINAL DATA ERROR]:", error);
+    res
+      .status(500)
+      .json({
+        message: "Gagal mengambil data pembanding.",
+        error: error.message,
+      });
+  }
+};
