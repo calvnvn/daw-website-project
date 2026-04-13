@@ -1,0 +1,16 @@
+$kind: http-request
+description: Daftar transaksi pending approval untuk approver tertentu.
+  `jenisApproval` opsional.
+url: "{{baseUrl}}/node/approval/trans/getData"
+method: POST
+headers:
+  Content-Type: application/json
+  Authorization: Bearer {{token}}
+body:
+  type: text
+  content: |-
+    {
+      "approver": "KRY001",
+      "jenisApproval": "lembur"
+    }
+order: 1000

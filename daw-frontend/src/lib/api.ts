@@ -10,11 +10,11 @@ import axios, { type InternalAxiosRequestConfig } from "axios";
 export const API_URL = import.meta.env.VITE_API_URL;
 
 // URL untuk OWL
-export const OWL_API_URL = import.meta.env.VITE_OWL_API_URL;
+export const DAW_API_URL = import.meta.env.VITE_DAW_API_URL;
 
-const cleanOwlUrl = OWL_API_URL.endsWith("/")
-  ? OWL_API_URL.slice(0, -1)
-  : OWL_API_URL;
+const cleanDawUrl = DAW_API_URL.endsWith("/")
+  ? DAW_API_URL.slice(0, -1)
+  : DAW_API_URL;
 
 // URL untuk akses file assets
 export const BASE_UPLOAD_URL = API_URL.replace("/api", "") + "/uploads";
@@ -29,8 +29,8 @@ const api = axios.create({
 });
 
 // Instance 2: untuk nembak OWL (Login & Approval)
-export const owlApi = axios.create({
-  baseURL: cleanOwlUrl,
+export const dawApi = axios.create({
+  baseURL: cleanDawUrl,
 });
 
 /**
@@ -45,6 +45,6 @@ const injectToken = (config: InternalAxiosRequestConfig) => {
 };
 
 api.interceptors.request.use(injectToken);
-owlApi.interceptors.request.use(injectToken);
+dawApi.interceptors.request.use(injectToken);
 
 export default api;

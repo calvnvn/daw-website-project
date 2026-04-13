@@ -1,0 +1,14 @@
+$kind: http-request
+description: Hapus konfigurasi approval berdasarkan ID.
+url: "{{baseUrl}}/node/approval/setup/delete"
+method: POST
+headers:
+  Content-Type: application/json
+  Authorization: Bearer {{token}}
+body:
+  type: text
+  content: |-
+    {
+      "id": 1
+    }
+order: 5000

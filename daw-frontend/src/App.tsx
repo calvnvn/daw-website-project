@@ -3,7 +3,7 @@ import { lazy, Suspense } from "react";
 import { Toaster } from "sonner";
 import { AuthProvider } from "./contexts/AuthContext";
 
-import MainLayout from "./pages/public/MainLayout";
+import MainLayout from "./layouts/MainLayout";
 import AdminLayout from "./layouts/AdminLayout";
 import ProtectedRoute from "./components/ProtectedRoute";
 

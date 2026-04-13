@@ -1,0 +1,15 @@
+$kind: http-request
+description: Cek apakah setup approval sudah dikonfigurasi untuk jenis & unit tertentu.
+url: "{{baseUrl}}/node/approval/setup/cekSetup"
+method: POST
+headers:
+  Content-Type: application/json
+  Authorization: Bearer {{token}}
+body:
+  type: text
+  content: |-
+    {
+      "jenisApproval": "lembur",
+      "unit": "DAW01"
+    }
+order: 2000

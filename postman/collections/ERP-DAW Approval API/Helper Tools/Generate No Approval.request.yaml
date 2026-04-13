@@ -1,0 +1,14 @@
+$kind: http-request
+description: Generate nomor approval baru.
+url: "{{baseUrl}}/node/tools/noapproval"
+method: POST
+headers:
+  Content-Type: application/json
+  Authorization: Bearer {{token}}
+body:
+  type: text
+  content: |-
+    {
+      "jenisApproval": "lembur"
+    }
+order: 2000

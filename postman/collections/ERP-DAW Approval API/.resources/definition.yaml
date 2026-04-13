@@ -1,0 +1,17 @@
+$kind: collection
+description: >-
+  Koleksi semua endpoint approval (Setup + Transaksi) dari erp-daw/routes/api.js
+  section 4.3.
+
+
+  ## Setup
+
+  1. Set environment variable `baseUrl` (contoh: `http://localhost:3000`)
+
+  2. Set environment variable `token` (JWT/token dari login)
+
+
+  Semua request sudah include header `Authorization: Bearer {{token}}`.
+variables:
+  baseUrl: https://erp-aziz.daw.co.id
+  token: ""

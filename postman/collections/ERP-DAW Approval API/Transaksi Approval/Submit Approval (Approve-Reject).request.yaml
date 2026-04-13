@@ -1,0 +1,17 @@
+$kind: http-request
+name: Submit Approval (Approve/Reject)
+description: "Submit keputusan approval. status: 1=approve, 2=reject."
+url: "{{baseUrl}}/node/approval/trans/submitApp"
+method: POST
+headers:
+  Content-Type: application/json
+  Authorization: Bearer {{token}}
+body:
+  type: text
+  content: |-
+    {
+      "notrans": "APP/2026/04/0001",
+      "status": "1",
+      "keterangan": "Disetujui"
+    }
+order: 4000

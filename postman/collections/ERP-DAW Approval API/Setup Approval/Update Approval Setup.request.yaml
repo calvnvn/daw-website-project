@@ -1,0 +1,18 @@
+$kind: http-request
+description: Update konfigurasi approval berdasarkan ID.
+url: "{{baseUrl}}/node/approval/setup/update"
+method: POST
+headers:
+  Content-Type: application/json
+  Authorization: Bearer {{token}}
+body:
+  type: text
+  content: |-
+    {
+      "id": 1,
+      "data": {
+        "approver": "KRY002",
+        "layer": "2"
+      }
+    }
+order: 4000

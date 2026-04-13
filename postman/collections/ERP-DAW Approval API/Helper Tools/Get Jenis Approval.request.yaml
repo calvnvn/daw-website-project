@@ -1,0 +1,7 @@
+$kind: http-request
+description: Daftar jenis approval (kode, keterangan, layer).
+url: "{{baseUrl}}/node/tools/jenisapp"
+method: GET
+headers:
+  Authorization: Bearer {{token}}
+order: 1000

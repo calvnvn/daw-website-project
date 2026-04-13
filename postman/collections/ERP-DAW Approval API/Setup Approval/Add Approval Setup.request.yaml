@@ -1,0 +1,16 @@
+$kind: http-request
+description: Menambahkan konfigurasi approval baru (jenis, layer, approver).
+url: "{{baseUrl}}/node/approval/setup/add"
+method: POST
+headers:
+  Content-Type: application/json
+  Authorization: Bearer {{token}}
+body:
+  type: text
+  content: |-
+    {
+      "jenisApproval": "lembur",
+      "layer": "1",
+      "approver": "KRY001"
+    }
+order: 3000

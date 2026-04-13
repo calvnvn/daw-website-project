@@ -1,0 +1,15 @@
+$kind: http-request
+description: Mendapatkan konfigurasi approval flow berdasarkan jenisApproval
+  (lembur, cuti, kasbank, dll).
+url: "{{baseUrl}}/node/approval/setup/getData"
+method: POST
+headers:
+  Content-Type: application/json
+  Authorization: Bearer {{token}}
+body:
+  type: text
+  content: |-
+    {
+      "jenisApproval": "lembur"
+    }
+order: 1000

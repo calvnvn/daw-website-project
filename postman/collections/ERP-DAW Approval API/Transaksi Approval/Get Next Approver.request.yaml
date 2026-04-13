@@ -1,0 +1,15 @@
+$kind: http-request
+description: Mendapatkan approver di layer berikutnya.
+url: "{{baseUrl}}/node/approval/trans/getNextApp"
+method: POST
+headers:
+  Content-Type: application/json
+  Authorization: Bearer {{token}}
+body:
+  type: text
+  content: |-
+    {
+      "notrans": "APP/2026/04/0001",
+      "jenisApproval": "lembur"
+    }
+order: 2000

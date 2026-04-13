@@ -1,0 +1,16 @@
+$kind: http-request
+description: Membuat record approval baru untuk transaksi yang diajukan.
+url: "{{baseUrl}}/node/approval/trans/add"
+method: POST
+headers:
+  Content-Type: application/json
+  Authorization: Bearer {{token}}
+body:
+  type: text
+  content: |-
+    {
+      "notrans": "APP/2026/04/0001",
+      "jenisApproval": "lembur",
+      "karyawanid": "KRY010"
+    }
+order: 3000

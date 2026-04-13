@@ -21,28 +21,31 @@ const verifyToken = (req, res, next) => {
 
     // 3. LOCAL DECODING (The Magic Bypass)
     // jwt.decode() HANYA membaca isi paket, TANPA mengecek tanda tangan (Secret)
-    const decoded = jwt.decode(token);
+    // const decoded = jwt.decode(token);
 
-    if (!decoded) {
-      console.error(
-        "❌ [OWL ERROR] Gagal membaca isi token. Struktur token bukan JWT yang valid.",
-      );
-      return res.status(401).json({ message: "Invalid token payload!" });
-    }
+    jwt.verify(token, process.env.JWT_SECRET, (err, decoded) => {
+      if (err) {
+        console.error(
+          "❌ [AUTH ERROR] Token Verification Failed:",
+          err.message,
+        );
 
-    // 4. Sinkronisasi Data (Mapping field dari Payload JWT Mas Umar ke CMS)
-    // Pastikan key-nya sesuai dengan yang ada di payload Mas Umar
-    req.userId = decoded.userid;
-    req.userRole = decoded.role; // Akan berisi "admin"
-    req.userName = decoded.name || "User OWL";
-    req.userPermissions = decoded.permissions || [];
+        if (err.name === "TokenExpiredError") {
+          return res
+            .status(401)
+            .json({ message: "Token has expired! Please login again." });
+        }
+        return res
+          .status(401)
+          .json({ message: "Unauthorized Access! Invalid token signature." });
+      }
 
-    // Debugging di terminal backend
-    // console.log(
-    //   `🔓 [LOCAL DECODE SUCCESS] User: ${req.userName} | Role: ${req.userRole}`,
-    // );
-
-    next();
+      req.userId = decoded.userid;
+      req.userRole = decoded.role; // Akan berisi "admin"
+      req.userName = decoded.name || "User OWL";
+      req.userPermissions = decoded.permissions || [];
+      next();
+    });
   } catch (error) {
     console.error("[MIDDLEWARE CRASH]", error);
     return res
@@ -57,14 +60,19 @@ const verifyToken = (req, res, next) => {
 const checkPermission = (requiredPermission) => {
   return (req, res, next) => {
     // 1. Logic bypass untuk Role 'admin' (karena dari OWL rolenya 'admin')
-    if (req.userRole === "admin" || req.userRole === "Superadmin") {
+    const isAdmin = req.userRole === "admin" || req.userRole === "Superadmin";
+
+    if (isAdmin) {
       return next();
     }
 
-    // 2. Cek permission jika ada sistem permission khusus
-    if (!req.userPermissions.includes(requiredPermission)) {
+    const permissions = Array.isArray(req.userPermissions)
+      ? req.userPermissions
+      : [];
+
+    if (!permissions.includes(requiredPermission)) {
       return res.status(403).json({
-        message: `Forbidden! Access denied for: ${requiredPermission}`,
+        message: `Forbidden! You need '${requiredPermission}' permission to perform this action.`,
       });
     }
     next();

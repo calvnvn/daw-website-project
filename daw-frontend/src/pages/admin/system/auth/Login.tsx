@@ -4,7 +4,7 @@ import { Mail, Lock, Eye, EyeOff, ArrowRight, ShieldCheck } from "lucide-react";
 import { toast } from "sonner";
 import logoDaw from "@/assets/logo-daw.png";
 import bgImage from "@/assets/hero-bg.jpg";
-import { owlApi } from "@/lib/api";
+import { dawApi } from "@/lib/api";
 import { Link } from "react-router-dom";
 import { useSettings } from "@/contexts/SettingsContext";
 import { getCleanImageUrl } from "@/lib/utils";
@@ -38,7 +38,7 @@ export default function Login() {
     setIsLoading(true);
 
     try {
-      const response = await owlApi.post("/auth/login", {
+      const response = await dawApi.post("/auth/login", {
         uname: email,
         password: password,
       });
