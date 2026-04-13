@@ -2,6 +2,10 @@ const Project = require("../models/Project");
 const BusinessSection = require("../models/BusinessSection");
 const { deleteSingleFile } = require("../utils/fileRemover");
 const { Op } = require("sequelize");
+const ErpApprovalService = require("../services/erpApprovalService");
+
+// 🔴 Asumsi sementara untuk kode approval CMS.
+const JENIS_APP_CMS = process.env.CMS_APPROVAL_CODE || "040101";
 
 // Slug Generator
 const generateUniqueProjectSlug = async (title, id = null) => {
@@ -188,12 +192,14 @@ exports.updateProject = async (req, res) => {
       meta_description,
     } = req.body;
 
-    // 1. Cari data lama (Gak perlu raw query, cukup findByPk)
+    // Cari data lama (Gak perlu raw query, cukup findByPk)
     const project = await Project.findByPk(id);
     if (!project) return res.status(404).json({ message: "Project not found" });
 
-    // 2. Olah Gallery (Merge lama & baru)
+    // Olah Gallery
     let finalGallery = [];
+    let filesToDelete = []; // Penampung
+
     if (existing_gallery) {
       try {
         const remainingGallery =
@@ -201,20 +207,14 @@ exports.updateProject = async (req, res) => {
             ? JSON.parse(existing_gallery)
             : existing_gallery;
 
-        // --- TAMBAHKAN LOGIC CLEANUP GALLERY ---
-        // Cari gambar yang ada di database lama tapi TIDAK ADA di kiriman 'existing_gallery'
         const oldGallery =
           typeof project.gallery === "string"
             ? JSON.parse(project.gallery || "[]")
             : project.gallery;
 
-        const filesToDelete = oldGallery.filter(
+        filesToDelete = oldGallery.filter(
           (file) => !remainingGallery.includes(file),
         );
-
-        // Hapus file-file yang dibuang tersebut dari folder
-        filesToDelete.forEach((file) => deleteSingleFile(file));
-
         finalGallery = remainingGallery;
       } catch (e) {
         console.error("Gagal parse gallery lama:", e);
@@ -226,26 +226,60 @@ exports.updateProject = async (req, res) => {
       finalGallery = [...finalGallery, ...newImages];
     }
 
-    // 3. Olah Cover Image
+    // Olah Cover Image
     let coverImageName = project.cover_image;
-    if (req.files && req.files["cover_image"]) {
-      deleteSingleFile(project.cover_image);
+    let oldCoverToDelete = null;
 
-      coverImageName = req.files["cover_image"][0].filename;
+    if (req.files && req.files["cover_image"]) {
+      oldCoverToDelete = project.cover_image; // Tampung nama lama
+      coverImageName = req.files["cover_image"][0].filename; // Ini sudah pakai nama "TEMP_" kalau dia Editor
     }
 
     let finalSlug = project.slug;
-
-    // 1. Jika user manual input slug di frontend
     if (slug && slug !== project.slug) {
       finalSlug = await generateUniqueProjectSlug(slug, id);
-    }
-    // 2. Jika slug tidak diinput manual tapi judul berubah, generate otomatis
-    else if (title && title !== project.title) {
+    } else if (title && title !== project.title) {
       finalSlug = await generateUniqueProjectSlug(title, id);
     }
 
-    // 4. Update Data (Tinggal panggil .update(), jauh lebih bersih!)
+    // 🔴 Gatekeeper: Pemisahan Logic Flow
+    if (req.userROle === "Editor") {
+      const packageContent = {
+        title: title || project.title,
+        slug: finalSlug,
+        excerpt: excerpt !== undefined ? excerpt : project.excerpt,
+        content: content || project.content,
+        category: category || project.category,
+        status: status || project.status,
+        cover_image: coverImageName,
+        gallery: finalGallery, // Sequelize handle JSON otomatis
+        seo_title: seo_title || project.seo_title,
+        meta_description: meta_description || project.meta_description,
+      };
+      const tokenOWL = req.headers["authorization"]?.split(" ")[1];
+      await ErpApprovalService.createDraft(
+        {
+          jenisApproval: JENIS_APP_CMS,
+          karyawanid: req.userId, // ID dari JWT
+          module: "Project",
+          action: "UPDATE",
+          targetId: id,
+          content: packageContent,
+        },
+        tokenOWL,
+      );
+      return res.status(202).json({
+        message:
+          "Draf revisi berhasil dikirim ke antrean Admin DAW untuk diperiksa.",
+      });
+    }
+
+    // Alur Normal (Bypass untuk Admin)
+    // Karena ini admin, aman untuk hapus file lama
+    filesToDelete.forEach((file) => deleteSingleFile(file));
+    if (oldCoverToDelete) deleteSingleFile(oldCoverToDelete);
+
+    // Update MySQL Lokal
     await project.update({
       title: title || project.title,
       slug: finalSlug,
@@ -254,12 +288,14 @@ exports.updateProject = async (req, res) => {
       category: category || project.category,
       status: status || project.status,
       cover_image: coverImageName,
-      gallery: finalGallery, // Sequelize handle JSON otomatis
+      gallery: finalGallery,
       seo_title: seo_title || project.seo_title,
       meta_description: meta_description || project.meta_description,
     });
 
-    res.status(200).json({ message: "Project berhasil diupdate!" });
+    res
+      .status(200)
+      .json({ message: "Project berhasil diupdate secara langsung!" });
   } catch (error) {
     console.error("🚨 ERROR UPDATE PROJECT:", error);
     res.status(500).json({ message: error.message });

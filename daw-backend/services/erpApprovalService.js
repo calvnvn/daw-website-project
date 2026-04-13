@@ -1,7 +1,7 @@
 const axios = require("axios");
 
 const dawApi = axios.create({
-  baseURL: ProcessingInstruction.env.DAW_NODE_URL,
+  baseURL: process.env.DAW_NODE_URL,
   timeout: 15000,
 });
 
