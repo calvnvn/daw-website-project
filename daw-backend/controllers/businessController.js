@@ -5,6 +5,9 @@ const MapCategory = require("../models/MapCategory");
 const sequelize = require("../config/database");
 const sanitizeHtml = require("sanitize-html");
 
+const ErpApprovalService = require("../services/erpApprovalService");
+const JENIS_APP_CMS = process.env.CMS_APPROVAL_CODE || "040101";
+
 /**
  * @constant sanitizeOptions
  * Defines the strict rules for HTML content allowed from the WYSIWYG Editor.
@@ -137,9 +140,37 @@ exports.updateBusinessSection = async (req, res) => {
     ? sanitizeHtml(htmlContent, sanitizeOptions)
     : "";
 
+  // Gatekeeper: Editor Flow
+  if (req.userRole && req.userRole.toLowerCase() === "editor") {
+    const packageContent = {
+      title,
+      htmlContent: cleanHtmlContent,
+      hasMap: isMapActive,
+      mapMarkers: mapMarkers || [], // Kirim seluruh array marker baru
+    };
+
+    const tokenOWL = req.headers["authorization"]?.split(" ")[1];
+
+    await ErpApprovalService.createDraft(
+      {
+        jenisApproval: JENIS_APP_CMS,
+        karyawanid: req.userId,
+        module: "BusinessSection",
+        action: "UPDATE_WITH_MARKERS",
+        targetId: id,
+        content: packageContent,
+      },
+      tokenOWL,
+    );
+
+    return res.status(202).json({
+      message: "Draf revisi Sektor Bisnis & Marker berhasil dikirim ke Admin.",
+    });
+  }
+
+  // Superadmin Flow (Transaction)
   // Initialize a Database Transaction to ensure atomicity (all or nothing)
   const t = await sequelize.transaction();
-
   try {
     const section = await BusinessSection.findByPk(id);
     if (!section) {

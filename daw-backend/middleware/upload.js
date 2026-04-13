@@ -7,27 +7,42 @@ const fs = require("fs");
 const storage = multer.memoryStorage();
 
 const fileFilter = (req, file, cb) => {
-  if (!file.mimetype.startsWith("image/")) {
-    return cb(new Error("Hanya file gambar yang diizinkan!"), false);
+  console.log(
+    `[DEBUG UPLOAD] Nama: ${file.originalname} | Mimetype: ${file.mimetype}`,
+  );
+
+  const allowedExtensions = /\.(jpg|jpeg|png|gif|webp)$/i;
+  const isExtensionValid = allowedExtensions.test(file.originalname);
+  const isMimetypeValid = file.mimetype.startsWith("image/");
+
+  if (isExtensionValid || isMimetypeValid) {
+    const allowedFields = [
+      "image",
+      "cover_image",
+      "gallery",
+      "inline_image",
+      "heroImage",
+      "teaser_image",
+      "logo",
+      "favicon",
+      "photo",
+    ];
+
+    if (allowedFields.includes(file.fieldname)) {
+      return cb(null, true);
+    } else {
+      return cb(
+        new multer.MulterError("LIMIT_UNEXPECTED_FILE", file.fieldname),
+        false,
+      );
+    }
   }
 
-  const allowedFields = [
-    "image",
-    "cover_image",
-    "gallery",
-    "inline_image",
-    "heroImage",
-    "teaser_image",
-    "logo",
-    "favicon",
-    "photo",
-  ];
-
-  if (allowedFields.includes(file.fieldname)) {
-    cb(null, true);
-  } else {
-    cb(new multer.MulterError("LIMIT_UNEXPECTED_FILE"), false);
-  }
+  // Jika dua-duanya gagal, baru kita usir
+  cb(
+    new Error(`File ${file.originalname} tidak dikenal sebagai gambar!`),
+    false,
+  );
 };
 
 const upload = multer({

@@ -1,6 +1,9 @@
 const Menu = require("../models/Menu");
 const Page = require("../models/Page");
 const sequelize = require("../config/database");
+const ErpApprovalService = require("../services/erpApprovalService");
+const JENIS_APP_CMS = process.env.CMS_APPROVAL_CODE || "040101";
+
 const isDescendant = async (menuId, targetParentId) => {
   if (!targetParentId) return false;
   if (menuId === targetParentId) return true;
@@ -123,6 +126,35 @@ exports.updateMenu = async (req, res) => {
       externalLink = null;
     }
 
+    // Gatekeeper: Editor Flow
+    if (req.userRole && req.userRole.toLowerCase() === "editor") {
+      const packageContent = {
+        label,
+        parentId: parentId || null,
+        type,
+        pageId: type === "page" ? pageId : null,
+        externalLink: type === "external" ? externalLink : null,
+        isActive,
+      };
+
+      await ErpApprovalService.createDraft(
+        {
+          jenisApproval: JENIS_APP_CMS,
+          karyawanid: req.userId,
+          module: "Menu",
+          action: "UPDATE",
+          targetId: id,
+          content: packageContent,
+        },
+        req.headers["authorization"]?.split(" ")[1],
+      );
+
+      return res
+        .status(202)
+        .json({ message: "Perubahan menu dikirim ke Admin DAW." });
+    }
+
+    // Admin Flow
     await menu.update({
       label,
       parentId: parentId || null,
@@ -157,8 +189,28 @@ exports.deleteMenu = async (req, res) => {
 // Endpoint Khusus untuk menangkap hasil Drag & Drop
 exports.reorderMenus = async (req, res) => {
   const { updatedMenus } = req.body;
-  const t = await sequelize.transaction();
 
+  // Gatekeeper: Editor (Bulk Reorder)
+  if (req.userRole && req.userRole.toLowerCase() === "editor") {
+    await ErpApprovalService.createDraft(
+      {
+        jenisApproval: JENIS_APP_CMS,
+        karyawanid: req.userId,
+        module: "Menu",
+        action: "BULK_REORDER",
+        targetId: "ALL_TREE",
+        content: { updatedMenus }, // Kirim seluruh array hasil drag & drop
+      },
+      req.headers["authorization"]?.split(" ")[1],
+    );
+
+    return res
+      .status(202)
+      .json({ message: "Urutan menu baru menunggu persetujuan Admin." });
+  }
+
+  // Admin Flow
+  const t = await sequelize.transaction();
   try {
     for (const item of updatedMenus) {
       const circular = await isDescendant(item.id, item.parentId);

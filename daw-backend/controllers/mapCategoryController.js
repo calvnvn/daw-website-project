@@ -30,6 +30,24 @@ exports.updateCategory = async (req, res) => {
     if (!category)
       return res.status(404).json({ message: "Category not found" });
 
+    // Gatekeeper: Editor Flow
+    if (req.userRole && req.userRole.toLowerCase() === "editor") {
+      await ErpApprovalService.createDraft(
+        {
+          jenisApproval: JENIS_APP_CMS,
+          karyawanid: req.userId,
+          module: "MapCategory",
+          action: "UPDATE",
+          targetId: id,
+          content: { name, color },
+        },
+        req.headers["authorization"]?.split(" ")[1],
+      );
+
+      return res
+        .status(202)
+        .json({ message: "Perubahan kategori peta sedang ditinjau Admin." });
+    }
     await category.update({ name, color });
     res.status(200).json(category);
   } catch (error) {

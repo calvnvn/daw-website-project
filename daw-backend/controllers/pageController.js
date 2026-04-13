@@ -5,6 +5,8 @@ const createDOMPurify = require("dompurify");
 const window = new JSDOM("").window;
 const dompurify = createDOMPurify(window);
 const { deleteSingleFile } = require("../utils/fileRemover");
+const ErpApprovalService = require("../services/erpApprovalService");
+const JENIS_APP_CMS = process.env.CMS_APPROVAL_CODE || "040101";
 
 /**
  * Helper: Strip HTML tags to get plain text
@@ -171,7 +173,6 @@ exports.updatePage = async (req, res) => {
       title,
       slug,
       subtitle,
-      heroImage,
       templateType,
       content,
       metaDescription,
@@ -184,13 +185,6 @@ exports.updatePage = async (req, res) => {
 
     const finalSlug = await generateUniqueSlug(title, slug, id);
     const sanitizedContent = dompurify.sanitize(content);
-    let heroImageName = page.heroImage;
-
-    // If a new hero image is uploaded, delete the old physical file
-    if (req.file) {
-      deleteSingleFile(page.heroImage);
-      heroImageName = req.file.filename;
-    }
 
     // SEO Automation
     let finalMetaDesc = metaDescription;
@@ -200,6 +194,50 @@ exports.updatePage = async (req, res) => {
         cleanText.substring(0, 150) + (cleanText.length > 150 ? "..." : "");
     }
 
+    let heroImageName = page.heroImage;
+    let oldHeroToDelete = null;
+
+    if (req.file) {
+      oldHeroToDelete = page.heroImage;
+      heroImageName = req.file.filename; // Akan ber-prefix TEMP_ jika Editor
+    }
+
+    // Gatekeeper: Editor
+    if (req.userRole && req.userRole.toLowerCase() === "editor") {
+      const packageContent = {
+        title,
+        slug: finalSlug,
+        subtitle,
+        heroImage: heroImageName,
+        templateType: templateType || "split",
+        content: sanitizedContent,
+        metaDescription: finalMetaDesc,
+        showDropCap: showDropCap === "true",
+        sidebarLinks:
+          typeof sidebarLinks === "string"
+            ? JSON.parse(sidebarLinks)
+            : sidebarLinks || [],
+      };
+
+      await ErpApprovalService.createDraft(
+        {
+          jenisApproval: JENIS_APP_CMS,
+          karyawanid: req.userId,
+          module: "Page",
+          action: "UPDATE",
+          targetId: id,
+          content: packageContent,
+        },
+        req.headers["authorization"]?.split(" ")[1],
+      );
+
+      return res
+        .status(202)
+        .json({ message: "Revisi halaman berhasil dikirim ke antrean Admin." });
+    }
+
+    // Admin Flow
+    if (oldHeroToDelete) deleteSingleFile(oldHeroToDelete);
     await page.update({
       title,
       slug: finalSlug,

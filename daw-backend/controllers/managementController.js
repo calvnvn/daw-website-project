@@ -1,34 +1,9 @@
 const Management = require("../models/Management");
 const { deleteSingleFile } = require("../utils/fileRemover");
+const ErpApprovalService = require("../services/erpApprovalService");
 
-/**
- *  HELPER: Menghapus file secara aman dari storage
- * Menangani leading slash dan path absolut
- */
-// const deletePhysicalFile = (relativeUrl) => {
-//   if (!relativeUrl) return;
-
-//   // Hilangkan leading slash jika ada agar path.join bekerja benar
-//   // '/uploads/foto.jpg' -> 'uploads/foto.jpg'
-//   const cleanPath = relativeUrl.startsWith("/")
-//     ? relativeUrl.substring(1)
-//     : relativeUrl;
-
-//   // Gunakan process.cwd() agar path selalu relatif terhadap root project
-//   const fullPath = path.join(process.cwd(), "public", cleanPath);
-
-//   try {
-//     if (fs.existsSync(fullPath)) {
-//       fs.unlinkSync(fullPath);
-//       console.log(`[CLEANUP] Deleted: ${fullPath}`);
-//     }
-//   } catch (err) {
-//     console.error(
-//       `[CLEANUP ERROR] Failed to delete ${relativeUrl}:`,
-//       err.message,
-//     );
-//   }
-// };
+// 🔴 Asumsi sementara untuk kode approval CMS.
+const JENIS_APP_CMS = process.env.CMS_APPROVAL_CODE || "040101";
 
 // 1. GET Data
 exports.getAllManagements = async (req, res) => {
@@ -76,22 +51,63 @@ exports.createManagement = async (req, res) => {
 exports.updateManagement = async (req, res) => {
   try {
     const { id } = req.params;
-    const { name, role, description, level, order, removePhoto } = req.body;
+    const { name, role, description, level, order, removePhoto, status } =
+      req.body;
 
     const person = await Management.findByPk(id);
     if (!person) return res.status(404).json({ message: "Member not found" });
 
     let finalPhotoUrl = person.photoUrl;
+    let oldPhotoToDelete = null;
 
-    // Skenario 1: Ada Upload File Baru
     if (req.file) {
-      deleteSingleFile(person.photoUrl);
-      finalPhotoUrl = req.file.filename;
-    }
-    // Skenario 2: User klik 'Remove Photo' di UI
-    else if (removePhoto === "true") {
-      deleteSingleFile(person.photoUrl);
+      oldPhotoToDelete = person.photoUrl; // Tampung nama foto lama
+      finalPhotoUrl = req.file.filename; // Ini akan bernama 'TEMP_...' jika uploader adalah Editor
+    } else if (removePhoto === "true") {
+      oldPhotoToDelete = person.photoUrl;
       finalPhotoUrl = null;
+    }
+
+    // Gatekeeper: Editor Flow
+    if (
+      req.userRole &&
+      req.userRole.toLowerCase() === "editor" &&
+      status === "Published"
+    ) {
+      const packageContent = {
+        name: name || person.name,
+        role: role || person.role,
+        description: description || person.description,
+        level: level || person.level,
+        order: parseInt(order) || person.order,
+        photoUrl: finalPhotoUrl,
+        removePhotoStatus: removePhoto === "true", // Flag tambahan untuk Admin tahu
+      };
+
+      const tokenOWL = req.headers["authorization"]?.split(" ")[1];
+
+      await ErpApprovalService.createDraft(
+        {
+          jenisApproval: JENIS_APP_CMS,
+          karyawanid: req.userId,
+          module: "Management",
+          action: "UPDATE",
+          targetId: id,
+          content: packageContent,
+        },
+        tokenOWL,
+      );
+
+      return res.status(202).json({
+        message:
+          "Draf perubahan Management berhasil dikirim ke antrean Admin DAW.",
+      });
+    }
+
+    // Superadmin Flow (Langsung eksekusi)
+    // Hapus file lama HANYA jika yang update adalah Admin
+    if (req.userRole.toLowerCase() !== "editor" && oldPhotoToDelete) {
+      deleteSingleFile(oldPhotoToDelete);
     }
 
     await person.update({

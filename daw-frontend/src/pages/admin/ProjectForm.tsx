@@ -77,6 +77,7 @@ export default function ProjectForm() {
   const isEditMode = !!id;
   const quillRef = useRef<ReactQuill>(null);
   const { user, can } = useAuth();
+  const isEditor = user?.roleData?.name === "Editor" || user?.role === "Editor";
   const { sections } = useBusiness();
   const [isLoading, setIsLoading] = useState(false);
   const [isFetching, setIsFetching] = useState(isEditMode); // Fetching hanya aktif jika Edit Mode
@@ -338,11 +339,25 @@ export default function ProjectForm() {
         },
       });
 
-      if (response.status === 201 || response.status === 200) {
-        toast.success(
-          `Proyek berhasil di${isEditMode ? "perbarui" : "simpan"}!`,
-          { id: loadingToast },
-        );
+      if ([200, 201, 202].includes(response.status)) {
+        if (response.status === 202) {
+          // Pesan khusus buat Editor (Draf dikirim ke OWL)
+          toast.success(
+            "Draf revisi berhasil dikirim ke ERP DAW. Menunggu approval Admin!",
+            {
+              id: loadingToast,
+              duration: 5000,
+            },
+          );
+        } else {
+          // Pesan buat Admin (Langsung simpan ke MySQL)
+          toast.success(
+            `Proyek berhasil di${isEditMode ? "perbarui" : "simpan"} secara langsung!`,
+            {
+              id: loadingToast,
+            },
+          );
+        }
         navigate("/admin/projects");
       }
     } catch (err: any) {
@@ -439,26 +454,61 @@ export default function ProjectForm() {
             )}
           </div>
         </div>
-        <div className="flex gap-3">
-          <button
-            onClick={() => handleSave("Draft")}
-            disabled={isLoading || !can("manage_projects")}
-            className="px-5 py-2 bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 rounded-lg font-bold text-sm shadow-sm transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            <Save className="w-4 h-4 inline mr-2 text-slate-400" /> Draf
-          </button>
-          <button
-            onClick={() => handleSave("Published")}
-            disabled={isLoading || !can("manage_projects")}
-            className="px-5 py-2 bg-daw-green hover:bg-[#003b1c] text-white rounded-lg font-bold text-sm shadow-sm transition-all active:scale-95 disabled:opacity-50"
-          >
-            <Send className="w-4 h-4 inline mr-2" />{" "}
-            {isLoading
-              ? "Menyimpan..."
-              : isEditMode
-                ? "Update & Publish"
-                : "Publish"}
-          </button>
+        <div className="flex flex-col items-end gap-1">
+          {" "}
+          {/* Tambah container agar hint rapi */}
+          <div className="flex gap-3">
+            {/* TOMBOL DRAF: Selalu Lokal (MySQL) */}
+            <button
+              type="button"
+              onClick={() => handleSave("Draft")}
+              disabled={isLoading || !can("manage_projects")}
+              className="px-5 py-2 bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 rounded-lg font-bold text-sm shadow-sm transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <Save className="w-4 h-4 inline mr-2 text-slate-400" />
+              Simpan Draf Lokal
+            </button>
+            {/* TOMBOL UTAMA: Berdasarkan Role */}
+            <button
+              type="button"
+              onClick={() => handleSave("Published")}
+              disabled={isLoading || !can("manage_projects")}
+              className={`px-5 py-2 text-white rounded-lg font-bold text-sm shadow-sm transition-all active:scale-95 disabled:opacity-50 ${
+                isEditor
+                  ? "bg-blue-600 hover:bg-blue-700 shadow-blue-100" // Warna Biru untuk Editor
+                  : "bg-daw-green hover:bg-[#003b1c] shadow-green-100" // Warna Hijau untuk Admin
+              }`}
+            >
+              {isLoading ? (
+                <div className="flex items-center gap-2">
+                  <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                  <span>Processing...</span>
+                </div>
+              ) : (
+                <div className="flex items-center gap-2">
+                  {isEditor ? (
+                    <Send className="w-4 h-4" />
+                  ) : (
+                    <Save className="w-4 h-4" />
+                  )}
+                  <span>
+                    {isEditor
+                      ? "Request Approval (OWL)"
+                      : isEditMode
+                        ? "Update & Publish"
+                        : "Publish Now"}
+                  </span>
+                </div>
+              )}
+            </button>
+          </div>
+          {/* HINT KHUSUS EDITOR */}
+          {isEditor && !isLoading && (
+            <p className="text-[10px] text-blue-500 font-bold mt-1 flex items-center gap-1 animate-in slide-in-from-top-1">
+              <span className="w-1.5 h-1.5 bg-blue-500 rounded-full animate-pulse"></span>
+              Status 'Published' akan dikirim ke ERP DAW untuk diperiksa Admin.
+            </p>
+          )}
         </div>
       </div>
 

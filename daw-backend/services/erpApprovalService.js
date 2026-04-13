@@ -9,6 +9,7 @@ class ErpApprovalService {
   // GET Nomor Tiket (Queue)
   static async getApprovalNumber(jenisApproval, token) {
     try {
+      console.log(">>> REQUESTING TICKET FOR:", jenisApproval);
       const response = await dawApi.post(
         "/tools/noapproval",
         { jenisApproval },

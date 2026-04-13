@@ -5,7 +5,7 @@ const { Op } = require("sequelize");
 const ErpApprovalService = require("../services/erpApprovalService");
 
 // 🔴 Asumsi sementara untuk kode approval CMS.
-const JENIS_APP_CMS = process.env.CMS_APPROVAL_CODE || "040101";
+const JENIS_APP_CMS = process.env.CMS_APPROVAL_CODE;
 
 // Slug Generator
 const generateUniqueProjectSlug = async (title, id = null) => {
@@ -241,26 +241,34 @@ exports.updateProject = async (req, res) => {
     } else if (title && title !== project.title) {
       finalSlug = await generateUniqueProjectSlug(title, id);
     }
-
     // 🔴 Gatekeeper: Pemisahan Logic Flow
-    if (req.userROle === "Editor") {
+    // JALUR 1: Jika Editor klik "Publish" (Kirim ke ERP DAW)
+    if (
+      req.userRole &&
+      req.userRole.toLowerCase() === "editor" &&
+      status === "Published"
+    ) {
+      console.log(">>> JALUR EDITOR (REQUEST APPROVAL KE OWL) <<<");
+
       const packageContent = {
         title: title || project.title,
         slug: finalSlug,
         excerpt: excerpt !== undefined ? excerpt : project.excerpt,
         content: content || project.content,
         category: category || project.category,
-        status: status || project.status,
+        status: status || project.status, // Ini akan bernilai "Published"
         cover_image: coverImageName,
-        gallery: finalGallery, // Sequelize handle JSON otomatis
+        gallery: finalGallery,
         seo_title: seo_title || project.seo_title,
         meta_description: meta_description || project.meta_description,
       };
+
       const tokenOWL = req.headers["authorization"]?.split(" ")[1];
+
       await ErpApprovalService.createDraft(
         {
           jenisApproval: JENIS_APP_CMS,
-          karyawanid: req.userId, // ID dari JWT
+          karyawanid: req.userId,
           module: "Project",
           action: "UPDATE",
           targetId: id,
@@ -268,18 +276,24 @@ exports.updateProject = async (req, res) => {
         },
         tokenOWL,
       );
+
       return res.status(202).json({
         message:
           "Draf revisi berhasil dikirim ke antrean Admin DAW untuk diperiksa.",
       });
     }
 
-    // Alur Normal (Bypass untuk Admin)
-    // Karena ini admin, aman untuk hapus file lama
-    filesToDelete.forEach((file) => deleteSingleFile(file));
-    if (oldCoverToDelete) deleteSingleFile(oldCoverToDelete);
+    // JALUR 2: Alur Normal (Berjalan jika: User = Admin, ATAU Editor simpan sebagai "Draft")
+    console.log(">>> JALUR UPDATE LOKAL (MYSQL) DIAKTIFKAN <<<");
 
-    // Update MySQL Lokal
+    // Jika Editor simpan draf, kita tidak hapus file lama dulu (karena belum final)
+    // Tapi jika Admin yang update, baru kita hapus file lamanya
+    if (req.userRole && req.userRole.toLowerCase() !== "editor") {
+      filesToDelete.forEach((file) => deleteSingleFile(file));
+      if (oldCoverToDelete) deleteSingleFile(oldCoverToDelete);
+    }
+
+    // Update MySQL Lokal (Status di sini bisa "Draft" atau "Published" tergantung siapa yang klik)
     await project.update({
       title: title || project.title,
       slug: finalSlug,
@@ -293,9 +307,12 @@ exports.updateProject = async (req, res) => {
       meta_description: meta_description || project.meta_description,
     });
 
-    res
-      .status(200)
-      .json({ message: "Project berhasil diupdate secara langsung!" });
+    res.status(200).json({
+      message:
+        status === "Draft"
+          ? "Draf proyek berhasil disimpan di workspace lokal!"
+          : "Project berhasil diupdate secara langsung!",
+    });
   } catch (error) {
     console.error("🚨 ERROR UPDATE PROJECT:", error);
     res.status(500).json({ message: error.message });

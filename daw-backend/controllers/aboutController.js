@@ -1,5 +1,8 @@
 const sequelize = require("../config/database");
+const ErpApprovalService = require("../services/erpApprovalService");
 
+// 🔴 Asumsi sementara untuk kode approval CMS.
+const JENIS_APP_CMS = process.env.CMS_APPROVAL_CODE || "040101";
 // GET: Data Info & Philosophu
 exports.getAboutInfo = async (req, res) => {
   try {
@@ -33,6 +36,36 @@ exports.updateAboutInfo = async (req, res) => {
       philosophyPillars,
     } = req.body;
 
+    // Gatekeeper: Editor Flow
+    if (req.userRole && req.userRole.toLowerCase() === "editor") {
+      const packageContent = {
+        spiritText: spiritText || "",
+        missionText: missionText || "",
+        visionText: visionText || "",
+        philosophyTitle: philosophyTitle || "",
+        philosophyPillars: philosophyPillars || [], // Kirim sebagai Array asli
+      };
+
+      const tokenOWL = req.headers["authorization"]?.split(" ")[1];
+
+      await ErpApprovalService.createDraft(
+        {
+          jenisApproval: JENIS_APP_CMS,
+          karyawanid: req.userId,
+          module: "AboutInfo",
+          action: "UPDATE",
+          targetId: "1", // Hardcode 1 karena About single row
+          content: packageContent,
+        },
+        tokenOWL,
+      );
+
+      return res.status(202).json({
+        message: "Draf revisi About Company berhasil dikirim ke antrean.",
+      });
+    }
+
+    // Supderadmin Flow (Langsung execute)
     const updateQuery = `
       UPDATE AboutInfo 
       SET 
