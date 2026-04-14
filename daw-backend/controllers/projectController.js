@@ -231,10 +231,11 @@ exports.updateProject = async (req, res) => {
     let oldCoverToDelete = null;
 
     if (req.files && req.files["cover_image"]) {
-      oldCoverToDelete = project.cover_image; // Tampung nama lama
-      coverImageName = req.files["cover_image"][0].filename; // Ini sudah pakai nama "TEMP_" kalau dia Editor
+      oldCoverToDelete = project.cover_image;
+      coverImageName = req.files["cover_image"][0].filename; 
     }
 
+    // Olah Slug
     let finalSlug = project.slug;
     if (slug && slug !== project.slug) {
       finalSlug = await generateUniqueProjectSlug(slug, id);
@@ -242,21 +243,22 @@ exports.updateProject = async (req, res) => {
       finalSlug = await generateUniqueProjectSlug(title, id);
     }
     // Gatekeeper: Pemisahan Logic Flow
-    // JALUR 1: Jika Editor klik "Publish" (Kirim ke ERP DAW)
+    // JALUR EDITOR: Minta Publish (Workflow Reference-Based)
     if (
       req.userRole &&
       req.userRole.toLowerCase() === "editor" &&
       status === "Published"
     ) {
-      console.log(">>> JALUR EDITOR (REQUEST APPROVAL KE OWL) <<<");
+      console.log(">>> [PROJECT] JALUR EDITOR: INITIATING WORKFLOW <<<");
 
+      // Siapkan data yang akan "parkir" di tabel ApprovalDrafts lokal
       const packageContent = {
         title: title || project.title,
         slug: finalSlug,
         excerpt: excerpt !== undefined ? excerpt : project.excerpt,
         content: content || project.content,
         category: category || project.category,
-        status: status || project.status,
+        status: "Published",
         cover_image: coverImageName,
         gallery: finalGallery,
         seo_title: seo_title || project.seo_title,
@@ -270,31 +272,24 @@ exports.updateProject = async (req, res) => {
           .json({ message: "Akses ditolak: Token OWL tidak ditemukan." });
       }
 
-      const approvalResult = await ErpApprovalService.createDraft(
-        {
-          karyawanid: req.owl_username || req.userId,
-          module: "Project",
-          action: "UPDATE",
-          targetId: id,
-          content: packageContent,
-        },
-        tokenOWL,
-      );
-
-      await project.update({
-        is_locked: true,
-        lock_ticket: approvalResult.notrans
-      })
+      // Fungsi ini akan handle: Get Notrans -> Simpan Draf Lokal -> Gembok Project -> Add Record ke OWL
+      const result = await ErpApprovalService.initiateApproval({
+        model: Project,
+        targetId: id,
+        payload: packageContent,
+        userId: req.userId,
+        owlUsername: req.owl_username,
+        token: tokenOWL
+      });
 
       return res.status(202).json({
-        message:
-          "Draf revisi berhasil dikirim ke antrean Admin DAW untuk diperiksa.",
-        ticket: approvalResult.notrans
+        message: "Draf proyek berhasil diajukan dan data telah dikunci.",
+        ticket: result.notrans
       });
     }
 
-    // JALUR 2: Alur Normal (Berjalan jika: User = Admin, ATAU Editor simpan sebagai "Draft")
-    console.log(">>> JALUR UPDATE LOKAL (MYSQL) DIAKTIFKAN <<<");
+    // JALUR SUPERADMIN / EDITOR SIMPAN DRAFT LOKAL
+    console.log(">>> [PROJECT] JALUR DIRECT: UPDATING LOCAL DATABASE <<<");
 
     // Jika Editor simpan draf, kita tidak hapus file lama dulu (karena belum final)
     // Tapi jika Admin yang update, baru kita hapus file lamanya
@@ -303,7 +298,6 @@ exports.updateProject = async (req, res) => {
       if (oldCoverToDelete) deleteSingleFile(oldCoverToDelete);
     }
 
-    // Update MySQL Lokal (Status di sini bisa "Draft" atau "Published" tergantung siapa yang klik)
     await project.update({
       title: title || project.title,
       slug: finalSlug,

@@ -84,25 +84,22 @@ exports.updateManagement = async (req, res) => {
       };
 
       const tokenOWL = req.headers["authorization"]?.split(" ")[1];
-
-      await ErpApprovalService.createDraft(
-        {
-          jenisApproval: JENIS_APP_CMS,
-          karyawanid: req.userId,
-          module: "Management",
-          action: "UPDATE",
-          targetId: id,
-          content: packageContent,
-        },
-        tokenOWL,
-      );
+      const result = await ErpApprovalService.initiateApproval({
+        model: Management,      // Mengoper Model secara dinamis
+        targetId: id,           // PK data asli
+        payload: packageContent,// Data revisi
+        userId: req.userId,
+        owlUsername: req.owl_username,
+        token: tokenOWL
+      });
 
       return res.status(202).json({
-        message:
-          "Draf perubahan Management berhasil dikirim ke antrean Admin DAW.",
+        message: "Perubahan sedang ditinjau. Data asli telah dikunci.",
+        ticket: result.notrans
       });
     }
 
+    console.log(">>> JALUR SUPERADMIN: DIRECT EXECUTION <<<");
     // Superadmin Flow (Langsung eksekusi)
     // Hapus file lama HANYA jika yang update adalah Admin
     if (req.userRole.toLowerCase() !== "editor" && oldPhotoToDelete) {
@@ -110,15 +107,17 @@ exports.updateManagement = async (req, res) => {
     }
 
     await person.update({
-      name,
-      role,
-      description,
-      level,
+      name: name || person.name,
+      role: role || person.role,
+      description: description || person.description,
+      level: level || person.level,
       order: parseInt(order) || person.order,
       photoUrl: finalPhotoUrl,
+      is_locked: false, 
+      lock_ticket: null
     });
 
-    res.status(200).json({ message: "Updated successfully!", data: person });
+    res.status(200).json({ message: "Data Management berhasil diperbarui langsung!" });
   } catch (error) {
     console.error("UPDATE Management Error:", error);
     res.status(500).json({ message: "Failed to update", error: error.message });
