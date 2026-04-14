@@ -18,6 +18,16 @@ const Settings = sequelize.define(
     linkedinUrl: { type: DataTypes.STRING(255) },
     logoUrl: { type: DataTypes.STRING(255) },
     faviconUrl: { type: DataTypes.STRING(255) },
+    is_locked: {
+      type: DataTypes.BOOLEAN,
+      defaultValue: false,
+      comment: "Status apakah data sedang dalam proses approval",
+    },
+    lock_ticket: {
+      type: DataTypes.STRING,
+      allowValue: true,
+      comment: "Menyimpan No. Tiket dari OWL yang sedang mengunci data ini",
+    },
   },
   {
     tableName: "Settings",

@@ -35,6 +35,16 @@ const Management = sequelize.define(
       type: DataTypes.STRING,
       allowNull: true,
     },
+    is_locked: {
+      type: DataTypes.BOOLEAN,
+      defaultValue: false,
+      comment: "Status apakah data sedang dalam proses approval",
+    },
+    lock_ticket: {
+      type: DataTypes.STRING,
+      allowValue: true,
+      comment: "Menyimpan No. Tiket dari OWL yang sedang mengunci data ini",
+    },
   },
   {
     tableName: "Managements",

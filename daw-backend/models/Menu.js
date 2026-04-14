@@ -36,6 +36,16 @@ const Menu = sequelize.define("Menu", {
     type: DataTypes.BOOLEAN,
     defaultValue: true, // Fitur hide/show menu tanpa harus menghapusnya
   },
+  is_locked: {
+    type: DataTypes.BOOLEAN,
+    defaultValue: false,
+    comment: "Status apakah data sedang dalam proses approval",
+  },
+  lock_ticket: {
+    type: DataTypes.STRING,
+    allowValue: true,
+    comment: "Menyimpan No. Tiket dari OWL yang sedang mengunci data ini",
+  },
 });
 
 // Self-Referencing Menu
