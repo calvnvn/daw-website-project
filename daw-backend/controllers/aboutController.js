@@ -32,65 +32,46 @@ exports.updateAboutInfo = async (req, res) => {
       missionText,
       visionText,
       philosophyTitle,
-      philosophyPillars,
+      philosophyPillars, status
     } = req.body;
 
-    // Gatekeeper: Editor Flow
-    if (req.userRole && req.userRole.toLowerCase() === "editor") {
-      const packageContent = {
-        spiritText: spiritText || "",
-        missionText: missionText || "",
-        visionText: visionText || "",
-        philosophyTitle: philosophyTitle || "",
-        philosophyPillars: philosophyPillars || [], // Kirim sebagai Array asli
-      };
+    // Ambil data ID 1
+    const info = await AboutInfo.findByPk(1);
+    if (!info) return res.status(404).json({ message: "About info not found" });
 
-      const tokenOWL = req.headers["authorization"]?.split(" ")[1];
-
-      await ErpApprovalService.createDraft(
-        {
-          jenisApproval: JENIS_APP_CMS,
-          karyawanid: req.userId,
-          module: "AboutInfo",
-          action: "UPDATE",
-          targetId: "1", // Hardcode 1 karena About single row
-          content: packageContent,
-        },
-        tokenOWL,
-      );
-
-      return res.status(202).json({
-        message: "Draf revisi About Company berhasil dikirim ke antrean.",
-      });
+    // IF locked
+    if (info.is_locked && req.userRole?.toLowerCase() === "editor") {
+      return res.status(423).json({ message: "Data sedang ditinjau Admin.", ticket: info.lock_ticket});
     }
 
-    // Supderadmin Flow (Langsung execute)
-    const updateQuery = `
-      UPDATE AboutInfo 
-      SET 
-        spiritText = :spiritText,
-        missionText = :missionText,
-        visionText = :visionText,
-        philosophyTitle = :philosophyTitle,
-        philosophyPillars = :philosophyPillars,
-        updatedAt = NOW()
-      WHERE id = 1
-    `;
+    const packageContent = {
+      spiritText: spiritText || info.spiritText,
+      missionText: missionText || info.missionText,
+      visionText: visionText || info.visionText,
+      philosophyTitle: philosophyTitle || info.philosophyTitle,
+      philosophyPillars: philosophyPillars || info.philosophyPillars, // Sequelize handle JSON otomatis
+    };
 
-    await sequelize.query(updateQuery, {
-      replacements: {
-        spiritText: spiritText || "",
-        missionText: missionText || "",
-        visionText: visionText || "",
-        philosophyTitle: philosophyTitle || "",
-        philosophyPillars: JSON.stringify(philosophyPillars || []),
-      },
-      type: sequelize.QueryTypes.UPDATE,
-    });
 
+    // Gatekeeper: Editor Flow
+    if (req.userRole?.toLowerCase() === "editor" && status === "Published") {
+      const result = await ErpApprovalService.initiateApproval({
+        model: AboutInfo,
+        targetId: 1, // Singleton selalu 1
+        action: "UPDATE",
+        payload: packageContent,
+        userId: req.userId,
+        owlUsername: req.owl_username,
+        token: req.headers["authorization"]?.split(" ")[1]
+      });
+
+      return res.status(202).json({ message: "Revisi About Company dikirim ke OWL.", ticket: result.notrans });
+    }
+    // Superadmin Flow
+    await info.update({ ...packageContent, is_locked: false, lock_ticket: null });
     res.status(200).json({ message: "About Info updated successfully!" });
+
   } catch (error) {
-    console.error("Error UPDATE About Info:", error);
-    res.status(500).json({ message: "Failed to update about info" });
+    res.status(500).json({ message: error.message });
   }
 };

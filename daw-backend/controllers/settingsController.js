@@ -1,5 +1,6 @@
 const sequelize = require("../config/database");
 const { deleteSingleFile } = require("../utils/fileRemover");
+const ErpApprovalService = require("../services/erpApprovalService");
 
 // --- 1. GET Data Settings ---
 exports.getSettings = async (req, res) => {
@@ -22,77 +23,43 @@ exports.getSettings = async (req, res) => {
 // --- 2. PUT Data Settings ---
 exports.updateSettings = async (req, res) => {
   try {
-    // 1. Ambil data lama dulu buat ngecek path gambar (biar nggak hilang kalau cuma edit text)
-    const [oldData] = await sequelize.query(
-      "SELECT logoUrl, faviconUrl FROM Settings WHERE id = 1 LIMIT 1",
-      { type: sequelize.QueryTypes.SELECT },
-    );
+    const settings = await Settings.findByPk(1);
+    const { status } = req.body;
 
-    const {
-      companyName,
-      address,
-      phone,
-      email,
-      website,
-      googleMapsUrl,
-      linkedinUrl,
-    } = req.body;
+    // 1. Handle Multiple Files
+    let newLogoUrl = settings.logoUrl;
+    let newFaviconUrl = settings.faviconUrl;
 
-    // 2. Setup Default Value gambar (Pakai yang lama kalau nggak ada file baru)
-    let newLogoUrl = oldData?.logoUrl || "";
-    let newFaviconUrl = oldData?.faviconUrl || "";
-
-    // 3. Tangkap File Baru (Jika Di-upload)
     if (req.files) {
-      if (req.files.logo && req.files.logo[0]) {
-        // deleteSingleFile(oldData?.logoUrl);
-        newLogoUrl = req.files.logo[0].filename;
-      }
-      if (req.files.favicon && req.files.favicon[0]) {
-        // deleteSingleFile(oldData?.faviconUrl);
-        newFaviconUrl = req.files.favicon[0].filename;
-      }
+      if (req.files.logo) newLogoUrl = req.files.logo[0].filename;
+      if (req.files.favicon) newFaviconUrl = req.files.favicon[0].filename;
     }
 
-    // 4. Eksekusi Update Query
-    const updateQuery = `
-      UPDATE Settings 
-      SET 
-        companyName = :companyName,
-        address = :address, 
-        phone = :phone, 
-        email = :email, 
-        website = :website, 
-        googleMapsUrl = :googleMapsUrl, 
-        linkedinUrl = :linkedinUrl,
-        logoUrl = :logoUrl,
-        faviconUrl = :faviconUrl,
-        updatedAt = NOW()
-      WHERE id = 1
-    `;
-
-    await sequelize.query(updateQuery, {
-      replacements: {
-        companyName: companyName || "",
-        address: address || "",
-        phone: phone || "",
-        email: email || "",
-        website: website || "",
-        googleMapsUrl: googleMapsUrl || "",
-        linkedinUrl: linkedinUrl || "",
-        logoUrl: newLogoUrl,
-        faviconUrl: newFaviconUrl,
-      },
-      type: sequelize.QueryTypes.UPDATE,
-    });
-
-    res.status(200).json({
-      message: "Global settings updated successfully!",
+    const packageContent = {
+      ...req.body,
       logoUrl: newLogoUrl,
-      faviconUrl: newFaviconUrl,
-    });
+      faviconUrl: newFaviconUrl
+    };
+
+    // 2. JALUR EDITOR
+    if (req.userRole?.toLowerCase() === "editor" && status === "Published") {
+      const result = await ErpApprovalService.initiateApproval({
+        model: Settings,
+        targetId: 1,
+        action: "UPDATE",
+        payload: packageContent,
+        userId: req.userId,
+        owlUsername: req.owl_username,
+        token: req.headers["authorization"]?.split(" ")[1]
+      });
+      return res.status(202).json({ message: "Global Settings revision sent to OWL." });
+    }
+
+    // 3. JALUR SUPERADMIN
+    await settings.update({ ...packageContent, is_locked: false, lock_ticket: null });
+    res.status(200).json({ message: "Settings updated directly!" });
+
   } catch (error) {
-    console.error("Error UPDATE Settings:", error);
-    res.status(500).json({ message: "Failed to update settings" });
+    res.status(500).json({ message: error.message });
   }
 };
