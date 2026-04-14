@@ -63,10 +63,10 @@ exports.createProject = async (req, res) => {
       meta_description,
       author,
     } = req.body;
-    const finalSlug = await generateUniqueProjectSlug(title);
-    console.log(" Creating Project:", title);
 
-    // 1. Handle Upload Files
+    // --- 1. PRE-PROCESSING DATA (Berlaku untuk semua Role) ---
+    const finalSlug = await generateUniqueProjectSlug(title);
+    
     let coverImageName = null;
     let galleryImagesNames = [];
 
@@ -79,9 +79,7 @@ exports.createProject = async (req, res) => {
       }
     }
 
-    // 2. Pakai Project.create (ORM)
-    // ID (UUID) biasanya sudah di-handle otomatis di Model atau Database
-    const newProject = await Project.create({
+    const projectData = {
       title,
       slug: finalSlug,
       author: author || "Admin DAW",
@@ -90,19 +88,51 @@ exports.createProject = async (req, res) => {
       category,
       status: status || "Draft",
       cover_image: coverImageName,
-      gallery: galleryImagesNames, // Masukkan Array langsung, Sequelize yang simpan jadi JSON
+      gallery: galleryImagesNames,
       seo_title: seo_title || title,
       meta_description: meta_description || excerpt,
       views: 0,
-    });
+    };
+
+    // --- 2. GATEKEEPER LOGIC ---
+    if (req.userRole?.toLowerCase() === "editor" && status === "Published") {
+      console.log(">>> [PROJECT] JALUR EDITOR: REQUESTING CREATE PERMISSION <<<");
+
+      const tokenOWL = req.headers["authorization"]?.split(" ")[1];
+      if (!tokenOWL) {
+        return res.status(401).json({ message: "Akses ditolak: Token OWL tidak ditemukan." });
+      }
+
+      const result = await ErpApprovalService.initiateApproval({
+        model: Project,
+        targetId: null,
+        action: "CREATE", 
+        payload: projectData,
+        userId: req.userId,
+        owlUsername: req.owl_username,
+        token: tokenOWL
+      });
+
+      return res.status(202).json({ 
+        message: "Permintaan penambahan proyek baru telah dikirim ke OWL.", 
+        ticket: result.notrans 
+      });
+    }
+
+    // JALUR SUPERADMIN / EDITOR SAVE AS DRAFT
+    // Logic: Jika Editor cuma klik 'Save Draft', dia bypass OWL dan langsung simpan ke MySQL lokal.
+    console.log(">>> [PROJECT] JALUR DIRECT: CREATING LOCAL RECORD <<<");
+
+    const newProject = await Project.create(projectData);
 
     res.status(201).json({
-      message: "Project created successfully!",
+      message: "Proyek berhasil dibuat di database lokal!",
       data: newProject,
     });
+
   } catch (error) {
     console.error("🚨 Error CREATE Project:", error);
-    res.status(500).json({ message: error.message });
+    res.status(500).json({ message: "Gagal membuat proyek.", error: error.message });
   }
 };
 
@@ -128,36 +158,77 @@ exports.uploadInlineImage = async (req, res) => {
 exports.deleteProject = async (req, res) => {
   try {
     const { id } = req.params;
+    
+    // 1. Cari data asli
     const project = await Project.findByPk(id);
     if (!project) return res.status(404).json({ message: "Project not found" });
 
-    deleteSingleFile(project.cover_image);
+    // --- JALUR EDITOR: REQUEST APPROVAL (Reference-Based) ---
+    if (req.userRole && req.userRole.toLowerCase() === "editor") {
+      console.log(`>>> [PROJECT] JALUR EDITOR: REQUESTING DELETE FOR ID: ${id} <<<`);
 
-    // Hapus Gallery (Parsing dulu jika string)
-    const gallery =
-      typeof project.gallery === "string"
-        ? JSON.parse(project.gallery || "[]")
-        : project.gallery;
+      const tokenOWL = req.headers["authorization"]?.split(" ")[1];
+      if (!tokenOWL) {
+        return res.status(401).json({ message: "Akses ditolak: Token OWL tidak ditemukan." });
+      }
+
+      // 2. Kirim Niat Hapus ke Orchestrator
+      // Kita kirim payload minimal saja agar Approver tahu data mana yang mau dihapus
+      const result = await ErpApprovalService.initiateApproval({
+        model: Project,
+        targetId: id,
+        action: "DELETE", 
+        payload: { 
+          title: project.title, 
+          reason: "User meminta penghapusan proyek" 
+        },
+        userId: req.userId,
+        owlUsername: req.owl_username,
+        token: tokenOWL
+      });
+
+      // 3. Respon ke Frontend
+      // Catatan: is_locked otomatis diset true oleh initiateApproval
+      return res.status(202).json({
+        message: "Permintaan penghapusan telah dikirim. Data akan tetap ada (dikunci) sampai disetujui Admin.",
+        ticket: result.notrans
+      });
+    }
+
+    // --- JALUR SUPERADMIN: EKSEKUSI LANGSUNG ---
+    console.log(">>> [PROJECT] JALUR SUPERADMIN: PERMANENT DELETION <<<");
+
+    // 1. Hapus File Fisik (Cover Image)
+    if (project.cover_image) {
+      deleteSingleFile(project.cover_image);
+    }
+
+    // 2. Hapus Gallery (Parsing dulu jika perlu)
+    const gallery = typeof project.gallery === "string"
+      ? JSON.parse(project.gallery || "[]")
+      : project.gallery;
 
     if (Array.isArray(gallery)) {
       gallery.forEach((file) => deleteSingleFile(file));
     }
 
-    // Hapus Gambar dari Content Quill (Regex)
+    // 3. Hapus Gambar di dalam Konten (Quill Regex)
     if (project.content) {
       const imgRegex = /src="[^"]*\/uploads\/([^"'\s>]+)"/g;
       let match;
       while ((match = imgRegex.exec(project.content)) !== null) {
-        deleteSingleFile(match[1]); // match[1] adalah nama filenya
+        deleteSingleFile(match[1]);
       }
     }
 
+    // 4. Hapus Record di Database
     await project.destroy();
 
-    res.status(200).json({ message: "Project and associated files deleted!" });
+    res.status(200).json({ message: "Project and associated files deleted permanently!" });
+
   } catch (error) {
     console.error("🚨 Error DELETE Project:", error);
-    res.status(500).json({ message: "Failed to Delete Project." });
+    res.status(500).json({ message: "Failed to process delete request.", error: error.message });
   }
 };
 

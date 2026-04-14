@@ -45,16 +45,19 @@ class ErpApprovalService {
         notrans: notrans, 
         module_name: model.name,
         target_id: targetId,
+        action: action,
         payload: payload, // JSON draf revisi
         created_by: owlUsername || userId,
         status: "Pending"
       }, { transaction: t});
 
       // Locking
+      if (action !== "CREATE" && targetId) {
       await model.update(
-        {is_locked: true, lock_ticket: notrans},
-        { where: { id: targetId }, transaction: t},
+        { is_locked: true, lock_ticket: notrans },
+        { where: { id: targetId }, transaction: t }
       );
+    }
 
       await dawApi.post("/node/approval/trans/add", {
         notrans: notrans,
