@@ -8,36 +8,17 @@ const { deleteSingleFile } = require("../utils/fileRemover");
 const ErpApprovalService = require("../services/erpApprovalService");
 const JENIS_APP_CMS = process.env.CMS_APPROVAL_CODE || "040101";
 
-/**
- * Helper: Strip HTML tags to get plain text
- * Used for generating SEO meta descriptions automatically
- */
+// Helper: Strip HTML tags to get plain text
 const stripHtml = (html) => html.replace(/<[^>]*>?/gm, "");
 
-/**
- * Helper: Generate a unique slug for the page
- * Recursively checks if slug exists and appends a counter if necessary
- * @param {string} title - Page title
- * @param {string} slug - Manually entered slug (optional)
- * @param {string} id - Current page ID to exclude during update checks
- */
 const generateUniqueSlug = async (title, slug, id = null) => {
-  let baseSlug = (slug || title)
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/(^-|-$)+/g, "");
-
+  let baseSlug = (slug || title).toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)+/g, "");
   let finalSlug = baseSlug;
   let counter = 1;
-
   while (true) {
-    const whereClause = id
-      ? { slug: finalSlug, id: { [Op.ne]: id } }
-      : { slug: finalSlug };
-
+    const whereClause = id ? { slug: finalSlug, id: { [Op.ne]: id } } : { slug: finalSlug };
     const existing = await Page.findOne({ where: whereClause });
     if (!existing) break;
-
     finalSlug = `${baseSlug}-${counter}`;
     counter++;
   }
@@ -116,7 +97,7 @@ exports.createPage = async (req, res) => {
       content,
       metaDescription,
       showDropCap,
-      sidebarLinks,
+      sidebarLinks, status
     } = req.body;
 
     const finalSlug = await generateUniqueSlug(title, slug);
@@ -124,20 +105,9 @@ exports.createPage = async (req, res) => {
     const heroImage = req.file ? req.file.filename : null;
 
     // SEO Automation: Generate meta description from content if empty
-    let finalMetaDesc = metaDescription;
-    if (!finalMetaDesc || finalMetaDesc.trim() === "") {
-      if (subtitle && subtitle.trim() !== "") {
-        // Fallback ke Subtitle jika ada
-        finalMetaDesc = subtitle.trim();
-      } else {
-        // Terakhir: Fallback ke konten (strip HTML dan ambil 150 char)
-        const cleanText = stripHtml(sanitizedContent);
-        finalMetaDesc =
-          cleanText.substring(0, 150) + (cleanText.length > 150 ? "..." : "");
-      }
-    }
+    let finalMetaDesc = metaDescription || (subtitle ? subtitle.trim() : stripHtml(sanitizedContent).substring(0, 150));
 
-    const newPage = await Page.create({
+    const pageData = {
       title,
       slug: finalSlug,
       subtitle,
@@ -146,99 +116,60 @@ exports.createPage = async (req, res) => {
       content: sanitizedContent,
       metaDescription: finalMetaDesc,
       showDropCap: showDropCap === "true",
-      sidebarLinks:
-        typeof sidebarLinks === "string"
-          ? JSON.parse(sidebarLinks)
-          : sidebarLinks || [],
-    });
+      sidebarLinks: typeof sidebarLinks === "string" ? JSON.parse(sidebarLinks) : sidebarLinks || [],
+    };
 
-    res
-      .status(201)
-      .json({ message: "Page created successfully", page: newPage });
+    // Editor Flow
+    if (req.userRole?.toLowerCase() === "editor" && status === "Published") {
+      const tokenOWL = req.headers["authorization"]?.split(" ")[1];
+      const result = await ErpApprovalService.initiateApproval({
+        model: Page,
+        targetId: null,
+        action: "CREATE",
+        payload: pageData,
+        userId: req.userId,
+        owlUsername: req.owl_username,
+        token: tokenOWL
+      });
+      return res.status(202).json({ message: "Permintaan pembuatan halaman baru dikirim ke OWL.", ticket: result.notrans });
+    }
+
+    // Superadmin Flow
+    const newPage = await Page.create(pageData);
+    res.status(201).json({ message: "Page created successfully", page: newPage });
   } catch (error) {
-    res
-      .status(500)
-      .json({ message: "Failed to create page", error: error.message });
+    res.status(500).json({ message: "Failed to create page", error: error.message });
   }
 };
 
-/**
- * Controller: Update Page
- * Manages image replacement and slug re-syncing
- */
+// Update Page
 exports.updatePage = async (req, res) => {
   try {
     const { id } = req.params;
-    const {
-      title,
-      slug,
-      subtitle,
-      templateType,
-      content,
-      metaDescription,
-      showDropCap,
-      sidebarLinks,
-    } = req.body;
+    const { title, slug, subtitle, templateType, content, metaDescription, showDropCap, sidebarLinks, status } = req.body;
 
     const page = await Page.findByPk(id);
     if (!page) return res.status(404).json({ message: "Page not found" });
 
+    // 🛡️ Safety Check: Gembok
+    if (page.is_locked && req.userRole?.toLowerCase() === "editor") {
+      return res.status(423).json({ message: "Halaman ini sedang dalam peninjauan Admin.", ticket: page.lock_ticket });
+    }
+
+    // --- PRE-PROCESSING ---
     const finalSlug = await generateUniqueSlug(title, slug, id);
     const sanitizedContent = dompurify.sanitize(content);
-
-    // SEO Automation
-    let finalMetaDesc = metaDescription;
-    if (!finalMetaDesc || finalMetaDesc.trim() === "") {
-      const cleanText = stripHtml(sanitizedContent);
-      finalMetaDesc =
-        cleanText.substring(0, 150) + (cleanText.length > 150 ? "..." : "");
-    }
+    let finalMetaDesc = metaDescription || stripHtml(sanitizedContent).substring(0, 150);
 
     let heroImageName = page.heroImage;
     let oldHeroToDelete = null;
 
     if (req.file) {
       oldHeroToDelete = page.heroImage;
-      heroImageName = req.file.filename; // Akan ber-prefix TEMP_ jika Editor
+      heroImageName = req.file.filename;
     }
 
-    // Gatekeeper: Editor
-    if (req.userRole && req.userRole.toLowerCase() === "editor") {
-      const packageContent = {
-        title,
-        slug: finalSlug,
-        subtitle,
-        heroImage: heroImageName,
-        templateType: templateType || "split",
-        content: sanitizedContent,
-        metaDescription: finalMetaDesc,
-        showDropCap: showDropCap === "true",
-        sidebarLinks:
-          typeof sidebarLinks === "string"
-            ? JSON.parse(sidebarLinks)
-            : sidebarLinks || [],
-      };
-
-      await ErpApprovalService.createDraft(
-        {
-          jenisApproval: JENIS_APP_CMS,
-          karyawanid: req.userId,
-          module: "Page",
-          action: "UPDATE",
-          targetId: id,
-          content: packageContent,
-        },
-        req.headers["authorization"]?.split(" ")[1],
-      );
-
-      return res
-        .status(202)
-        .json({ message: "Revisi halaman berhasil dikirim ke antrean Admin." });
-    }
-
-    // Admin Flow
-    if (oldHeroToDelete) deleteSingleFile(oldHeroToDelete);
-    await page.update({
+    const updatedData = {
       title,
       slug: finalSlug,
       subtitle,
@@ -247,49 +178,67 @@ exports.updatePage = async (req, res) => {
       content: sanitizedContent,
       metaDescription: finalMetaDesc,
       showDropCap: showDropCap === "true",
-      sidebarLinks:
-        typeof sidebarLinks === "string"
-          ? JSON.parse(sidebarLinks)
-          : sidebarLinks || [],
-    });
+      sidebarLinks: typeof sidebarLinks === "string" ? JSON.parse(sidebarLinks) : sidebarLinks || [],
+    };
 
+    // Editor Flow
+    if (req.userRole?.toLowerCase() === "editor" && status === "Published") {
+      const tokenOWL = req.headers["authorization"]?.split(" ")[1];
+      const result = await ErpApprovalService.initiateApproval({
+        model: Page,
+        targetId: id,
+        action: "UPDATE",
+        payload: updatedData,
+        userId: req.userId,
+        owlUsername: req.owl_username,
+        token: tokenOWL
+      });
+      return res.status(202).json({ message: "Revisi halaman dikirim ke OWL.", ticket: result.notrans });
+    }
+
+    // Superadmin Flow
+    if (oldHeroToDelete) deleteSingleFile(oldHeroToDelete);
+    await page.update({ ...updatedData, is_locked: false, lock_ticket: null });
     res.status(200).json({ message: "Page updated successfully" });
   } catch (error) {
-    res
-      .status(500)
-      .json({ message: "Failed to update page", error: error.message });
+    res.status(500).json({ message: "Failed to update page", error: error.message });
   }
 };
 
-/**
- * Controller: Delete Page
- * Triggers cascading cleanup of physical hero image and editor inline images
- */
+// 3. DELETE PAGE
 exports.deletePage = async (req, res) => {
   try {
     const { id } = req.params;
     const page = await Page.findByPk(id);
     if (!page) return res.status(404).json({ message: "Page not found" });
 
-    // Step 1: Physical removal of Hero Image
-    deleteSingleFile(page.heroImage);
+    // Editor Flow
+    if (req.userRole?.toLowerCase() === "editor") {
+      const tokenOWL = req.headers["authorization"]?.split(" ")[1];
+      const result = await ErpApprovalService.initiateApproval({
+        model: Page,
+        targetId: id,
+        action: "DELETE",
+        payload: { title: page.title },
+        userId: req.userId,
+        owlUsername: req.owl_username,
+        token: tokenOWL
+      });
+      return res.status(202).json({ message: "Permintaan hapus halaman dikirim ke OWL. Data dikunci.", ticket: result.notrans });
+    }
 
-    // Step 2: Physical removal of all hosted images found in the Rich Text content
+    // Superadmin Flow
+    deleteSingleFile(page.heroImage);
     if (page.content) {
-      // Regex detects filenames within src attributes that point to our uploads folder
       const imgRegex = /src="[^"]*\/uploads\/([^"'\s>]+)"/g;
       let match;
       while ((match = imgRegex.exec(page.content)) !== null) {
-        deleteSingleFile(match[1]); // match[1] extracts the specific filename
+        deleteSingleFile(match[1]);
       }
     }
     await page.destroy();
-    res
-      .status(200)
-      .json({ message: "Page and all associated assets deleted successfully" });
+    res.status(200).json({ message: "Page deleted successfully" });
   } catch (error) {
-    res
-      .status(500)
-      .json({ message: "Failed to delete page", error: error.message });
+    res.status(500).json({ message: "Failed to delete page", error: error.message });
   }
 };

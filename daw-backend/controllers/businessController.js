@@ -249,100 +249,124 @@ const slugify = (text) => {
  * @access  Private (Admin)
  */
 exports.createBusinessSection = async (req, res) => {
-  const t = await sequelize.transaction();
   try {
-    const { category, title } = req.body;
+    const { category, title, status } = req.body;
     const generatedId = slugify(category);
 
-    // Prevent duplicate sections by checking the slug ID
-    const existing = await BusinessSection.findByPk(generatedId, {
-      transaction: t,
-    });
+    // 1. CEK DUPLIKASI (Di Tabel Utama)
+    const existing = await BusinessSection.findByPk(generatedId);
     if (existing) {
-      await t.rollback();
-      return res
-        .status(400)
-        .json({ message: "Sektor bisnis dengan kategori ini sudah ada!" });
+      return res.status(400).json({ message: "Sektor bisnis dengan kategori ini sudah ada!" });
     }
 
-    // Auto-calculate the next order index for visual sequencing
-    const maxOrder =
-      (await BusinessSection.max("orderIndex", { transaction: t })) || 0;
+    // 2. CEK DUPLIKASI (Di Tabel Antrean/Draft) - Biar gak ada 2 orang request kategori sama
+    const pendingDraft = await ApprovalDraft.findOne({ 
+      where: { module_name: 'BusinessSection', target_id: generatedId } 
+    });
+    if (pendingDraft) {
+      return res.status(400).json({ message: "Kategori ini sedang dalam antrean approval orang lain!" });
+    }
 
-    const newSection = await BusinessSection.create(
-      {
+    // Editor Flow
+    if (req.userRole?.toLowerCase() === "editor" && status === "Published") {
+      const tokenOWL = req.headers["authorization"]?.split(" ")[1];
+      
+      const sectionData = {
+        id: generatedId,
+        category,
+        title,
+        htmlContent: "",
+        hasMap: false,
+      };
+
+      const result = await ErpApprovalService.initiateApproval({
+        model: BusinessSection,
+        targetId: generatedId, 
+        action: "CREATE",
+        payload: sectionData,
+        userId: req.userId,
+        owlUsername: req.owl_username,
+        token: tokenOWL
+      });
+
+      return res.status(202).json({ message: "Permintaan sektor baru dikirim ke OWL.", ticket: result.notrans });
+    }
+
+    // --- JALUR SUPERADMIN: DIRECT CREATE ---
+    const t = await sequelize.transaction();
+    try {
+      const maxOrder = (await BusinessSection.max("orderIndex", { transaction: t })) || 0;
+      
+      const newSection = await BusinessSection.create({
         id: generatedId,
         category,
         title,
         htmlContent: "",
         hasMap: false,
         orderIndex: maxOrder + 1,
-      },
-      { transaction: t },
-    );
-    await t.commit();
-    res.status(201).json(newSection);
+      }, { transaction: t });
+
+      await t.commit();
+      res.status(201).json(newSection);
+    } catch (err) {
+      await t.rollback();
+      throw err;
+    }
   } catch (error) {
-    await t.rollback();
     res.status(500).json({ message: error.message });
   }
 };
 
-/**
- * @desc    Safely deletes a business section. Rejects deletion if projects are still attached.
- * @route   DELETE /api/businesses/admin/:id
- * @access  Private (Admin)
- */
+
 exports.deleteSection = async (req, res) => {
   const { id } = req.params;
 
   try {
     const section = await BusinessSection.findByPk(id);
-    if (!section) {
-      return res.status(404).json({ message: "Sektor bisnis tidak ditemukan" });
-    }
+    if (!section) return res.status(404).json({ message: "Sektor tidak ditemukan" });
 
-    // THE SECURITY SHIELD: Check for Orphaned Projects Risk
-    // Hitung apakah ada proyek di tabel Project yang kolom 'category'-nya sama dengan ID sektor ini
-    const attachedProjectsCount = await Project.count({
-      where: { category: id },
-    });
-
-    // Jika ada, TOLAK proses penghapusan
+    const attachedProjectsCount = await Project.count({ where: { category: id } });
     if (attachedProjectsCount > 0) {
       return res.status(400).json({
-        message: `Penghapusan ditolak! Sektor ini masih memiliki ${attachedProjectsCount} proyek aktif. Silakan pindahkan atau hapus proyek tersebut terlebih dahulu.`,
+        message: `Hapus ditolak! Sektor ini masih punya ${attachedProjectsCount} proyek aktif.`,
       });
     }
 
-    // Mulai transaksi hanya setelah lolos pengecekan keamanan
-    const t = await sequelize.transaction();
-
-    try {
-      // Hapus marker terkait terlebih dahulu (Menghindari constraint error)
-      await BusinessMapMarker.destroy({
-        where: { sectionId: id },
-        transaction: t,
+    // Editor Flow
+    if (req.userRole?.toLowerCase() === "editor") {
+      const tokenOWL = req.headers["authorization"]?.split(" ")[1];
+      
+      const result = await ErpApprovalService.initiateApproval({
+        model: BusinessSection,
+        targetId: id,
+        action: "DELETE",
+        payload: { title: section.title }, // Payload tipis aja buat info
+        userId: req.userId,
+        owlUsername: req.owl_username,
+        token: tokenOWL
       });
 
-      // Hapus sektor bisnis
+      return res.status(202).json({ 
+        message: "Permintaan hapus dikirim ke OWL. Data sekarang dikunci.", 
+        ticket: result.notrans 
+      });
+    }
+
+    // Superadmin Flow
+    const t = await sequelize.transaction();
+    try {
+      // Hapus marker dulu (Foreign Key Safety)
+      await BusinessMapMarker.destroy({ where: { sectionId: id }, transaction: t });
+      // Hapus sektornya
       await section.destroy({ transaction: t });
 
-      // Persetujui perubahan
       await t.commit();
-      res.status(200).json({
-        message:
-          "Sektor bisnis beserta markernya berhasil dihapus dengan aman.",
-      });
-    } catch (transactionError) {
+      res.status(200).json({ message: "Sektor dan marker berhasil dihapus permanen." });
+    } catch (err) {
       await t.rollback();
-      throw transactionError; // Lempar ke outer catch block
+      throw err;
     }
   } catch (error) {
-    console.error("[DELETE_SECTION_ERROR]:", error);
-    res.status(500).json({
-      message: "Terjadi kesalahan server saat mencoba menghapus sektor.",
-      error: error.message,
-    });
+    res.status(500).json({ message: error.message });
   }
 };

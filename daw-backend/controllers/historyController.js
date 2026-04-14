@@ -1,5 +1,6 @@
 const sequelize = require("../config/database");
 const ErpApprovalService = require("../services/erpApprovalService");
+const History = require("../models/History");
 
 const JENIS_APP_CMS = process.env.CMS_APPROVAL_CODE;
 
@@ -20,55 +21,49 @@ exports.getHistories = async (req, res) => {
 // PUT
 exports.updateHistories = async (req, res) => {
   try {
-    const { histories } = req.body;
+    const { histories, status } = req.body; 
 
     // Gatekeeper: Editor Flow
-    if (req.userRole && req.userRole.toLowerCase() === "editor") {
-      // Bungkusan untuk History cukup keseluruhan Array-nya saja
-      const packageContent = {
-        histories: histories || [],
-      };
-
-      const tokenOWL = req.headers["authorization"]?.split(" ")[1];
-
-      await ErpApprovalService.createDraft(
-        {
-          jenisApproval: JENIS_APP_CMS,
-          karyawanid: req.userId,
-          module: "History",
-          action: "BULK_UPDATE",
-          targetId: "ALL",
-          content: packageContent,
-        },
-        tokenOWL,
-      );
+    if (req.userRole?.toLowerCase() === "editor" && status === "Published") {
+      
+      const result = await ErpApprovalService.initiateApproval({
+        model: History,
+        targetId: "ALL", 
+        action: "BULK_UPDATE",
+        payload: { histories }, 
+        userId: req.userId,
+        owlUsername: req.owl_username,
+        token: req.headers["authorization"]?.split(" ")[1]
+      });
 
       return res.status(202).json({
-        message: "Draf Timeline Perusahaan berhasil dikirim ke antrean.",
+        message: "Draf Timeline Perusahaan berhasil dikirim ke antrean OWL.",
+        ticket: result.notrans
       });
     }
 
     // Supderadmin Flow (Langsung Execute)
-    await sequelize.query("DELETE FROM Histories");
+    const t = await sequelize.transaction();
+    try {
+      await History.destroy({ where: {}, transaction: t });
 
-    if (histories && histories.length > 0) {
-      for (const item of histories) {
-        await sequelize.query(
-          "INSERT INTO Histories (year, description) VALUES (:year, :desc)",
-          {
-            replacements: {
-              year: item.year || "",
-              desc: item.text || "",
-            },
-            type: sequelize.QueryTypes.INSERT,
-          },
-        );
+      if (histories && histories.length > 0) {
+        const historyData = histories.map(item => ({
+          year: item.year,
+          description: item.text, 
+          is_locked: false,
+          lock_ticket: null
+        }));
+        await History.bulkCreate(historyData, { transaction: t });
       }
-    }
 
-    res.status(200).json({ message: "Company timeline updated successfully!" });
+      await t.commit();
+      res.status(200).json({ message: "Company timeline updated successfully!" });
+    } catch (err) {
+      await t.rollback();
+      throw err;
+    }
   } catch (error) {
-    console.error("Error updating histories:", error);
-    res.status(500).json({ message: "Failed to update histories" });
+    res.status(500).json({ message: "Failed to update histories", error: error.message });
   }
 };
