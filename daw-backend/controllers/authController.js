@@ -1,89 +1,96 @@
 const sequelize = require("../config/database");
-const { Op } = require("sequelize");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
-const crypto = require("crypto");
+const axios = require("axios"); // Tambahkan ini
 const User = require("../models/User");
-const transporter = require("../utils/mailer");
-const Role = require("../models/Role");
-const Permission = require("../models/Permission");
 
-// 1. LOGIN
+// 1. LOGIN (Hybrid: Local & OWL)
 exports.login = async (req, res) => {
   try {
     const { email, password } = req.body;
+
+    // 1. Cari User di DB Lokal (Bisa pakai email atau owl_username)
     const user = await User.findOne({
-      where: { email },
-      include: [
-        {
-          model: Role,
-          as: "roleData", // Sesuaikan dengan alias di server.js
-          include: [
-            {
-              model: Permission,
-              as: "permissions",
-              attributes: ["name"],
-              through: { attributes: [] }, // Sembunyikan tabel junction
-            },
-          ],
-        },
-      ],
+      where: {
+        [sequelize.Sequelize.Op.or]: [{ email }, { owl_username: email }],
+      },
     });
+
     if (!user) {
-      return res.status(404).json({ message: "User not found." });
+      return res.status(404).json({ message: "User tidak terdaftar di CMS." });
     }
 
     if (user.status === "Suspended") {
-      return res.status(403).json({
-        message:
-          "Access Denied. Your account has been suspended by Superadmin.",
-      });
+      return res.status(403).json({ message: "Akun Anda ditangguhkan." });
     }
 
-    const passwordIsValid = await bcrypt.compare(password, user.password);
-    if (!passwordIsValid) {
-      return res.status(401).json({ message: "Invalid Password!" });
+    let authSuccess = false;
+    let owlData = null;
+
+    // 2. STRATEGI AUTHENTICATION
+    if (user.role === "Superadmin" && user.password) {
+      // Jalur Backdoor untuk IT (Cek Local DB)
+      authSuccess = await bcrypt.compare(password, user.password);
+    } else {
+      // Jalur Utama Karyawan (Tembak OWL)
+      try {
+        const owlResponse = await axios.post(
+          "https://erp-aziz.daw.co.id/node/auth/login",
+          {
+            uname: user.owl_username, // Menggunakan username OWL yang terdaftar di DB
+            password: password,
+          },
+        );
+
+        if (owlResponse.data && owlResponse.data.status === "success") {
+          authSuccess = true;
+          owlData = owlResponse.data.user; // Ambil data user dari OWL jika ada
+        }
+      } catch (owlErr) {
+        console.error(
+          "❌ OWL Auth Failed:",
+          owlErr.response?.data || owlErr.message,
+        );
+        return res
+          .status(401)
+          .json({ message: "Login OWL Gagal: Identitas tidak valid." });
+      }
     }
 
-    const isFirstLogin = user.lastLogin === null;
-    if (!isFirstLogin) {
-      // Update lastLogin tanpa memicu hook beforeUpdate
-      await User.update(
-        { lastLogin: sequelize.fn("NOW") },
-        { where: { id: user.id } },
-      );
+    if (!authSuccess) {
+      return res.status(401).json({ message: "Password salah!" });
     }
+
+    // 3. AUTO-SYNC (Update Nama jika ada perubahan di OWL)
+    if (owlData && owlData.nama) {
+      await user.update({ name: owlData.nama, lastLogin: sequelize.fn("NOW") });
+    } else {
+      await user.update({ lastLogin: sequelize.fn("NOW") });
+    }
+
+    // 4. GENERATE JWT CMS
+    // Karena kita pakai Fixed Roles, permission kita hardcode saja di token
+    const permissions = getPermissionsByRole(user.role);
 
     const jwtSecret = process.env.JWT_SECRET;
-    if (!jwtSecret) {
-      console.error("[FATAL] JWT_SECRET is missing in .env file!");
-      process.exit(1);
-    }
-
-    // Ambil daftar nama permission ke dalam array string sederhana
-    const userPermissions =
-      user.roleData?.permissions?.map((p) => p.name) || [];
-
     const token = jwt.sign(
       {
         id: user.id,
-        role: user.roleData?.name || "No Role",
-        permissions: userPermissions,
+        owl_username: user.owl_username,
+        role: user.role,
+        permissions: permissions,
       },
       jwtSecret,
-      {
-        expiresIn: process.env.JWT_EXPIRES_IN || "24h",
-      },
+      { expiresIn: process.env.JWT_EXPIRES_IN || "24h" },
     );
 
     res.status(200).json({
       id: user.id,
       name: user.name,
       email: user.email,
-      role: user.roleData?.name, // Kirim nama role asli ke frontend
-      permissions: userPermissions, // Kirim array permission agar frontend bisa sembunyikan menu
+      role: user.role,
+      permissions: permissions,
       accessToken: token,
-      needsPasswordChange: isFirstLogin,
     });
   } catch (error) {
     console.error("[LOGIN ERROR]:", error.message);
@@ -91,52 +98,46 @@ exports.login = async (req, res) => {
   }
 };
 
-// 2. GET ME (Cek Sesi Saat Ini)
+// 2. GET ME (Identitas Sesi)
 exports.getMe = async (req, res) => {
   try {
-    const user = await User.findByPk(req.userId, {
-      attributes: ["id", "name", "email", "status"],
-      include: [
-        {
-          model: Role,
-          as: "roleData",
-          include: [
-            {
-              model: Permission,
-              as: "permissions",
-              attributes: ["name"],
-              through: { attributes: [] },
-            },
-          ],
-        },
-      ],
-    });
-
+    const user = await User.findByPk(req.userId);
     if (!user) return res.status(404).json({ message: "User not found." });
 
-    if (user.status === "Suspended") {
-      return res
-        .status(403)
-        .json({ message: "Your account has been suspended." });
-    }
-
-    // Ekstraksi permission agar formatnya sama dengan login
-    const userPermissions =
-      user.roleData?.permissions?.map((p) => p.name) || [];
+    const permissions = getPermissionsByRole(user.role);
 
     res.status(200).json({
       id: user.id,
       name: user.name,
       email: user.email,
-      role: user.roleData?.name,
-      permissions: userPermissions,
+      role: user.role,
+      permissions: permissions,
       status: user.status,
     });
   } catch (error) {
-    console.error("[GET ME ERROR]:", error.message);
-    res.status(500).json({ message: "Internal Server Error" });
+    res.status(500).json({ message: error.message });
   }
 };
+
+// 🛠️ HELPER: Mapping Permission Berdasarkan Role (Tanpa Tabel DB)
+function getPermissionsByRole(role) {
+  const common = ["dashboard", "manage_inbox"];
+  const content = [
+    "manage_businesses",
+    "manage_projects",
+    "manage_investments",
+    "manage_content",
+    "manage_homepage",
+    "manage_about",
+    "manage_settings",
+  ];
+
+  if (role === "Superadmin")
+    return [...common, ...content, "manage_approvals", "manage_users"];
+  if (role === "Editor") return [...common, ...content];
+  if (role === "Approver") return ["dashboard", "manage_approvals"];
+  return [];
+}
 
 // 3. FORCE CHANGE PASSWORD (Saat Pertama Login)
 exports.forceChangePassword = async (req, res) => {

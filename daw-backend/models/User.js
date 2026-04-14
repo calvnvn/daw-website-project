@@ -23,17 +23,21 @@ const User = sequelize.define(
       },
       validate: { isEmail: true },
     },
+    // Identitas OWL dari post uname
+    owl_username: {
+      type: DataTypes.STRING,
+      allowNull: true,
+      unique: true,
+      comment: "Username/NIK dari ERP OWL untuk SSO",
+    },
+    // Password bisa null karena verifikasinya lewat owl
     password: {
       type: DataTypes.STRING,
-      allowNull: false,
+      allowNull: true,
     },
     role: {
-      type: DataTypes.ENUM("Superadmin", "Editor"),
+      type: DataTypes.ENUM("Superadmin", "Editor", "Approver"),
       defaultValue: "Editor",
-    },
-    roleId: {
-      type: DataTypes.UUID,
-      allowNull: true,
     },
     status: {
       type: DataTypes.ENUM("Active", "Suspended"),
@@ -43,27 +47,22 @@ const User = sequelize.define(
       type: DataTypes.DATE,
       allowNull: true,
     },
-    resetPasswordToken: {
-      type: DataTypes.STRING,
-      allowNull: true,
-    },
-    resetPasswordExpires: {
-      type: DataTypes.DATE,
-      allowNull: true,
-    },
   },
   {
     timestamps: true,
     hooks: {
       beforeCreate: async (user) => {
         if (user.password && !user.password.startsWith("$2")) {
-          // Hanya hash jika belum berbentuk hash
           const salt = await bcrypt.genSalt(10);
           user.password = await bcrypt.hash(user.password, salt);
         }
       },
       beforeUpdate: async (user) => {
-        if (user.changed("password") && !user.password.startsWith("$2")) {
+        if (
+          user.changed("password") &&
+          user.password &&
+          !user.password.startsWith("$2")
+        ) {
           const salt = await bcrypt.genSalt(10);
           user.password = await bcrypt.hash(user.password, salt);
         }
