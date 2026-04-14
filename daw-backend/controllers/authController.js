@@ -3,97 +3,68 @@ const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const axios = require("axios"); // Tambahkan ini
 const User = require("../models/User");
+const { Op } = require("sequelize");
 
 // 1. LOGIN (Hybrid: Local & OWL)
 exports.login = async (req, res) => {
   try {
-    const { email, password } = req.body;
+    const { uname, password } = req.body;
 
-    // 1. Cari User di DB Lokal (Bisa pakai email atau owl_username)
-    const user = await User.findOne({
-      where: {
-        [sequelize.Sequelize.Op.or]: [{ email }, { owl_username: email }],
-      },
-    });
+    // 1. Tembak API OWL (Server DAW API) buat Verifikasi
+    console.log(`>>> [AUTH] Verifying ${uname} via OWL ERP...`);
+    
+    try {
+      const owlResponse = await axios.post("https://erp-aziz.daw.co.id/node/auth/login", {
+        uname: uname,
+        password: password
+      });
 
-    if (!user) {
-      return res.status(404).json({ message: "User tidak terdaftar di CMS." });
-    }
+      // Jika OWL sukses, kita dapet data user dan token dari sana
+      const owlData = owlResponse.data; 
+      // Anggap strukturnya: { success: true, token: "...", data: { username: "bcs.dev", ... } }
 
-    if (user.status === "Suspended") {
-      return res.status(403).json({ message: "Akun Anda ditangguhkan." });
-    }
+      // 2. Sinkronisasi dengan Database Lokal CMS
+      // Kita cari user berdasarkan owl_username.
+      let user = await User.findOne({ where: { owl_username: uname } });
 
-    let authSuccess = false;
-    let owlData = null;
-
-    // 2. STRATEGI AUTHENTICATION
-    if (user.role === "Superadmin" && user.password) {
-      // Jalur Backdoor untuk IT (Cek Local DB)
-      authSuccess = await bcrypt.compare(password, user.password);
-    } else {
-      // Jalur Utama Karyawan (Tembak OWL)
-      try {
-        const owlResponse = await axios.post(
-          "https://erp-aziz.daw.co.id/node/auth/login",
-          {
-            uname: user.owl_username, // Menggunakan username OWL yang terdaftar di DB
-            password: password,
-          },
-        );
-
-        if (owlResponse.data && owlResponse.data.status === "success") {
-          authSuccess = true;
-          owlData = owlResponse.data.user; // Ambil data user dari OWL jika ada
-        }
-      } catch (owlErr) {
-        console.error(
-          "❌ OWL Auth Failed:",
-          owlErr.response?.data || owlErr.message,
-        );
-        return res
-          .status(401)
-          .json({ message: "Login OWL Gagal: Identitas tidak valid." });
+      if (!user) {
+        // Opsi: Kalau user OWL belum terdaftar di CMS, kita tolak atau buatkan otomatis.
+        // Di sini kita tolak dulu biar Jap aman (hanya user terdaftar yang bisa login).
+        return res.status(403).json({ message: "User OWL terverifikasi, tapi tidak memiliki akses ke CMS DAW." });
       }
+
+      // 3. Generate Token Lokal CMS (Isinya data gabungan)
+      const cmsToken = jwt.sign(
+        { 
+          id: user.id, 
+          owl_username: user.owl_username, 
+          role: user.role, // "Editor" atau "Admin"
+          owl_token: owlData.token // Simpan token OWL asli buat nanti nembak approval
+        },
+        process.env.JWT_SECRET,
+        { expiresIn: "24h" }
+      );
+
+      return res.status(200).json({
+        message: "Login Berhasil via OWL!",
+        token: cmsToken,
+        user: {
+          name: user.name,
+          role: user.role,
+          owl_username: user.owl_username
+        }
+      });
+
+    } catch (owlError) {
+      console.error("❌ [OWL AUTH FAILED]:", owlError.response?.data || owlError.message);
+      return res.status(401).json({ 
+        message: "Gagal Login: Username atau Password OWL salah!",
+        detail: owlError.response?.data?.message
+      });
     }
 
-    if (!authSuccess) {
-      return res.status(401).json({ message: "Password salah!" });
-    }
-
-    // 3. AUTO-SYNC (Update Nama jika ada perubahan di OWL)
-    if (owlData && owlData.nama) {
-      await user.update({ name: owlData.nama, lastLogin: sequelize.fn("NOW") });
-    } else {
-      await user.update({ lastLogin: sequelize.fn("NOW") });
-    }
-
-    // 4. GENERATE JWT CMS
-    // Karena kita pakai Fixed Roles, permission kita hardcode saja di token
-    const permissions = getPermissionsByRole(user.role);
-
-    const jwtSecret = process.env.JWT_SECRET;
-    const token = jwt.sign(
-      {
-        id: user.id,
-        owl_username: user.owl_username,
-        role: user.role,
-        permissions: permissions,
-      },
-      jwtSecret,
-      { expiresIn: process.env.JWT_EXPIRES_IN || "24h" },
-    );
-
-    res.status(200).json({
-      id: user.id,
-      name: user.name,
-      email: user.email,
-      role: user.role,
-      permissions: permissions,
-      accessToken: token,
-    });
   } catch (error) {
-    console.error("[LOGIN ERROR]:", error.message);
+    console.error("🚨 [AUTH CRASH]:", error.message);
     res.status(500).json({ message: "Internal Server Error" });
   }
 };

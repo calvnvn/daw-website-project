@@ -21,19 +21,27 @@ class ErpApprovalService {
   // GET Nomor Tiket (Queue)
   static async getApprovalNumber(jenisApproval, token) {
     try {
-      const response = await dawApi.post(
-        "/node/tools/noapproval",
-        { jenisApproval: CMS_CODE },
-        { headers: { Authorization: `Bearer ${token}` } },
-      );
-      return response.data.data; // 'APP/2026/...'
-    } catch (error) {
-      this._handleError(error, "getApprovalNumber");
-    }
+    // SEMENTARA: Komen bagian ini kalau server OWL belum siap (masih 401)
+    /*
+    const response = await dawApi.post(
+      "/node/tools/noapproval",
+      { jenisApproval: CMS_CODE },
+      { headers: { Authorization: `Bearer ${token}` } }
+    );
+    return response.data.data;
+    */
+
+    // JALUR TESTING: Kasih nomor tiket bohongan
+    console.log("⚠️ [DEBUG] Menggunakan Tiket Dummy karena OWL masih 401");
+    return `DUMMY/APP/${new Date().getTime()}`; 
+
+  } catch (error) {
+    this._handleError(error, "getApprovalNumber");
   }
+}
 
   // Reference-Based Approval. Simpan konten di SQL, send nomor ke API DAW
-  static async initiateApproval({ model, targetId, payload, userId, owlUsername, token}) {
+  static async initiateApproval({ model, targetId,action, payload, userId, owlUsername, token}) {
     const t = await sequelize.transaction();
 
     try {

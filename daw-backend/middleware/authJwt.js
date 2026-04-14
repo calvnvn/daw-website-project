@@ -49,6 +49,7 @@ const verifyToken = (req, res, next) => {
       req.userRole = decoded.role;
       // req.userRole = "Editor";
       req.userPermissions = decoded.permissions || [];
+      req.owl_token = decoded.owl_token;
 
       // console.log(
       //   `[AUTH DEBUG] User: ${req.userName} | Role Forced to: ${req.userRole}`,

@@ -347,6 +347,7 @@ exports.updateProject = async (req, res) => {
       const result = await ErpApprovalService.initiateApproval({
         model: Project,
         targetId: id,
+        action: "UPDATE",
         payload: packageContent,
         userId: req.userId,
         owlUsername: req.owl_username,
