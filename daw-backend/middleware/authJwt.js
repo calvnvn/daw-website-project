@@ -44,10 +44,10 @@ const verifyToken = (req, res, next) => {
       // console.log(decoded);
       // console.log("-------------------------");
 
-      req.userId = decoded.userid;
-      // req.userRole = decoded.role;
-      req.userRole = "Editor";
-      req.userName = decoded.name || decoded.username || "User OWL";
+      req.userId = decoded.id;
+      req.owl_username = decoded.owl_username || decoded.username;
+      req.userRole = decoded.role;
+      // req.userRole = "Editor";
       req.userPermissions = decoded.permissions || [];
 
       // console.log(

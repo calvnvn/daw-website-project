@@ -1,0 +1,21 @@
+# Dependency folders
+node_modules/
+
+# Build outputs
+dist/
+build/
+.vite/
+
+# DAW Project Specific: Jangan biarkan Prettier masuk ke folder upload!
+# Gambar .webp atau .jpg lo bisa korup kalau Prettier maksa "format" isinya
+public/uploads/
+backend/public/uploads/
+
+# Library atau file auto-generated
+package-lock.json
+*.min.js
+*.min.css
+
+# Config files yang sensitif
+.env
+.env.local

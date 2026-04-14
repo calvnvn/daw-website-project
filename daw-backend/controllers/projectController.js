@@ -3,6 +3,7 @@ const BusinessSection = require("../models/BusinessSection");
 const { deleteSingleFile } = require("../utils/fileRemover");
 const { Op } = require("sequelize");
 const ErpApprovalService = require("../services/erpApprovalService");
+const { token } = require("morgan");
 
 const JENIS_APP_CMS = process.env.CMS_APPROVAL_CODE;
 
@@ -255,7 +256,7 @@ exports.updateProject = async (req, res) => {
         excerpt: excerpt !== undefined ? excerpt : project.excerpt,
         content: content || project.content,
         category: category || project.category,
-        status: status || project.status, // Ini akan bernilai "Published"
+        status: status || project.status,
         cover_image: coverImageName,
         gallery: finalGallery,
         seo_title: seo_title || project.seo_title,
@@ -263,11 +264,15 @@ exports.updateProject = async (req, res) => {
       };
 
       const tokenOWL = req.headers["authorization"]?.split(" ")[1];
+      if (!tokenOWL) {
+        return res
+          .status(401)
+          .json({ message: "Akses ditolak: Token OWL tidak ditemukan." });
+      }
 
-      await ErpApprovalService.createDraft(
+      const approvalResult = await ErpApprovalService.createDraft(
         {
-          jenisApproval: JENIS_APP_CMS,
-          karyawanid: req.userId,
+          karyawanid: req.owl_username || req.userId,
           module: "Project",
           action: "UPDATE",
           targetId: id,
@@ -276,9 +281,15 @@ exports.updateProject = async (req, res) => {
         tokenOWL,
       );
 
+      await project.update({
+        is_locked: true,
+        lock_ticket: approvalResult.notrans
+      })
+
       return res.status(202).json({
         message:
           "Draf revisi berhasil dikirim ke antrean Admin DAW untuk diperiksa.",
+        ticket: approvalResult.notrans
       });
     }
 
@@ -304,6 +315,8 @@ exports.updateProject = async (req, res) => {
       gallery: finalGallery,
       seo_title: seo_title || project.seo_title,
       meta_description: meta_description || project.meta_description,
+      is_locked: false,
+      lock_ticket: null,
     });
 
     res.status(200).json({
@@ -312,13 +325,14 @@ exports.updateProject = async (req, res) => {
           ? "Draf proyek berhasil disimpan di workspace lokal!"
           : "Project berhasil diupdate secara langsung!",
     });
+
   } catch (error) {
     console.error("🚨 ERROR UPDATE PROJECT:", error);
     res.status(500).json({ message: error.message });
   }
 };
 
-// Ganti fungsi getPublicProjects kamu dengan ini:
+// Ganti fungsi getPublicProjects kamu dengan ini
 exports.getPublicProjects = async (req, res) => {
   try {
     const projects = await Project.findAll({

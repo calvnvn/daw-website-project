@@ -33,7 +33,7 @@ const approvalRoutes = require("./routes/approvalRoutes");
 const User = require("./models/User");
 // const Role = require("./models/Role");
 // const Permission = require("./models/Permission");
-const RolePermission = require("./models/RolePermission");
+// const RolePermission = require("./models/RolePermission");
 const Project = require("./models/Project");
 require("./models/Management");
 require("./models/Settings");
@@ -51,6 +51,7 @@ require("./models/Affiliate");
 require("./models/Inquiry");
 require("./models/InquirySubject");
 require("./models/InvestmentSettings");
+require("./models/ApprovalDraft");
 
 const app = express();
 

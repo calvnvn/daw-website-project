@@ -1,4 +1,6 @@
 const axios = require("axios");
+const ApprovalDraft = require("../models/ApprovalDraft");
+const sequelize = require("../config/database");
 
 const CMS_CODE = process.env.CMS_APPROVAL_CODE;
 
@@ -19,66 +21,65 @@ class ErpApprovalService {
   // GET Nomor Tiket (Queue)
   static async getApprovalNumber(jenisApproval, token) {
     try {
-      console.log(">>> REQUESTING TICKET FOR:", jenisApproval);
       const response = await dawApi.post(
-        "/tools/noapproval",
+        "/node/tools/noapproval",
         { jenisApproval: CMS_CODE },
         { headers: { Authorization: `Bearer ${token}` } },
       );
-
       return response.data.data; // 'APP/2026/...'
     } catch (error) {
       this._handleError(error, "getApprovalNumber");
     }
   }
 
-  // POST Draft Package to ERP (Add Transaction)
-  static async createDraft(
-    { karyawanid, module, action, targetId, content },
-    token,
-  ) {
+  // Reference-Based Approval. Simpan konten di SQL, send nomor ke API DAW
+  static async initiateApproval({ model, targetId, payload, userId, owlUsername, token}) {
+    const t = await sequelize.transaction();
+
     try {
+      // GET notrans from OWL
       const notrans = await this.getApprovalNumber(token);
 
-      const packageJSON = JSON.stringify({
-        module, // ex: Project
-        action, // ex: UPDATE
-        targetId, // ex: "uuid-xxxx"
-        content, // ex: { title: "Baru", ...}
+      // Save content to Local ApprovalDrafts Table
+      await ApprovalDraft.create({
+        notrans: notrans, 
+        module_name: model.name,
+        target_id: targetId,
+        payload: payload, // JSON draf revisi
+        created_by: owlUsername || userId,
+        status: "Pending"
+      }, { transaction: t});
+
+      // Locking
+      await model.update(
+        {is_locked: true, lock_ticket: notrans},
+        { where: { id: targetId }, transaction: t},
+      );
+
+      await dawApi.post("/node/approval/trans/add", {
+        notrans: notrans,
+        jenisApproval: CMS_CODE,
+        karyawanid: owlUsername || userId,
+      }, {
+        headers: { Authorization: `Bearer ${token}`},
       });
 
-      // API Shoots to Add Transaction
-      // Kalau ada field khusus dari API, ganti 'keterangan'
-      const payload = {
-        notrans: notrans,
-        jenisApproval: jenisApproval,
-        karyawanid: karyawanid,
-        keterangan: packageJSON,
-      };
+      await t.commit();
 
-      await dawApi.post("/approval/trans/add", payload, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-
-      return {
-        success: true,
-        notrans: notrans,
-        message: "Draf berhasil dikirim ke ERP DAW",
-      };
+      return { success: true, notrans: notrans};
     } catch (error) {
-      this._handleError(error, "createDraft");
+      await t.rollback();
+      this._handleError(error, "initiateApproval");
     }
   }
 
   // GET Queue List for Admin (GET Pending)
-  static async getPendingList(karyawanid, jenisApproval, token) {
+static async getPendingList(karyawanid, token) {
     try {
-      const payload = {
+      const response = await dawApi.post("/node/approval/trans/getData", {
         approver: karyawanid,
         jenisApproval: CMS_CODE,
-      };
-
-      const response = await dawApi.post("/approval/trans/getData", payload, {
+      }, {
         headers: { Authorization: `Bearer ${token}` },
       });
       return response.data;
@@ -86,20 +87,17 @@ class ErpApprovalService {
       this._handleError(error, "getPendingList");
     }
   }
-
+  
   // Execute Admin Decision (Approve/Reject)
   static async submitDecision(notrans, status, keterangan, token) {
-    try {
-      const payload = {
+   try {
+      const response = await dawApi.post("/node/approval/trans/submitApp", {
         notrans,
-        status, // "1" = Approve, "2" = Reject
+        status, // 1=Approve, 2=Reject
         keterangan: keterangan || "Processed via CMS",
-      };
-
-      const response = await dawApi.post("/approval/trans/submitApp", payload, {
+      }, {
         headers: { Authorization: `Bearer ${token}` },
       });
-
       return response.data;
     } catch (error) {
       this._handleError(error, "submitDecision");
