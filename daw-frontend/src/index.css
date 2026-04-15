@@ -194,29 +194,51 @@
 }
 
 /* --- 5. THE NUCLEAR RESET (Pusat Kendali Teks) --- */
+/* 1. Paksa Container & Semua Anak Cucunya */
 .prose,
 .daw-editorial-content,
-.prose *,
-.daw-editorial-content * {
-  /* 1. Hancurkan Rata Kanan (Justify) */
+.prose p,
+.prose span,
+.prose div,
+.prose h1,
+.prose h2,
+.prose h3,
+.prose li {
+  /* MATIKAN JUSTIFY: Paksa rata kiri total */
   text-align: left !important;
 
-  /* 2. Kunci Kata (Dilarang potong huruf di tengah kata) */
+  /* ANTI POTONG HURUF: Kata harus utuh ke bawah */
   word-break: normal !important;
-  word-wrap: normal !important;
+  overflow-wrap: break-word !important; /* Pindah ke baris baru kalau kata gak muat */
 
-  /* 3. Matikan Pemenggalan (Anti "busi-ness") */
+  /* MATIKAN HYPHENS: Anti tanda hubung (busi-ness) */
   hyphens: none !important;
   -webkit-hyphens: none !important;
   -moz-hyphens: none !important;
-  -ms-hyphens: none !important;
 
-  /* 4. Bungkus Teks (Biar nggak lewat layar) */
-  /* Kita pakai 'break-word', JANGAN 'anywhere' karena anywhere suka potong huruf */
-  overflow-wrap: break-word !important;
+  /* RECOVERY: Pastikan spasi antar kata tetap normal */
+  white-space: normal !important;
+}
 
-  /* 5. Jaga Lebar */
+/* 2. Fix Khusus React Quill (Span sering bikin masalah) */
+.prose span {
+  display: inline; /* Jangan biarkan span jadi block */
+  word-break: normal !important;
+}
+
+/* 3. Override Class Bawaan Quill yang Justify */
+.ql-align-justify {
+  text-align: left !important; /* Paksa justify jadi left */
+}
+
+/* 4. Fix Video & Image agar tidak merusak layout */
+.prose img,
+.prose iframe {
   max-width: 100% !important;
+  height: auto !important;
+  display: block;
+  margin-left: 0 !important; /* Pastikan nempel kiri */
+  margin-right: auto !important;
 }
 
 /* --- 6. FIX KHUSUS SPAN & INLINE STYLE --- 
@@ -226,4 +248,17 @@
 .daw-editorial-content span {
   display: inline !important; /* Mencegah span jadi block yang merusak aliran teks */
   word-break: keep-all !important; /* Tambahan perlindungan agar kata tetap utuh */
+}
+
+/* Tambahkan/Update di CSS kamu */
+.prose p {
+  word-break: normal !important;
+  overflow-wrap: anywhere !important; /* Gunakan anywhere sebagai fallback yang lebih aman */
+  hyphens: none !important;
+}
+
+/* Khusus untuk teks dari Quill yang sering membungkus kata di dalam span */
+.prose span {
+  display: inline;
+  white-space: normal;
 }
