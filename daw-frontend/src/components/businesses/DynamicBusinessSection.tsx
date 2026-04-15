@@ -59,21 +59,28 @@ const DynamicBusinessSection = memo(function DynamicBusinessSection({
             <ScrollReveal direction="up" delay={150}>
               <div
                 className={[
-                  // 1. Layout Base
-                  "w-full max-w-none min-w-0 selection:bg-[#004B23] selection:text-white",
+                  // 1. Container & Layout (Jangan lupa min-w-0 agar Grid tidak Error)
+                  "w-full min-w-0 max-w-[65ch] text-left selection:bg-[#004B23] selection:text-white",
+                  "prose prose-lg md:prose-xl max-w-none daw-editorial-content",
 
-                  // 2. Typography Engine (Gunakan class custom kita)
-                  "prose prose-lg md:prose-xl daw-editorial-content",
+                  "break-words whitespace-normal", // Pakai ini, jangan break-all!
 
-                  // 3. Kosmetik Headings (Tailwind 4 syntax)
-                  "prose-headings:font-serif prose-headings:font-bold prose-headings:tracking-tight",
+                  // 3. Prose Global
+                  "prose prose-lg md:prose-xl max-w-none",
+
+                  // 4. Typography styling (Kosmetik)
+                  "prose-headings:font-serif prose-headings:font-bold prose-headings:tracking-tight prose-headings:mb-5 prose-headings:mt-8",
                   "prose-h2:text-transparent prose-h2:bg-clip-text prose-h2:bg-gradient-to-r prose-h2:from-[#004B23] prose-h2:to-[#10B981]",
+                  "prose-h3:text-slate-800",
+                  "prose-p:mb-6 prose-p:font-sans prose-p:font-normal prose-p:text-slate-600 prose-p:leading-[1.85] prose-p:!text-left",
 
-                  // 4. Reset Paragraph (Minimalis saja karena sudah dihandle CSS)
-                  "prose-p:text-slate-600 prose-p:leading-relaxed",
+                  // 5. Image & Interactive
+                  "[&_img]:rounded-2xl [&_img]:shadow-md [&_img]:transition-all [&_img]:duration-700 hover:[&_img]:scale-[1.02]",
+                  "prose-strong:font-bold prose-strong:text-slate-900",
+                  "prose-a:font-semibold prose-a:text-daw-green hover:prose-a:text-emerald-500",
                 ].join(" ")}
                 dangerouslySetInnerHTML={{
-                  __html: data.htmlContent,
+                  __html: data.htmlContent.replace(/&nbsp;|\u00A0/g, " "),
                 }}
               />
             </ScrollReveal>
