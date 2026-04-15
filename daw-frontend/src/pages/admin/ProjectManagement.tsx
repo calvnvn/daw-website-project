@@ -25,6 +25,8 @@ interface AdminProject {
   author: string;
   createdAt: string;
   views: number;
+  is_locked: boolean;
+  lock_ticket: string | null;
 }
 
 export default function ProjectManagement() {
@@ -243,8 +245,7 @@ export default function ProjectManagement() {
           <select
             className="w-full pl-10 pr-8 py-2.5 bg-white border border-slate-200 rounded-lg appearance-none focus:outline-none focus:ring-2 focus:ring-daw-green/20 focus:border-daw-green cursor-pointer text-slate-700"
             value={filterCategory}
-            onChange={(e) => setFilterCategory(e.target.value)}
-          >
+            onChange={(e) => setFilterCategory(e.target.value)}>
             <option value="All">Semua Kategori</option>
             {sections.map((sec) => (
               <option key={sec.id} value={sec.id}>
@@ -278,8 +279,7 @@ export default function ProjectManagement() {
                 <tr>
                   <td
                     colSpan={5}
-                    className="px-6 py-12 text-center text-slate-500"
-                  >
+                    className="px-6 py-12 text-center text-slate-500">
                     Loading projects...
                   </td>
                 </tr>
@@ -288,8 +288,7 @@ export default function ProjectManagement() {
                 filteredProjects.map((project) => (
                   <tr
                     key={project.id}
-                    className="hover:bg-slate-50/80 transition-colors group"
-                  >
+                    className="hover:bg-slate-50/80 transition-colors group">
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-3">
                         <div className="w-10 h-10 rounded bg-slate-100 flex items-center justify-center shrink-0 border border-slate-200">
@@ -334,8 +333,7 @@ export default function ProjectManagement() {
                           project.status === "Published"
                             ? "bg-green-100 text-green-700 border border-green-200"
                             : "bg-amber-100 text-amber-700 border border-amber-200"
-                        }`}
-                      >
+                        }`}>
                         {project.status}
                       </button>
                     </td>
@@ -362,8 +360,7 @@ export default function ProjectManagement() {
                           target="_blank"
                           rel="noopener noreferrer"
                           className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
-                          title="View Article Live"
-                        >
+                          title="View Article Live">
                           <Eye className="w-4 h-4" />
                         </Link>
 
@@ -371,8 +368,7 @@ export default function ProjectManagement() {
                         <Link
                           to={`/admin/projects/edit/${project.id}`}
                           className="p-2 text-slate-400 hover:text-daw-green hover:bg-green-50 rounded-lg transition-colors inline-block"
-                          title="Edit Article"
-                        >
+                          title="Edit Article">
                           <Edit className="w-4 h-4" />
                         </Link>
                         {/* --- DELETE ACTION --- */}
@@ -381,8 +377,7 @@ export default function ProjectManagement() {
                             handleDeleteRequest(project.id, project.title)
                           } //  Panggil fungsi trigger
                           className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all"
-                          title="Delete Record"
-                        >
+                          title="Delete Record">
                           <Trash2 className="w-4 h-4" />
                         </button>
                       </div>

@@ -106,7 +106,6 @@ exports.getOriginalData = async (req, res) => {
 };
 
 // --- PRIVATE HELPERS (MAINTAINABILITY) ---
-
 /**
  * 1. MAPPING MODEL
  * Menghubungkan nama modul dari OWL ke Model Sequelize kita

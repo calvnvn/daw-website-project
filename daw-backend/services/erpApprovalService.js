@@ -1,6 +1,7 @@
 const axios = require("axios");
 const ApprovalDraft = require("../models/ApprovalDraft");
 const sequelize = require("../config/database");
+const { generateNotrans } = require("../utils/notransGenerator");
 
 const CMS_CODE = process.env.CMS_APPROVAL_CODE;
 
@@ -19,24 +20,6 @@ class ErpApprovalService {
     );
   }
 
-  // GET Nomor Tiket (Queue)
-  static async getApprovalNumber(token) {
-    try {
-      const response = await dawApi.post(
-        "/node/tools/noapproval",
-        { jenisApproval: CMS_CODE },
-        { headers: { Authorization: `Bearer ${token}` } },
-      );
-      return response.data.data;
-
-      //   Testing: Fake Ticket
-      //   console.log("⚠️ [DEBUG] Tiket Dummy");
-      //   return `DUMMY/APP/${new Date().getTime()}`;
-    } catch (error) {
-      this._handleError(error, "getApprovalNumber");
-    }
-  }
-
   // Reference-Based Approval. Simpan konten di SQL, send nomor ke API DAW
   static async initiateApproval({
     model,
@@ -50,24 +33,25 @@ class ErpApprovalService {
     const t = await sequelize.transaction();
 
     try {
-      // GET notrans from OWL
-      const notrans = await this.getApprovalNumber(token);
+      // GENERATE notrans
+      const notrans = generateNotrans(model.name);
+      console.log(`>>> [APPROVAL] Generated Local Notrans: ${notrans}`);
 
-      // Save content to Local ApprovalDrafts Table
+      // Save content to ApprovalDrafts Table (Status: Pending)
       await ApprovalDraft.create(
         {
           notrans: notrans,
           module_name: model.name,
           target_id: String(targetId),
           action: action,
-          payload: payload, // JSON draf revisi
+          payload: payload,
           created_by: owlUsername || userId,
           status: "Pending",
         },
         { transaction: t },
       );
 
-      // Locking
+      // Locking Data Asli
       if (action !== "CREATE" && targetId) {
         await model.update(
           { is_locked: true, lock_ticket: notrans },
@@ -88,11 +72,28 @@ class ErpApprovalService {
       );
 
       await t.commit();
+      console.log(
+        `>>> [APPROVAL SUCCESS] Tiket ${notrans} berhasil didaftarkan.`,
+      );
 
       return { success: true, notrans: notrans };
     } catch (error) {
       await t.rollback();
       this._handleError(error, "initiateApproval");
+    }
+  }
+
+  // GET Nomor Tiket [GAKEPAKE TAPI BUAT JAGA JAGA]
+  static async getApprovalNumber(token) {
+    try {
+      const response = await dawApi.post(
+        "/node/tools/noapproval",
+        { jenisApproval: CMS_CODE },
+        { headers: { Authorization: `Bearer ${token}` } },
+      );
+      return response.data.data;
+    } catch (error) {
+      this._handleError(error, "getApprovalNumber");
     }
   }
 
