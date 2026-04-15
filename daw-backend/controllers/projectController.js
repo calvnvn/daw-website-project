@@ -95,7 +95,7 @@ exports.createProject = async (req, res) => {
     };
 
     // --- 2. GATEKEEPER LOGIC ---
-    if (req.userRole === "Editor" && status === "Published") {
+    if (req.userRole?.toLowerCase() === "editor" && status === "Published") {
       const result = await ErpApprovalService.initiateApproval({
         model: Project,
         targetId: null,
@@ -234,12 +234,10 @@ exports.deleteProject = async (req, res) => {
       .json({ message: "Project and associated files deleted permanently!" });
   } catch (error) {
     console.error("🚨 Error DELETE Project:", error);
-    res
-      .status(500)
-      .json({
-        message: "Failed to process delete request.",
-        error: error.message,
-      });
+    res.status(500).json({
+      message: "Failed to process delete request.",
+      error: error.message,
+    });
   }
 };
 
