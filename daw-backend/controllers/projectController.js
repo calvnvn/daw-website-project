@@ -95,41 +95,33 @@ exports.createProject = async (req, res) => {
     };
 
     // --- 2. GATEKEEPER LOGIC ---
-    if (req.userRole?.toLowerCase() === "editor" && status === "Published") {
-      console.log(">>> [PROJECT] JALUR EDITOR: REQUESTING CREATE PERMISSION <<<");
-
-      const tokenOWL = req.headers["authorization"]?.split(" ")[1];
-      if (!tokenOWL) {
-        return res.status(401).json({ message: "Akses ditolak: Token OWL tidak ditemukan." });
-      }
-
+    if (req.userRole === "Editor" && status === "Published") {
       const result = await ErpApprovalService.initiateApproval({
         model: Project,
-        targetId: null,
-        action: "CREATE", 
+        targetId: null, 
+        action: "CREATE",
         payload: projectData,
         userId: req.userId,
         owlUsername: req.owl_username,
-        token: tokenOWL
+        token: req.owl_token // decoded token middleware 
       });
 
-      return res.status(202).json({ 
-        message: "Permintaan penambahan proyek baru telah dikirim ke OWL.", 
-        ticket: result.notrans 
+      return res.status(202).json({
+        message: "Permintaan publish sedang diproses di OWL.",
+        ticket: result.notrans
       });
     }
 
-    // JALUR SUPERADMIN / EDITOR SAVE AS DRAFT
-    // Logic: Jika Editor cuma klik 'Save Draft', dia bypass OWL dan langsung simpan ke MySQL lokal.
+    // Jalur Superadmin ATAU Editor yang cuma save Draft
+    // CMS Buta: Superadmin nggak perlu tau layer OWL ada berapa.
     console.log(">>> [PROJECT] JALUR DIRECT: CREATING LOCAL RECORD <<<");
-
     const newProject = await Project.create(projectData);
-
-    res.status(201).json({
-      message: "Proyek berhasil dibuat di database lokal!",
-      data: newProject,
+    
+    return res.status(201).json({
+      message: "Proyek berhasil disimpan secara langsung.",
+      data: newProject
     });
-
+    
   } catch (error) {
     console.error("🚨 Error CREATE Project:", error);
     res.status(500).json({ message: "Gagal membuat proyek.", error: error.message });
@@ -158,12 +150,17 @@ exports.uploadInlineImage = async (req, res) => {
 exports.deleteProject = async (req, res) => {
   try {
     const { id } = req.params;
-    
-    // 1. Cari data asli
     const project = await Project.findByPk(id);
     if (!project) return res.status(404).json({ message: "Project not found" });
 
-    // --- JALUR EDITOR: REQUEST APPROVAL (Reference-Based) ---
+    if (project.is_locked) {
+      return res.status(423).json({ 
+        message: "Data terkunci karena sedang dalam proses approval. Batalkan tiket di OWL terlebih dahulu.",
+        ticket: project.lock_ticket 
+      });
+    }
+
+    // Editor Flow
     if (req.userRole && req.userRole.toLowerCase() === "editor") {
       console.log(`>>> [PROJECT] JALUR EDITOR: REQUESTING DELETE FOR ID: ${id} <<<`);
 
@@ -251,6 +248,8 @@ exports.getProjectById = async (req, res) => {
 exports.updateProject = async (req, res) => {
   try {
     const { id } = req.params;
+    console.log("DEBUG ROLE:", req.userRole); 
+    console.log("DEBUG USER ID:", req.userId);
     const {
       title,
       slug,
@@ -266,6 +265,12 @@ exports.updateProject = async (req, res) => {
     // Cari data lama (Gak perlu raw query, cukup findByPk)
     const project = await Project.findByPk(id);
     if (!project) return res.status(404).json({ message: "Project not found" });
+    if (project.is_locked) {
+      return res.status(423).json({ 
+        message: "Data sedang dalam proses approval di OWL dan terkunci.",
+        ticket: project.lock_ticket 
+      });
+    }
 
     // Olah Gallery
     let finalGallery = [];
@@ -313,16 +318,11 @@ exports.updateProject = async (req, res) => {
     } else if (title && title !== project.title) {
       finalSlug = await generateUniqueProjectSlug(title, id);
     }
-    // Gatekeeper: Pemisahan Logic Flow
-    // JALUR EDITOR: Minta Publish (Workflow Reference-Based)
-    if (
-      req.userRole &&
-      req.userRole.toLowerCase() === "editor" &&
-      status === "Published"
-    ) {
+
+    const userRole = req.userRole?.toLowerCase();
+    if (userRole === "editor" && status === "Published") {
       console.log(">>> [PROJECT] JALUR EDITOR: INITIATING WORKFLOW <<<");
 
-      // Siapkan data yang akan "parkir" di tabel ApprovalDrafts lokal
       const packageContent = {
         title: title || project.title,
         slug: finalSlug,
@@ -336,14 +336,6 @@ exports.updateProject = async (req, res) => {
         meta_description: meta_description || project.meta_description,
       };
 
-      const tokenOWL = req.headers["authorization"]?.split(" ")[1];
-      if (!tokenOWL) {
-        return res
-          .status(401)
-          .json({ message: "Akses ditolak: Token OWL tidak ditemukan." });
-      }
-
-      // Fungsi ini akan handle: Get Notrans -> Simpan Draf Lokal -> Gembok Project -> Add Record ke OWL
       const result = await ErpApprovalService.initiateApproval({
         model: Project,
         targetId: id,
@@ -351,21 +343,21 @@ exports.updateProject = async (req, res) => {
         payload: packageContent,
         userId: req.userId,
         owlUsername: req.owl_username,
-        token: tokenOWL
+        token: req.owl_token // Pastikan middleware nyimpen ini
       });
 
       return res.status(202).json({
-        message: "Draf proyek berhasil diajukan dan data telah dikunci.",
+        message: "Revisi diajukan ke OWL. Data asli dikunci.",
         ticket: result.notrans
       });
     }
 
-    // JALUR SUPERADMIN / EDITOR SIMPAN DRAFT LOKAL
+    // ⚡ JALUR SUPERADMIN ATAU EDITOR SIMPAN DRAFT
     console.log(">>> [PROJECT] JALUR DIRECT: UPDATING LOCAL DATABASE <<<");
 
-    // Jika Editor simpan draf, kita tidak hapus file lama dulu (karena belum final)
-    // Tapi jika Admin yang update, baru kita hapus file lamanya
-    if (req.userRole && req.userRole.toLowerCase() !== "editor") {
+    // HANYA hapus file fisik jika yang melakukan adalah Superadmin 
+    // atau jika Editor menyimpan sebagai Draft (dan memang ada file yang diganti)
+    if (userRole === "superadmin" || (userRole === "editor" && status === "Draft")) {
       filesToDelete.forEach((file) => deleteSingleFile(file));
       if (oldCoverToDelete) deleteSingleFile(oldCoverToDelete);
     }
@@ -381,15 +373,12 @@ exports.updateProject = async (req, res) => {
       gallery: finalGallery,
       seo_title: seo_title || project.seo_title,
       meta_description: meta_description || project.meta_description,
-      is_locked: false,
+      is_locked: false, // Pastikan tidak terkunci
       lock_ticket: null,
     });
 
     res.status(200).json({
-      message:
-        status === "Draft"
-          ? "Draf proyek berhasil disimpan di workspace lokal!"
-          : "Project berhasil diupdate secara langsung!",
+      message: status === "Draft" ? "Draf berhasil disimpan." : "Update berhasil di-commit langsung."
     });
 
   } catch (error) {

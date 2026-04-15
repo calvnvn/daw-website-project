@@ -2,7 +2,8 @@ const sequelize = require("../config/database");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const axios = require("axios"); // Tambahkan ini
-const User = require("../models/User");
+const User = require("../models/User")
+const Role = require("../models/Role")
 const { Op } = require("sequelize");
 
 // 🛠️ HELPER: Mapping Permission sesuai request lo
@@ -57,38 +58,49 @@ exports.login = async (req, res) => {
 
       // Jika OWL sukses, kita dapet data user dan token dari sana
       const owlData = owlResponse.data; 
-      // Anggap strukturnya: { success: true, token: "...", data: { username: "bcs.dev", ... } }
 
-      // 2. Sinkronisasi dengan Database Lokal CMS
-      // Kita cari user berdasarkan owl_username.
-      let user = await User.findOne({ where: { owl_username: uname } });
+      let user = await User.findOne({ 
+        where: { owl_username: uname },
+        include: [{ 
+          model: Role, 
+          as: 'roleData' 
+        }]
+      });
 
       if (!user) {
-        // Opsi: Kalau user OWL belum terdaftar di CMS, kita tolak atau buatkan otomatis.
-        // Di sini kita tolak dulu biar Jap aman (hanya user terdaftar yang bisa login).
         return res.status(403).json({ message: "User OWL terverifikasi, tapi tidak memiliki akses ke CMS DAW." });
       }
 
-      const permissions = getPermissionsByRole(user.role);
-      // 3. Generate Token Lokal CMS (Isinya data gabungan)
+      if (!user.roleData) {
+        console.error(`🚨 [AUTH ERROR] User ${uname} gapunya roleId yang valid di DB!`);
+        return res.status(500).json({ message: "User role configuration error." });
+      }
+
+      const actualRole = user.roleData.name;
+      console.log(`>>> [AUTH] User ${uname} detected as: ${actualRole}`);
+
+      const permissions = getPermissionsByRole(actualRole);
+
+      // --- 4. GENERATE TOKEN DENGAN ROLE YANG BENER ---
       const cmsToken = jwt.sign(
         { 
           id: user.id, 
           name: user.name, 
           owl_username: user.owl_username, 
-          role: user.role, 
+          role: actualRole, 
           permissions: permissions,
           owl_token: owlData.token 
         },
         process.env.JWT_SECRET,
         { expiresIn: "24h" }
       );
+
       return res.status(200).json({
         message: "Login Berhasil via OWL!",
         token: cmsToken,
         user: {
           name: user.name,
-          role: user.role,
+          role: actualRole, 
           permissions: permissions
         }
       });
