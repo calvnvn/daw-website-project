@@ -20,26 +20,33 @@ class ErpApprovalService {
   }
 
   // GET Nomor Tiket (Queue)
-  static async getApprovalNumber(jenisApproval, token) {
+  static async getApprovalNumber(token) {
     try {
-    const response = await dawApi.post(
-      "/node/tools/noapproval",
-      { jenisApproval: CMS_CODE },
-      { headers: { Authorization: `Bearer ${token}` } }
-    );
-    return response.data.data;
+      const response = await dawApi.post(
+        "/node/tools/noapproval",
+        { jenisApproval: CMS_CODE },
+        { headers: { Authorization: `Bearer ${token}` } },
+      );
+      return response.data.data;
 
-  //   Testing: Fake Ticket
-  //   console.log("⚠️ [DEBUG] Tiket Dummy");
-  //   return `DUMMY/APP/${new Date().getTime()}`; 
-
-  } catch (error) {
-    this._handleError(error, "getApprovalNumber");
+      //   Testing: Fake Ticket
+      //   console.log("⚠️ [DEBUG] Tiket Dummy");
+      //   return `DUMMY/APP/${new Date().getTime()}`;
+    } catch (error) {
+      this._handleError(error, "getApprovalNumber");
+    }
   }
-}
 
   // Reference-Based Approval. Simpan konten di SQL, send nomor ke API DAW
-  static async initiateApproval({ model, targetId,action, payload, userId, owlUsername, token}) {
+  static async initiateApproval({
+    model,
+    targetId,
+    action,
+    payload,
+    userId,
+    owlUsername,
+    token,
+  }) {
     const t = await sequelize.transaction();
 
     try {
@@ -47,35 +54,42 @@ class ErpApprovalService {
       const notrans = await this.getApprovalNumber(token);
 
       // Save content to Local ApprovalDrafts Table
-      await ApprovalDraft.create({
-        notrans: notrans, 
-        module_name: model.name,
-        target_id: targetId,
-        action: action,
-        payload: payload, // JSON draf revisi
-        created_by: owlUsername || userId,
-        status: "Pending"
-      }, { transaction: t});
+      await ApprovalDraft.create(
+        {
+          notrans: notrans,
+          module_name: model.name,
+          target_id: String(targetId),
+          action: action,
+          payload: payload, // JSON draf revisi
+          created_by: owlUsername || userId,
+          status: "Pending",
+        },
+        { transaction: t },
+      );
 
       // Locking
       if (action !== "CREATE" && targetId) {
-      await model.update(
-        { is_locked: true, lock_ticket: notrans },
-        { where: { id: targetId }, transaction: t }
-      );
-    }
+        await model.update(
+          { is_locked: true, lock_ticket: notrans },
+          { where: { id: targetId }, transaction: t },
+        );
+      }
 
-      await dawApi.post("/node/approval/trans/add", {
-        notrans: notrans,
-        jenisApproval: CMS_CODE,
-        karyawanid: owlUsername || userId,
-      }, {
-        headers: { Authorization: `Bearer ${token}`},
-      });
+      await dawApi.post(
+        "/node/approval/trans/add",
+        {
+          notrans: notrans,
+          jenisApproval: CMS_CODE,
+          karyawanid: owlUsername || userId,
+        },
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        },
+      );
 
       await t.commit();
 
-      return { success: true, notrans: notrans};
+      return { success: true, notrans: notrans };
     } catch (error) {
       await t.rollback();
       this._handleError(error, "initiateApproval");
@@ -83,30 +97,38 @@ class ErpApprovalService {
   }
 
   // GET Queue List for Admin (GET Pending)
-static async getPendingList(karyawanid, token) {
+  static async getPendingList(karyawanid, token) {
     try {
-      const response = await dawApi.post("/node/approval/trans/getData", {
-        approver: karyawanid,
-        jenisApproval: CMS_CODE,
-      }, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      const response = await dawApi.post(
+        "/node/approval/trans/getData",
+        {
+          approver: karyawanid,
+          jenisApproval: CMS_CODE,
+        },
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        },
+      );
       return response.data;
     } catch (error) {
       this._handleError(error, "getPendingList");
     }
   }
-  
+
   // Execute Admin Decision (Approve/Reject)
   static async submitDecision(notrans, status, keterangan, token) {
-   try {
-      const response = await dawApi.post("/node/approval/trans/submitApp", {
-        notrans,
-        status, // 1=Approve, 2=Reject
-        keterangan: keterangan || "Processed via CMS",
-      }, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+    try {
+      const response = await dawApi.post(
+        "/node/approval/trans/submitApp",
+        {
+          notrans,
+          status, // 1=Approve, 2=Reject
+          keterangan: keterangan || "Processed via CMS",
+        },
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        },
+      );
       return response.data;
     } catch (error) {
       this._handleError(error, "submitDecision");

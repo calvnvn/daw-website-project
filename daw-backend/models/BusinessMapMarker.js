@@ -37,7 +37,16 @@ const BusinessMapMarker = sequelize.define(
       type: DataTypes.STRING(255),
       allowNull: false,
     },
-  }, // <--- Koma di sini wajib ada!
+    // 🚀 TAMBAHKAN DUA KOLOM INI:
+    is_locked: {
+      type: DataTypes.BOOLEAN,
+      defaultValue: false,
+    },
+    lock_ticket: {
+      type: DataTypes.STRING(255),
+      allowNull: true,
+    },
+  },
   {
     tableName: "BusinessMapMarkers",
     timestamps: true,

@@ -2,14 +2,14 @@ const sequelize = require("../config/database");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const axios = require("axios"); // Tambahkan ini
-const User = require("../models/User")
-const Role = require("../models/Role")
+const User = require("../models/User");
+const Role = require("../models/Role");
 const { Op } = require("sequelize");
 
 // 🛠️ HELPER: Mapping Permission sesuai request lo
 function getPermissionsByRole(role) {
   const common = ["dashboard"];
-  
+
   // Menu yang bisa diakses Editor & Superadmin
   const editorContent = [
     "manage_inbox",
@@ -24,21 +24,21 @@ function getPermissionsByRole(role) {
 
   if (role === "Superadmin") {
     return [
-      ...common, 
-      ...editorContent, 
+      ...common,
+      ...editorContent,
       "manage_approvals", // Read-only mode di UI
-      "manage_users"      // Akses User & Roles
+      "manage_users", // Akses User & Roles
     ];
   }
-  
+
   if (role === "Editor") {
     return [...common, ...editorContent];
   }
-  
+
   if (role === "Approver") {
     return ["dashboard", "manage_approvals"];
   }
-  
+
   return ["dashboard"];
 }
 
@@ -49,31 +49,61 @@ exports.login = async (req, res) => {
 
     // 1. Tembak API OWL (Server DAW API) buat Verifikasi
     console.log(`>>> [AUTH] Verifying ${uname} via OWL ERP...`);
-    
+
     try {
-      const owlResponse = await axios.post("https://erp-aziz.daw.co.id/node/auth/login", {
-        uname: uname,
-        password: password
-      });
+      const owlResponse = await axios.post(
+        "https://erp-aziz.daw.co.id/node/auth/login",
+        {
+          uname: uname,
+          password: password,
+        },
+      );
 
       // Jika OWL sukses, kita dapet data user dan token dari sana
-      const owlData = owlResponse.data; 
+      console.log(
+        ">>> [DEBUG] FULL OWL RESPONSE:",
+        JSON.stringify(owlResponse.data, null, 2),
+      );
+      const owlData = owlResponse.data;
 
-      let user = await User.findOne({ 
+      // 🚀 DISINI PERUBAHANNYA: Mas Umar ngasih token di field 'data'
+      const tokenDiterima = owlData.data;
+
+      console.log(
+        ">>> [DEBUG AUTH] OWL TOKEN RECEIVED:",
+        tokenDiterima ? "YES" : "NO",
+      );
+
+      if (!tokenDiterima || owlData.error) {
+        return res.status(401).json({
+          message: "Gagal mendapatkan akses dari OWL. Pastikan akun aktif!",
+        });
+      }
+
+      let user = await User.findOne({
         where: { owl_username: uname },
-        include: [{ 
-          model: Role, 
-          as: 'roleData' 
-        }]
+        include: [
+          {
+            model: Role,
+            as: "roleData",
+          },
+        ],
       });
 
       if (!user) {
-        return res.status(403).json({ message: "User OWL terverifikasi, tapi tidak memiliki akses ke CMS DAW." });
+        return res.status(403).json({
+          message:
+            "User OWL terverifikasi, tapi tidak memiliki akses ke CMS DAW.",
+        });
       }
 
       if (!user.roleData) {
-        console.error(`🚨 [AUTH ERROR] User ${uname} gapunya roleId yang valid di DB!`);
-        return res.status(500).json({ message: "User role configuration error." });
+        console.error(
+          `🚨 [AUTH ERROR] User ${uname} gapunya roleId yang valid di DB!`,
+        );
+        return res
+          .status(500)
+          .json({ message: "User role configuration error." });
       }
 
       const actualRole = user.roleData.name;
@@ -83,16 +113,16 @@ exports.login = async (req, res) => {
 
       // --- 4. GENERATE TOKEN DENGAN ROLE YANG BENER ---
       const cmsToken = jwt.sign(
-        { 
-          id: user.id, 
-          name: user.name, 
-          owl_username: user.owl_username, 
-          role: actualRole, 
+        {
+          id: user.id,
+          name: user.name,
+          owl_username: user.owl_username,
+          role: actualRole,
           permissions: permissions,
-          owl_token: owlData.token 
+          owl_token: tokenDiterima,
         },
         process.env.JWT_SECRET,
-        { expiresIn: "24h" }
+        { expiresIn: "24h" },
       );
 
       return res.status(200).json({
@@ -100,19 +130,20 @@ exports.login = async (req, res) => {
         token: cmsToken,
         user: {
           name: user.name,
-          role: actualRole, 
-          permissions: permissions
-        }
+          role: actualRole,
+          permissions: permissions,
+        },
       });
-
     } catch (owlError) {
-      console.error("❌ [OWL AUTH FAILED]:", owlError.response?.data || owlError.message);
-      return res.status(401).json({ 
+      console.error(
+        "❌ [OWL AUTH FAILED]:",
+        owlError.response?.data || owlError.message,
+      );
+      return res.status(401).json({
         message: "Gagal Login: Username atau Password OWL salah!",
-        detail: owlError.response?.data?.message
+        detail: owlError.response?.data?.message,
       });
     }
-
   } catch (error) {
     console.error("🚨 [AUTH CRASH]:", error.message);
     res.status(500).json({ message: "Internal Server Error" });
@@ -123,7 +154,7 @@ exports.login = async (req, res) => {
 exports.getMe = async (req, res) => {
   try {
     const user = await User.findByPk(req.userId, {
-      include: [{ model: Role, as: 'roleData' }] 
+      include: [{ model: Role, as: "roleData" }],
     });
     if (!user) return res.status(404).json({ message: "User not found." });
     const actualRole = user.roleData ? user.roleData.name : user.role;
@@ -133,7 +164,7 @@ exports.getMe = async (req, res) => {
       id: user.id,
       name: user.name,
       email: user.email,
-      role: actualRole, 
+      role: actualRole,
       permissions: permissions,
       status: user.status,
     });
