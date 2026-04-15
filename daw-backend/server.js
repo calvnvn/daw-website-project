@@ -31,7 +31,7 @@ const approvalRoutes = require("./routes/approvalRoutes");
 
 // --- 3. MODELS IMPORT ---
 const User = require("./models/User");
-// const Role = require("./models/Role");
+const Role = require("./models/Role");
 // const Permission = require("./models/Permission");
 // const RolePermission = require("./models/RolePermission");
 const Project = require("./models/Project");
@@ -165,8 +165,8 @@ try {
 // DATABASE ASSOCIATIONS (Relationships)
 
 // // 1. User & Role Relations
-// Role.hasMany(User, { foreignKey: "roleId", as: "users" });
-// User.belongsTo(Role, { foreignKey: "roleId", as: "roleData" });
+Role.hasMany(User, { foreignKey: "roleId", as: "users" });
+User.belongsTo(Role, { foreignKey: "roleId", as: "roleData" });
 
 // // 2. Role & Permission Relations (Many-to-Many)
 // Role.belongsToMany(Permission, {

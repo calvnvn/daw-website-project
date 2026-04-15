@@ -4,7 +4,7 @@ import { Mail, Lock, Eye, EyeOff, ArrowRight, ShieldCheck } from "lucide-react";
 import { toast } from "sonner";
 import logoDaw from "@/assets/logo-daw.png";
 import bgImage from "@/assets/hero-bg.jpg";
-import { dawApi } from "@/lib/api";
+import api from "@/lib/api";
 import { Link } from "react-router-dom";
 import { useSettings } from "@/contexts/SettingsContext";
 import { getCleanImageUrl } from "@/lib/utils";
@@ -38,55 +38,38 @@ export default function Login() {
     setIsLoading(true);
 
     try {
-      const response = await dawApi.post("/auth/login", {
+      // const response = await dawApi.post("/auth/login", {
+      //   uname: email,
+      //   password: password,
+      // });
+
+      // Ganti dawApi (OWL) jadi api (Backend Lokal lo)
+      const response = await api.post("/auth/login", { 
         uname: email,
         password: password,
       });
 
-      const resData = response.data; // Structure: { error: boolean, response: string, data: string }
-
+      const resData = response.data; 
       if (resData.error) {
         throw new Error(
           resData.response || "Token tidak diterima dari server.",
         );
       }
 
-      const token = resData.data; // JWT String
+      const token = resData.token; 
 
       if (token) {
-        // Decode JWT to Extract User Identity
-        // The server is stateless, so extract name and role from the token payload
         const decoded: any = jwtDecode(token);
 
         const userData = {
-          id: decoded.userid,
-          name: decoded.name,
-          email: decoded.email || email,
-          role: decoded.role,
-          permissions:
-            decoded.role === "admin"
-              ? [
-                  "manage_projects",
-                  "manage_content",
-                  "manage_settings",
-                  "manage_homepage",
-                  "manage_businesses",
-                  "manage_about",
-                  "manage_inbox",
-                  "manage_investments",
-                  "manage_users",
-                ]
-              : [],
+          id: decoded.id, 
+          name: resData.user.name, 
+          email: email, 
+          role: decoded.role, 
+          permissions: resData.user.permissions,
         };
-
-        // Update Global Auth State
-        // login() handles localStorage and setting the 'user' state in AuthContext
         login(userData, token);
-
         toast.success(`Welcome back, ${decoded.name}!`);
-
-        // Intelligent Redirection
-        // Redirects user to their intended destination or default to /admin
         navigate(from, { replace: true });
       } else {
         toast.error("Authentication Error", {

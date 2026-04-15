@@ -18,22 +18,20 @@ class ErpApprovalService {
       `ERP DAW Error (${context}): ${error.response?.data?.message || error.message}`,
     );
   }
+
   // GET Nomor Tiket (Queue)
   static async getApprovalNumber(jenisApproval, token) {
     try {
-    // SEMENTARA: Komen bagian ini kalau server OWL belum siap (masih 401)
-    /*
     const response = await dawApi.post(
       "/node/tools/noapproval",
       { jenisApproval: CMS_CODE },
       { headers: { Authorization: `Bearer ${token}` } }
     );
     return response.data.data;
-    */
 
-    // JALUR TESTING: Kasih nomor tiket bohongan
-    console.log("⚠️ [DEBUG] Menggunakan Tiket Dummy karena OWL masih 401");
-    return `DUMMY/APP/${new Date().getTime()}`; 
+  //   Testing: Fake Ticket
+  //   console.log("⚠️ [DEBUG] Tiket Dummy");
+  //   return `DUMMY/APP/${new Date().getTime()}`; 
 
   } catch (error) {
     this._handleError(error, "getApprovalNumber");

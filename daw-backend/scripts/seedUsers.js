@@ -1,24 +1,51 @@
-// Data yang dimasukkan ke tabel Users
-[
-  {
-    name: "IT Superadmin",
-    email: "it@daw.co.id",
-    owl_username: "bcs.dev", // Ini yang bakal nembak ke OWL beneran
-    password: "password123", // Password lokal buat jaga-jaga
-    role: "Superadmin",
-  },
-  {
-    name: "Editor Dummy",
-    email: "editor@daw.co.id",
-    owl_username: "editor.dev", // Dummy
-    password: "password123", // Selama development, kita bypass OWL pakai ini
-    role: "Editor",
-  },
-  {
-    name: "Approver Dummy",
-    email: "approver@daw.co.id",
-    owl_username: "approver.dev", // Dummy
-    password: "password123", // Selama development, kita bypass OWL pakai ini
-    role: "Approver",
-  },
-];
+// scripts/seedUsers.js
+const sequelize = require("../config/database");
+const Role = require("../models/Role");
+const User = require("../models/User");
+
+// 🚀 SUNTIKAN RELASI MANUAL (WAJIB ADA DI SINI)
+// Karena script ini jalan di luar server.js, kita harus ingetin lagi ke Sequelize
+Role.hasMany(User, { foreignKey: "roleId", as: "users" });
+User.belongsTo(Role, { foreignKey: "roleId", as: "roleData" });
+
+const seedDatabase = async () => {
+  try {
+    // 1. Alter: true memaksa Sequelize ngecek ulang kolom di MySQL
+    // Kalau roleId belum ada, dia bakal otomatis bikinin kolomnya.
+    await sequelize.sync({ alter: true }); 
+    console.log("✅ Database tables synced and updated.");
+
+    // Ambil Role Superadmin
+    const superadminRole = await Role.findOne({ where: { name: "Superadmin" } });
+
+    if (!superadminRole) {
+      console.log("❌ Role Superadmin belum ada, jalanin seed roles dulu!");
+      return;
+    }
+
+    const [user, created] = await User.findOrCreate({
+      where: { owl_username: "bcs.dev" },
+      defaults: {
+        name: "Superadmin Dev",
+        email: "it@daw.co.id",
+        roleId: superadminRole.id, 
+        status: "Active"
+      }
+    });
+
+    if (!created) {
+      user.roleId = superadminRole.id;
+      await user.save();
+      console.log("✅ User 'bcs.dev' updated with roleId.");
+    } else {
+      console.log("✅ User 'bcs.dev' created with roleId.");
+    }
+
+    process.exit(0);
+  } catch (error) {
+    console.error("❌ Seeding failed:", error);
+    process.exit(1);
+  }
+};
+
+seedDatabase();
