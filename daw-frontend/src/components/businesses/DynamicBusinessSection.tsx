@@ -4,8 +4,6 @@ import InteractiveMap, { type MapMarker } from "./InteractiveMap";
 import { useMemo, memo } from "react";
 import { useBusiness } from "@/contexts/BusinessContext";
 
-import { Link } from "react-router-dom";
-import { ArrowRight } from "lucide-react";
 export interface SectionData {
   id: string;
   category: string;
