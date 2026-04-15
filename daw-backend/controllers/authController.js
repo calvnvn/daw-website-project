@@ -122,16 +122,18 @@ exports.login = async (req, res) => {
 // 2. GET ME (Identitas Sesi)
 exports.getMe = async (req, res) => {
   try {
-    const user = await User.findByPk(req.userId);
+    const user = await User.findByPk(req.userId, {
+      include: [{ model: Role, as: 'roleData' }] 
+    });
     if (!user) return res.status(404).json({ message: "User not found." });
-
-    const permissions = getPermissionsByRole(user.role);
+    const actualRole = user.roleData ? user.roleData.name : user.role;
+    const permissions = getPermissionsByRole(actualRole);
 
     res.status(200).json({
       id: user.id,
       name: user.name,
       email: user.email,
-      role: user.role,
+      role: actualRole, 
       permissions: permissions,
       status: user.status,
     });

@@ -164,7 +164,7 @@ exports.deleteProject = async (req, res) => {
     if (req.userRole && req.userRole.toLowerCase() === "editor") {
       console.log(`>>> [PROJECT] JALUR EDITOR: REQUESTING DELETE FOR ID: ${id} <<<`);
 
-      const tokenOWL = req.headers["authorization"]?.split(" ")[1];
+      const tokenOWL = req.owl_token;
       if (!tokenOWL) {
         return res.status(401).json({ message: "Akses ditolak: Token OWL tidak ditemukan." });
       }

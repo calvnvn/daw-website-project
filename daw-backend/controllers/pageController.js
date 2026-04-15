@@ -121,7 +121,7 @@ exports.createPage = async (req, res) => {
 
     // Editor Flow
     if (req.userRole?.toLowerCase() === "editor" && status === "Published") {
-      const tokenOWL = req.headers["authorization"]?.split(" ")[1];
+      const tokenOWL = req.owl_token;
       const result = await ErpApprovalService.initiateApproval({
         model: Page,
         targetId: null,
@@ -183,7 +183,7 @@ exports.updatePage = async (req, res) => {
 
     // Editor Flow
     if (req.userRole?.toLowerCase() === "editor" && status === "Published") {
-      const tokenOWL = req.headers["authorization"]?.split(" ")[1];
+      const tokenOWL = req.owl_token;
       const result = await ErpApprovalService.initiateApproval({
         model: Page,
         targetId: id,
@@ -214,7 +214,7 @@ exports.deletePage = async (req, res) => {
 
     // Editor Flow
     if (req.userRole?.toLowerCase() === "editor") {
-      const tokenOWL = req.headers["authorization"]?.split(" ")[1];
+      const tokenOWL = req.owl_token;
       const result = await ErpApprovalService.initiateApproval({
         model: Page,
         targetId: id,

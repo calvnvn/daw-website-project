@@ -118,12 +118,6 @@ const MENU_GROUPS = [
         perm: "manage_users",
       },
       {
-        name: "Role Management",
-        path: "/admin/roles",
-        icon: Key,
-        perm: "manage_users",
-      },
-      {
         name: "Settings",
         path: "/admin/settings",
         icon: Settings,
@@ -222,24 +216,20 @@ export default function AdminLayout() {
    * Otherwise, we strictly check their specific permissions.
    */
   const filteredMenuGroups = useMemo(() => {
-    return MENU_GROUPS.map((group) => {
-      return {
-        ...group,
-        items: group.items.filter((item) => {
-          // 1. Dashboard/Public items (no perm required)
-          if (!item.perm) return true;
+  return MENU_GROUPS.map((group) => {
+    return {
+      ...group,
+      items: group.items.filter((item) => {
+        if (!item.perm) return true;
 
-          // 2. OWL Admin Bypass (The "Master Key")
-          // If the role from Mas Umar is "admin", show all menus.
-          if (user?.role === "admin") return true;
+        const isMasterAdmin = user?.role === "admin" || user?.role === "Superadmin";
+        if (isMasterAdmin) return true;
 
-          // 3. Specific Permission Check
-          // If not an admin, check if their permissions array has the required string.
-          return can(item.perm);
-        }),
-      };
-    }).filter((group) => group.items.length > 0); // Hide empty headers
-  }, [user, can]);
+        return can(item.perm);
+      }),
+    };
+  }).filter((group) => group.items.length > 0);
+}, [user, can]);
 
   return (
     <div className="h-[100dvh] bg-slate-50 flex font-sans text-slate-900 overflow-hidden">

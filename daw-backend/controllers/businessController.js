@@ -149,7 +149,7 @@ exports.updateBusinessSection = async (req, res) => {
       mapMarkers: mapMarkers || [], // Kirim seluruh array marker baru
     };
 
-    const tokenOWL = req.headers["authorization"]?.split(" ")[1];
+    const tokenOWL = req.owl_token;
 
     await ErpApprovalService.createDraft(
       {
@@ -269,7 +269,7 @@ exports.createBusinessSection = async (req, res) => {
 
     // Editor Flow
     if (req.userRole?.toLowerCase() === "editor" && status === "Published") {
-      const tokenOWL = req.headers["authorization"]?.split(" ")[1];
+      const tokenOWL = req.owl_token;
       
       const sectionData = {
         id: generatedId,
@@ -334,7 +334,7 @@ exports.deleteSection = async (req, res) => {
 
     // Editor Flow
     if (req.userRole?.toLowerCase() === "editor") {
-      const tokenOWL = req.headers["authorization"]?.split(" ")[1];
+      const tokenOWL = req.owl_token;
       
       const result = await ErpApprovalService.initiateApproval({
         model: BusinessSection,

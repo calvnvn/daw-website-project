@@ -106,7 +106,7 @@ exports.createMenu = async (req, res) => {
 
     // Editor Flow
     if (req.userRole?.toLowerCase() === "editor" && status === "Published") {
-      const tokenOWL = req.headers["authorization"]?.split(" ")[1];
+      const tokenOWL = req.owl_token;
       const result = await ErpApprovalService.initiateApproval({
         model: Menu,
         targetId: null, // Data baru belum ada ID
@@ -151,7 +151,7 @@ exports.updateMenu = async (req, res) => {
 
     // Editor Flow
     if (req.userRole?.toLowerCase() === "editor" && status === "Published") {
-      const tokenOWL = req.headers["authorization"]?.split(" ")[1];
+      const tokenOWL = req.owl_token;
       const result = await ErpApprovalService.initiateApproval({
         model: Menu,
         targetId: id,
@@ -180,7 +180,7 @@ exports.deleteMenu = async (req, res) => {
 
     // Editor Flow
     if (req.userRole?.toLowerCase() === "editor") {
-      const tokenOWL = req.headers["authorization"]?.split(" ")[1];
+      const tokenOWL = req.owl_token;
       const result = await ErpApprovalService.initiateApproval({
         model: Menu,
         targetId: id,
@@ -208,7 +208,7 @@ exports.reorderMenus = async (req, res) => {
 
     // --- JALUR EDITOR: BULK REORDER REQUEST ---
     if (req.userRole?.toLowerCase() === "editor") {
-      const tokenOWL = req.headers["authorization"]?.split(" ")[1];
+      const tokenOWL = req.owl_token;
       
       const result = await ErpApprovalService.initiateApproval({
         model: Menu,

@@ -35,7 +35,7 @@ exports.createManagement = async (req, res) => {
 
     // --- JALUR EDITOR: REQUEST CREATE ---
     if (req.userRole?.toLowerCase() === "editor" && status === "Published") {
-      const tokenOWL = req.headers["authorization"]?.split(" ")[1];
+      const tokenOWL = req.owl_token;
       
       const result = await ErpApprovalService.initiateApproval({
         model: Management,
@@ -102,7 +102,7 @@ exports.updateManagement = async (req, res) => {
         photoUrl: finalPhotoUrl,
       };
 
-      const tokenOWL = req.headers["authorization"]?.split(" ")[1];
+      const tokenOWL = req.owl_token;
       const result = await ErpApprovalService.initiateApproval({
         model: Management,
         targetId: id,
@@ -153,7 +153,7 @@ exports.deleteManagement = async (req, res) => {
 
     // --- JALUR EDITOR: REQUEST DELETE ---
     if (req.userRole?.toLowerCase() === "editor") {
-      const tokenOWL = req.headers["authorization"]?.split(" ")[1];
+      const tokenOWL = req.owl_token;
       
       const result = await ErpApprovalService.initiateApproval({
         model: Management,

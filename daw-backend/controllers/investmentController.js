@@ -67,7 +67,7 @@ exports.createAffiliate = async (req, res) => {
 
     // --- JALUR EDITOR: REQUEST CREATE ---
     if (req.userRole?.toLowerCase() === "editor" && status === "Published") {
-      const tokenOWL = req.headers["authorization"]?.split(" ")[1];
+      const tokenOWL = req.owl_token;
       
       const result = await ErpApprovalService.initiateApproval({
         model: Affiliate,
@@ -128,7 +128,7 @@ exports.updateAffiliate = async (req, res) => {
 
     // --- JALUR EDITOR: REQUEST UPDATE ---
     if (req.userRole?.toLowerCase() === "editor" && status === "Published") {
-      const tokenOWL = req.headers["authorization"]?.split(" ")[1];
+      const tokenOWL = req.owl_token;
       const result = await ErpApprovalService.initiateApproval({
         model: Affiliate,
         targetId: id,
@@ -161,7 +161,7 @@ exports.deleteAffiliate = async (req, res) => {
 
     // --- JALUR EDITOR: REQUEST DELETE ---
     if (req.userRole?.toLowerCase() === "editor") {
-      const tokenOWL = req.headers["authorization"]?.split(" ")[1];
+      const tokenOWL = req.owl_token;
       const result = await ErpApprovalService.initiateApproval({
         model: Affiliate,
         targetId: id,
