@@ -46,18 +46,16 @@ function getPermissionsByRole(role) {
 exports.login = async (req, res) => {
   try {
     const { uname, password } = req.body;
+    const baseUrl = process.env.DAW_NODE_URL;
 
     // 1. Tembak API OWL (Server DAW API) buat Verifikasi
-    console.log(`>>> [AUTH] Verifying ${uname} via OWL ERP...`);
+    console.log(`>>> [AUTH] Verifying ${uname} via OWL ERP at ${baseUrl}...`);
 
     try {
-      const owlResponse = await axios.post(
-        "https://erp-aziz.daw.co.id/node/auth/login",
-        {
-          uname: uname,
-          password: password,
-        },
-      );
+      const owlResponse = await axios.post(`${baseUrl}/node/auth/login`, {
+        uname: uname,
+        password: password,
+      });
 
       // Jika OWL sukses, kita dapet data user dan token dari sana
       console.log(
