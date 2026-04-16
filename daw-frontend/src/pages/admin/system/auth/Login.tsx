@@ -44,28 +44,28 @@ export default function Login() {
       // });
 
       // Ganti dawApi (OWL) jadi api (Backend Lokal lo)
-      const response = await api.post("/auth/login", { 
+      const response = await api.post("/auth/login", {
         uname: email,
         password: password,
       });
 
-      const resData = response.data; 
+      const resData = response.data;
       if (resData.error) {
         throw new Error(
           resData.response || "Token tidak diterima dari server.",
         );
       }
 
-      const token = resData.token; 
+      const token = resData.token;
 
       if (token) {
         const decoded: any = jwtDecode(token);
 
         const userData = {
-          id: decoded.id, 
-          name: resData.user.name, 
-          email: email, 
-          role: decoded.role, 
+          id: decoded.id,
+          name: resData.user.name,
+          email: email,
+          role: decoded.role,
           permissions: resData.user.permissions,
         };
         login(userData, token);
@@ -149,8 +149,7 @@ export default function Login() {
               <button
                 type="button"
                 onClick={() => setShowPassword(!showPassword)}
-                className="absolute inset-y-0 right-0 pr-3.5 flex items-center text-slate-400 hover:text-slate-600 transition-colors"
-              >
+                className="absolute inset-y-0 right-0 pr-3.5 flex items-center text-slate-400 hover:text-slate-600 transition-colors">
                 {showPassword ? (
                   <EyeOff className="w-4 h-4" />
                 ) : (
@@ -159,21 +158,12 @@ export default function Login() {
               </button>
             </div>
           </div>
-          {/* <div className="flex justify-end mb-4">
-            <Link
-              to="/forgot-password"
-              className="text-xs font-bold text-emerald-700 hover:text-emerald-800 transition-colors"
-            >
-              Forgot Password?
-            </Link>
-          </div> */}
 
           <div className="pt-4">
             <button
               type="submit"
               disabled={isLoading}
-              className="w-full flex items-center justify-center gap-2 bg-slate-900 hover:bg-slate-800 disabled:bg-slate-400 text-white py-3 rounded-lg font-bold transition-all shadow-md hover:shadow-lg disabled:cursor-not-allowed group text-sm"
-            >
+              className="w-full flex items-center justify-center gap-2 bg-slate-900 hover:bg-slate-800 disabled:bg-slate-400 text-white py-3 rounded-lg font-bold transition-all shadow-md hover:shadow-lg disabled:cursor-not-allowed group text-sm">
               {isLoading ? (
                 <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
               ) : (

@@ -18,15 +18,6 @@ const DynamicPage = lazy(() => import("./pages/public/DynamicPage"));
 
 // Lazy Import Auth
 const Login = lazy(() => import("./pages/admin/system/auth/Login"));
-// const ForceChangePassword = lazy(
-//   () => import("./pages/admin/system/auth/ForceChangePassword"),
-// );
-// const ForgotPassword = lazy(
-//   () => import("./pages/admin/system/auth/ForgotPassword"),
-// );
-// const ResetPassword = lazy(
-//   () => import("./pages/admin/system/auth/ResetPassword"),
-// );
 
 // Lazy Import Admin Dashboard
 const Dashboard = lazy(() => import("./pages/admin/Dashboard"));
