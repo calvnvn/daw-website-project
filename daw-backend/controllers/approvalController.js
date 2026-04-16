@@ -361,14 +361,17 @@ async function executeModelUpdate(
         transaction,
       });
       // Update Markers (Hapus yang lama, pasang yang baru dari draf)
-      if (payload.mapMarkers) {
+      if (payload.mapMarkers && Array.isArray(payload.mapMarkers)) {
         await BusinessMapMarker.destroy({
           where: { sectionId: targetId },
           transaction,
         });
         const newMarkers = payload.mapMarkers.map((m) => ({
           ...m,
+          id: undefined, // Buat ID baru (Auto Increment)
           sectionId: targetId,
+          is_locked: false,
+          lock_ticket: null,
         }));
         await BusinessMapMarker.bulkCreate(newMarkers, { transaction });
       }

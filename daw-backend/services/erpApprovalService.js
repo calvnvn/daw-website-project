@@ -77,7 +77,7 @@ class ErpApprovalService {
       );
 
       // Locking Data Asli
-      if (targetId) {
+      if (targetId && action !== "CREATE") {
         await model.update(
           { is_locked: true, lock_ticket: notrans },
           { where: { id: targetId }, transaction: t },
@@ -95,8 +95,8 @@ class ErpApprovalService {
 
       const inputByString = String(owlUsername || userId);
       const payloadTransAdd = {
-        notrans: notrans,
-        inputby: inputByString,
+        notrans,
+        inputby: String(owlUsername || userId),
         data: approverRows,
       };
 
