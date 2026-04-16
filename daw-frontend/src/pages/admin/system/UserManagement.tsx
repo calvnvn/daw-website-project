@@ -18,6 +18,7 @@ interface AdminUser {
   id: string;
   name: string;
   email: string;
+  owl_username: string;
   roleId: string;
   roleData?: { name: string };
   status: "Active" | "Suspended";
@@ -110,11 +111,14 @@ export default function UserManagement() {
     setFormData({ owl_username: "", email: "", roleId: "" }); // Reset form
   };
 
-  const filteredUsers = users.filter(
-    (user) =>
-      user.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      user.email.toLowerCase().includes(searchTerm.toLowerCase()),
-  );
+  const filteredUsers = users.filter((user) => {
+    const searchLower = searchTerm.toLowerCase();
+    return (
+      (user.name?.toLowerCase() || "").includes(searchLower) ||
+      (user.email?.toLowerCase() || "").includes(searchLower) ||
+      (user.owl_username?.toLowerCase() || "").includes(searchLower) // Tambahkan ini!
+    );
+  });
 
   const handleAddUser = async () => {
     if (!formData.owl_username || !formData.roleId) {
@@ -143,8 +147,7 @@ export default function UserManagement() {
   const toggleUserStatus = async (user: AdminUser) => {
     if (user.id === currentUserId) {
       return toast.error("Safety Breach", {
-        description:
-          "You cannot suspend your own account to prevent system lockout.",
+        description: "You cannot suspend your own account.",
       });
     }
 
@@ -152,67 +155,52 @@ export default function UserManagement() {
     const actionText = newStatus === "Active" ? "mengaktifkan" : "menangguhkan";
 
     try {
-      await api.put(`/users/${user.id}`, { ...user, status: newStatus });
-      toast.success(`Berhasil ${actionText} user.`);
+      // SURGICAL UPDATE: Cukup kirim status saja
+      await api.put(`/users/${user.id}`, { status: newStatus });
+      toast.success(`Berhasil ${actionText} user ${user.owl_username}.`);
       fetchUsersAndRoles();
-    } catch (error) {
-      toast.error("Gagal mengubah status user.");
-      console.error(error);
+    } catch (error: any) {
+      toast.error(
+        error.response?.data?.message || "Gagal mengubah status user.",
+      );
     }
   };
 
   const handleDeleteUser = async (id: string) => {
-    // Guard 1: Suicide Prevention (Cegah hapus diri sendiri)
     if (String(id) === String(currentUserId)) {
       return toast.error("Safety Breach", {
-        description:
-          "You cannot delete your own account to prevent system lockout.",
+        description: "Self-deletion is blocked.",
       });
     }
 
     const targetUser = users.find((u) => String(u.id) === String(id));
-
-    // Guard 2: Superadmin Protection
     if (targetUser?.roleData?.name === "Superadmin") {
       return toast.error("Action Denied", {
-        description: "Superadmin accounts are immutable and cannot be deleted.",
+        description: "Superadmin accounts are immutable.",
       });
     }
 
-    //  TAHAP 1: Konfirmasi menggunakan Sonner Toast Action
-    toast("Confirm Deletion", {
-      description: `Are you sure you want to permanently delete ${targetUser?.name}?`,
-      duration: Infinity, // Agar toast tidak hilang sampai user memilih
+    toast(`Hapus Akses: ${targetUser?.owl_username}?`, {
+      // Gunakan username buat konteks
+      description: `Seluruh akses CMS untuk ${targetUser?.name || targetUser?.owl_username} akan dicabut.`,
+      duration: Infinity,
       action: {
-        label: "Delete User",
+        label: "Hapus Permanen",
         onClick: async () => {
-          //  TAHAP 2: Jalankan proses hapus setelah dikonfirmasi
-          const loadingToast = toast.loading(
-            `Terminating ${targetUser?.name}...`,
-          );
-
+          const loadingToast = toast.loading(`Mencabut akses...`);
           try {
             await api.delete(`/users/${id}`);
-
-            toast.success("User Terminated", {
-              id: loadingToast,
-              description: `${targetUser?.name} has been removed from the DAW database.`,
-            });
-
-            fetchUsersAndRoles(); // Refresh data
+            toast.success("Akses Dicabut", { id: loadingToast });
+            fetchUsersAndRoles();
           } catch (error: any) {
-            toast.error("Operation Failed", {
+            toast.error("Gagal", {
               id: loadingToast,
-              description:
-                error.response?.data?.message || "Internal Server Error",
+              description: error.response?.data?.message,
             });
           }
         },
       },
-      cancel: {
-        label: "Cancel",
-        onClick: () => toast.dismiss(),
-      },
+      cancel: { label: "Batal", onClick: () => toast.dismiss() },
     });
   };
 
@@ -250,22 +238,20 @@ export default function UserManagement() {
       );
 
       try {
+        // Pastikan payload bersih
         await api.put(`/users/${userId}`, { roleId: newRoleId });
-
-        toast.success("Access Level Updated", {
+        toast.success("Role Updated", {
           id: loadingToast,
-          description: `${targetUser?.name} is now a ${newRole?.name}.`,
+          description: `${targetUser?.owl_username} sekarang adalah ${newRole?.name}.`,
         });
-
-        await fetchUsersAndRoles();
+        fetchUsersAndRoles();
       } catch (error: any) {
-        toast.error("Update Failed", {
+        toast.error("Gagal Update", {
           id: loadingToast,
           description:
             error.response?.data?.message || "Internal server error.",
         });
-
-        fetchUsersAndRoles(); // Kembalikan ke state database jika gagal
+        fetchUsersAndRoles(); // Revert UI
       }
     };
 
@@ -291,9 +277,7 @@ export default function UserManagement() {
     }
   };
 
-  // --- SENIOR FULLSTACK MAGIC: DETERMINISTIC COLOR ASSIGNMENT ---
   const getRoleBadgeColor = (role: string) => {
-    // 1. CORE SYSTEM ROLES (Pertahankan identitas aslinya)
     switch (role) {
       case "Superadmin":
         return "bg-purple-100 text-purple-700 border-purple-200";
@@ -303,8 +287,6 @@ export default function UserManagement() {
         return "bg-slate-100 text-slate-700 border-slate-200";
     }
 
-    // 2. CURATED PALETTE (Palet warna premium untuk role kustom)
-    // Kita kurasi agar tidak ada warna jelek (seperti kuning stabilo) yang merusak mata.
     const customPalette = [
       "bg-emerald-100 text-emerald-700 border-emerald-200", // Nature / Fresh
       "bg-amber-100 text-amber-700 border-amber-200", // Warm / Alert
@@ -316,15 +298,11 @@ export default function UserManagement() {
       "bg-orange-100 text-orange-700 border-orange-200", // Energetic
     ];
 
-    // 3. THE HASHING ALGORITHM
-    // Mengubah string (contoh: "Marketing") menjadi angka integer unik secara konsisten
     let hash = 0;
     for (let i = 0; i < role.length; i++) {
       hash = role.charCodeAt(i) + ((hash << 5) - hash);
     }
 
-    // 4. MAPPING TO PALETTE
-    // Gunakan absolute & modulo agar angka hash selalu muat di dalam index array palet kita
     const colorIndex = Math.abs(hash) % customPalette.length;
 
     return customPalette[colorIndex];

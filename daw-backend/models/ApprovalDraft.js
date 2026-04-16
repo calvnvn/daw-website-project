@@ -6,7 +6,7 @@ const ApprovalDraft = sequelize.define(
   {
     notrans: {
       type: DataTypes.STRING(255),
-      primaryKey: true, // PK mengikuti nomor tiket dari OWL
+      primaryKey: true,
       allowNull: false,
     },
     module_name: {
@@ -32,6 +32,10 @@ const ApprovalDraft = sequelize.define(
     status: {
       type: DataTypes.ENUM("Pending", "Approved", "Rejected"),
       defaultValue: "Pending",
+    },
+    rejection_reason: {
+      type: DataTypes.TEXT,
+      allowNull: true,
     },
   },
   {

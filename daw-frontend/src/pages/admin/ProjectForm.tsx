@@ -532,7 +532,7 @@ export default function ProjectForm() {
                   )}
                   <span>
                     {isEditor
-                      ? "Request Approval (OWL)"
+                      ? "Request Approval"
                       : isEditMode
                         ? "Update & Publish"
                         : "Publish Now"}

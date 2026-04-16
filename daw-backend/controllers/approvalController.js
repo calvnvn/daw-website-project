@@ -115,19 +115,23 @@ exports.executeDecision = async (req, res) => {
       await ErpApprovalService.submitDecision(
         notrans,
         "2",
-        keteranganRejek,
+        keteranganRejek || "Ditolak",
         tokenOWL,
       );
-      const Model = getModelByModuleName(module);
-      if (Model && targetId) {
-        await Model.update(
-          { is_locked: false, lock_ticket: null },
-          { where: { id: targetId }, transaction: t },
-        );
+
+      if (action !== "CREATE") {
+        const Model = getModelByModuleName(module);
+        if (Model && targetId) {
+          await Model.update(
+            { is_locked: false, lock_ticket: null },
+            { where: { id: targetId }, transaction: t },
+          );
+        }
       }
 
       await ApprovalDraft.update(
-        { status: "Rejected" },
+        { status: "Rejected", rejection_reason: keteranganRejek },
+
         { where: { notrans: notrans }, transaction: t },
       );
 
