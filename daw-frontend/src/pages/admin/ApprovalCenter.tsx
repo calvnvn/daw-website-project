@@ -17,6 +17,7 @@ import {
   ShieldAlert,
   LayoutTemplate,
   Code2,
+  RotateCcw,
 } from "lucide-react";
 import api, { BASE_UPLOAD_URL } from "@/lib/api";
 import { useAuth } from "@/contexts/AuthContext";
@@ -32,6 +33,7 @@ interface ApprovalDraft {
   created_by: string;
   status: string;
   createdAt: string;
+  rejection_reason?: string | null;
 }
 
 // Helper: Memburu semua value gambar
@@ -506,21 +508,38 @@ export default function ApprovalCenter() {
     }
   };
 
-  const handleReject = async (notrans: string, reason: string) => {
-    const toastId = toast.loading("Mengirim penolakan...");
+  const handleReject = async (draft: any, reason: string) => {
+    // 1. Validasi: Jangan kasih ampun buat Approver yang malas nulis alasan
+    if (!reason.trim() || reason.length < 5) {
+      return toast.error("Alasan penolakan terlalu singkat atau kosong.");
+    }
+
+    const toastId = toast.loading("Mengirim keputusan penolakan...");
+
     try {
       await api.post("/approval/decide", {
-        notrans,
-        status: "2",
+        notrans: draft.notrans,
+        status: "2", // Status Reject
         keteranganRejek: reason,
+        // PENTING: Kirim metadata ini agar gembok di tabel utama terbuka
+        module: draft.module_name,
+        targetId: draft.target_id,
+        action: draft.action,
       });
-      toast.success("Draf berhasil ditolak dan gembok telah dibuka.", {
+
+      toast.success(
+        "Draf ditolak. Editor kini bisa memperbaiki data tersebut.",
+        {
+          id: toastId,
+        },
+      );
+
+      setSelectedDraft(null);
+      fetchApprovals(); // Refresh list
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || "Gagal mengirim penolakan", {
         id: toastId,
       });
-      setSelectedDraft(null);
-      fetchApprovals();
-    } catch {
-      toast.error("Gagal mengirim penolakan", { id: toastId });
     }
   };
 
@@ -629,6 +648,12 @@ export default function ApprovalCenter() {
                             <span className="font-mono text-sm font-bold text-slate-700 bg-slate-100/80 ring-1 ring-slate-200/50 px-2.5 py-1 rounded-md shadow-sm">
                               {draft.notrans}
                             </span>
+                            {draft.rejection_reason && (
+                              <span className="inline-flex items-center gap-1 text-[9px] bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full font-black border border-amber-200 animate-pulse">
+                                <RotateCcw className="w-2.5 h-2.5" />{" "}
+                                RESUBMISSION
+                              </span>
+                            )}
                             {isAged && (
                               <span
                                 title="Draf ini sudah tertunda lebih dari 3 hari"
@@ -644,6 +669,13 @@ export default function ApprovalCenter() {
                             <Clock className="w-3.5 h-3.5 text-slate-400" />
                             {timeAgo(draft.createdAt)}
                           </div>
+                          {draft.rejection_reason && (
+                            <p
+                              className="text-[10px] text-amber-600 italic font-medium line-clamp-1 max-w-[200px]"
+                              title={draft.rejection_reason}>
+                              Note: "{draft.rejection_reason}"
+                            </p>
+                          )}
                         </div>
                       </td>
 
