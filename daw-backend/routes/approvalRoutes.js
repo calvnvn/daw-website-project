@@ -25,8 +25,9 @@ router.get(
 );
 
 router.get(
-  "/drafts/rejected/:id",
+  "/rejected/:id",
   verifyToken,
   approvalController.getRejectedDraftByTarget,
 );
+
 module.exports = router;

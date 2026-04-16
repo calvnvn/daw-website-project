@@ -31,6 +31,15 @@ import { compressImage } from "@/utils/imageHelper";
 import { useAuth } from "@/contexts/AuthContext";
 import { useBusiness } from "@/contexts/BusinessContext";
 
+// Tambahkan di bagian atas file jika Anda menggunakan TypeScript yang ketat
+interface RejectedDraft {
+  notrans: string;
+  module_name: string;
+  payload: any;
+  rejection_reason: string | null; // Kolom baru dari backend
+  createdAt: string;
+}
+
 // --- SUB-COMPONENT: GALLERY PREVIEW ---
 const GalleryPreviewItem = ({
   file,
@@ -80,8 +89,12 @@ export default function ProjectForm() {
   const isEditor = user?.roleData?.name === "Editor" || user?.role === "Editor";
   const { sections } = useBusiness();
   const [isLoading, setIsLoading] = useState(false);
-  const [rejectedDraft, setRejectedDraft] = useState<any>(null);
+
+  const [rejectedDraft, setRejectedDraft] = useState<RejectedDraft | null>(
+    null,
+  );
   const [showDraftBanner, setShowDraftBanner] = useState(false);
+
   const [isRestoring, setIsRestoring] = useState(false);
   const [isFetching, setIsFetching] = useState(isEditMode); // Fetching hanya aktif jika Edit Mode
 
@@ -173,24 +186,34 @@ export default function ProjectForm() {
       setIsFetching(false);
       return;
     }
+
     const fetchProject = async () => {
       setIsFetching(true);
       try {
-        // Fetch data original
+        // 1. Ambil Data Original (Live Data)
         const response = await api.get(`/projects/${id}`);
         const data = response.data.data || response.data;
-        // Fetch draf rejected (Jika ada)
+
+        // 2. Deteksi Draf yang Ditolak (Recovery Data)
         try {
+          // Menyesuaikan endpoint Tahap 2.2 Backend
           const draftRes = await api.get(
-            `/approval/drafts/rejected/${id}?module=Project`,
+            `/approval/rejected/${id}?module=Project`,
           );
-          if (draftRes.data && draftRes.data.payload) {
-            setRejectedDraft(draftRes.data);
-            setShowDraftBanner(true);
+
+          // Sesuai respons Tahap 2.1: { success: true, hasRejected: true, data: draft }
+          if (draftRes.data.hasRejected && draftRes.data.data) {
+            setRejectedDraft(draftRes.data.data);
+            setShowDraftBanner(true); // Aktifkan banner jika draf ditemukan
           }
-        } catch {
-          console.log("No rejected draft found.");
+        } catch (draftErr: any) {
+          // Abaikan jika 404 (Memang tidak ada draf rejected)
+          if (draftErr.response?.status !== 404) {
+            console.error("Recovery Data Fetch Error:", draftErr);
+          }
         }
+
+        // 3. Injeksi Data Original ke State Form (State Awal)
         setFormData({
           title: data.title || "",
           excerpt: data.excerpt || "",
@@ -213,6 +236,7 @@ export default function ProjectForm() {
         setIsFetching(false);
       }
     };
+
     fetchProject();
   }, [id, isEditMode, navigate]);
 
@@ -220,24 +244,33 @@ export default function ProjectForm() {
   const handleRestoreDraft = () => {
     if (!rejectedDraft?.payload) return;
     setIsRestoring(true);
+
     const payload = rejectedDraft.payload;
 
     setFormData({
-      title: payload.title || formData.title,
-      excerpt: payload.excerpt || formData.excerpt,
-      content: payload.content || formData.content,
-      category: payload.category || formData.category,
-      status: "Draft",
-      cover_image: payload.cover_image || formData.cover_image,
+      ...formData, // Spread untuk menjaga field lain yang mungkin tidak ada di payload
+      title: payload.title || "",
+      excerpt: payload.excerpt || "",
+      content: payload.content || "",
+      category: payload.category || "",
+      status: "Draft", // Selalu paksa ke Draft saat restore
+      cover_image: payload.cover_image || "",
       gallery:
         typeof payload.gallery === "string"
           ? payload.gallery
           : JSON.stringify(payload.gallery || []),
-      seo_title: payload.seo_title || formData.seo_title,
-      meta_description: payload.meta_description || formData.meta_description,
+      seo_title: payload.seo_title || "",
+      meta_description: payload.meta_description || "",
     });
 
-    toast.success("Draft berhasil dimuat ulang ke dalam form!");
+    setCoverFile(null);
+    setGalleryFiles([]);
+    setCoverPreview(null);
+
+    toast.success("Konten berhasil dipulihkan!", {
+      description: "Silakan periksa kembali sebelum mengirim ulang.",
+    });
+
     setShowDraftBanner(false);
     setIsRestoring(false);
   };
@@ -339,9 +372,14 @@ export default function ProjectForm() {
       // Optimize & Append Files
       if (coverFile) {
         payload.append("cover_image", await compressImage(coverFile));
+      } else if (formData.cover_image) {
+        payload.append("cover_image", formData.cover_image);
       }
       for (const file of galleryFiles) {
         payload.append("gallery", await compressImage(file));
+      }
+      if (rejectedDraft?.notrans) {
+        payload.append("previous_notrans", rejectedDraft.notrans);
       }
 
       // Append Texts
@@ -382,6 +420,8 @@ export default function ProjectForm() {
       });
 
       if ([200, 201, 202].includes(response.status)) {
+        setRejectedDraft(null);
+        setShowDraftBanner(false);
         if (response.status === 202) {
           // Pesan khusus buat Editor (Draf dikirim ke OWL)
           toast.success(
@@ -496,7 +536,6 @@ export default function ProjectForm() {
           </div>
         </div>
         <div className="flex flex-col items-end gap-1">
-          {" "}
           {/* Tambah container agar hint rapi */}
           <div className="flex gap-3">
             {/* TOMBOL DRAF: Selalu Lokal (MySQL) */}
@@ -551,34 +590,65 @@ export default function ProjectForm() {
         </div>
       </div>
 
-      {/* REJECTED DRAFT BANNER */}
+      {/* RECOVERY BANNER SYSTEM */}
       {showDraftBanner && rejectedDraft && (
-        <div className="mt-6 bg-amber-50 border border-amber-200 rounded-xl p-5 shadow-sm animate-in slide-in-from-top-2">
-          <div className="flex gap-3 items-start">
-            <AlertTriangle className="w-5 h-5 text-amber-600 mt-0.5 shrink-0" />
-            <div className="flex-1">
-              <h3 className="text-sm font-bold text-amber-800">
-                Peringatan: Revisi Ditolak
-              </h3>
-              <p className="text-xs text-amber-700 mt-1 mb-3 leading-relaxed">
-                Anda memiliki draf revisi untuk proyek ini yang sebelumnya{" "}
-                <strong>ditolak</strong> oleh Manager. Anda dapat memuat ulang
-                draf tersebut atau mengabaikannya dan mulai mengedit dari data
-                Live.
-              </p>
-              <div className="flex gap-2">
+        <div className="mb-8 animate-in fade-in slide-in-from-top-4 duration-500">
+          <div className="bg-amber-50 border border-amber-200 rounded-2xl overflow-hidden shadow-sm">
+            <div className="p-5 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+              <div className="flex items-start gap-4">
+                <div className="p-3 bg-amber-100 rounded-xl text-amber-600">
+                  <AlertCircle className="w-6 h-6" />
+                </div>
+                <div>
+                  <h4 className="text-sm font-bold text-amber-900 mb-1">
+                    Draf Revisi Ditolak oleh Approver
+                  </h4>
+                  <p className="text-xs text-amber-700 leading-relaxed max-w-2xl">
+                    <span className="font-bold italic">Alasan Penolakan: </span>
+                    "
+                    {rejectedDraft.rejection_reason ||
+                      "Tidak ada alasan spesifik yang diberikan."}
+                    "
+                  </p>
+                  <div className="mt-2 flex items-center gap-2 text-[10px] text-amber-500 font-medium">
+                    <Clock className="w-3 h-3" />
+                    Ditolak pada{" "}
+                    {new Date(rejectedDraft.updatedAt).toLocaleString("id-ID", {
+                      day: "numeric",
+                      month: "long",
+                      year: "numeric",
+                      hour: "2-digit",
+                      minute: "2-digit",
+                    })}
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2 w-full md:w-auto shrink-0">
                 <button
+                  type="button"
                   onClick={handleRestoreDraft}
                   disabled={isRestoring}
-                  className="px-4 py-1.5 bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold rounded-lg shadow-sm transition-colors disabled:opacity-50">
-                  {isRestoring ? "Memuat..." : "Pulihkan Draft Terakhir"}
+                  className="flex-1 md:flex-none flex items-center justify-center gap-2 bg-amber-600 hover:bg-amber-700 text-white px-5 py-2.5 rounded-xl text-xs font-bold transition-all active:scale-95 shadow-sm shadow-amber-200">
+                  <RotateCcw
+                    className={`w-4 h-4 ${isRestoring ? "animate-spin" : ""}`}
+                  />
+                  Pulihkan Data
                 </button>
+
                 <button
+                  type="button"
                   onClick={() => setShowDraftBanner(false)}
-                  className="px-4 py-1.5 bg-white border border-amber-200 text-amber-700 hover:bg-amber-100 text-xs font-bold rounded-lg shadow-sm transition-colors">
-                  Abaikan & Mulai Baru
+                  className="p-2.5 text-amber-400 hover:text-amber-600 hover:bg-amber-100 rounded-xl transition-colors"
+                  title="Abaikan">
+                  <X className="w-5 h-5" />
                 </button>
               </div>
+            </div>
+
+            {/* Visual Progress Bar (Optional) */}
+            <div className="h-1 bg-amber-200 w-full overflow-hidden">
+              <div className="h-full bg-amber-500 w-1/3 animate-pulse"></div>
             </div>
           </div>
         </div>
@@ -756,21 +826,41 @@ export default function ProjectForm() {
             </h3>
             <div
               {...getRootCoverProps()}
-              className={`aspect-video rounded-xl border-2 border-dashed flex items-center justify-center cursor-pointer transition-all overflow-hidden ${isCoverDragActive ? "border-daw-green bg-green-50" : "border-slate-100 bg-slate-50 hover:bg-slate-100"}`}>
+              className={`aspect-video rounded-xl border-2 border-dashed flex items-center justify-center cursor-pointer transition-all relative overflow-hidden 
+      ${isCoverDragActive ? "border-daw-green bg-green-50" : "border-slate-100 bg-slate-50 hover:bg-slate-100"}
+      ${showDraftBanner && !coverPreview ? "border-amber-400 ring-4 ring-amber-50" : ""} 
+    `}>
               <input {...getInputCoverProps()} />
+
+              {/* Kasus A: Ada File Baru yang baru saja di-drop */}
               {coverPreview ? (
                 <img
                   src={coverPreview}
                   className="w-full h-full object-cover"
-                  alt="Cover Preview"
+                  alt="New Upload"
                 />
-              ) : formData.cover_image ? (
-                <img
-                  src={`${BASE_UPLOAD_URL}/${formData.cover_image}`}
-                  className="w-full h-full object-cover"
-                  alt="Server Cover"
-                />
+              ) : /* Kasus B: Menggunakan data dari Database (Live atau Recovered Draft) */
+              formData.cover_image ? (
+                <>
+                  <img
+                    src={
+                      formData.cover_image.startsWith("http")
+                        ? formData.cover_image // Jika sudah URL lengkap
+                        : `${BASE_UPLOAD_URL}/${formData.cover_image}` // Jika hanya nama file
+                    }
+                    className="w-full h-full object-cover"
+                    alt="Existing Cover"
+                  />
+
+                  {/* Indikator visual jika ini adalah data yang di-restore */}
+                  {rejectedDraft && !coverPreview && (
+                    <div className="absolute top-2 left-2 bg-amber-500 text-white text-[8px] font-black px-2 py-1 rounded uppercase tracking-widest shadow-lg">
+                      Restored from Draft
+                    </div>
+                  )}
+                </>
               ) : (
+                /* Kasus C: Kosong */
                 <div className="text-center p-4">
                   <ImageIcon className="w-8 h-8 text-slate-200 mx-auto mb-2" />
                   <p className="text-[10px] font-bold text-slate-400 uppercase tracking-tighter">

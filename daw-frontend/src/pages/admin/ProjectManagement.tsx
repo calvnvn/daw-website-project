@@ -28,6 +28,7 @@ interface AdminProject {
   views: number;
   is_locked: boolean;
   lock_ticket: string | null;
+  has_rejected?: boolean;
 }
 
 export default function ProjectManagement() {
@@ -85,6 +86,8 @@ export default function ProjectManagement() {
         matchCategory = true;
       } else if (filterCategory === "Uncategorized") {
         matchCategory = !validSectorIds.has(project.category);
+      } else if (filterCategory === "Rejected") {
+        matchCategory = project.has_rejected === true;
       } else {
         // Standard slug comparison
         matchCategory = project.category === filterCategory;
@@ -260,6 +263,9 @@ export default function ProjectManagement() {
             value={filterCategory}
             onChange={(e) => setFilterCategory(e.target.value)}>
             <option value="All">Semua Kategori</option>
+            <option value="Rejected" className="text-red-500 font-bold">
+              Butuh Revisi
+            </option>
             {sections.map((sec) => (
               <option key={sec.id} value={sec.id}>
                 {sec.category}
@@ -313,13 +319,15 @@ export default function ProjectManagement() {
                             <p className="text-sm font-bold text-slate-900 group-hover:text-daw-green transition-colors line-clamp-1">
                               {project.title}
                             </p>
-                            {project.is_locked && (
-                              <span
-                                className="inline-flex items-center gap-1 text-[10px] bg-blue-50 text-blue-600 px-2 py-0.5 rounded-full font-bold border border-blue-100"
-                                title={`Terkunci oleh tiket OWL: ${project.lock_ticket}`}>
-                                <Lock className="w-3 h-3" /> Pending
+                            {project.is_locked ? (
+                              <span className="inline-flex items-center gap-1 text-[10px] bg-blue-50 text-blue-600 px-2 py-0.5 rounded-full font-bold border border-blue-100 shadow-sm">
+                                <Lock className="w-3 h-3" /> PENDING
                               </span>
-                            )}
+                            ) : project.has_rejected ? (
+                              <span className="inline-flex items-center gap-1 text-[10px] bg-red-50 text-red-600 px-2 py-0.5 rounded-full font-bold border border-red-100 shadow-sm animate-pulse">
+                                <AlertTriangle className="w-3 h-3" /> REVISION
+                              </span>
+                            ) : null}
                           </div>
                           <p className="text-xs text-slate-500 mt-0.5">
                             Penulis: {project.author}
@@ -340,9 +348,11 @@ export default function ProjectManagement() {
                           );
                         } else {
                           return (
-                            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-red-50 text-red-600 text-xs font-bold border border-red-100">
-                              <AlertTriangle className="w-3 h-3" />
-                              Sektor Terhapus
+                            <span
+                              title="Kategori proyek ini telah dihapus dari sistem. Harap segera edit dan pilih kategori baru."
+                              className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-red-50 text-red-600 text-xs font-bold border border-red-100 cursor-help">
+                              <AlertTriangle className="w-3 h-3" /> Sektor
+                              Terhapus
                             </span>
                           );
                         }

@@ -207,8 +207,14 @@ exports.getOriginalData = async (req, res) => {
 
 exports.getRejectedDraftByTarget = async (req, res) => {
   try {
-    const { id } = req.params; // Ini targetId (ID Project)
-    const { module } = req.query; // Ini nama Modul (Project)
+    const { id } = req.params; // Target ID
+    const { module } = req.query; // Nama Modul
+
+    if (!id || !module) {
+      return res.status(400).json({
+        message: "Target ID dan Module Name wajib disertakan.",
+      });
+    }
 
     const draft = await ApprovalDraft.findOne({
       where: {
@@ -220,13 +226,23 @@ exports.getRejectedDraftByTarget = async (req, res) => {
     });
 
     if (!draft) {
-      return res.status(404).json({ message: "No rejected draft found" });
+      return res.status(404).json({
+        message: "Tidak ada draf tertunda yang ditolak untuk entitas ini.",
+        hasRejected: false,
+      });
     }
 
-    res.status(200).json(draft);
+    res.status(200).json({
+      success: true,
+      hasRejected: true,
+      data: draft,
+    });
   } catch (error) {
-    console.error("Error fetching rejected draft:", error);
-    res.status(500).json({ message: "Internal Server Error" });
+    console.error(
+      `🚨 [RECOVERY API ERROR] ID: ${req.params.id}:`,
+      error.message,
+    );
+    res.status(500).json({ message: "Gagal mengambil data pemulihan." });
   }
 };
 
