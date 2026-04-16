@@ -9,6 +9,7 @@ import {
   Eye,
   FileText,
   AlertTriangle,
+  Lock,
 } from "lucide-react";
 import { Link } from "react-router-dom";
 import { toast } from "sonner";
@@ -162,8 +163,20 @@ export default function ProjectManagement() {
 
     toast.promise(api.put(`/projects/${id}`, { status: newStatus }), {
       loading: "Memperbarui status...",
-      success: () => {
-        // Update state lokal biar UI langsung berubah tanpa reload
+      success: (response) => {
+        // Cek apakah Backend merespon dengan 202 (Jalur Approval Editor)
+        if (response.status === 202) {
+          setProjects((prev) =>
+            prev.map((p) =>
+              p.id === id
+                ? { ...p, is_locked: true, lock_ticket: response.data.ticket }
+                : p,
+            ),
+          );
+          return "Status diajukan ke OWL. Data dikunci menunggu persetujuan.";
+        }
+
+        // Jalur Eksekusi Langsung (Superadmin / Save Draft)
         setProjects((prev) =>
           prev.map((p) => (p.id === id ? { ...p, status: newStatus } : p)),
         );
@@ -295,9 +308,19 @@ export default function ProjectManagement() {
                           <FileText className="w-5 h-5 text-slate-400" />
                         </div>
                         <div>
-                          <p className="text-sm font-bold text-slate-900 group-hover:text-daw-green transition-colors line-clamp-1">
-                            {project.title}
-                          </p>
+                          {/* BADGE GEMBOK DI SEBELAH JUDUL */}
+                          <div className="flex items-center gap-2">
+                            <p className="text-sm font-bold text-slate-900 group-hover:text-daw-green transition-colors line-clamp-1">
+                              {project.title}
+                            </p>
+                            {project.is_locked && (
+                              <span
+                                className="inline-flex items-center gap-1 text-[10px] bg-blue-50 text-blue-600 px-2 py-0.5 rounded-full font-bold border border-blue-100"
+                                title={`Terkunci oleh tiket OWL: ${project.lock_ticket}`}>
+                                <Lock className="w-3 h-3" /> Pending
+                              </span>
+                            )}
+                          </div>
                           <p className="text-xs text-slate-500 mt-0.5">
                             Penulis: {project.author}
                           </p>
@@ -328,25 +351,27 @@ export default function ProjectManagement() {
                     <td className="px-6 py-4">
                       <button
                         onClick={() => toggleStatus(project.id, project.status)}
-                        title="Klik untuk ubah status"
-                        className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold tracking-wide transition-all active:scale-95 hover:brightness-90 ${
-                          project.status === "Published"
-                            ? "bg-green-100 text-green-700 border border-green-200"
-                            : "bg-amber-100 text-amber-700 border border-amber-200"
+                        disabled={project.is_locked}
+                        title={
+                          project.is_locked
+                            ? "Data sedang terkunci"
+                            : "Klik untuk ubah status"
+                        }
+                        className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold tracking-wide transition-all ${
+                          project.is_locked
+                            ? "bg-slate-100 text-slate-400 border border-slate-200 cursor-not-allowed"
+                            : project.status === "Published"
+                              ? "bg-green-100 text-green-700 border border-green-200 active:scale-95 hover:brightness-90"
+                              : "bg-amber-100 text-amber-700 border border-amber-200 active:scale-95 hover:brightness-90"
                         }`}>
                         {project.status}
                       </button>
                     </td>
                     <td className="px-6 py-4">
                       <p className="text-sm text-slate-600">
-                        {/* 6. Format Tanggal dari MySQL (createdAt) */}
                         {new Date(project.createdAt).toLocaleDateString(
                           "id-ID",
-                          {
-                            day: "numeric",
-                            month: "short",
-                            year: "numeric",
-                          },
+                          { day: "numeric", month: "short", year: "numeric" },
                         )}
                       </p>
                       <p className="text-xs text-slate-400 mt-0.5">
@@ -364,22 +389,32 @@ export default function ProjectManagement() {
                           <Eye className="w-4 h-4" />
                         </Link>
 
-                        {/* --- EDIT ARTICLE --- */}
-                        <Link
-                          to={`/admin/projects/edit/${project.id}`}
-                          className="p-2 text-slate-400 hover:text-daw-green hover:bg-green-50 rounded-lg transition-colors inline-block"
-                          title="Edit Article">
-                          <Edit className="w-4 h-4" />
-                        </Link>
-                        {/* --- DELETE ACTION --- */}
-                        <button
-                          onClick={() =>
-                            handleDeleteRequest(project.id, project.title)
-                          } //  Panggil fungsi trigger
-                          className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all"
-                          title="Delete Record">
-                          <Trash2 className="w-4 h-4" />
-                        </button>
+                        {/* 3. SEMBUNYIKAN/UBAH EDIT & DELETE JIKA TERKUNCI */}
+                        {project.is_locked ? (
+                          <button
+                            disabled
+                            className="p-2 text-slate-300 cursor-not-allowed"
+                            title="Terkunci di OWL">
+                            <Lock className="w-4 h-4" />
+                          </button>
+                        ) : (
+                          <>
+                            <Link
+                              to={`/admin/projects/edit/${project.id}`}
+                              className="p-2 text-slate-400 hover:text-daw-green hover:bg-green-50 rounded-lg transition-colors inline-block"
+                              title="Edit Article">
+                              <Edit className="w-4 h-4" />
+                            </Link>
+                            <button
+                              onClick={() =>
+                                handleDeleteRequest(project.id, project.title)
+                              }
+                              className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all"
+                              title="Delete Record">
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </>
+                        )}
                       </div>
                       <button className="p-2 text-slate-400 md:hidden">
                         <MoreVertical className="w-4 h-4" />

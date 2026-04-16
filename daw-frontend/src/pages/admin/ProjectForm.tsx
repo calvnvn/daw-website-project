@@ -23,6 +23,7 @@ import {
   X,
   Link as LinkIcon,
   Plus,
+  AlertTriangle,
 } from "lucide-react";
 import { useDropzone } from "react-dropzone";
 import api, { BASE_UPLOAD_URL } from "@/lib/api";
@@ -62,8 +63,7 @@ const GalleryPreviewItem = ({
       <button
         type="button"
         onClick={onRemove}
-        className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity z-10 hover:bg-red-600 shadow-md"
-      >
+        className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity z-10 hover:bg-red-600 shadow-md">
         <X className="w-3 h-3" />
       </button>
     </div>
@@ -80,6 +80,9 @@ export default function ProjectForm() {
   const isEditor = user?.roleData?.name === "Editor" || user?.role === "Editor";
   const { sections } = useBusiness();
   const [isLoading, setIsLoading] = useState(false);
+  const [rejectedDraft, setRejectedDraft] = useState<any>(null);
+  const [showDraftBanner, setShowDraftBanner] = useState(false);
+  const [isRestoring, setIsRestoring] = useState(false);
   const [isFetching, setIsFetching] = useState(isEditMode); // Fetching hanya aktif jika Edit Mode
 
   /**
@@ -173,8 +176,21 @@ export default function ProjectForm() {
     const fetchProject = async () => {
       setIsFetching(true);
       try {
+        // Fetch data original
         const response = await api.get(`/projects/${id}`);
         const data = response.data.data || response.data;
+        // Fetch draf rejected (Jika ada)
+        try {
+          const draftRes = await api.get(
+            `/approval/drafts/rejected/${id}?module=Project`,
+          );
+          if (draftRes.data && draftRes.data.payload) {
+            setRejectedDraft(draftRes.data);
+            setShowDraftBanner(true);
+          }
+        } catch {
+          console.log("No rejected draft found.");
+        }
         setFormData({
           title: data.title || "",
           excerpt: data.excerpt || "",
@@ -199,6 +215,32 @@ export default function ProjectForm() {
     };
     fetchProject();
   }, [id, isEditMode, navigate]);
+
+  // --- DRAFT RECOVERY HANDLER ---
+  const handleRestoreDraft = () => {
+    if (!rejectedDraft?.payload) return;
+    setIsRestoring(true);
+    const payload = rejectedDraft.payload;
+
+    setFormData({
+      title: payload.title || formData.title,
+      excerpt: payload.excerpt || formData.excerpt,
+      content: payload.content || formData.content,
+      category: payload.category || formData.category,
+      status: "Draft",
+      cover_image: payload.cover_image || formData.cover_image,
+      gallery:
+        typeof payload.gallery === "string"
+          ? payload.gallery
+          : JSON.stringify(payload.gallery || []),
+      seo_title: payload.seo_title || formData.seo_title,
+      meta_description: payload.meta_description || formData.meta_description,
+    });
+
+    toast.success("Draft berhasil dimuat ulang ke dalam form!");
+    setShowDraftBanner(false);
+    setIsRestoring(false);
+  };
 
   // Remove existing gallery image (Edit Mode)
   const removeOldGalleryImage = (indexToRemove: number) => {
@@ -438,8 +480,7 @@ export default function ProjectForm() {
         <div className="flex items-center gap-4">
           <button
             onClick={() => navigate("/admin/projects")}
-            className="p-2 hover:bg-white rounded-lg transition-all border border-transparent hover:border-slate-200 shadow-sm"
-          >
+            className="p-2 hover:bg-white rounded-lg transition-all border border-transparent hover:border-slate-200 shadow-sm">
             <ArrowLeft className="w-5 h-5 text-slate-500" />
           </button>
           <div>
@@ -463,8 +504,7 @@ export default function ProjectForm() {
               type="button"
               onClick={() => handleSave("Draft")}
               disabled={isLoading || !can("manage_projects")}
-              className="px-5 py-2 bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 rounded-lg font-bold text-sm shadow-sm transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
+              className="px-5 py-2 bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 rounded-lg font-bold text-sm shadow-sm transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed">
               <Save className="w-4 h-4 inline mr-2 text-slate-400" />
               Simpan Draf Lokal
             </button>
@@ -477,8 +517,7 @@ export default function ProjectForm() {
                 isEditor
                   ? "bg-blue-600 hover:bg-blue-700 shadow-blue-100" // Warna Biru untuk Editor
                   : "bg-daw-green hover:bg-[#003b1c] shadow-green-100" // Warna Hijau untuk Admin
-              }`}
-            >
+              }`}>
               {isLoading ? (
                 <div className="flex items-center gap-2">
                   <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
@@ -512,6 +551,39 @@ export default function ProjectForm() {
         </div>
       </div>
 
+      {/* REJECTED DRAFT BANNER */}
+      {showDraftBanner && rejectedDraft && (
+        <div className="mt-6 bg-amber-50 border border-amber-200 rounded-xl p-5 shadow-sm animate-in slide-in-from-top-2">
+          <div className="flex gap-3 items-start">
+            <AlertTriangle className="w-5 h-5 text-amber-600 mt-0.5 shrink-0" />
+            <div className="flex-1">
+              <h3 className="text-sm font-bold text-amber-800">
+                Peringatan: Revisi Ditolak
+              </h3>
+              <p className="text-xs text-amber-700 mt-1 mb-3 leading-relaxed">
+                Anda memiliki draf revisi untuk proyek ini yang sebelumnya{" "}
+                <strong>ditolak</strong> oleh Manager. Anda dapat memuat ulang
+                draf tersebut atau mengabaikannya dan mulai mengedit dari data
+                Live.
+              </p>
+              <div className="flex gap-2">
+                <button
+                  onClick={handleRestoreDraft}
+                  disabled={isRestoring}
+                  className="px-4 py-1.5 bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold rounded-lg shadow-sm transition-colors disabled:opacity-50">
+                  {isRestoring ? "Memuat..." : "Pulihkan Draft Terakhir"}
+                </button>
+                <button
+                  onClick={() => setShowDraftBanner(false)}
+                  className="px-4 py-1.5 bg-white border border-amber-200 text-amber-700 hover:bg-amber-100 text-xs font-bold rounded-lg shadow-sm transition-colors">
+                  Abaikan & Mulai Baru
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="mt-4 grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
         {/* KIRI: CONTENT AREA */}
         <div className="lg:col-span-2 space-y-6">
@@ -532,8 +604,7 @@ export default function ProjectForm() {
                 <span
                   className={
                     formData.excerpt.length >= 145 ? "text-red-500" : ""
-                  }
-                >
+                  }>
                   {formData.excerpt.length}/150
                 </span>
               </label>
@@ -634,8 +705,7 @@ export default function ProjectForm() {
                 </p>
                 <Link
                   to="/admin/businesses"
-                  className="text-xs font-bold text-daw-green hover:underline"
-                >
+                  className="text-xs font-bold text-daw-green hover:underline">
                   &rarr; Kelola Sektor
                 </Link>
               </div>
@@ -650,15 +720,13 @@ export default function ProjectForm() {
                   value={formData.category}
                   onChange={(e) =>
                     setFormData({ ...formData, category: e.target.value })
-                  }
-                >
+                  }>
                   {formData.category &&
                     !validSectorIds.has(formData.category) && (
                       <option
                         value={formData.category}
                         disabled
-                        className="text-red-500 font-bold"
-                      >
+                        className="text-red-500 font-bold">
                         ⚠️ Sektor Terhapus
                       </option>
                     )}
@@ -666,8 +734,7 @@ export default function ProjectForm() {
                     <option
                       key={sec.id}
                       value={sec.id}
-                      className="text-slate-700"
-                    >
+                      className="text-slate-700">
                       {sec.category}
                     </option>
                   ))}
@@ -689,8 +756,7 @@ export default function ProjectForm() {
             </h3>
             <div
               {...getRootCoverProps()}
-              className={`aspect-video rounded-xl border-2 border-dashed flex items-center justify-center cursor-pointer transition-all overflow-hidden ${isCoverDragActive ? "border-daw-green bg-green-50" : "border-slate-100 bg-slate-50 hover:bg-slate-100"}`}
-            >
+              className={`aspect-video rounded-xl border-2 border-dashed flex items-center justify-center cursor-pointer transition-all overflow-hidden ${isCoverDragActive ? "border-daw-green bg-green-50" : "border-slate-100 bg-slate-50 hover:bg-slate-100"}`}>
               <input {...getInputCoverProps()} />
               {coverPreview ? (
                 <img
@@ -731,8 +797,7 @@ export default function ProjectForm() {
                     (imgName: string, idx: number) => (
                       <div
                         key={`old-${idx}`}
-                        className="relative aspect-square group rounded-xl overflow-hidden border border-slate-100 shadow-sm"
-                      >
+                        className="relative aspect-square group rounded-xl overflow-hidden border border-slate-100 shadow-sm">
                         <img
                           src={`${BASE_UPLOAD_URL}/${imgName}`}
                           className="w-full h-full object-cover"
@@ -749,8 +814,7 @@ export default function ProjectForm() {
                             e.stopPropagation();
                             removeOldGalleryImage(idx);
                           }}
-                          className="absolute top-1.5 right-1.5 bg-red-500 hover:bg-red-600 text-white rounded-full p-1.5 shadow-lg opacity-0 group-hover:opacity-100 transition-all transform hover:scale-110 z-30"
-                        >
+                          className="absolute top-1.5 right-1.5 bg-red-500 hover:bg-red-600 text-white rounded-full p-1.5 shadow-lg opacity-0 group-hover:opacity-100 transition-all transform hover:scale-110 z-30">
                           <X className="w-3 h-3" />
                         </button>
                       </div>
@@ -773,8 +837,7 @@ export default function ProjectForm() {
 
             <div
               {...getRootGalleryProps()}
-              className={`p-6 border-2 border-dashed rounded-lg text-center cursor-pointer transition-all ${isGalleryDragActive ? "border-daw-green bg-green-50" : "border-slate-200 hover:bg-slate-50"}`}
-            >
+              className={`p-6 border-2 border-dashed rounded-lg text-center cursor-pointer transition-all ${isGalleryDragActive ? "border-daw-green bg-green-50" : "border-slate-200 hover:bg-slate-50"}`}>
               <input {...getInputGalleryProps()} />
               <Plus
                 className={`w-6 h-6 mx-auto mb-2 transition-transform ${isGalleryDragActive ? "scale-150 text-daw-green" : "text-slate-300"}`}

@@ -23,4 +23,10 @@ router.get(
   checkPermission("manage_approvals"),
   approvalController.getOriginalData,
 );
+
+router.get(
+  "/drafts/rejected/:id",
+  verifyToken,
+  approvalController.getRejectedDraftByTarget,
+);
 module.exports = router;

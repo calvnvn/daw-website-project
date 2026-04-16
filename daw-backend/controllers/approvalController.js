@@ -11,18 +11,63 @@ const Menu = require("../models/Menu");
 const MapCategory = require("../models/MapCategory");
 const BusinessSection = require("../models/BusinessSection");
 const BusinessMapMarker = require("../models/BusinessMapMarker");
+const ApprovalDraft = require("../models/ApprovalDraft");
 
-// GET: List Queue from DAW API
+// GET: List Queue dengan Data Lengkap dari Lokal
+// GET: List Queue dari DAW API
 exports.getPendingApprovals = async (req, res) => {
   try {
     const tokenOWL = req.owl_token;
-    // Asumsi req.userId adalah NIK/ID Karyawan Admin dari JWT
-    const pendingList = await ErpApprovalService.getPendingList(
-      req.owl_username || req.userId,
+    const karyawanId = req.owl_username || req.userId;
+
+    const owlResponse = await ErpApprovalService.getPendingList(
+      karyawanId,
       tokenOWL,
     );
 
-    res.status(200).json(pendingList);
+    // 1. TAMBAHIN LOG INI BUAT NGINTIP BALESAN ASLI MAS RIZKY
+    console.log(
+      ">>> [DEBUG OWL PENDING]:",
+      JSON.stringify(owlResponse, null, 2),
+    );
+
+    // 2. EXTRACTION YANG AMAN (Safe Check)
+    let pendingTickets = [];
+
+    if (Array.isArray(owlResponse)) {
+      // Kasus 1: Mas Rizky langsung balikin Array
+      pendingTickets = owlResponse;
+    } else if (owlResponse && Array.isArray(owlResponse.data)) {
+      // Kasus 2: Mas Rizky balikin { error: false, data: [...] }
+      pendingTickets = owlResponse.data;
+    } else if (
+      owlResponse &&
+      owlResponse.data &&
+      Array.isArray(owlResponse.data.rows)
+    ) {
+      // Kasus 3: Mas Rizky balikin { error: false, data: { rows: [...] } }
+      pendingTickets = owlResponse.data.rows;
+    }
+
+    // 3. JIKA TETAP KOSONG / BUKAN ARRAY
+    if (pendingTickets.length === 0) {
+      console.log(
+        ">>> [INFO] Antrean kosong atau Karyawan ID tidak punya akses approval.",
+      );
+      return res.status(200).json([]);
+    }
+
+    // Karena sekarang pendingTickets DIJAMIN array, .map() nggak akan error lagi
+    const ticketNumbers = pendingTickets.map((item) => item.notrans);
+
+    const detailedDrafts = await ApprovalDraft.findAll({
+      where: {
+        notrans: ticketNumbers,
+      },
+      order: [["createdAt", "DESC"]],
+    });
+
+    res.status(200).json(detailedDrafts);
   } catch (error) {
     console.error("🚨 [FETCH PENDING ERROR]:", error.message);
     res.status(error.statusCode || 500).json({ message: error.message });
@@ -49,7 +94,7 @@ exports.executeDecision = async (req, res) => {
       await ErpApprovalService.submitDecision(
         notrans,
         "2",
-        keteranganRejek || "Ditolak",
+        keteranganRejek,
         tokenOWL,
       );
       const Model = getModelByModuleName(module);
@@ -59,6 +104,12 @@ exports.executeDecision = async (req, res) => {
           { where: { id: targetId }, transaction: t },
         );
       }
+
+      await ApprovalDraft.update(
+        { status: "Rejected" },
+        { where: { notrans: notrans }, transaction: t },
+      );
+
       await t.commit();
       return res
         .status(200)
@@ -70,7 +121,15 @@ exports.executeDecision = async (req, res) => {
       const cleanPayload = { ...payload };
       delete cleanPayload.id;
 
+      cleanPayload.is_locked = false;
+      cleanPayload.lock_ticket = null;
+
       await executeModelUpdate(module, targetId, cleanPayload, action, t);
+
+      await ApprovalDraft.update(
+        { status: "Approved" },
+        { where: { notrans: notrans }, transaction: t },
+      );
 
       await ErpApprovalService.submitDecision(
         notrans,
@@ -102,6 +161,31 @@ exports.getOriginalData = async (req, res) => {
     res.status(200).json(data);
   } catch (error) {
     res.status(500).json({ message: error.message });
+  }
+};
+
+exports.getRejectedDraftByTarget = async (req, res) => {
+  try {
+    const { id } = req.params; // Ini targetId (ID Project)
+    const { module } = req.query; // Ini nama Modul (Project)
+
+    const draft = await ApprovalDraft.findOne({
+      where: {
+        target_id: id,
+        module_name: module,
+        status: "Rejected", // Kita cuma cari yang statusnya ditolak
+      },
+      order: [["createdAt", "DESC"]], // Ambil yang paling baru ditolak
+    });
+
+    if (!draft) {
+      return res.status(404).json({ message: "No rejected draft found" });
+    }
+
+    res.status(200).json(draft);
+  } catch (error) {
+    console.error("Error fetching rejected draft:", error);
+    res.status(500).json({ message: "Internal Server Error" });
   }
 };
 
@@ -172,7 +256,13 @@ function handleFileCommit(module, payload) {
  * 3. EXECUTION ENGINE
  * Tempat eksekusi logika update ke MySQL berdasarkan modul
  */
-async function executeModelUpdate(module, targetId, payload, transaction) {
+async function executeModelUpdate(
+  module,
+  targetId,
+  payload,
+  action,
+  transaction,
+) {
   const Model = getModelByModuleName(module);
 
   if (action === "DELETE") {

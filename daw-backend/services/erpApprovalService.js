@@ -20,7 +20,26 @@ class ErpApprovalService {
     );
   }
 
-  // Reference-Based Approval. Simpan konten di SQL, send nomor ke API DAW
+  // Handshake: Cek Setup
+  static async _cekSetup(notrans, token) {
+    try {
+      const response = await dawApi.post(
+        "/node/approval/setup/cekSetup",
+        {
+          notrans: notrans,
+          jenisApp: CMS_CODE,
+        },
+        { headers: { Authorization: `Bearer ${token}` } },
+      );
+
+      return response.data.data.rows;
+    } catch (error) {
+      this._handleError(error, "cekSetup");
+    }
+  }
+
+  // Initiate Approval (The Handshake Flow)
+  // Alur: Vaulting -> Discovery -> Injection
   static async initiateApproval({
     model,
     targetId,
@@ -35,7 +54,7 @@ class ErpApprovalService {
     try {
       // GENERATE notrans
       const notrans = generateNotrans(model.name);
-      console.log(`>>> [APPROVAL] Generated Local Notrans: ${notrans}`);
+      console.log(`>>> [LOCAL VAULT] Storing draft: ${notrans}`);
 
       // Save content to ApprovalDrafts Table (Status: Pending)
       await ApprovalDraft.create(
@@ -59,12 +78,20 @@ class ErpApprovalService {
         );
       }
 
+      console.log(
+        `>>> [HANDSHAKE] Discovery: Checking setup for ${notrans}...`,
+      );
+      const approverRows = await this._cekSetup(notrans, token);
+
+      console.log(
+        `>>> [HANDSHAKE] Injection: Registering transaction to OWL...`,
+      );
       await dawApi.post(
         "/node/approval/trans/add",
         {
           notrans: notrans,
-          jenisApproval: CMS_CODE,
-          karyawanid: owlUsername || userId,
+          inputby: owlUsername || userId,
+          data: approverRows,
         },
         {
           headers: { Authorization: `Bearer ${token}` },
@@ -73,13 +100,13 @@ class ErpApprovalService {
 
       await t.commit();
       console.log(
-        `>>> [APPROVAL SUCCESS] Tiket ${notrans} berhasil didaftarkan.`,
+        `>>> [SUCCESS] Ticket ${notrans} is now live in OWL hierarchy.`,
       );
 
       return { success: true, notrans: notrans };
     } catch (error) {
-      await t.rollback();
-      this._handleError(error, "initiateApproval");
+      if (t) await t.rollback();
+      this._handleError(error, "initiateApprovalInternal");
     }
   }
 
