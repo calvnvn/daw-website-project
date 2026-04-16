@@ -13,10 +13,38 @@ const BusinessSection = require("../models/BusinessSection");
 const BusinessMapMarker = require("../models/BusinessMapMarker");
 const ApprovalDraft = require("../models/ApprovalDraft");
 
+const HeroSlide = require("../models/HeroSlide");
+const History = require("../models/History");
+const HomeSetting = require("../models/HomeSetting");
+const ImpactStat = require("../models/ImpactStat");
+const InvestmentSettings = require("../models/InvestmentSettings");
+const Settings = require("../models/Settings");
+const AboutInfo = require("../models/AboutInfo");
+
 // GET: List Queue dengan Data Lengkap dari Lokal
-// GET: List Queue dari DAW API
 exports.getPendingApprovals = async (req, res) => {
   try {
+    const userRole = req.userRole; // Ambil dari middleware authJwt.js
+
+    // SUPERADMIN: melihat semua list yang statusnya "Pending" di lokal
+    if (userRole === "Superadmin" || userRole === "admin") {
+      console.log(
+        ">>> [APPROVAL CENTER] Mengakses sebagai Superadmin (All Pending Drafts)",
+      );
+
+      const allPendingDrafts = await ApprovalDraft.findAll({
+        where: { status: "Pending" },
+        order: [["createdAt", "DESC"]],
+      });
+
+      return res.status(200).json(allPendingDrafts);
+    }
+
+    // APPROVER: melihat list yang ditugaskan melalui NIK mereka dari OWL
+    console.log(
+      ">>> [APPROVAL CENTER] Mengakses sebagai Approver (Syncing with OWL...)",
+    );
+
     const tokenOWL = req.owl_token;
     const karyawanId = req.owl_username || req.userId;
 
@@ -24,50 +52,43 @@ exports.getPendingApprovals = async (req, res) => {
       karyawanId,
       tokenOWL,
     );
-
-    // 1. TAMBAHIN LOG INI BUAT NGINTIP BALESAN ASLI MAS RIZKY
-    console.log(
-      ">>> [DEBUG OWL PENDING]:",
-      JSON.stringify(owlResponse, null, 2),
-    );
-
-    // 2. EXTRACTION YANG AMAN (Safe Check)
     let pendingTickets = [];
 
     if (Array.isArray(owlResponse)) {
-      // Kasus 1: Mas Rizky langsung balikin Array
+      // Kasus 1: langsung balikin Array
       pendingTickets = owlResponse;
     } else if (owlResponse && Array.isArray(owlResponse.data)) {
-      // Kasus 2: Mas Rizky balikin { error: false, data: [...] }
+      // Kasus 2: balikin { error: false, data: [...] }
       pendingTickets = owlResponse.data;
     } else if (
       owlResponse &&
       owlResponse.data &&
       Array.isArray(owlResponse.data.rows)
     ) {
-      // Kasus 3: Mas Rizky balikin { error: false, data: { rows: [...] } }
+      // Kasus 3: balikin { error: false, data: { rows: [...] } }
       pendingTickets = owlResponse.data.rows;
     }
 
-    // 3. JIKA TETAP KOSONG / BUKAN ARRAY
+    // Kalau tetep kosong
     if (pendingTickets.length === 0) {
       console.log(
-        ">>> [INFO] Antrean kosong atau Karyawan ID tidak punya akses approval.",
+        ">>> [INFO] Antrean kosong atau Karyawan ID tidak punya akses approval di OWL.",
       );
       return res.status(200).json([]);
     }
 
-    // Karena sekarang pendingTickets DIJAMIN array, .map() nggak akan error lagi
+    // Merge OWL dengan LOKAL
     const ticketNumbers = pendingTickets.map((item) => item.notrans);
 
     const detailedDrafts = await ApprovalDraft.findAll({
       where: {
         notrans: ticketNumbers,
+        status: "Pending", // Pastikan status di lokal juga masih pending
       },
       order: [["createdAt", "DESC"]],
     });
 
-    res.status(200).json(detailedDrafts);
+    return res.status(200).json(detailedDrafts);
   } catch (error) {
     console.error("🚨 [FETCH PENDING ERROR]:", error.message);
     res.status(error.statusCode || 500).json({ message: error.message });
@@ -153,14 +174,30 @@ exports.executeDecision = async (req, res) => {
 // GET: Mengambil data asli (Live) dari database lokal untuk komparasi (Diff Viewer)
 exports.getOriginalData = async (req, res) => {
   try {
-    const { module, targetId } = req.query;
+    const { module, targetId, action } = req.query;
+
+    if (action === "CREATE") {
+      return res.status(200).json({
+        _system_note: "Ini adalah data baru, belum ada versi Live.",
+      });
+    }
     const data = await fetchOriginalDataByModule(module, targetId);
 
-    if (!data)
-      return res.status(404).json({ message: "Data asli tidak ditemukan." });
+    if (!data) {
+      return res.status(200).json({
+        _system_note: `Data Live tidak ditemukan. Pastikan data dengan ID ${targetId} belum dihapus dari database.`,
+      });
+    }
+
     res.status(200).json(data);
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    console.error(
+      `🚨 [GET ORIGINAL DATA ERROR] Module: ${req.query.module} | Message:`,
+      error.message,
+    );
+    res.status(500).json({
+      message: "Terjadi kesalahan saat menarik data Live.",
+    });
   }
 };
 
@@ -347,28 +384,84 @@ async function executeModelUpdate(
 async function fetchOriginalDataByModule(module, targetId) {
   const Model = getModelByModuleName(module);
 
-  // Custom fetch untuk data yang punya relasi atau singleton
-  if (module === "BusinessSection") {
-    return await BusinessSection.findByPk(targetId, {
-      include: [{ model: BusinessMapMarker, as: "mapMarkers" }],
-    });
+  if (!Model) {
+    console.error(
+      `🚨 [DIFF VIEWER] Fatal: Model untuk modul '${module}' tidak ditemukan di mapping!`,
+    );
+    return null;
   }
 
-  if (
-    ["AboutInfo", "HomeSetting", "InvestmentSettings", "Settings"].includes(
-      module,
-    )
-  ) {
-    return await Model.findByPk(1);
+  // 2. SANITASI SUPER KETAT (Membunuh White Space dan Stringified Null)
+  let cleanTargetId = null;
+  if (targetId && typeof targetId === "string") {
+    cleanTargetId = targetId.trim();
+    if (
+      cleanTargetId === "null" ||
+      cleanTargetId === "undefined" ||
+      cleanTargetId === ""
+    ) {
+      cleanTargetId = null;
+    }
+  } else {
+    cleanTargetId = targetId;
   }
 
-  if (module === "History") {
-    const histories = await History.findAll({ order: [["year", "ASC"]] });
-    return {
-      histories: histories.map((h) => ({ year: h.year, text: h.description })),
-    };
-  }
+  console.log(
+    `>>> [DIFF VIEWER] Mencari versi Live | Modul: ${module} | Clean ID: '${cleanTargetId}'`,
+  );
 
-  // Default Fetch
-  return Model ? await Model.findByPk(targetId) : null;
+  try {
+    // Custom fetch untuk data yang punya relasi atau singleton
+    if (module === "BusinessSection") {
+      return await BusinessSection.findByPk(cleanTargetId, {
+        include: [{ model: BusinessMapMarker, as: "mapMarkers" }],
+      });
+    }
+
+    if (
+      ["AboutInfo", "HomeSetting", "InvestmentSettings", "Settings"].includes(
+        module,
+      )
+    ) {
+      // Modul Singleton selalu pakai ID 1
+      return await Model.findByPk(1);
+    }
+
+    if (module === "History") {
+      const histories = await History.findAll({ order: [["year", "ASC"]] });
+      return {
+        histories: histories.map((h) => ({
+          year: h.year,
+          text: h.description,
+        })),
+      };
+    }
+
+    // 3. PENCEGAHAN QUERY KOSONG
+    if (!cleanTargetId) {
+      console.warn(
+        `⚠️ [DIFF VIEWER] Target ID kosong setelah sanitasi. Batal query ke database.`,
+      );
+      return null;
+    }
+
+    // Default Fetch (Project, Affiliate, Management, Page, dll)
+    const data = await Model.findByPk(cleanTargetId);
+
+    if (!data) {
+      console.warn(
+        `⚠️ [DIFF VIEWER] Data GHOST! Record '${cleanTargetId}' tidak ada di tabel '${Model.tableName}'`,
+      );
+    } else {
+      console.log(`>>> [DIFF VIEWER] Data Live Ditemukan! Sukses.`);
+    }
+
+    return data;
+  } catch (error) {
+    console.error(
+      `🚨 [DIFF VIEWER] Sequelize Error saat query tabel '${Model.tableName}':`,
+      error,
+    );
+    throw error;
+  }
 }

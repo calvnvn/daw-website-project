@@ -40,8 +40,7 @@ export default function ProtectedRoute({ permission }: ProtectedRouteProps) {
         </p>
         <button
           onClick={() => (window.location.href = "/admin")}
-          className="text-sm font-bold text-daw-green hover:underline"
-        >
+          className="text-sm font-bold text-daw-green hover:underline">
           Back to Dashboard
         </button>
       </div>
