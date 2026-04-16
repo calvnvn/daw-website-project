@@ -10,10 +10,6 @@ import {
   Building,
   CheckSquare,
   X,
-  LinkIcon,
-  Send,
-  Info,
-  Save,
 } from "lucide-react";
 import api from "@/lib/api";
 import { toast } from "sonner";
@@ -256,8 +252,7 @@ export default function Inbox() {
           <div className="flex items-center gap-3">
             <button
               onClick={() => setIsSubjectModalOpen(true)}
-              className="bg-white border border-slate-200 text-slate-600 px-4 py-2 rounded-lg font-bold text-sm flex items-center gap-2 hover:bg-slate-50 transition-colors shadow-sm"
-            >
+              className="bg-white border border-slate-200 text-slate-600 px-4 py-2 rounded-lg font-bold text-sm flex items-center gap-2 hover:bg-slate-50 transition-colors shadow-sm">
               <CheckSquare className="w-4 h-4" /> Manage Subjects
             </button>
             <div className="bg-daw-green/10 text-daw-green px-4 py-2 rounded-lg font-bold text-sm flex items-center gap-2">
@@ -289,8 +284,7 @@ export default function Inbox() {
               <div className="flex gap-2 overflow-x-auto hide-scrollbar pb-1">
                 <button
                   onClick={() => setFilterSubject("All")}
-                  className={`px-3 py-1.5 rounded-md text-[10px] uppercase tracking-wider font-bold whitespace-nowrap transition-colors ${filterSubject === "All" ? "bg-daw-green text-white" : "bg-slate-100 text-slate-500 hover:bg-slate-200"}`}
-                >
+                  className={`px-3 py-1.5 rounded-md text-[10px] uppercase tracking-wider font-bold whitespace-nowrap transition-colors ${filterSubject === "All" ? "bg-daw-green text-white" : "bg-slate-100 text-slate-500 hover:bg-slate-200"}`}>
                   All
                 </button>
                 {subjects
@@ -303,8 +297,7 @@ export default function Inbox() {
                         filterSubject === sub.name
                           ? "bg-daw-green text-white"
                           : "bg-slate-100 text-slate-500 hover:bg-slate-200"
-                      }`}
-                    >
+                      }`}>
                       {sub.name}
                     </button>
                   ))}{" "}
@@ -338,14 +331,12 @@ export default function Inbox() {
                 <div className="flex gap-2">
                   <button
                     onClick={() => setSelectedMails([])}
-                    className="p-1.5 text-daw-green hover:bg-daw-green/20 rounded-md transition-colors"
-                  >
+                    className="p-1.5 text-daw-green hover:bg-daw-green/20 rounded-md transition-colors">
                     <X className="w-4 h-4" />
                   </button>
                   <button
                     onClick={bulkDelete}
-                    className="p-1.5 text-red-500 hover:bg-red-100 rounded-md transition-colors"
-                  >
+                    className="p-1.5 text-red-500 hover:bg-red-100 rounded-md transition-colors">
                     <Trash2 className="w-4 h-4" />
                   </button>
                 </div>
@@ -373,15 +364,13 @@ export default function Inbox() {
                     <div
                       key={inq.id}
                       className={`flex items-start p-4 transition-colors hover:bg-slate-50 group relative cursor-pointer ${selectedInquiryId === inq.id ? "bg-green-50/50" : ""}`}
-                      onClick={() => handleSelectInquiry(inq.id)}
-                    >
+                      onClick={() => handleSelectInquiry(inq.id)}>
                       {selectedInquiryId === inq.id && (
                         <div className="absolute left-0 top-0 bottom-0 w-1 bg-daw-green"></div>
                       )}
                       <div
                         className="shrink-0 mr-3 mt-0.5"
-                        onClick={(e) => e.stopPropagation()}
-                      >
+                        onClick={(e) => e.stopPropagation()}>
                         <input
                           type="checkbox"
                           checked={selectedMails.includes(inq.id)}
@@ -392,8 +381,7 @@ export default function Inbox() {
                       <div className="flex-1 min-w-0">
                         <div className="flex justify-between items-start mb-1">
                           <h3
-                            className={`text-sm truncate pr-4 ${!inq.isRead ? "font-bold text-slate-900" : "font-medium text-slate-700"}`}
-                          >
+                            className={`text-sm truncate pr-4 ${!inq.isRead ? "font-bold text-slate-900" : "font-medium text-slate-700"}`}>
                             {inq.name}
                           </h3>
                           <span className="text-[10px] text-slate-400 whitespace-nowrap shrink-0">
@@ -401,13 +389,11 @@ export default function Inbox() {
                           </span>
                         </div>
                         <h4
-                          className={`text-xs truncate mb-1 ${!inq.isRead ? "font-semibold text-slate-800" : "text-slate-500"}`}
-                        >
+                          className={`text-xs truncate mb-1 ${!inq.isRead ? "font-semibold text-slate-800" : "text-slate-500"}`}>
                           {inq.subject || "General Inquiry"}
                         </h4>
                         <p
-                          className={`text-xs line-clamp-2 ${!inq.isRead ? "text-slate-600 font-medium" : "text-slate-400"}`}
-                        >
+                          className={`text-xs line-clamp-2 ${!inq.isRead ? "text-slate-600 font-medium" : "text-slate-400"}`}>
                           {inq.message}
                         </p>
                       </div>
@@ -436,8 +422,7 @@ export default function Inbox() {
                         setSearchTerm("");
                         setFilterSubject("All");
                       }}
-                      className="mt-4 text-xs font-bold text-daw-green hover:underline"
-                    >
+                      className="mt-4 text-xs font-bold text-daw-green hover:underline">
                       Clear Filters
                     </button>
                   )}
@@ -466,15 +451,13 @@ export default function Inbox() {
                     <button
                       onClick={() => markAsRead(selectedInquiry.id)}
                       className="p-2 text-slate-400 hover:text-daw-green hover:bg-green-50 rounded-lg transition-colors"
-                      title="Mark as Read"
-                    >
+                      title="Mark as Read">
                       <CheckCircle2 className="w-4 h-4" />
                     </button>
                     <button
                       onClick={() => deleteInquiry(selectedInquiry.id)}
                       className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                      title="Delete Message"
-                    >
+                      title="Delete Message">
                       <Trash2 className="w-4 h-4" />
                     </button>
                   </div>
@@ -504,8 +487,7 @@ export default function Inbox() {
                                 copyEmailToClipboard(selectedInquiry.email)
                               }
                               className="flex items-center gap-2 text-slate-600 hover:text-daw-green font-medium transition-colors group/copy"
-                              title="Click to copy email"
-                            >
+                              title="Click to copy email">
                               <div className="p-1.5 bg-slate-100 rounded-md group-hover/copy:bg-daw-green/10 transition-colors">
                                 <Mail className="w-3.5 h-3.5" />
                               </div>
@@ -514,8 +496,7 @@ export default function Inbox() {
                             {selectedInquiry.phone && (
                               <a
                                 href={`tel:${selectedInquiry.phone}`}
-                                className="flex items-center gap-2 text-slate-600 hover:text-daw-green font-medium transition-colors group/phone"
-                              >
+                                className="flex items-center gap-2 text-slate-600 hover:text-daw-green font-medium transition-colors group/phone">
                                 <div className="p-1.5 bg-slate-100 rounded-md group-hover/phone:bg-daw-green/10 transition-colors">
                                   <Phone className="w-3.5 h-3.5" />
                                 </div>
@@ -564,8 +545,7 @@ export default function Inbox() {
                       <div className="flex flex-wrap justify-center md:justify-end items-center gap-3 relative z-10 w-full md:w-auto">
                         <button
                           onClick={() => openWebMail("gmail")}
-                          className="flex-1 md:flex-none inline-flex items-center justify-center gap-2 bg-white/10 hover:bg-white/20 text-white border border-white/10 px-5 py-2.5 rounded-xl font-medium transition-all  group"
-                        >
+                          className="flex-1 md:flex-none inline-flex items-center justify-center gap-2 bg-white/10 hover:bg-white/20 text-white border border-white/10 px-5 py-2.5 rounded-xl font-medium transition-all  group">
                           <div className="w-6 h-6 rounded-full bg-red-500 flex items-center justify-center group-hover:scale-110 transition-transform">
                             <Mail className="w-3.5 h-3.5 text-white" />
                           </div>{" "}
@@ -573,8 +553,7 @@ export default function Inbox() {
                         </button>
                         <button
                           onClick={() => openWebMail("outlook")}
-                          className="flex-1 md:flex-none inline-flex items-center justify-center gap-2 bg-white/10 hover:bg-white/20 text-white border border-white/10 px-5 py-2.5 rounded-xl font-medium transition-all  group"
-                        >
+                          className="flex-1 md:flex-none inline-flex items-center justify-center gap-2 bg-white/10 hover:bg-white/20 text-white border border-white/10 px-5 py-2.5 rounded-xl font-medium transition-all  group">
                           <div className="w-6 h-6 rounded-full bg-blue-500 flex items-center justify-center group-hover:scale-110 transition-transform">
                             <Mail className="w-3.5 h-3.5 text-white" />
                           </div>{" "}
@@ -584,8 +563,7 @@ export default function Inbox() {
                           onClick={() =>
                             copyEmailToClipboard(selectedInquiry.email)
                           }
-                          className="w-full md:w-auto inline-flex items-center justify-center gap-2 bg-daw-green hover:bg-emerald-500 text-white px-5 py-2.5 rounded-xl font-bold transition-all shadow-[0_0_15px_rgba(16,185,129,0.3)] hover:shadow-[0_0_20px_rgba(16,185,129,0.5)]"
-                        >
+                          className="w-full md:w-auto inline-flex items-center justify-center gap-2 bg-daw-green hover:bg-emerald-500 text-white px-5 py-2.5 rounded-xl font-bold transition-all shadow-[0_0_15px_rgba(16,185,129,0.3)] hover:shadow-[0_0_20px_rgba(16,185,129,0.5)]">
                           Copy Email
                         </button>
                       </div>
