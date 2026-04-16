@@ -3,7 +3,9 @@ const ApprovalDraft = require("../models/ApprovalDraft");
 const sequelize = require("../config/database");
 const { generateNotrans } = require("../utils/notransGenerator");
 
-const CMS_CODE = process.env.CMS_APPROVAL_CODE;
+const CMS_CODE = process.env.CMS_APPROVAL_CODE
+  ? process.env.CMS_APPROVAL_CODE.trim()
+  : "CMS";
 
 const dawApi = axios.create({
   baseURL: process.env.DAW_NODE_URL,
@@ -23,16 +25,20 @@ class ErpApprovalService {
   // Handshake: Cek Setup
   static async _cekSetup(notrans, token) {
     try {
+      const payload = {
+        notrans: notrans,
+        jenisApp: CMS_CODE,
+      };
+
+      console.log(`>>> [DEBUG OWL] Payload cekSetup:`, payload);
+
       const response = await dawApi.post(
         "/node/approval/setup/cekSetup",
-        {
-          notrans: notrans,
-          jenisApp: CMS_CODE,
-        },
+        payload,
         { headers: { Authorization: `Bearer ${token}` } },
       );
 
-      return response.data.data.rows;
+      return response.data?.data?.rows || [];
     } catch (error) {
       this._handleError(error, "cekSetup");
     }
@@ -86,17 +92,22 @@ class ErpApprovalService {
       console.log(
         `>>> [HANDSHAKE] Injection: Registering transaction to OWL...`,
       );
-      await dawApi.post(
-        "/node/approval/trans/add",
-        {
-          notrans: notrans,
-          inputby: owlUsername || userId,
-          data: approverRows,
-        },
-        {
-          headers: { Authorization: `Bearer ${token}` },
-        },
+
+      const inputByString = String(owlUsername || userId);
+      const payloadTransAdd = {
+        notrans: notrans,
+        inputby: inputByString,
+        data: approverRows,
+      };
+
+      console.log(
+        `>>> [DEBUG OWL] Payload trans/add:`,
+        JSON.stringify(payloadTransAdd, null, 2),
       );
+
+      await dawApi.post("/node/approval/trans/add", payloadTransAdd, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
 
       await t.commit();
       console.log(
