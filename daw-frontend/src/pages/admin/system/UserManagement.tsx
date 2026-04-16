@@ -30,6 +30,23 @@ interface RoleData {
   name: string;
 }
 
+const timeAgo = (dateString: string | null) => {
+  if (!dateString) return "Belum pernah login";
+  const date = new Date(dateString);
+  const now = new Date();
+  const diffInSeconds = Math.floor((now.getTime() - date.getTime()) / 1000);
+
+  if (diffInSeconds < 60) return "Baru saja";
+  const diffInMinutes = Math.floor(diffInSeconds / 60);
+  if (diffInMinutes < 60) return `${diffInMinutes}m yang lalu`;
+  const diffInHours = Math.floor(diffInMinutes / 60);
+  if (diffInHours < 24) return `${diffInHours}j yang lalu`;
+  const diffInDays = Math.floor(diffInHours / 24);
+  if (diffInDays < 7) return `${diffInDays} hari lalu`;
+
+  return date.toLocaleDateString("id-ID", { day: "numeric", month: "short" });
+};
+
 export default function UserManagement() {
   const { user: currentUser } = useAuth();
   const currentUserId = currentUser?.id;
@@ -64,6 +81,13 @@ export default function UserManagement() {
         );
         setRoles([]); // Kosongkan agar tidak crash
       }
+
+      if (rolesRes.status === "rejected") {
+        console.error(
+          "Roles fetch error details:",
+          rolesRes.reason?.response?.data,
+        );
+      }
     } catch (error) {
       console.error("Critical Error fetching data:", error);
     } finally {
@@ -76,20 +100,14 @@ export default function UserManagement() {
   }, []);
 
   const [formData, setFormData] = useState({
-    name: "",
+    owl_username: "",
     email: "",
     roleId: "",
   });
 
-  const [tempCredentials, setTempCredentials] = useState<{
-    email: string;
-    pass: string;
-  } | null>(null);
-
   const handleCloseModal = () => {
     setIsModalOpen(false);
-    setTempCredentials(null);
-    setFormData({ name: "", email: "", roleId: "" }); // Reset form
+    setFormData({ owl_username: "", email: "", roleId: "" }); // Reset form
   };
 
   const filteredUsers = users.filter(
@@ -99,24 +117,24 @@ export default function UserManagement() {
   );
 
   const handleAddUser = async () => {
-    if (!formData.name || !formData.email || !formData.roleId) {
-      return toast.error("Please fill in all required fields, including Role.");
+    if (!formData.owl_username || !formData.roleId) {
+      return toast.error("OWL Username dan System Role wajib diisi!");
     }
-    const loadingToast = toast.loading("Creating user account...");
-    try {
-      const response = await api.post("/users", formData);
-      const result = response.data;
 
-      // Tampilkan password sementara
-      toast.success("User account created successfully!", {
+    const loadingToast = toast.loading("Mendaftarkan akses user ke CMS...");
+    try {
+      await api.post("/users", formData);
+
+      toast.success("User OWL berhasil didaftarkan!", {
         id: loadingToast,
+        description:
+          "User dapat langsung login menggunakan password DAW mereka.",
       });
 
       fetchUsersAndRoles();
-
-      setTempCredentials({ email: formData.email, pass: result.tempPassword });
+      handleCloseModal();
     } catch (error: any) {
-      toast.error(error.response?.data?.message || "Failed to invite User.", {
+      toast.error(error.response?.data?.message || "Gagal mendaftarkan user.", {
         id: loadingToast,
       });
     }
@@ -326,10 +344,9 @@ export default function UserManagement() {
         </div>
         <button
           onClick={() => setIsModalOpen(true)}
-          className="flex items-center gap-2 bg-slate-900 hover:bg-slate-800 text-white px-5 py-2.5 rounded-lg font-medium transition-colors shadow-sm"
-        >
+          className="flex items-center gap-2 bg-slate-900 hover:bg-slate-800 text-white px-5 py-2.5 rounded-lg font-medium transition-colors shadow-sm">
           <UserPlus className="w-5 h-5" />
-          <span>Invite New User</span>
+          <span>Tambah Pengguna</span>
         </button>
       </div>
 
@@ -352,175 +369,183 @@ export default function UserManagement() {
       {/* DATA TABLE */}
       <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse">
+          <table className="w-full text-left border-collapse whitespace-nowrap">
             <thead>
-              <tr className="bg-slate-50 border-b border-slate-200 text-xs uppercase tracking-wider text-slate-500 font-semibold">
-                <th className="px-6 py-4">User Details</th>
-                <th className="px-6 py-4">System Role</th>
-                <th className="px-6 py-4">Status</th>
-                <th className="px-6 py-4">Last Login</th>
-                <th className="px-6 py-4 text-right">Actions</th>
+              <tr className="bg-slate-50/80 border-b border-slate-200 text-[10px] uppercase tracking-widest text-slate-500 font-black">
+                <th className="px-6 py-4">Identitas</th>
+                <th className="px-6 py-4">Role CMS</th>
+                <th className="px-6 py-4">Status Akun</th>
+                <th className="px-6 py-4">Aktivitas Terakhir</th>
+                <th className="px-6 py-4 text-right">Manajemen</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100">
+            <tbody className="divide-y divide-slate-100/80">
               {isLoading ? (
                 /* --- LOADING STATE --- */
                 <tr>
                   <td colSpan={5} className="px-6 py-12 text-center">
                     <div className="flex flex-col items-center justify-center space-y-3">
                       <div className="w-6 h-6 border-2 border-daw-green border-t-transparent rounded-full animate-spin"></div>
-                      <p className="text-sm text-slate-500">Loading users...</p>
+                      <p className="text-sm font-bold tracking-widest uppercase text-slate-400">
+                        Sinkronisasi Data...
+                      </p>
                     </div>
                   </td>
                 </tr>
               ) : filteredUsers.length > 0 ? (
                 /* --- DATA ITERATION --- */
-                filteredUsers.map((user) => {
-                  // LOGIKA PROTEKSI (Dihitung per baris user)
+                filteredUsers.map((user: any) => {
                   const isSelf = String(user.id) === String(currentUserId);
                   const roleName = user.roleData?.name || "Unknown Role";
                   const isSuperadmin = roleName === "Superadmin";
+
+                  // DETEKSI STATUS SYNC SSO
+                  const isPendingSync = user.name === "Menunggu Sync Login...";
+
                   return (
                     <tr
                       key={user.id}
-                      className="hover:bg-slate-50/80 transition-colors group"
-                    >
+                      className="hover:bg-slate-50 transition-colors group">
+                      {/* KOLOM 1: IDENTITAS (OWL + LOKAL) */}
                       <td className="px-6 py-4">
-                        <div className="flex items-center gap-3">
-                          <div className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center shrink-0 border border-slate-200 text-slate-500 font-bold uppercase">
-                            {user.name.charAt(0)}
+                        <div className="flex items-center gap-4">
+                          {/* Avatar Cerdas */}
+                          <div
+                            className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 font-black text-sm border shadow-sm
+                            ${isPendingSync ? "bg-slate-100 text-slate-400 border-slate-200" : "bg-gradient-to-br from-slate-800 to-slate-900 text-white border-slate-700"}`}>
+                            {isPendingSync
+                              ? "?"
+                              : user.name.charAt(0).toUpperCase()}
                           </div>
-                          <div>
-                            <p className="text-sm font-bold text-slate-900 group-hover:text-daw-green transition-colors">
-                              {user.name}{" "}
+
+                          <div className="flex flex-col">
+                            <div className="flex items-center gap-2">
+                              <p
+                                className={`text-sm font-bold ${isPendingSync ? "text-slate-400 italic" : "text-slate-900"}`}>
+                                {isPendingSync
+                                  ? "Belum Login (No Data)"
+                                  : user.name}
+                              </p>
                               {isSelf && (
-                                <span className="text-xs text-slate-400 ml-1">
-                                  (You)
+                                <span className="bg-daw-green/10 text-daw-green text-[9px] uppercase tracking-wider font-black px-1.5 py-0.5 rounded">
+                                  Anda
                                 </span>
                               )}
-                            </p>
-                            <p className="text-xs text-slate-500 mt-0.5">
-                              {user.email}
-                            </p>
+                            </div>
+
+                            {/* Pemasangan Identitas OWL & Email */}
+                            <div className="flex items-center gap-2 mt-1">
+                              <span className="font-mono text-[10px] font-bold bg-slate-100 border border-slate-200 text-slate-600 px-1.5 py-0.5 rounded uppercase">
+                                ID: {user.owl_username || "UNKNOWN"}
+                              </span>
+                              {!isPendingSync && user.email && (
+                                <span className="text-xs text-slate-500">
+                                  {user.email}
+                                </span>
+                              )}
+                            </div>
                           </div>
                         </div>
                       </td>
-                      {/* --- SYSTEM ROLE CELL --- */}
+
+                      {/* KOLOM 2: TINGKAT AKSES */}
                       <td className="px-6 py-4">
                         {currentUser?.role === "Superadmin" && !isSelf ? (
-                          <div className="relative inline-block group/role">
-                            {/* Highlight Background saat Hover */}
-                            <div className="absolute inset-0 bg-slate-100 rounded-lg opacity-0 group-hover/role:opacity-100 transition-opacity duration-200" />
-
+                          <div className="relative inline-block">
                             <select
                               value={user.roleId}
                               onChange={(e) =>
                                 handleUpdateRole(user.id, e.target.value)
                               }
-                              className={`relative appearance-none outline-none pr-8 pl-3 py-1.5 rounded-lg text-xs font-bold border transition-all cursor-pointer w-full min-w-[130px] shadow-sm
-                                ${getRoleBadgeColor(roleName)} 
-                                hover:border-daw-green hover:shadow-md focus:ring-2 focus:ring-daw-green/30 active:scale-[0.98]`}
-                            >
+                              className={`appearance-none outline-none pr-8 pl-3 py-1.5 rounded-lg text-xs font-bold border transition-all cursor-pointer shadow-sm
+                                ${getRoleBadgeColor(roleName)} hover:shadow-md focus:ring-2 focus:ring-daw-green/30 active:scale-[0.98]`}>
                               {roles.map((r) => (
                                 <option
                                   key={r.id}
                                   value={r.id}
-                                  className="text-slate-700 bg-white font-medium"
-                                >
+                                  className="text-slate-700 bg-white font-medium">
                                   {r.name}
                                 </option>
                               ))}
                             </select>
-
-                            {/* Custom Icon: Berputar saat hover */}
-                            <div className="absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400 group-hover/role:text-daw-green transition-all duration-300 group-hover/role:rotate-180">
-                              <ChevronDown className="w-4 h-4" />
-                            </div>
+                            <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
                           </div>
                         ) : (
-                          /* Mode Statis (Bukan Superadmin atau Akun Sendiri) */
                           <span
-                            className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold border shadow-sm ${getRoleBadgeColor(roleName)} ${isSelf ? "opacity-80 ring-1 ring-slate-200 ring-offset-1" : ""}`}
-                            title={
-                              isSelf ? "Your current role" : "Role is locked"
-                            }
-                          >
+                            className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold border shadow-sm ${getRoleBadgeColor(roleName)}`}>
                             {isSuperadmin && <Shield className="w-3.5 h-3.5" />}
                             {roleName}
                           </span>
                         )}
                       </td>
+
+                      {/* KOLOM 3: STATUS AKUN */}
                       <td className="px-6 py-4">
-                        {user.status === "Active" ? (
-                          <span className="inline-flex items-center gap-1.5 text-xs font-bold text-green-600">
-                            <ShieldCheck className="w-4 h-4" /> Active
-                          </span>
-                        ) : (
-                          <span className="inline-flex items-center gap-1.5 text-xs font-bold text-red-500">
-                            <ShieldAlert className="w-4 h-4" /> Suspended
-                          </span>
-                        )}
+                        <button
+                          onClick={() => !isSelf && toggleUserStatus(user)}
+                          disabled={isSelf}
+                          title={
+                            isSelf
+                              ? "Tidak bisa mengubah status sendiri"
+                              : "Klik untuk ubah status"
+                          }
+                          className={`inline-flex items-center gap-1.5 text-xs font-bold px-2.5 py-1 rounded-full transition-all border
+                            ${
+                              user.status === "Active"
+                                ? "bg-green-50 text-green-700 border-green-200 hover:bg-green-100 hover:border-green-300"
+                                : "bg-red-50 text-red-600 border-red-200 hover:bg-red-100 hover:border-red-300"
+                            } ${isSelf ? "opacity-50 cursor-not-allowed" : "cursor-pointer active:scale-95 shadow-sm"}`}>
+                          {user.status === "Active" ? (
+                            <ShieldCheck className="w-3.5 h-3.5" />
+                          ) : (
+                            <ShieldAlert className="w-3.5 h-3.5" />
+                          )}
+                          {user.status}
+                        </button>
                       </td>
+
+                      {/* KOLOM 4:LAST LOGIN */}
                       <td className="px-6 py-4">
-                        <p className="text-sm text-slate-600">
-                          {user.lastLogin
-                            ? new Date(user.lastLogin).toLocaleDateString()
-                            : "Never"}
-                        </p>
-                      </td>
-                      <td className="px-6 py-4 text-right">
-                        {/* --- ACTION BUTTONS --- */}
-                        <div className="flex items-center justify-end gap-3 opacity-100 lg:opacity-0 lg:group-hover:opacity-100 transition-all duration-300">
-                          {/* 1. SUSPEND BUTTON */}
-                          <div className="relative flex items-center justify-center group/tooltip">
-                            <button
-                              onClick={() => !isSelf && toggleUserStatus(user)}
-                              disabled={isSelf}
-                              className={`p-2 rounded-lg transition-colors ${
-                                isSelf
-                                  ? "opacity-20 cursor-not-allowed text-slate-300"
-                                  : user.status === "Active"
-                                    ? "text-slate-400 hover:text-amber-600 hover:bg-amber-50"
-                                    : "text-slate-400 hover:text-green-600 hover:bg-green-50"
-                              }`}
-                            >
-                              <ShieldAlert className="w-4 h-4" />
-                            </button>
-                            <span className="absolute -top-8 scale-0 transition-all rounded bg-slate-800 p-2 text-[10px] text-white group-hover/tooltip:scale-100 z-10 whitespace-nowrap shadow-lg">
-                              {isSelf
-                                ? "Cannot suspend yourself"
-                                : user.status === "Active"
-                                  ? "Suspend User"
-                                  : "Reactivate User"}
+                        <div className="flex flex-col">
+                          <span
+                            className={`text-sm font-medium ${user.lastLogin ? "text-slate-600" : "text-slate-400 italic"}`}>
+                            {timeAgo(user.lastLogin)}
+                          </span>
+                          {user.lastLogin && (
+                            <span className="text-[10px] text-slate-400">
+                              {new Date(user.lastLogin).toLocaleTimeString(
+                                "id-ID",
+                                { hour: "2-digit", minute: "2-digit" },
+                              )}
                             </span>
-                          </div>
-                          {/* 3. DELETE BUTTON */}
-                          <div className="relative flex items-center justify-center group/tooltip">
-                            <button
-                              onClick={() =>
-                                !isSelf &&
-                                !isSuperadmin &&
-                                handleDeleteUser(user.id)
-                              }
-                              disabled={isSelf || isSuperadmin}
-                              className={`p-2 rounded-lg transition-colors ${
-                                isSelf || isSuperadmin
-                                  ? "opacity-20 cursor-not-allowed text-slate-300 bg-slate-100"
-                                  : "text-slate-400 hover:text-red-600 hover:bg-red-50"
-                              }`}
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </button>
-                            {/* Tooltip yang lebih informatif */}
-                            <span className="absolute -top-8 scale-0 transition-all rounded bg-slate-800 p-2 text-[10px] text-white group-hover/tooltip:scale-100 z-10 whitespace-nowrap shadow-lg">
-                              {isSelf
-                                ? "You cannot delete yourself"
-                                : isSuperadmin
-                                  ? "Superadmin is protected"
-                                  : "Delete User"}
-                            </span>
-                          </div>
+                          )}
                         </div>
+                      </td>
+
+                      {/* KOLOM 5: DELETE ACTION */}
+                      <td className="px-6 py-4 text-right">
+                        <button
+                          onClick={() =>
+                            !isSelf &&
+                            !isSuperadmin &&
+                            handleDeleteUser(user.id)
+                          }
+                          disabled={isSelf || isSuperadmin}
+                          title={
+                            isSelf
+                              ? "Tidak bisa hapus diri sendiri"
+                              : isSuperadmin
+                                ? "Superadmin dilindungi"
+                                : "Hapus Akun"
+                          }
+                          className={`p-2 rounded-lg transition-all border shadow-sm flex items-center justify-center ml-auto
+                            ${
+                              isSelf || isSuperadmin
+                                ? "bg-slate-50 text-slate-300 border-slate-100 cursor-not-allowed"
+                                : "bg-white text-slate-500 border-slate-200 hover:text-red-600 hover:border-red-200 hover:bg-red-50 active:scale-95"
+                            }`}>
+                          <Trash2 className="w-4 h-4" />
+                        </button>
                       </td>
                     </tr>
                   );
@@ -528,10 +553,18 @@ export default function UserManagement() {
               ) : (
                 /* --- EMPTY STATE --- */
                 <tr>
-                  <td colSpan={5} className="px-6 py-12 text-center">
-                    <p className="text-sm text-slate-500">
-                      No users found matching your search.
-                    </p>
+                  <td colSpan={5} className="px-6 py-20 text-center">
+                    <div className="flex flex-col items-center justify-center">
+                      <div className="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center mb-4">
+                        <Search className="w-8 h-8 text-slate-300" />
+                      </div>
+                      <p className="text-sm font-bold text-slate-600">
+                        Tidak ada user ditemukan
+                      </p>
+                      <p className="text-xs text-slate-400 mt-1">
+                        Coba gunakan kata kunci pencarian yang lain.
+                      </p>
+                    </div>
                   </td>
                 </tr>
               )}
@@ -544,146 +577,109 @@ export default function UserManagement() {
       {isModalOpen && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6 bg-slate-900/60 animate-in fade-in duration-200">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md flex flex-col overflow-hidden animate-in zoom-in-95 duration-200">
-            {/* CONDITIONAL RENDERING: Cek apakah ada kredensial sementara */}
-            {tempCredentials ? (
-              <div className="p-8 text-center space-y-6">
-                <div className="w-20 h-20 bg-green-100 text-green-600 rounded-full flex items-center justify-center mx-auto mb-2 animate-in zoom-in duration-300">
-                  <ShieldCheck className="w-10 h-10" />
-                </div>
-                <div>
-                  <h3 className="text-2xl font-serif font-bold text-slate-900">
-                    User Created!
-                  </h3>
-                  <p className="text-sm text-slate-500 mt-2">
-                    Please securely share this temporary credential with the new
-                    user. It will not be shown again.
-                  </p>
-                </div>
-
-                <div className="bg-slate-50 p-5 rounded-xl border border-slate-200 text-left space-y-3 relative">
-                  <div>
-                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">
-                      Email Address
-                    </p>
-                    <p className="text-sm font-medium text-slate-900">
-                      {tempCredentials.email}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">
-                      Temporary Password
-                    </p>
-                    <p className="text-xl font-mono font-bold text-slate-900 tracking-wider bg-white px-3 py-2 rounded border border-slate-200 inline-block w-full text-center shadow-inner select-all">
-                      {tempCredentials.pass}
-                    </p>
-                  </div>
-                </div>
-
-                <button
-                  onClick={() => {
-                    // Logika Copy & Cleanup
-                    const copyText = `Login to DAW Group Admin:\nEmail: ${tempCredentials.email}\nPassword: ${tempCredentials.pass}`;
-                    navigator.clipboard.writeText(copyText);
-
-                    toast.success("Credentials copied to clipboard!", {
-                      description: "You can now paste it securely to the user.",
-                    });
-
-                    handleCloseModal();
-                  }}
-                  className="w-full flex items-center justify-center gap-2 py-3.5 bg-daw-green hover:bg-[#003b1c] text-white rounded-xl font-bold transition-colors shadow-md"
-                >
-                  <Key className="w-5 h-5" /> Copy Credentials & Close
-                </button>
+            <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
+              <div>
+                <h2 className="text-xl font-serif font-bold text-slate-800 flex items-center gap-2">
+                  <UserPlus className="w-5 h-5 text-daw-green" /> Daftarkan
+                  Akses (SSO)
+                </h2>
+                <p className="text-xs text-slate-500 mt-1 font-medium">
+                  Hubungkan akun ERP DAW ke sistem CMS.
+                </p>
               </div>
-            ) : (
-              <>
-                <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
-                  <h2 className="text-xl font-serif font-bold text-slate-800 flex items-center gap-2">
-                    <UserPlus className="w-5 h-5 text-daw-green" /> Invite User
-                  </h2>
-                  <button
-                    onClick={handleCloseModal}
-                    className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-full transition-colors"
-                  >
-                    <X className="w-5 h-5" />
-                  </button>{" "}
+              <button
+                onClick={handleCloseModal}
+                className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-full transition-colors">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="p-6 space-y-5">
+              {/* INFO BOX PENTING */}
+              <div className="bg-blue-50 border border-blue-100 rounded-xl p-4 flex gap-3 text-blue-800 text-sm">
+                <ShieldCheck className="w-5 h-5 shrink-0 text-blue-600" />
+                <p className="leading-relaxed">
+                  Masukkan <strong>Username OWL</strong> yang valid.
+                </p>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">
+                  OWL Username (Wajib)
+                </label>
+                <div className="relative">
+                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                    <UserPlus className="w-4 h-4 text-slate-400" />
+                  </div>
+                  <input
+                    type="text"
+                    placeholder="Contoh: amar.badu"
+                    className="w-full pl-10 pr-4 py-2.5 bg-white border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-daw-green/20 focus:border-daw-green transition-all uppercase placeholder:normal-case font-mono"
+                    value={formData.owl_username}
+                    onChange={(e) =>
+                      setFormData({ ...formData, owl_username: e.target.value })
+                    }
+                    autoFocus
+                  />
                 </div>
+              </div>
 
-                <div className="p-6 space-y-5">
-                  <div>
-                    <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">
-                      Full Name
-                    </label>
-                    <input
-                      type="text"
-                      placeholder="e.g. John Doe"
-                      className="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-daw-green/20 focus:border-daw-green transition-all"
-                      value={formData.name}
-                      onChange={(e) =>
-                        setFormData({ ...formData, name: e.target.value })
-                      }
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">
-                      Email Address
-                    </label>
-                    <input
-                      type="email"
-                      placeholder="e.g. john@daw.co.id"
-                      className="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-daw-green/20 focus:border-daw-green transition-all"
-                      value={formData.email}
-                      onChange={(e) =>
-                        setFormData({ ...formData, email: e.target.value })
-                      }
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">
-                      System Role
-                    </label>
-                    <select
-                      className="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-daw-green/20 focus:border-daw-green transition-all appearance-none cursor-pointer"
-                      value={formData.roleId}
-                      onChange={(e) =>
-                        setFormData({ ...formData, roleId: e.target.value })
-                      }
-                    >
-                      <option value="" disabled>
-                        -- Select a Role --
+              <div>
+                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">
+                  System Role (Wajib)
+                </label>
+                <div className="relative">
+                  <select
+                    className="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-daw-green/20 focus:border-daw-green transition-all appearance-none cursor-pointer font-medium text-slate-700"
+                    value={formData.roleId}
+                    onChange={(e) =>
+                      setFormData({ ...formData, roleId: e.target.value })
+                    }>
+                    <option value="" disabled>
+                      Pilih Tingkat Akses
+                    </option>
+                    {roles.map((role) => (
+                      <option key={role.id} value={role.id}>
+                        {role.name}
                       </option>
-                      {roles.map((role) => (
-                        <option key={role.id} value={role.id}>
-                          {role.name}
-                        </option>
-                      ))}
-                    </select>
-                    <p className="text-[11px] text-slate-400 mt-2 flex items-center gap-1.5">
-                      <Key className="w-3.5 h-3.5" /> A secure temporary
-                      password will be generated.
-                    </p>
-                  </div>
+                    ))}
+                  </select>
+                  <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
                 </div>
+              </div>
 
-                <div className="px-6 py-4 border-t border-slate-100 flex items-center justify-end gap-3 bg-slate-50/50">
-                  <button
-                    onClick={handleCloseModal}
-                    className="px-5 py-2.5 text-sm font-bold text-slate-600 hover:text-slate-900 hover:bg-slate-200 rounded-lg transition-colors"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    onClick={handleAddUser}
-                    className="px-5 py-2.5 text-sm font-bold text-white bg-slate-900 hover:bg-slate-800 rounded-lg transition-colors shadow-sm"
-                  >
-                    Generate Credentials
-                  </button>
-                </div>
-              </>
-            )}
+              <div>
+                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2 flex items-center gap-2">
+                  Email Address{" "}
+                  <span className="text-[10px] bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded normal-case">
+                    Opsional
+                  </span>
+                </label>
+                <input
+                  type="email"
+                  placeholder="Hanya isi jika ingin override email dari OWL"
+                  className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:bg-white focus:ring-2 focus:ring-daw-green/20 focus:border-daw-green transition-all text-sm"
+                  value={formData.email}
+                  onChange={(e) =>
+                    setFormData({ ...formData, email: e.target.value })
+                  }
+                />
+              </div>
+            </div>
+
+            <div className="px-6 py-4 border-t border-slate-100 flex items-center justify-end gap-3 bg-slate-50/50">
+              <button
+                onClick={handleCloseModal}
+                className="px-5 py-2.5 text-sm font-bold text-slate-500 hover:text-slate-800 hover:bg-slate-200 rounded-lg transition-colors">
+                Batal
+              </button>
+              <button
+                onClick={handleAddUser}
+                disabled={!formData.owl_username || !formData.roleId}
+                className="px-6 py-2.5 text-sm font-bold text-white bg-daw-green hover:bg-[#003b1c] disabled:bg-slate-300 disabled:cursor-not-allowed rounded-lg transition-all shadow-md active:scale-95 flex items-center gap-2">
+                <Key className="w-4 h-4" /> Daftarkan Akses
+              </button>
+            </div>
           </div>
         </div>
       )}

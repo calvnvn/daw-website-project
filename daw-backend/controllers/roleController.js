@@ -1,103 +1,75 @@
+/**
+ * MODULE: Role Controller (Slim Edition)
+ * PURPOSE: Managing Role names and descriptions for User Assignment.
+ * NOTE: Permissions are hardcoded in authController mapping.
+ */
 const Role = require("../models/Role");
-const Permission = require("../models/Permission");
-const sequelize = require("../config/database");
 const User = require("../models/User");
 
 // Get All Roles (dengan list permission-nya)
 exports.getAllRoles = async (req, res) => {
   try {
     const roles = await Role.findAll({
-      include: [
-        {
-          model: Permission,
-          as: "permissions",
-          attributes: ["id", "name"],
-          through: { attributes: [] },
-        },
-      ],
-      order: [["createdAt", "ASC"]],
-    });
-    res.status(200).json(roles);
-  } catch (error) {
-    res
-      .status(500)
-      .json({ message: "Failed to fetch roles", error: error.message });
-  }
-};
-
-// Get All Available Permissions (untuk list checkbox di UI)
-exports.getAllPermissions = async (req, res) => {
-  try {
-    const permissions = await Permission.findAll({
       attributes: ["id", "name", "description"],
       order: [["name", "ASC"]],
     });
-    res.status(200).json(permissions);
+
+    res.status(200).json(roles);
   } catch (error) {
-    res.status(500).json({ message: "Failed to fetch permissions" });
+    console.error("🚨 [GET ROLES ERROR]:", error.message);
+    res.status(500).json({
+      message: "Failed to fetch roles",
+      error: error.message,
+    });
   }
 };
 
 // Create Role
 exports.createRole = async (req, res) => {
-  const t = await sequelize.transaction();
   try {
-    const { name, description, permissionIds } = req.body;
+    const { name, description } = req.body;
 
-    const role = await Role.create({ name, description }, { transaction: t });
+    if (!name)
+      return res.status(400).json({ message: "Nama role wajib diisi." });
 
-    if (
-      permissionIds &&
-      Array.isArray(permissionIds) &&
-      permissionIds.length > 0
-    ) {
-      await role.setPermissions(permissionIds, { transaction: t });
-    }
+    const role = await Role.create({ name, description });
 
-    await t.commit();
-
-    res.status(201).json({ message: "Role created successfully", data: role });
+    res.status(201).json({
+      success: true,
+      message: "Role baru berhasil dibuat.",
+      data: role,
+    });
   } catch (error) {
-    await t.rollback();
     res
       .status(500)
-      .json({ message: "Failed to create role", error: error.message });
+      .json({ message: "Gagal membuat role.", error: error.message });
   }
 };
 
 // Update Role
 exports.updateRole = async (req, res) => {
-  const t = await sequelize.transaction();
-
   try {
     const { id } = req.params;
-    const { name, description, permissionIds } = req.body;
+    const { name, description } = req.body;
 
     const role = await Role.findByPk(id);
-    if (!role) {
-      await t.rollback();
-      return res.status(404).json({ message: "Role not found" });
-    }
+    if (!role)
+      return res.status(404).json({ message: "Role tidak ditemukan." });
 
-    // Proteksi Superadmin
+    // 🛡️ Hierarchy Protection: Jangan biarkan user mengubah nama Superadmin via API
     if (role.name === "Superadmin" && name !== "Superadmin") {
-      await t.rollback();
-      return res.status(403).json({ message: "Cannot rename Superadmin role" });
+      return res
+        .status(403)
+        .json({ message: "Dilarang mengubah nama role sistem (Superadmin)." });
     }
 
-    // Update data dasar
-    await role.update({ name, description }, { transaction: t });
+    await role.update({ name, description });
 
-    // Update Junction Table
-    if (permissionIds && Array.isArray(permissionIds)) {
-      await role.setPermissions(permissionIds, { transaction: t });
-    }
-
-    await t.commit();
-    res.status(200).json({ message: "Role updated successfully" });
+    res
+      .status(200)
+      .json({ success: true, message: "Role berhasil diperbarui." });
   } catch (error) {
-    await t.rollback();
-    res.status(500).json({ message: "Update failed", error: error.message });
+    res.status(500).json({ message: "Update gagal.", error: error.message });
   }
 };
 
@@ -107,29 +79,30 @@ exports.deleteRole = async (req, res) => {
     const { id } = req.params;
     const role = await Role.findByPk(id);
 
-    if (!role) return res.status(404).json({ message: "Role not found" });
+    if (!role)
+      return res.status(404).json({ message: "Role tidak ditemukan." });
 
-    // PROTEKSI: Jangan biarkan role sistem dihapus
-    if (["Superadmin", "Editor"].includes(role.name)) {
-      return res
-        .status(403)
-        .json({ message: `System role '${role.name}' cannot be deleted.` });
+    // 🛡️ System Protection: Role krusial DAW CMS nggak boleh dihapus
+    if (["Superadmin", "Editor", "Approver"].includes(role.name)) {
+      return res.status(403).json({
+        message: `Role sistem '${role.name}' dilindungi dan tidak dapat dihapus.`,
+      });
     }
 
-    // Mencari apakah ada user yang masih terhubung ke role ini
+    // 🛡️ Integrity Check: Pastikan nggak ada user yang lagi pake role ini
     const userCount = await User.count({ where: { roleId: id } });
-
     if (userCount > 0) {
       return res.status(400).json({
-        message: `Cannot delete role. There are still ${userCount} user(s) assigned to this role.`,
-        description:
-          "Please reassign these users to a different role before deleting.",
+        message: `Role gagal dihapus. Masih ada ${userCount} user yang menggunakan role ini.`,
+        description: "Pindahkan user ke role lain terlebih dahulu.",
       });
     }
 
     await role.destroy();
-    res.status(200).json({ message: "Role deleted successfully" });
+    res.status(200).json({ message: "Role berhasil dihapus selamanya." });
   } catch (error) {
-    res.status(500).json({ message: "Delete failed", error: error.message });
+    res
+      .status(500)
+      .json({ message: "Proses hapus gagal.", error: error.message });
   }
 };

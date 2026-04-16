@@ -71,6 +71,9 @@ exports.login = async (req, res) => {
         });
       }
 
+      const decodedOwlToken = jwt.decode(tokenDiterima);
+      console.log(">>> [DEBUG] Decoded Content:", decodedOwlToken);
+
       let user = await User.findOne({
         where: { owl_username: uname },
         include: [
@@ -89,23 +92,31 @@ exports.login = async (req, res) => {
       }
 
       // Syncing OWL's Token Identity
-      const decodeOwlToken = jwt.decode(tokenDiterima);
 
       if (decodedOwlToken) {
-        const updatedName = decodedOwlToken.name || user.naame;
+        const updatedName = decodedOwlToken.name || user.name;
         const updatedEmail = decodedOwlToken.email || user.email;
 
-        if (user.name !== updatedName || user.email !== updatedEmail) {
+        const updatePayload = {
+          lastLogin: new Date(),
+        };
+
+        if (
+          user.name !== updatedName ||
+          (updatedEmail && user.email !== updatedEmail)
+        ) {
           console.log(
-            `>>> [AUTH SYNC] Mengupdate profil ${uname} dari data OWL terbaru...`,
+            `>>> [AUTH SYNC] Data profil berubah, menyamakan dengan OWL...`,
           );
-          await user.update({
-            name: updatedName,
-            email: updatedEmail,
-          });
-          user.name = updatedName;
-          user.email = updatedEmail;
+          updatePayload.name = updatedName;
+          updatePayload.email = updatedEmail;
         }
+
+        await user.update(updatePayload);
+
+        user.lastLogin = updatePayload.lastLogin;
+        if (updatePayload.name) user.name = updatePayload.name;
+        if (updatePayload.email) user.email = updatePayload.email;
       }
 
       if (!user.roleData) {

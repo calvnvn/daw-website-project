@@ -21,6 +21,7 @@ const investmentRoutes = require("./routes/investmentRoutes");
 const homeRoutes = require("./routes/homeRoutes");
 const inquiryRoutes = require("./routes/inquiryRoutes");
 const userRoutes = require("./routes/userRoutes");
+const roleRoutes = require("./routes/roleRoutes");
 const dashboardRoutes = require("./routes/dashboardRoutes");
 const businessRoutes = require("./routes/businessRoutes");
 const pageRoutes = require("./routes/pageRoutes");
@@ -101,7 +102,7 @@ app.use(
 // ROUTER REGISTRATION
 app.use("/api/auth", authRoutes);
 app.use("/api/users", userRoutes);
-// app.use("/api/roles", require("./routes/roleRoutes"));
+app.use("/api/roles", roleRoutes);
 app.use("/api/projects", projectRoutes);
 app.use("/api/settings", settingsRoutes);
 app.use("/api/about", aboutRoutes);

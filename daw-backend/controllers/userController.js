@@ -50,7 +50,7 @@ exports.createUser = async (req, res) => {
 
     await User.create({
       name: "Menunggu Sync Login...",
-      email: email || "",
+      email: email && email.trim() !== "" ? email : null,
       owl_username: owl_username.trim(),
       roleId: roleId,
       password: "SSO_USER_NO_LOCAL_LOGIN", // Unused
