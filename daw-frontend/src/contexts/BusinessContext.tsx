@@ -59,7 +59,11 @@ interface BusinessContextType {
   isLoading: boolean;
   isProcessing: boolean;
   rejectedDraft: any | null;
-  fetchRejectedDraft: (id: string, moduleName: string) => Promise<void>;
+  fetchRejectedDraft: (
+    id: string,
+    moduleName: string,
+    signal?: AbortSignal,
+  ) => Promise<void>;
   clearRejectedDraft: () => void;
   refreshData: () => Promise<void>;
   updateSection: (id: string, data: Partial<SectionData>) => Promise<void>;
@@ -92,15 +96,23 @@ export const BusinessProvider = ({ children }: { children: ReactNode }) => {
 
   // Menarik data draf yang ditolak dari backend untuk fitur Recovery Editor
   const fetchRejectedDraft = useCallback(
-    async (id: string, moduleName: string) => {
+    async (id: string, moduleName: string, signal?: AbortSignal) => {
       try {
         const response = await api.get(`/approval/rejected/${id}`, {
           params: { module: moduleName },
+          signal, // 💡 FIX: Teruskan signal pembatalan ke Axios
         });
         if (response.data.hasRejected) {
           setRejectedDraft(response.data.data);
         }
       } catch (error: any) {
+        if (
+          error.name === "CanceledError" ||
+          error.message?.includes("canceled")
+        ) {
+          return;
+        }
+
         if (error.response?.status === 404) {
           setRejectedDraft(null);
         } else {
@@ -146,27 +158,38 @@ export const BusinessProvider = ({ children }: { children: ReactNode }) => {
       setIsProcessing(true);
       try {
         const res = await api.put(`/businesses/admin/${id}`, data);
+
         if (res.status === 202) {
-          toast.success(
-            "Draf revisi berhasil dikirim ke antrean persetujuan!",
-            {
-              description: `Tiket: ${res.data.ticket || "Memproses..."}`,
-            },
-          );
+          toast.success("Draf revisi dikirim ke antrean OWL!", {
+            description: `Tiket: ${res.data.ticket}`,
+          });
         } else {
-          toast.success("Data bisnis berhasil diperbarui secara permanen!");
+          toast.success("Data bisnis diperbarui!");
         }
 
         clearRejectedDraft();
         await refreshData();
       } catch (error: any) {
-        console.error("Save error:", error);
-        toast.error(
-          error.response?.data?.message || "Gagal menyimpan perubahan",
-        );
-        throw error;
+        // 💡 Senior Debugging: Log full error biar kita tau strukturnya
+        console.error("🚨 [SAVE_ERROR_DEBUG]:", {
+          message: error.message,
+          response: error.response?.data,
+          status: error.response?.status,
+        });
+
+        // Ambil pesan paling spesifik: dari backend, atau dari axios, atau fallback
+        const backendMessage = error.response?.data?.message;
+        const axiosMessage = error.message;
+        const finalMessage =
+          backendMessage || axiosMessage || "Gagal menyimpan perubahan";
+
+        toast.error("Gagal Memproses Data", {
+          description: finalMessage, // Ini yang bakal nampilin "INSERT command denied..."
+        });
+
+        throw error; // Lempar ke komponen supaya handleSave berhenti
       } finally {
-        setIsProcessing(false);
+        setIsProcessing(false); // Mematikan isProcessing global
       }
     },
     [refreshData, clearRejectedDraft],

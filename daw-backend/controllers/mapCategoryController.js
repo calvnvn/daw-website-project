@@ -1,5 +1,6 @@
+const sequelize = require("../config/database");
 const MapCategory = require("../models/MapCategory");
-const ErpApprovalService = require("../services/erpApprovalService");
+// 🚀 ErpApprovalService DIHAPUS dari file ini karena kita bypass sepenuhnya.
 
 exports.getAllCategories = async (req, res) => {
   try {
@@ -10,50 +11,31 @@ exports.getAllCategories = async (req, res) => {
   }
 };
 
+// --- 1. CREATE (LANGSUNG LIVE) ---
 exports.createCategory = async (req, res) => {
-  const { id, name, color, status } = req.body;
+  const { id, name, color } = req.body; // Parameter 'status' tidak lagi relevan di sini
+
+  // Tetap gunakan transaksi untuk atomic safety
   const t = await sequelize.transaction();
 
   try {
-    // 1. Cek Duplikasi di Tabel Utama & Draft (Agar ID unique tetap terjaga)
+    // Cek Duplikasi (Mencegah Error 500 karena Primary Key Clash)
     const existing = await MapCategory.findByPk(id, { transaction: t });
     if (existing) {
       await t.rollback();
       return res.status(400).json({ message: "ID Kategori sudah digunakan!" });
     }
 
-    // 2. PRE-INSERT STRATEGY
-    const isEditor = req.userRole?.toLowerCase() === "editor";
+    // Eksekusi langsung tanpa mengecek role Editor/Admin
     const categoryData = {
       id,
       name,
       color,
-      is_locked: isEditor, // Langsung gembok kalau Editor
+      is_locked: false, // Pastikan tidak terkunci
     };
 
     await MapCategory.create(categoryData, { transaction: t });
 
-    // 3. EDITOR GATE
-    if (isEditor && status === "Published") {
-      const result = await ErpApprovalService.initiateApproval({
-        model: MapCategory,
-        targetId: id,
-        action: "PRE_INSERT_CREATE", // Menggunakan action khusus sesuai SOP
-        payload: categoryData,
-        userId: req.userId,
-        owlUsername: req.owl_username,
-        token: req.owl_token, // Gunakan token dari middleware
-        transaction: t,
-      });
-
-      await t.commit();
-      return res.status(202).json({
-        message: "Reservasi kategori berhasil. Permintaan dikirim ke OWL.",
-        ticket: result.notrans,
-      });
-    }
-
-    // 4. SUPERADMIN FLOW
     await t.commit();
     res.status(201).json({ message: "Kategori berhasil dibuat permanen." });
   } catch (error) {
@@ -62,14 +44,14 @@ exports.createCategory = async (req, res) => {
   }
 };
 
-// UPDATE
+// --- 2. UPDATE (LANGSUNG LIVE) ---
 exports.updateCategory = async (req, res) => {
   const { id } = req.params;
-  const { name, color, status } = req.body;
+  const { name, color } = req.body;
   const t = await sequelize.transaction();
 
   try {
-    // 1. CHECK LOCK + PESSIMISTIC LOCKING
+    // PESSIMISTIC LOCKING: Tetap dipakai untuk mencegah race condition sesama Editor
     const category = await MapCategory.findByPk(id, {
       transaction: t,
       lock: t.LOCK.UPDATE,
@@ -80,51 +62,28 @@ exports.updateCategory = async (req, res) => {
       return res.status(404).json({ message: "Category not found" });
     }
 
-    if (category.is_locked) {
-      await t.rollback();
-      return res.status(423).json({
-        message: "Gagal update. Data sedang dikunci proses approval.",
-        ticket: category.lock_ticket,
-      });
-    }
+    // 💡 SENIOR FIX: Force is_locked menjadi false dan bersihkan lock_ticket
+    // Ini berguna sebagai "Pembersih Zombie" jika sebelumnya ada data yang sempat
+    // terkunci oleh sistem approval lama sebelum kita refactor ke Bypass mode.
+    await category.update(
+      { name, color, is_locked: false, lock_ticket: null },
+      { transaction: t },
+    );
 
-    // 2. EDITOR GATE
-    if (req.userRole?.toLowerCase() === "editor" && status === "Published") {
-      const result = await ErpApprovalService.initiateApproval({
-        model: MapCategory,
-        targetId: id,
-        action: "UPDATE",
-        payload: { name, color },
-        userId: req.userId,
-        owlUsername: req.owl_username,
-        token: req.owl_token,
-        transaction: t,
-      });
-
-      await t.commit();
-      return res.status(202).json({
-        message: "Revisi kategori dikirim ke OWL. Data dikunci.",
-        ticket: result.notrans,
-      });
-    }
-
-    // 3. SUPERADMIN FLOW
-    await category.update({ name, color }, { transaction: t });
     await t.commit();
-    res.status(200).json({ message: "Kategori diperbarui!" });
+    res.status(200).json({ message: "Kategori diperbarui secara permanen!" });
   } catch (error) {
     if (t) await t.rollback();
     res.status(500).json({ message: error.message });
   }
 };
 
-// DELETE
+// --- 3. DELETE (LANGSUNG LIVE) ---
 exports.deleteCategory = async (req, res) => {
   const { id } = req.params;
   const t = await sequelize.transaction();
 
   try {
-    // 1. CHECK LOCK
     const category = await MapCategory.findByPk(id, {
       transaction: t,
       lock: t.LOCK.UPDATE,
@@ -135,39 +94,14 @@ exports.deleteCategory = async (req, res) => {
       return res.status(404).json({ message: "Category not found" });
     }
 
-    if (category.is_locked) {
-      await t.rollback();
-      return res
-        .status(423)
-        .json({ message: "Hapus gagal. Data sedang terkunci." });
-    }
-
-    // 2. EDITOR GATE
-    if (req.userRole?.toLowerCase() === "editor") {
-      const result = await ErpApprovalService.initiateApproval({
-        model: MapCategory,
-        targetId: id,
-        action: "DELETE",
-        payload: { name: category.name },
-        userId: req.userId,
-        owlUsername: req.owl_username,
-        token: req.owl_token,
-        transaction: t,
-      });
-
-      await t.commit();
-      return res.status(202).json({
-        message: "Permintaan hapus dikirim ke OWL.",
-        ticket: result.notrans,
-      });
-    }
-
-    // 3. SUPERADMIN FLOW
+    // Langsung hancurkan data tanpa melalui OWL
     await category.destroy({ transaction: t });
+
     await t.commit();
     res.status(200).json({ message: "Category deleted!" });
   } catch (error) {
     if (t) await t.rollback();
+    // Penanganan Foreign Key Constraint tetap dipertahankan (Sangat Krusial)
     const msg =
       error.name === "SequelizeForeignKeyConstraintError"
         ? "Gagal hapus! Kategori ini masih digunakan oleh titik peta (markers)."

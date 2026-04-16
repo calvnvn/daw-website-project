@@ -31,6 +31,7 @@ const initialFormData: Omit<SectionData, "id"> = {
   hasMap: false,
   orderIndex: 0,
   mapMarkers: [],
+  is_locked: false,
 };
 
 export default function ManageBusinesses() {
@@ -41,6 +42,8 @@ export default function ManageBusinesses() {
     updateSection,
     addSection,
     deleteSection,
+    fetchRejectedDraft,
+    clearRejectedDraft,
   } = useBusiness();
 
   // --- 1. CORE STATES ---
@@ -54,10 +57,9 @@ export default function ManageBusinesses() {
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [isDiscardModalOpen, setIsDiscardModalOpen] = useState(false);
-  const [isMapModalOpen, setIsMapModalOpen] = useState(false); // FIX: Restored map modal state
+  const [isMapModalOpen, setIsMapModalOpen] = useState(false);
   const [pendingTab, setPendingTab] = useState<string | null>(null);
 
-  // Deteksi perangkat untuk UX Map Picker
   const isMobile = typeof window !== "undefined" && window.innerWidth < 768;
 
   // --- 3. MEMOIZED UTILITIES (Performance Guard) ---
@@ -65,9 +67,23 @@ export default function ManageBusinesses() {
     return Object.fromEntries(categories.map((cat) => [cat.id, cat.color]));
   }, [categories]);
 
-  // --- 4. DATA ENGINE (SYNC) ---
+  const currentSection = sections.find((s) => s.id === activeTab);
+  const isArticleLocked = currentSection?.is_locked === true;
+
+  // DATA ENGINE (SYNC & LOCK ENFORCEMENT)
+
+  // Lock Guard: Paksa keluar dari mode edit jika data tiba-tiba dikunci dari backend
   useEffect(() => {
-    // FIX: Fallback logic jika Admin menghapus sektor terakhir
+    if (currentSection?.is_locked && isEditing) {
+      setIsEditing(false);
+      toast.info(
+        "Akses edit ditutup. Sektor ini sedang dalam antrean approval.",
+      );
+    }
+  }, [currentSection?.is_locked, isEditing]);
+
+  // Safe Form Synchronization
+  useEffect(() => {
     if (!sections || sections.length === 0) {
       if (activeTab !== "categories") setActiveTab("categories");
       return;
@@ -83,8 +99,7 @@ export default function ManageBusinesses() {
       return;
     }
 
-    const currentSection = sections.find((sec) => sec.id === activeTab);
-    if (currentSection) {
+    if (currentSection && !isEditing) {
       const rawMarkers =
         (currentSection as any).mapMarkers ||
         (currentSection as any).BusinessMapMarkers ||
@@ -96,11 +111,27 @@ export default function ManageBusinesses() {
         hasMap: normalizeBool(currentSection.hasMap),
         orderIndex: currentSection.orderIndex || 0,
         mapMarkers: Array.isArray(rawMarkers) ? [...rawMarkers] : [],
+        is_locked: currentSection.is_locked || false,
       });
     }
-  }, [activeTab, sections]);
+  }, [activeTab, sections, currentSection, isEditing]);
 
-  // --- 5. SECURITY GUARD ---
+  // PARALLEL FETCHING
+  useEffect(() => {
+    const abortController = new AbortController();
+
+    if (activeTab && activeTab !== "categories") {
+      fetchRejectedDraft(activeTab, "BusinessSection", abortController.signal);
+    } else {
+      clearRejectedDraft();
+    }
+
+    return () => {
+      abortController.abort();
+    };
+  }, [activeTab, fetchRejectedDraft, clearRejectedDraft]);
+
+  // SECURITY GUARD
   useEffect(() => {
     const handleBeforeUnload = (e: BeforeUnloadEvent) => {
       if (isEditing) {
@@ -112,7 +143,7 @@ export default function ManageBusinesses() {
     return () => window.removeEventListener("beforeunload", handleBeforeUnload);
   }, [isEditing]);
 
-  // --- 6. DATA HANDLERS (Dikirim ke MapManager sebagai Props) ---
+  // DATA HANDLERS (Dikirim ke MapManager sebagai Props)
   const updateMarker = useCallback(
     (index: number, field: keyof MapMarker, value: string) => {
       setFormData((prev) => {
@@ -154,7 +185,7 @@ export default function ManageBusinesses() {
     [categories],
   );
 
-  // --- 7. UI HANDLERS ---
+  // UI HANDLERS
   const handleTabChange = (targetTab: string) => {
     if (targetTab === activeTab) return;
     if (isEditing) {
@@ -168,15 +199,13 @@ export default function ManageBusinesses() {
   const handleSave = async () => {
     if (activeTab === "categories") return;
     setIsSaving(true);
-    const toastId = toast.loading("Menyimpan ke database...");
+    const toastId = toast.loading("Memproses data...");
     try {
       await updateSection(activeTab, formData);
-      toast.success(`${activeTab.toUpperCase()} berhasil diperbarui!`, {
-        id: toastId,
-      });
+      toast.dismiss(toastId);
       setIsEditing(false);
     } catch {
-      toast.error("Gagal menyimpan data.", { id: toastId });
+      toast.error("Gagal memproses data.", { id: toastId });
     } finally {
       setIsSaving(false);
     }
@@ -208,6 +237,9 @@ export default function ManageBusinesses() {
         isSaving={isSaving}
         onSave={handleSave}
         onDeleteClick={() => setIsDeleteModalOpen(true)}
+        // Kirim status lock ke header untuk indikator visual (Badge Pending)
+        isLocked={isArticleLocked}
+        lockTicket={currentSection?.lock_ticket}
       />
 
       <SectionTabs
@@ -220,19 +252,24 @@ export default function ManageBusinesses() {
 
       <main className="bg-white rounded-b-xl border border-t-0 border-slate-200 shadow-sm p-6 lg:p-8 min-h-[500px]">
         {activeTab === "categories" ? (
+          // 💡 Jalur Bypass: CategoryManager tidak terpengaruh is_locked
           <CategoryManager />
         ) : (
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+            {/* 1. EDITOR ARTIKEL (MANDATORY APPROVAL) */}
             <BusinessEditor
               activeTab={activeTab}
               formData={formData}
               setFormData={setFormData}
-              isEditing={isEditing}
+              // 🛡️ Kunci hanya bagian ini jika is_locked = true
+              isEditing={isEditing && !isArticleLocked}
             />
-            {/* FIX: Props disalurkan dengan benar ke MapManager */}
+
+            {/* 2. MAP MANAGER (BYPASS APPROVAL) */}
             <MapManager
               formData={formData}
               setFormData={setFormData}
+              // 🚀 Tetap nyala meski artikel sedang dikunci!
               isEditing={isEditing}
               categories={categories}
               categoryMap={categoryMap}
@@ -244,10 +281,11 @@ export default function ManageBusinesses() {
         )}
       </main>
 
-      {/* MODALS */}
+      {/* --- MODALS (BYPASS GATEWAYS) --- */}
       {isAddModalOpen && (
         <AddSectionModal
           onClose={() => setIsAddModalOpen(false)}
+          // addSection sekarang langsung simpan (Bypass) di backend
           addSection={addSection}
         />
       )}
@@ -262,7 +300,7 @@ export default function ManageBusinesses() {
         />
       )}
 
-      {/* FIX: MapPickerModal dirender di root untuk menghindari Z-Index conflict */}
+      {/* Map Picker tetap bisa dibuka kapan saja selama isEditing aktif */}
       <MapPickerModal
         isOpen={isMapModalOpen}
         onClose={() => setIsMapModalOpen(false)}
@@ -272,6 +310,7 @@ export default function ManageBusinesses() {
         isMobile={isMobile}
       />
 
+      {/* Discard Modal Tetap Dipertahankan untuk Safety */}
       {isDiscardModalOpen && (
         <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
           <div className="bg-white rounded-2xl p-6 max-w-sm w-full shadow-2xl">
@@ -284,14 +323,12 @@ export default function ManageBusinesses() {
             <div className="flex flex-col gap-2">
               <button
                 onClick={confirmDiscard}
-                className="w-full py-2.5 bg-red-50 text-red-600 rounded-xl font-bold hover:bg-red-100 transition-colors"
-              >
+                className="w-full py-2.5 bg-red-50 text-red-600 rounded-xl font-bold hover:bg-red-100 transition-colors">
                 Buang & Keluar
               </button>
               <button
                 onClick={() => setIsDiscardModalOpen(false)}
-                className="w-full py-2.5 bg-slate-100 text-slate-900 rounded-xl font-bold hover:bg-slate-200 transition-colors"
-              >
+                className="w-full py-2.5 bg-slate-100 text-slate-900 rounded-xl font-bold hover:bg-slate-200 transition-colors">
                 Tetap di Sini
               </button>
             </div>

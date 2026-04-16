@@ -1,7 +1,13 @@
-import { useState, useRef, useCallback } from "react";
-import { X, MousePointerClick } from "lucide-react";
+import { useState, useRef, useCallback, useEffect } from "react";
+import { X, MousePointerClick, Crosshair } from "lucide-react";
 import mapBase from "@/assets/map-indonesia-base.svg";
 import { type MapMarker } from "@/contexts/BusinessContext";
+
+// --- CONSTANTS (Centralized for maintainability) ---
+const CONFIG = {
+  DESKTOP: { zoom: 2.5, radius: 80, offset: 140 }, // offset untuk loupe agar tidak clipping
+  MOBILE: { zoom: 2.0, radius: 64 },
+};
 
 interface MapPickerModalProps {
   isOpen: boolean;
@@ -20,11 +26,9 @@ export default function MapPickerModal({
   categoryMap,
   isMobile,
 }: MapPickerModalProps) {
-  // --- LOCAL INTERACTION STATES ---
   const [isHoveringMap, setIsHoveringMap] = useState(false);
   const [isTouching, setIsTouching] = useState(false);
 
-  // --- DOM REFERENCES (High Performance Tracking) ---
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const crosshairRef = useRef<HTMLDivElement>(null);
   const loupeRef = useRef<HTMLDivElement>(null);
@@ -33,66 +37,47 @@ export default function MapPickerModal({
 
   /**
    * Method: updatePointerPos
-   * Menghitung koordinat kursor dan menerapkan "Pixel-Perfect Math"
-   * agar background kaca pembesar (loupe/radar) sejajar presisi 100% dengan kursor asli.
+   * Optimasi: Penanganan rasio aspek dan pencegahan clipping.
    */
   const updatePointerPos = useCallback(
     (clientX: number, clientY: number) => {
       if (!mapContainerRef.current) return;
 
-      // Dapatkan dimensi dan posisi absolut kontainer peta di layar
       const rect = mapContainerRef.current.getBoundingClientRect();
-
-      // Hitung posisi mouse dalam PIKSEL relatif terhadap kiri-atas kontainer
       const xPx = clientX - rect.left;
       const yPx = clientY - rect.top;
 
-      // Hitung posisi persentase (0-100%) untuk disimpan di database
+      // Hitung persentase murni terhadap container
       const xP = Math.max(0, Math.min(100, (xPx / rect.width) * 100));
       const yP = Math.max(0, Math.min(100, (yPx / rect.height) * 100));
 
       lastCoords.current = { x: `${xP.toFixed(2)}%`, y: `${yP.toFixed(2)}%` };
 
-      // Injeksi style langsung ke DOM (bypass React render cycle untuk 60fps)
       if (!isMobile) {
         if (crosshairRef.current) {
           crosshairRef.current.style.left = `${xP}%`;
           crosshairRef.current.style.top = `${yP}%`;
         }
         if (loupeRef.current) {
-          // 1. Posisikan kontainer loupe mengikuti kursor
+          const { zoom, radius, offset } = CONFIG.DESKTOP;
+
+          // Dynamic positioning: jika kursor di atas, pindahkan loupe ke bawah kursor
+          const shouldFlip = yPx < offset;
+          loupeRef.current.style.transform = `translate(-50%, ${shouldFlip ? "20%" : "-130%"})`;
+
           loupeRef.current.style.left = `${xP}%`;
           loupeRef.current.style.top = `${yP}%`;
-
-          // 2. PIXEL-PERFECT MATH (Memperbaiki Bug Meleset)
-          const zoomScale = 2; // Skala zoom 400%
-          const loupeRadius = 80; // Jari-jari loupe (Tailwind w-40 = 160px, maka tengahnya 80px)
-
-          // Paksa ukuran gambar background menjadi piksel absolut (lebar container asli x skala zoom)
-          loupeRef.current.style.backgroundSize = `${rect.width * zoomScale}px ${rect.height * zoomScale}px`;
-
-          // Kalkulasi pergeseran gambar.
-          // Rumus: Titik Tengah Kaca Pembesar - (Posisi Mouse * Skala Zoom)
-          const bgPosX = loupeRadius - xPx * zoomScale;
-          const bgPosY = loupeRadius - yPx * zoomScale;
-
-          loupeRef.current.style.backgroundPosition = `${bgPosX}px ${bgPosY}px`;
+          loupeRef.current.style.backgroundSize = `${rect.width * zoom}px ${rect.height * zoom}px`;
+          loupeRef.current.style.backgroundPosition = `${radius - xPx * zoom}px ${radius - yPx * zoom}px`;
         }
       } else if (radarRef.current) {
-        // Terapkan Pixel-Perfect Math yang sama untuk Mobile Radar
-        const radarScale = 2; // Skala zoom 600% (sesuai kode Anda sebelumnya)
-        const radarRadius = 64; // Jari-jari radar (Tailwind w-32 = 128px, maka tengahnya 64px)
-
-        radarRef.current.style.backgroundSize = `${rect.width * radarScale}px ${rect.height * radarScale}px`;
-
-        const bgPosX = radarRadius - xPx * radarScale;
-        const bgPosY = radarRadius - yPx * radarScale;
-
-        radarRef.current.style.backgroundPosition = `${bgPosX}px ${bgPosY}px`;
+        const { zoom, radius } = CONFIG.MOBILE;
+        radarRef.current.style.backgroundSize = `${rect.width * zoom}px ${rect.height * zoom}px`;
+        radarRef.current.style.backgroundPosition = `${radius - xPx * zoom}px ${radius - yPx * zoom}px`;
 
         const textNode = radarRef.current.querySelector(".radar-coord");
         if (textNode)
-          textNode.innerHTML = `X:${xP.toFixed(0)} Y:${yP.toFixed(0)}`;
+          textNode.textContent = `X:${xP.toFixed(0)} Y:${yP.toFixed(0)}`;
       }
     },
     [isMobile],
@@ -101,34 +86,35 @@ export default function MapPickerModal({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-[100] bg-slate-900/90 flex items-center justify-center p-4 animate-in fade-in duration-300">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-5xl h-full max-h-[90vh] flex flex-col overflow-hidden">
-        {/* Header Modal */}
-        <div className="flex justify-between items-center p-4 border-b border-slate-100 bg-slate-50">
-          <div className="flex items-center gap-3 text-slate-900">
-            <div className="w-10 h-10 rounded-full bg-daw-green/10 flex items-center justify-center">
-              <MousePointerClick className="w-5 h-5 text-daw-green" />
+    <div className="fixed inset-0 z-[200] bg-slate-900/95 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-300">
+      <div className="bg-white rounded-3xl shadow-2xl w-full max-w-5xl h-full max-h-[85vh] flex flex-col overflow-hidden border border-white/20">
+        {/* Header Modals - Lebih Clean */}
+        <div className="flex justify-between items-center p-5 border-b border-slate-100 bg-slate-50/50">
+          <div className="flex items-center gap-4">
+            <div className="w-12 h-12 rounded-2xl bg-daw-green text-white flex items-center justify-center shadow-lg shadow-daw-green/20">
+              <Crosshair className="w-6 h-6 animate-pulse" />
             </div>
             <div>
-              <h3 className="font-bold">Precision Map Picker</h3>
-              <p className="text-[10px] text-slate-500 uppercase tracking-widest">
-                Click to drop a location pin
+              <h3 className="font-bold text-slate-900 leading-tight">
+                Geographic Precision Tool
+              </h3>
+              <p className="text-[10px] text-slate-400 uppercase tracking-[0.2em] font-black">
+                Select location coordinate
               </p>
             </div>
           </div>
           <button
             onClick={onClose}
-            className="p-2 hover:bg-red-50 hover:text-red-500 rounded-xl transition-all"
-          >
+            className="p-3 hover:bg-red-50 text-slate-400 hover:text-red-500 rounded-2xl transition-all active:scale-90">
             <X className="w-6 h-6" />
           </button>
         </div>
 
-        {/* Map Interactive Area */}
-        <div className="flex-1 bg-slate-200 flex items-center justify-center p-4 relative overflow-hidden">
+        {/* Workspace */}
+        <div className="flex-1 bg-slate-100 flex items-center justify-center p-4 md:p-8 relative overflow-hidden">
           <div
             ref={mapContainerRef}
-            className={`relative w-full max-w-4xl aspect-video bg-white shadow-2xl rounded-xl overflow-hidden ${
+            className={`relative w-full max-w-4xl aspect-video bg-white shadow-xl rounded-2xl overflow-hidden border-4 border-white transition-all ${
               isMobile ? "touch-none" : "cursor-none"
             }`}
             onClick={() => onSelectLocation(lastCoords.current)}
@@ -147,23 +133,22 @@ export default function MapPickerModal({
               isMobile &&
               updatePointerPos(e.touches[0].clientX, e.touches[0].clientY)
             }
-            onTouchEnd={() => setIsTouching(false)}
-          >
+            onTouchEnd={() => setIsTouching(false)}>
+            {/* Base Map */}
             <img
               src={mapBase}
-              className="absolute inset-0 w-full h-full object-contain opacity-70 pointer-events-none"
+              className="absolute inset-0 w-full h-full object-fill opacity-80 select-none pointer-events-none"
               alt="map"
             />
 
-            {/* Existing Pins */}
+            {/* Existing Pins - Dibuat lebih kecil agar tidak menumpuk saat zoom */}
             {mapMarkers.map((m) => (
               <div
                 key={m.id}
                 className="absolute -translate-x-1/2 -translate-y-1/2 pointer-events-none z-20"
-                style={{ left: m.dotX, top: m.dotY }}
-              >
+                style={{ left: m.dotX, top: m.dotY }}>
                 <div
-                  className="w-3 h-3 rounded-full border-2 border-white shadow-lg"
+                  className="w-2.5 h-2.5 rounded-full border-2 border-white shadow-md"
                   style={{
                     backgroundColor: categoryMap[m.categoryId] || "#94a3b8",
                   }}
@@ -171,44 +156,39 @@ export default function MapPickerModal({
               </div>
             ))}
 
-            {/* Magnifier / Loupe (Desktop Only) */}
+            {/* Desktop Loupe Interface */}
             {!isMobile && isHoveringMap && (
               <>
                 <div
                   ref={crosshairRef}
-                  className="absolute -translate-x-1/2 -translate-y-1/2 pointer-events-none z-40 flex items-center justify-center"
-                >
-                  <div className="absolute w-8 h-[1.5px] bg-slate-900/60" />
-                  <div className="absolute h-8 w-[1.5px] bg-slate-900/60" />
-                  <div className="w-2 h-2 bg-red-600 rounded-full shadow-lg" />
+                  className="absolute -translate-x-1/2 -translate-y-1/2 pointer-events-none z-40 flex items-center justify-center">
+                  <div className="absolute w-10 h-[1px] bg-red-600/40" />
+                  <div className="absolute h-10 w-[1px] bg-red-600/40" />
+                  <div className="w-1.5 h-1.5 bg-red-600 rounded-full ring-4 ring-red-600/20" />
                 </div>
                 <div
                   ref={loupeRef}
-                  className="absolute pointer-events-none z-50 w-40 h-40 rounded-full border-4 border-white shadow-2xl bg-white overflow-hidden -translate-y-[130%] -translate-x-1/2"
+                  className="absolute pointer-events-none z-50 w-40 h-40 rounded-full border-4 border-white shadow-[0_20px_50px_rgba(0,0,0,0.3)] bg-white overflow-hidden transition-transform duration-100 ease-out"
                   style={{
                     backgroundImage: `url(${mapBase})`,
-                    backgroundSize: "400%",
                     backgroundRepeat: "no-repeat",
-                  }}
-                >
-                  <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-2 h-2 bg-red-600 rounded-full" />
+                  }}>
+                  <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-3 h-3 border-2 border-white bg-red-600 rounded-full shadow-lg" />
                 </div>
               </>
             )}
 
-            {/* Radar (Mobile Only) */}
+            {/* Mobile Radar Interface - Lebih Modern */}
             {isMobile && isTouching && (
               <div
                 ref={radarRef}
-                className="absolute top-4 left-4 pointer-events-none z-[100] w-32 h-32 rounded-2xl border-4 border-daw-green shadow-2xl bg-white overflow-hidden"
+                className="absolute top-4 right-4 pointer-events-none z-[100] w-32 h-32 rounded-3xl border-4 border-daw-green shadow-2xl bg-white overflow-hidden"
                 style={{
                   backgroundImage: `url(${mapBase})`,
-                  backgroundSize: "600%",
                   backgroundRepeat: "no-repeat",
-                }}
-              >
-                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-3 h-3 bg-red-600 rounded-full shadow-[0_0_10px_red]" />
-                <div className="radar-coord absolute bottom-2 left-1/2 -translate-x-1/2 bg-black/80 text-white text-[9px] px-2 py-0.5 rounded-full font-mono">
+                }}>
+                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-4 h-4 border-2 border-white bg-red-600 rounded-full shadow-lg" />
+                <div className="radar-coord absolute bottom-2 left-1/2 -translate-x-1/2 bg-slate-900/90 text-white text-[8px] px-3 py-1 rounded-full font-mono font-bold border border-white/20">
                   X:0 Y:0
                 </div>
               </div>

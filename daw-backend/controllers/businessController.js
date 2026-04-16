@@ -132,27 +132,19 @@ exports.getPublicBusinessData = async (req, res) => {
 exports.updateBusinessSection = async (req, res) => {
   const { id } = req.params;
   const { title, htmlContent, hasMap, mapMarkers } = req.body;
-
-  // Normalize boolean/tinyint for database compatibility
   const isMapActive =
     hasMap === true || hasMap === "true" || hasMap === 1 ? 1 : 0;
-
-  // Clean the incoming HTML
   const cleanHtmlContent = htmlContent
     ? sanitizeHtml(htmlContent, sanitizeOptions)
     : "";
 
-  // 1. INISIALISASI ATOMIC TRANSACTION (SOP Point B)
-  // Transaksi ini membungkus SELURUH proses (baik Editor maupun Superadmin)
   const t = await sequelize.transaction();
 
   try {
-    // 2. CHECK LOCK (The Gatekeeper) + Database Level Lock
     const section = await BusinessSection.findByPk(id, {
       transaction: t,
       lock: t.LOCK.UPDATE,
     });
-
     if (!section) {
       await t.rollback();
       return res
@@ -160,96 +152,77 @@ exports.updateBusinessSection = async (req, res) => {
         .json({ message: "Sektor Bisnis tidak ditemukan!" });
     }
 
-    // Jika data sedang diajukan revisinya, tolak update baru!
-    if (section.is_locked) {
-      await t.rollback();
-      return res.status(423).json({
-        message:
-          "Akses ditolak. Sektor ini sedang dikunci oleh proses approval lain.",
-        ticket: section.lock_ticket,
-      });
-    }
+    // --- JALUR 1: BYPASS (MARKERS & MAP TOGGLE) ---
+    // Editor maupun Admin, update marker dan toggle map LANGSUNG ke database utama
+    await section.update({ hasMap: isMapActive }, { transaction: t });
 
-    // 3. EDITOR GATE
-    if (req.userRole && req.userRole.toLowerCase() === "editor") {
-      const packageContent = {
-        title,
-        htmlContent: cleanHtmlContent,
-        hasMap: isMapActive,
-        mapMarkers: mapMarkers || [], // Kirim seluruh array marker baru untuk direview
-      };
-
-      // Panggil initiateApproval DI DALAM transaksi
-      const result = await ErpApprovalService.initiateApproval({
-        model: BusinessSection,
-        targetId: id,
-        action: "UPDATE_WITH_MARKERS", // Action khusus yang akan dibaca oleh orchestrator
-        payload: packageContent,
-        userId: req.userId,
-        owlUsername: req.owl_username,
-        token: req.owl_token,
-        transaction: t, // Inject transaction agar proses lokal & OWL sinkron (Atomic)
-      });
-
-      // Commit transaksi jika OWL menerima "Handshake"
-      await t.commit();
-      return res.status(202).json({
-        message:
-          "Draf revisi Sektor Bisnis & Marker berhasil dikirim ke Admin.",
-        ticket: result.notrans,
-      });
-    }
-
-    // 4. SUPERADMIN FLOW (Direct Update)
-    // Update primary section attributes
-    await section.update(
-      {
-        title: title,
-        htmlContent: cleanHtmlContent,
-        hasMap: isMapActive,
-      },
-      { transaction: t },
-    );
-
-    /**
-     * MARKER SYNCHRONIZATION LOGIC: "Wipe and Replace" Strategy
-     * 1. Remove all existing markers associated with this section
-     * 2. Re-insert the new set of markers provided by the client
-     */
     await BusinessMapMarker.destroy({
       where: { sectionId: id },
       transaction: t,
     });
-
-    // Jika Admin menyalakan toggle Map dan mengirimkan data marker baru
     if (isMapActive && mapMarkers && mapMarkers.length > 0) {
       const newMarkers = mapMarkers.map((marker) => ({
-        title: marker.title,
-        desc: marker.desc,
+        ...marker,
         categoryId: marker.categoryId || marker.type,
-        dotX: marker.dotX,
-        dotY: marker.dotY,
-        boxX: marker.boxX,
-        boxY: marker.boxY,
-        mapUrl: marker.mapUrl,
         sectionId: id,
       }));
-
       await BusinessMapMarker.bulkCreate(newMarkers, { transaction: t });
     }
 
-    // Persist all changes to the database
+    // --- JALUR 2: SELECTIVE APPROVAL (TITLE & HTML CONTENT) ---
+    if (req.userRole && req.userRole.toLowerCase() === "editor") {
+      // Bandingkan apakah Konten Artikel (Title/HTML) berubah?
+      const isContentChanged =
+        section.title !== title || section.htmlContent !== cleanHtmlContent;
+
+      if (isContentChanged) {
+        // Cek gembok HANYA jika ingin mengubah konten
+        if (section.is_locked) {
+          await t.rollback();
+          return res.status(423).json({
+            message: "Konten artikel sedang dikunci oleh approval lain.",
+            ticket: section.lock_ticket,
+          });
+        }
+
+        const result = await ErpApprovalService.initiateApproval({
+          model: BusinessSection,
+          targetId: id,
+          action: "UPDATE_ARTICLE_ONLY", // Action spesifik untuk update teks saja
+          payload: { title, htmlContent: cleanHtmlContent },
+          userId: req.userId,
+          owlUsername: req.owl_username,
+          token: req.owl_token,
+          transaction: t,
+        });
+
+        await t.commit();
+        return res.status(202).json({
+          message:
+            "Lokasi peta diperbarui, namun revisi artikel dikirim ke OWL untuk persetujuan.",
+          ticket: result.notrans,
+        });
+      }
+    }
+
+    // JALUR SUPERADMIN: Langsung simpan konten artikel
+    await section.update(
+      { title, htmlContent: cleanHtmlContent },
+      { transaction: t },
+    );
+
     await t.commit();
-    res.status(200).json({
-      message: "Sektor Bisnis beserta lokasi petanya berhasil diperbarui!",
-    });
+    res
+      .status(200)
+      .json({ message: "Sektor dan lokasi peta berhasil diperbarui!" });
   } catch (error) {
-    // Revert all changes if ANY step fails (OWL API error atau Database error)
     if (t) await t.rollback();
-    console.error("Error updating business section:", error);
-    res.status(500).json({
-      message: "Gagal memperbarui Sektor Bisnis",
-      error: error.message,
+    console.error("🚨 [CONTROLLER ERROR]:", error.message);
+
+    return res.status(error.statusCode || 500).json({
+      message: error.message || "Internal Server Error",
+      details: error.details || null,
+      error: true,
     });
   }
 };
@@ -268,95 +241,47 @@ const slugify = (text) => {
     .trim(); // Trim whitespace
 };
 
-/**
- * @desc    Create a new business section with auto-generated ID
- * @route   POST /api/businesses/admin
- * @access  Private (Admin/Editor)
- */
 exports.createBusinessSection = async (req, res) => {
-  const { category, title, status } = req.body;
+  const { category, title } = req.body;
   const generatedId = slugify(category);
-
-  // 1. INISIALISASI ATOMIC TRANSACTION
   const t = await sequelize.transaction();
 
   try {
-    // 2. CEK DUPLIKASI (Di Tabel Utama & Antrean)
     const existing = await BusinessSection.findByPk(generatedId, {
       transaction: t,
     });
     if (existing) {
       await t.rollback();
-      return res
-        .status(400)
-        .json({ message: "Sektor bisnis dengan kategori ini sudah ada!" });
+      return res.status(400).json({ message: "Sektor bisnis sudah ada!" });
     }
 
-    const pendingDraft = await ApprovalDraft.findOne({
-      where: {
-        module_name: "BusinessSection",
-        target_id: generatedId,
-        status: "Pending",
-      },
-      transaction: t,
-    });
-
-    if (pendingDraft) {
-      await t.rollback();
-      return res.status(423).json({
-        message: "Kategori ini sedang dalam antrean approval orang lain!",
-      });
-    }
-
-    // 3. PRE-INSERT STRATEGY (SOP Point B)
     const maxOrder =
       (await BusinessSection.max("orderIndex", { transaction: t })) || 0;
-    const isEditor = req.userRole?.toLowerCase() === "editor";
 
-    const preInsertPayload = {
-      id: generatedId,
-      category,
-      title,
-      htmlContent: "",
-      hasMap: false,
-      orderIndex: maxOrder + 1,
-      is_locked: isEditor,
-    };
+    const newSection = await BusinessSection.create(
+      {
+        id: generatedId,
+        category,
+        title,
+        htmlContent: "",
+        hasMap: false,
+        orderIndex: maxOrder + 1,
+        is_locked: false, // Bebas akses
+      },
+      { transaction: t },
+    );
 
-    await BusinessSection.create(preInsertPayload, { transaction: t });
-
-    // 4. EDITOR GATE
-    if (isEditor && status === "Published") {
-      const result = await ErpApprovalService.initiateApproval({
-        model: BusinessSection,
-        targetId: generatedId,
-        // Kita ubah action menjadi spesifik agar tidak crash di Orchestrator (Lihat Catatan Senior di bawah)
-        action: "PRE_INSERT_CREATE",
-        payload: preInsertPayload,
-        userId: req.userId,
-        owlUsername: req.owl_username,
-        token: req.owl_token,
-        transaction: t, // Inject transaction (Atomik)
-      });
-
-      await t.commit();
-      return res.status(202).json({
-        message: "Sektor direservasi. Draf dikirim ke OWL untuk persetujuan.",
-        ticket: result.notrans,
-      });
-    }
-
-    // 5. SUPERADMIN FLOW (Bypass Approval)
     await t.commit();
-    res
-      .status(201)
-      .json({ message: "Sektor bisnis berhasil dibuat secara permanen." });
+    res.status(201).json(newSection);
   } catch (error) {
     if (t) await t.rollback();
-    console.error("Error creating business section:", error);
-    res
-      .status(500)
-      .json({ message: "Gagal membuat Sektor Bisnis", error: error.message });
+    console.error("🚨 [CONTROLLER ERROR]:", error.message);
+
+    return res.status(error.statusCode || 500).json({
+      message: error.message || "Internal Server Error",
+      details: error.details || null, // Jika ada detail tambahan
+      error: true,
+    });
   }
 };
 
