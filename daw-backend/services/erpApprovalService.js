@@ -77,7 +77,7 @@ class ErpApprovalService {
       );
 
       // Locking Data Asli
-      if (action !== "CREATE" && targetId) {
+      if (targetId) {
         await model.update(
           { is_locked: true, lock_ticket: notrans },
           { where: { id: targetId }, transaction: t },

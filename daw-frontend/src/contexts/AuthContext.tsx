@@ -11,6 +11,12 @@ interface User {
   name: string;
   email: string;
   role: string;
+  owl_username?: string;
+  roleId?: string;
+  roleData?: {
+    name: string;
+    description?: string;
+  };
   permissions: string[];
 }
 
@@ -88,8 +94,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
         logout,
         can,
         refreshUser: async () => {},
-      }}
-    >
+      }}>
       {children}
     </AuthContext.Provider>
   );

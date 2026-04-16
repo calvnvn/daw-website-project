@@ -66,7 +66,6 @@ exports.createProject = async (req, res) => {
 
     // --- 1. PRE-PROCESSING DATA (Berlaku untuk semua Role) ---
     const finalSlug = await generateUniqueProjectSlug(title);
-
     let coverImageName = null;
     let galleryImagesNames = [];
 
@@ -86,41 +85,46 @@ exports.createProject = async (req, res) => {
       excerpt: excerpt || "",
       content,
       category,
-      status: status || "Draft",
+      status: "Draft",
       cover_image: coverImageName,
       gallery: galleryImagesNames,
       seo_title: seo_title || title,
       meta_description: meta_description || excerpt,
       views: 0,
+      is_locked: false,
     };
+
+    const newProject = await Project.create(projectData);
 
     // --- 2. GATEKEEPER LOGIC ---
     if (req.userRole?.toLowerCase() === "editor" && status === "Published") {
+      console.log(
+        `>>> [PROJECT] JALUR EDITOR: INITIATING APPROVAL FOR ID: ${newProject.id} <<<`,
+      );
+
       const result = await ErpApprovalService.initiateApproval({
         model: Project,
-        targetId: null,
+        targetId: newProject.id, // <--- SEKARANG ID TIDAK NULL
         action: "CREATE",
-        payload: projectData,
+        payload: { ...projectData, status: "Published" }, // Payload tetap minta status Published
         userId: req.userId,
         owlUsername: req.owl_username,
-        token: req.owl_token, // decoded token middleware
+        token: req.owl_token,
+      });
+
+      // Update record lokal agar terkunci
+      await newProject.update({
+        is_locked: true,
+        lock_ticket: result.notrans,
       });
 
       return res.status(202).json({
-        message: "Permintaan publish sedang diproses di OWL.",
+        message:
+          "Permintaan publish sedang diproses di OWL. Data disimpan sebagai draf terkunci.",
         ticket: result.notrans,
+        data: newProject, // Kirim data agar Frontend bisa langsung update list
       });
     }
-
-    // Jalur Superadmin ATAU Editor yang cuma save Draft
-    // CMS Buta: Superadmin nggak perlu tau layer OWL ada berapa.
-    console.log(">>> [PROJECT] JALUR DIRECT: CREATING LOCAL RECORD <<<");
-    const newProject = await Project.create(projectData);
-
-    return res.status(201).json({
-      message: "Proyek berhasil disimpan secara langsung.",
-      data: newProject,
-    });
   } catch (error) {
     console.error("🚨 Error CREATE Project:", error);
     res

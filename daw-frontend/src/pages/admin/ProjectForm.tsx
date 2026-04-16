@@ -168,6 +168,8 @@ export default function ProjectForm() {
 
   // --- LOGIC: FETCH EXISTING DATA (EDIT MODE ONLY) ---
   useEffect(() => {
+    const controller = new AbortController();
+
     if (!isEditMode) {
       setFormData({
         title: "",
@@ -187,57 +189,70 @@ export default function ProjectForm() {
       return;
     }
 
-    const fetchProject = async () => {
+    const fetchInitialData = async () => {
       setIsFetching(true);
+
       try {
-        // 1. Ambil Data Original (Live Data)
-        const response = await api.get(`/projects/${id}`);
-        const data = response.data.data || response.data;
+        const [projectRes, draftRes] = await Promise.allSettled([
+          api.get(`/projects/${id}`, { signal: controller.signal }), // Selipkan signal di config axios
+          api.get(`/approval/rejected/${id}?module=Project`, {
+            signal: controller.signal,
+          }),
+        ]);
 
-        // 2. Deteksi Draf yang Ditolak (Recovery Data)
-        try {
-          // Menyesuaikan endpoint Tahap 2.2 Backend
-          const draftRes = await api.get(
-            `/approval/rejected/${id}?module=Project`,
-          );
+        if (projectRes.status === "fulfilled") {
+          const data = projectRes.value.data.data || projectRes.value.data;
 
-          // Sesuai respons Tahap 2.1: { success: true, hasRejected: true, data: draft }
-          if (draftRes.data.hasRejected && draftRes.data.data) {
-            setRejectedDraft(draftRes.data.data);
-            setShowDraftBanner(true); // Aktifkan banner jika draf ditemukan
-          }
-        } catch (draftErr: any) {
-          // Abaikan jika 404 (Memang tidak ada draf rejected)
-          if (draftErr.response?.status !== 404) {
-            console.error("Recovery Data Fetch Error:", draftErr);
-          }
+          setFormData((prev) => ({
+            ...prev,
+            title: data.title || "",
+            excerpt: data.excerpt || "",
+            content: data.content || "",
+            category: data.category || "",
+            status: data.status || "Draft",
+            cover_image: data.cover_image || "",
+            gallery:
+              typeof data.gallery === "string"
+                ? data.gallery
+                : JSON.stringify(data.gallery || []),
+            seo_title: data.seo_title || "",
+            meta_description: data.meta_description || "",
+          }));
+        } else if (projectRes.reason.name !== "CanceledError") {
+          throw projectRes.reason;
         }
 
-        // 3. Injeksi Data Original ke State Form (State Awal)
-        setFormData({
-          title: data.title || "",
-          excerpt: data.excerpt || "",
-          content: data.content || "",
-          category: data.category || "",
-          status: data.status || "Draft",
-          cover_image: data.cover_image || "",
-          gallery:
-            typeof data.gallery === "string"
-              ? data.gallery
-              : JSON.stringify(data.gallery || []),
-          seo_title: data.seo_title || "",
-          meta_description: data.meta_description || "",
-        });
-      } catch (error) {
-        console.error("Fetch Error:", error);
-        toast.error("Gagal memuat data proyek");
-        navigate("/admin/projects");
+        if (
+          draftRes.status === "fulfilled" &&
+          draftRes.value.data?.hasRejected
+        ) {
+          setRejectedDraft(draftRes.value.data.data);
+          setShowDraftBanner(true);
+        } else if (
+          draftRes.status === "rejected" &&
+          draftRes.reason.response?.status !== 404 &&
+          draftRes.reason.name !== "CanceledError"
+        ) {
+          console.error("Recovery Data Fetch Error:", draftRes.reason);
+        }
+      } catch (error: any) {
+        if (error.name !== "CanceledError") {
+          console.error("Fetch Error:", error);
+          toast.error("Gagal memuat data proyek");
+          navigate("/admin/projects");
+        }
       } finally {
-        setIsFetching(false);
+        if (!controller.signal.aborted) {
+          setIsFetching(false);
+        }
       }
     };
 
-    fetchProject();
+    fetchInitialData();
+
+    return () => {
+      controller.abort();
+    };
   }, [id, isEditMode, navigate]);
 
   // --- DRAFT RECOVERY HANDLER ---
@@ -340,6 +355,7 @@ export default function ProjectForm() {
 
   // --- UNIFIED SAVE LOGIC ---
   const handleSave = async (targetStatus: string) => {
+    // 1. Validasi Dasar
     if (!formData.title.trim())
       return toast.error("Judul proyek tidak boleh kosong.");
 
@@ -363,26 +379,31 @@ export default function ProjectForm() {
 
     setIsLoading(true);
     const loadingToast = toast.loading(
-      `${isEditMode ? "Memperbarui" : "Menyimpan"} proyek...`,
+      `${isEditMode ? "Memperbarui" : "Menyimpan"} proyek dan sinkronisasi ke OWL...`,
     );
 
     try {
       const payload = new FormData();
 
-      // Optimize & Append Files
+      // 2. Optimize & Append Cover Image
       if (coverFile) {
         payload.append("cover_image", await compressImage(coverFile));
       } else if (formData.cover_image) {
         payload.append("cover_image", formData.cover_image);
       }
-      for (const file of galleryFiles) {
-        payload.append("gallery", await compressImage(file));
-      }
+
+      // 3. Append Identity (Auto-Recovery Cleanup)
+      // FIX: Sebelumnya kode ini tertulis 2x di kodingan lo. Cukup 1x saja.
       if (rejectedDraft?.notrans) {
         payload.append("previous_notrans", rejectedDraft.notrans);
       }
 
-      // Append Texts
+      // 4. Optimize & Append Gallery
+      for (const file of galleryFiles) {
+        payload.append("gallery", await compressImage(file));
+      }
+
+      // 5. Append Texts
       payload.append("title", formData.title.trim());
       if (generatedSlug) {
         payload.append("slug", generatedSlug);
@@ -405,25 +426,29 @@ export default function ProjectForm() {
         payload.append("existing_gallery", formData.gallery);
       }
 
-      // Append Author (Dari Local Storage)
+      // Append Author (Dengan fallback aman)
       payload.append("author", user?.name || "Admin DAW");
 
-      // Dinamis menggunakan POST (Create) atau PUT (Edit)
+      // 6. Eksekusi API dengan TIMEOUT (Penting untuk mencegah "Stuck Loading"!)
       const endpoint = isEditMode ? `/projects/${id}` : "/projects";
       const method = isEditMode ? api.put : api.post;
 
       const response = await method(endpoint, payload, {
+        timeout: 60000, // Timeout 60 detik (Wajib saat proses integrasi dengan sistem eksternal seperti OWL)
         onUploadProgress: (p) => {
           const percent = Math.round((p.loaded * 100) / (p.total || 1));
+          // Update toast ID yang sama agar tidak muncul notifikasi ganda
           toast.loading(`Mengunggah: ${percent}%...`, { id: loadingToast });
         },
       });
 
+      // 7. Handle Success
       if ([200, 201, 202].includes(response.status)) {
+        // Bersihkan state draf agar banner hilang dan memori bersih
         setRejectedDraft(null);
         setShowDraftBanner(false);
+
         if (response.status === 202) {
-          // Pesan khusus buat Editor (Draf dikirim ke OWL)
           toast.success(
             "Draf revisi berhasil dikirim ke ERP DAW. Menunggu approval Admin!",
             {
@@ -432,7 +457,6 @@ export default function ProjectForm() {
             },
           );
         } else {
-          // Pesan buat Admin (Langsung simpan ke MySQL)
           toast.success(
             `Proyek berhasil di${isEditMode ? "perbarui" : "simpan"} secara langsung!`,
             {
@@ -440,12 +464,17 @@ export default function ProjectForm() {
             },
           );
         }
-        navigate("/admin/projects");
+
+        // Berikan jeda sedikit agar pesan sukses sempat terbaca user sebelum pindah halaman
+        setTimeout(() => navigate("/admin/projects"), 500);
       }
     } catch (err: any) {
-      toast.error("Gagal", {
-        description: err.response?.data?.message || "Terjadi kesalahan server.",
+      console.error("Save Error:", err);
+      toast.error("Gagal menyimpan", {
         id: loadingToast,
+        description:
+          err.response?.data?.message ||
+          "Koneksi OWL mungkin lambat atau terputus.",
       });
     } finally {
       setIsLoading(false);
