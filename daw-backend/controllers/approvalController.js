@@ -220,7 +220,8 @@ exports.getRejectedDraftByTarget = async (req, res) => {
       where: {
         target_id: id,
         module_name: module,
-        status: "Rejected", // Kita cuma cari yang statusnya ditolak
+        status: "Rejected",
+        created_by: req.owl_username || req.userId,
       },
       order: [["createdAt", "DESC"]], // Ambil yang paling baru ditolak
     });

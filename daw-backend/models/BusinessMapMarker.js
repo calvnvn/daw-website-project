@@ -36,6 +36,11 @@ const BusinessMapMarker = sequelize.define(
     sectionId: {
       type: DataTypes.STRING(255),
       allowNull: false,
+      references: {
+        model: "BusinessSections", // Konsistensi relasi
+        key: "id",
+      },
+      onDelete: "CASCADE", // Menghapus marker jika sektor dihapus
     },
     // 🚀 TAMBAHKAN DUA KOLOM INI:
     is_locked: {

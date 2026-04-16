@@ -46,9 +46,8 @@ const BusinessSection = sequelize.define(
       comment: "Status apakah data sedang dalam proses approval",
     },
     lock_ticket: {
-      type: DataTypes.STRING,
-      allowValue: true,
-      comment: "Menyimpan No. Tiket dari OWL yang sedang mengunci data ini",
+      type: DataTypes.STRING(255),
+      allowNull: true, // Perbaikan dari allowValue
     },
   },
   {
