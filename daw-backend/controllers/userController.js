@@ -25,37 +25,40 @@ exports.getAllUsers = async (req, res) => {
 // --- 1. CREATE USER (Tambahkan Guard Role) ---
 exports.createUser = async (req, res) => {
   try {
-    const { name, email, roleId } = req.body;
-    const requesterRole = req.userRole; // Dari middleware verifyToken
+    const { email, roleId, owl_username } = req.body;
+    const requesterRole = req.userRole;
 
-    // 🛡️ PROTEKSI: Hanya Superadmin yang boleh buat user baru
+    // Protection: Hanya Superadmin yang bisa buat user baru
     if (requesterRole !== "Superadmin") {
       return res.status(403).json({
-        message: "Access Denied: Only Superadmin can create new users.",
+        message: "Access Denied: Only Admin can create new users.",
       });
     }
 
-    const existingUser = await User.findOne({ where: { email } });
-    if (existingUser) {
-      return res.status(400).json({ message: "Email is already registered" });
+    if (!owl_username) {
+      return res
+        .status(400)
+        .json({ message: "OWL Username wajib diisi untuk sinkronisasi SSO." });
     }
 
-    const randomNum = Math.floor(1000 + Math.random() * 9000);
-    const tempPassword = `Daw${randomNum}!`;
+    const existingUser = await User.findOne({ where: { owl_username } });
+    if (existingUser) {
+      return res
+        .status(400)
+        .json({ message: `Username OWL '${owl_username}' sudah terdaftar.` });
+    }
 
     await User.create({
-      name,
-      email,
-      roleId,
-      password: tempPassword,
+      name: "Menunggu Sync Login...",
+      email: email || "",
+      owl_username: owl_username.trim(),
+      roleId: roleId,
+      password: "SSO_USER_NO_LOCAL_LOGIN", // Unused
+      status: "Active",
     });
-
-    console.log(`[INFO] Temp Password for ${email} is: ${tempPassword}`);
-
     res.status(201).json({
       success: true,
-      message: "User created successfully",
-      tempPassword: tempPassword,
+      message: `User '${owl_username}' berhasil di-whitelist. Nama asli akan otomatis tersinkronisasi saat user tersebut login pertama kali via OWL.`,
     });
   } catch (error) {
     console.error("Create User Error:", error);
