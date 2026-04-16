@@ -13,6 +13,8 @@ export interface MapCategory {
   id: string;
   name: string;
   color: string;
+  is_locked?: boolean;
+  lock_ticket?: string;
 }
 
 export interface MapMarker {
@@ -33,13 +35,17 @@ export interface MapMarker {
  * Represents a major business division (e.g., Resources, Energy).
  */
 export interface SectionData {
-  id: string; // The slug-based unique identifier
-  category: string; // Display name of the sector
-  title: string; // The eyebrow/hero title
-  htmlContent: string; // Rich text editorial content
-  hasMap: boolean; // Toggle for interactive map visibility
-  orderIndex: number; // Sequence for frontend display sorting
+  id: string;
+  category: string;
+  title: string;
+  htmlContent: string;
+  hasMap: boolean;
+  orderIndex: number;
   mapMarkers: MapMarker[];
+  is_locked: boolean;
+  lock_ticket?: string;
+  has_rejected?: boolean;
+  rejection_reason?: string;
 }
 
 /**
@@ -52,12 +58,23 @@ interface BusinessContextType {
   publicProjects: any[];
   isLoading: boolean;
   isProcessing: boolean;
+  rejectedDraft: any | null;
+  fetchRejectedDraft: (id: string, moduleName: string) => Promise<void>;
+  clearRejectedDraft: () => void;
   refreshData: () => Promise<void>;
   updateSection: (id: string, data: Partial<SectionData>) => Promise<void>;
-  addSection: (category: string, title: string) => Promise<void>;
+  addSection: (
+    category: string,
+    title: string,
+    status?: string,
+  ) => Promise<void>;
   deleteSection: (id: string) => Promise<void>;
-  addCategory: (data: MapCategory) => Promise<void>;
-  updateCategory: (id: string, data: Partial<MapCategory>) => Promise<void>;
+  addCategory: (data: MapCategory, status?: string) => Promise<void>;
+  updateCategory: (
+    id: string,
+    data: Partial<MapCategory>,
+    status?: string,
+  ) => Promise<void>;
   deleteCategory: (id: string) => Promise<void>;
 }
 
@@ -71,7 +88,33 @@ export const BusinessProvider = ({ children }: { children: ReactNode }) => {
   const [publicProjects, setPublicProjects] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [rejectedDraft, setRejectedDraft] = useState<any | null>(null);
 
+  // Menarik data draf yang ditolak dari backend untuk fitur Recovery Editor
+  const fetchRejectedDraft = useCallback(
+    async (id: string, moduleName: string) => {
+      try {
+        const response = await api.get(`/approval/rejected/${id}`, {
+          params: { module: moduleName },
+        });
+        if (response.data.hasRejected) {
+          setRejectedDraft(response.data.data);
+        }
+      } catch (error: any) {
+        if (error.response?.status === 404) {
+          setRejectedDraft(null);
+        } else {
+          console.error("[FETCH_REJECTED_ERROR]:", error);
+        }
+      }
+    },
+    [],
+  );
+
+  // Cleaning Draf's State (saat save atau pindah tab)
+  const clearRejectedDraft = useCallback(() => {
+    setRejectedDraft(null);
+  }, []);
   /**
    * @desc Synchronizes local memory with the remote database.
    * Fetches both business sections and map categories concurrently for performance.
@@ -79,7 +122,6 @@ export const BusinessProvider = ({ children }: { children: ReactNode }) => {
   const refreshData = useCallback(async () => {
     setIsLoading(true);
     try {
-      // FIX 5: Tarik data proyek publik secara paralel bersama data bisnis lainnya
       const [bizRes, catRes, projRes] = await Promise.all([
         api.get("/businesses/public"),
         api.get("/map-categories"),
@@ -103,9 +145,20 @@ export const BusinessProvider = ({ children }: { children: ReactNode }) => {
     async (id: string, data: Partial<SectionData>) => {
       setIsProcessing(true);
       try {
-        await api.put(`/businesses/admin/${id}`, data);
+        const res = await api.put(`/businesses/admin/${id}`, data);
+        if (res.status === 202) {
+          toast.success(
+            "Draf revisi berhasil dikirim ke antrean persetujuan!",
+            {
+              description: `Tiket: ${res.data.ticket || "Memproses..."}`,
+            },
+          );
+        } else {
+          toast.success("Data bisnis berhasil diperbarui secara permanen!");
+        }
+
+        clearRejectedDraft();
         await refreshData();
-        toast.success("Data bisnis berhasil diperbarui!");
       } catch (error: any) {
         console.error("Save error:", error);
         toast.error(
@@ -116,7 +169,7 @@ export const BusinessProvider = ({ children }: { children: ReactNode }) => {
         setIsProcessing(false);
       }
     },
-    [refreshData],
+    [refreshData, clearRejectedDraft],
   );
 
   const addCategory = useCallback(
@@ -229,9 +282,12 @@ export const BusinessProvider = ({ children }: { children: ReactNode }) => {
       value={{
         sections,
         categories,
-        publicProjects, // FIX 6: Export ini ke luar supaya bisa dipakai komponen lain
+        publicProjects,
         isLoading,
         isProcessing,
+        rejectedDraft,
+        fetchRejectedDraft,
+        clearRejectedDraft,
         refreshData,
         updateSection,
         addCategory,
@@ -239,8 +295,7 @@ export const BusinessProvider = ({ children }: { children: ReactNode }) => {
         deleteCategory,
         addSection,
         deleteSection,
-      }}
-    >
+      }}>
       {children}
     </BusinessContext.Provider>
   );
