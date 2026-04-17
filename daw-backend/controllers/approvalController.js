@@ -24,12 +24,15 @@ const AboutInfo = require("../models/AboutInfo");
 // GET: List Queue dengan Data Lengkap dari Lokal
 exports.getPendingApprovals = async (req, res) => {
   try {
-    const userRole = req.userRole; // Ambil dari middleware authJwt.js
-
-    // SUPERADMIN: melihat semua list yang statusnya "Pending" di lokal
-    if (userRole === "Superadmin" || userRole === "admin") {
+    const userRole = req.userRole ? req.userRole.toLowerCase().trim() : "";
+    console.log(`>>> [APPROVAL CENTER] Role Check: '${userRole}'`);
+    if (
+      userRole === "superadmin" ||
+      userRole === "admin" ||
+      userRole === "administrator"
+    ) {
       console.log(
-        ">>> [APPROVAL CENTER] Mengakses sebagai Superadmin (All Pending Drafts)",
+        ">>> [APPROVAL CENTER] Authorized as Admin/Superadmin (Fetching All Pending Drafts)",
       );
 
       const allPendingDrafts = await ApprovalDraft.findAll({
@@ -147,6 +150,8 @@ exports.executeDecision = async (req, res) => {
     if (status === "1") {
       const cleanPayload = { ...payload };
       delete cleanPayload.id;
+
+      await executeModelUpdate(module, targetId, cleanPayload, action, t);
 
       handleFileCommit(module, cleanPayload);
 
