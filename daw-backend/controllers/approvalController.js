@@ -234,7 +234,7 @@ exports.getRejectedDraftByTarget = async (req, res) => {
         status: "Rejected",
         created_by: req.owl_username || req.userId,
       },
-      order: [["createdAt", "DESC"]], // Ambil yang paling baru ditolak
+      order: [["createdAt", "DESC"]],
     });
 
     if (!draft) {
