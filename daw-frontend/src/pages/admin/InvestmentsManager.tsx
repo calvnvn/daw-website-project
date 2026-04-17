@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useCallback } from "react";
 import {
   Save,
   Lock,
@@ -8,6 +8,7 @@ import {
   Image as ImageIcon,
   Building,
   Type,
+  AlertTriangle,
 } from "lucide-react";
 import { toast } from "sonner";
 import { useInvestments } from "@/contexts/InvestmentContext";
@@ -23,13 +24,12 @@ interface LocalAffiliate {
   logoUrl: string | null;
   newLogoFile?: File | null;
   isNew?: boolean;
+  is_locked?: boolean;
+  lock_ticket?: string | null;
+  has_rejected?: boolean;
+  previous_notrans?: string | null;
 }
 
-/**
- * REFACTORED: LogoPreviewer (Anti-Flicker & Clean Placeholder Version)
- * @description Managed component to handle ObjectURL lifecycle.
- * Displays a clean placeholder icon when no image is loaded.
- */
 const LogoPreviewer = React.memo(
   ({
     file,
@@ -64,8 +64,7 @@ const LogoPreviewer = React.memo(
           isEditing
             ? "border-slate-300 bg-white hover:border-daw-green cursor-pointer"
             : "border-slate-200 bg-slate-100/50 cursor-not-allowed"
-        }`}
-      >
+        }`}>
         {/* 🛡️ PERBAIKAN DISPLAY: Cek apakah previewUrl benar-benar ada data string-nya */}
         {previewUrl ? (
           <img
@@ -82,8 +81,7 @@ const LogoPreviewer = React.memo(
               className={`w-6 h-6 ${isEditing ? "text-daw-green" : "text-slate-400"}`}
             />
             <span
-              className={`text-[9px] font-medium leading-tight ${isEditing ? "text-slate-700" : "text-slate-400"}`}
-            >
+              className={`text-[9px] font-medium leading-tight ${isEditing ? "text-slate-700" : "text-slate-400"}`}>
               Upload Logo
             </span>
           </div>
@@ -92,8 +90,6 @@ const LogoPreviewer = React.memo(
     );
   },
 );
-
-// Tambahkan Display Name agar tidak error di dev-tools
 LogoPreviewer.displayName = "LogoPreviewer";
 
 export default function InvestmentsManager() {
@@ -103,26 +99,51 @@ export default function InvestmentsManager() {
   const [isEditing, setIsEditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
 
-  // Tarik Context
   const { settings, companies, refreshData } = useInvestments();
 
-  // --- STATE 1: TEXT CONTENT ---
   const [pageContent, setPageContent] = useState({
     teaserHeadline: "",
     teaserBody: "",
     sectionIntro: "",
   });
 
-  // --- STATE 2: LOCAL COMPANIES ---
   const [localCompanies, setLocalCompanies] = useState<LocalAffiliate[]>([]);
+  const [rejectedSettingsDraft, setRejectedSettingsDraft] = useState<
+    any | null
+  >(null);
 
-  // Sinkronisasi data dari Context ke Local State saat pertama kali render
+  // Resilient Fetching & Abort Controller
   useEffect(() => {
-    /**
-     * PREVENTION LOGIC:
-     * We only sync context data to local state if the user is NOT in editing mode.
-     * This prevents background refreshes from wiping out unsaved user input.
-     */
+    const controller = new AbortController();
+
+    const checkRejectedDrafts = async () => {
+      try {
+        // Kita cek modul Singleton (Settings) dengan targetId 1
+        const res = await api.get(
+          "/approval/rejected/1?module=InvestmentSettings",
+          {
+            signal: controller.signal,
+          },
+        );
+
+        if (res.data.hasRejected) {
+          setRejectedSettingsDraft(res.data.data);
+        }
+      } catch (err: any) {
+        if (err.name !== "CanceledError") {
+          console.error("Failed to fetch rejected drafts:", err);
+        }
+      }
+    };
+
+    checkRejectedDrafts();
+
+    return () => {
+      controller.abort(); // Cleanup jika komponen di-unmount cepat
+    };
+  }, []);
+
+  useEffect(() => {
     if (!isEditing) {
       if (settings) {
         setPageContent({
@@ -132,31 +153,48 @@ export default function InvestmentsManager() {
         });
       }
       if (companies) {
-        /**
-         * @description Deep copy the company list and normalize null values.
-         * Using Nullish Coalescing (??) to ensure controlled inputs don't receive 'null'.
-         */
         setLocalCompanies(
-          companies.map((c) => ({
+          companies.map((c: any) => ({
             ...c,
             websiteUrl: c.websiteUrl ?? "",
             logoUrl: c.logoUrl || null,
+            is_locked: c.is_locked || false,
+            lock_ticket: c.lock_ticket || null,
+            has_rejected: c.has_rejected || false,
           })),
         );
       }
     }
-  }, [settings, companies, isEditing]); // Include isEditing as a dependency
+  }, [settings, companies, isEditing]);
 
-  // ==========================================
-  // LOGIKA TAB 1: CONTENT
-  // ==========================================
+  // Restoration
+  const handleRestoreSettingsDraft = useCallback(() => {
+    if (!rejectedSettingsDraft?.payload) return;
+
+    const payload = rejectedSettingsDraft.payload;
+    setPageContent((prev) => ({
+      teaserHeadline: payload.teaserHeadline ?? prev.teaserHeadline,
+      teaserBody: payload.teaserBody ?? prev.teaserBody,
+      sectionIntro: payload.sectionIntro ?? prev.sectionIntro,
+    }));
+
+    setIsEditing(true);
+    toast.info("Draf berhasil dipulihkan.", {
+      description: "Silakan perbaiki dan simpan kembali.",
+    });
+  }, [rejectedSettingsDraft]);
+
   const handleSaveSettings = async () => {
-    await api.put("/investment/settings", pageContent);
+    const payload = {
+      ...pageContent,
+      status: "Published",
+      previous_notrans: rejectedSettingsDraft?.notrans || null,
+    };
+
+    await api.put("/investment/settings", payload, { timeout: 60000 });
+    setRejectedSettingsDraft(null);
   };
 
-  // ==========================================
-  // LOGIKA TAB 2: COMPANIES
-  // ==========================================
   const addCompany = () => {
     setLocalCompanies([
       ...localCompanies,
@@ -168,6 +206,7 @@ export default function InvestmentsManager() {
         websiteUrl: "",
         logoUrl: null,
         isNew: true,
+        is_locked: false,
       },
     ]);
   };
@@ -176,7 +215,6 @@ export default function InvestmentsManager() {
     const target = localCompanies.find((c) => c.id === id);
     if (!target) return;
 
-    // 1. Tampilkan konfirmasi menggunakan Sonner
     toast.warning(`Remove ${target.name || "Company"}?`, {
       description: "This action will remove the affiliate from the grid.",
       action: {
@@ -235,64 +273,79 @@ export default function InvestmentsManager() {
     updateCompany(id, "newLogoFile", file);
   };
 
-  /**
-   * REFACTORED: Parallel Company Sync
-   * @description Switches from sequential loop to concurrent promises for 10x faster performance.
-   */
   const handleSaveCompanies = async () => {
     const loadingToast = toast.loading("Syncing affiliate records...");
-
     const validCompanies = localCompanies.filter((comp) => comp.name.trim());
 
     if (validCompanies.length === 0) {
       toast.dismiss(loadingToast);
       return;
     }
+    const saveTasks = validCompanies.map((comp) => {
+      if (comp.is_locked && !comp.isNew) return Promise.resolve(comp);
 
-    try {
-      const saveTasks = validCompanies.map(async (comp) => {
-        const formData = new FormData();
-        formData.append("name", comp.name);
-        formData.append("desc", comp.desc || "");
-        formData.append("category", comp.category);
-        formData.append("websiteUrl", comp.websiteUrl || "");
+      const formData = new FormData();
+      formData.append("name", comp.name);
+      formData.append("desc", comp.desc || "");
+      formData.append("category", comp.category);
+      formData.append("websiteUrl", comp.websiteUrl || "");
+      formData.append("status", "Published");
+      if (comp.previous_notrans)
+        formData.append("previous_notrans", comp.previous_notrans);
+      if (comp.newLogoFile) formData.append("logo", comp.newLogoFile);
 
-        if (comp.newLogoFile) {
-          formData.append("logo", comp.newLogoFile);
-        }
+      const config = { timeout: 60000 };
+      if (comp.isNew) {
+        return api
+          .post("/investment/affiliate", formData, config)
+          .then((res) => ({
+            ...comp,
+            id: res.data.data?.id || res.data.id,
+            isNew: false,
+            newLogoFile: null,
+            is_locked: true,
+          }));
+      } else {
+        return api
+          .put(`/investment/affiliate/${comp.id}`, formData, config)
+          .then(() => ({ ...comp, newLogoFile: null, is_locked: true }));
+      }
+    });
 
-        if (comp.isNew) {
-          const res = await api.post("/investment/affiliate", formData);
-          return { ...comp, id: res.data.id, isNew: false, newLogoFile: null };
-        } else {
-          await api.put(`/investment/affiliate/${comp.id}`, formData);
-          return { ...comp, newLogoFile: null };
-        }
-      });
+    const results = await Promise.allSettled(saveTasks);
 
-      const updatedResults = await Promise.all(saveTasks);
-      setLocalCompanies(updatedResults);
+    const successfulComps: LocalAffiliate[] = [];
+    let failedCount = 0;
 
-      toast.success("Consellation grid synchronized!", {
+    results.forEach((result, index) => {
+      if (result.status === "fulfilled") {
+        successfulComps.push(result.value);
+      } else {
+        failedCount++;
+        successfulComps.push(validCompanies[index]);
+        console.error(
+          `Failed to save company: ${validCompanies[index].name}`,
+          result.reason,
+        );
+      }
+    });
+
+    setLocalCompanies(successfulComps);
+
+    if (failedCount === 0) {
+      toast.success("Grid tersinkronisasi!", {
         id: loadingToast,
-        description: `Successfully processed ${updatedResults.length} records.`,
+        description: `Berhasil memproses ${successfulComps.length} data.`,
       });
-    } catch (err: any) {
-      console.error("Batch Save Error:", err);
-      const errorMsg =
-        err.response?.data?.message || "Check network connection.";
-
-      toast.error("Sync Interrupted", {
+    } else {
+      toast.error("Sinkronisasi Parsial", {
         id: loadingToast,
-        description: `Failed to save some items: ${errorMsg}`,
+        description: `${failedCount} data gagal disimpan. Silakan coba lagi.`,
       });
-      throw err;
+      throw new Error("Partial sync failure");
     }
   };
 
-  // ==========================================
-  // MAIN SAVE CONTROLLER
-  // ==========================================
   const handleSave = async () => {
     setIsSaving(true);
     const loadingToast = toast.loading("Saving changes...");
@@ -302,12 +355,11 @@ export default function InvestmentsManager() {
       } else {
         await handleSaveCompanies();
       }
-      toast.success("Changes saved successfully!", { id: loadingToast });
-      refreshData();
+      toast.success("Perubahan berhasil dikirim ke OWL!", { id: loadingToast });
+      await refreshData();
       setIsEditing(false);
     } catch (err) {
-      toast.error("Failed to save changes.", { id: loadingToast });
-      console.log(err);
+      toast.error("Gagal memproses data.", { id: loadingToast });
     } finally {
       setIsSaving(false);
     }
@@ -329,75 +381,171 @@ export default function InvestmentsManager() {
 
   return (
     <div className="max-w-6xl mx-auto space-y-6 animate-in fade-in duration-500 pb-12">
+      {rejectedSettingsDraft && (
+        <div className="mb-6 bg-amber-50 border border-amber-200 rounded-2xl p-4 flex flex-col sm:flex-row items-center justify-between gap-4 animate-in slide-in-from-top duration-500 shadow-sm ring-2 ring-amber-500/10">
+          <div className="flex items-center gap-4">
+            <div className="w-12 h-12 bg-amber-100 rounded-xl flex items-center justify-center shrink-0 animate-pulse">
+              <AlertTriangle className="w-6 h-6 text-amber-600" />
+            </div>
+            <div>
+              <h4 className="text-sm font-black text-amber-900 uppercase tracking-tight">
+                Revisi Konten Ditolak Admin OWL
+              </h4>
+              <p className="text-xs text-amber-700 leading-relaxed max-w-xl">
+                Alasan:{" "}
+                <span className="italic font-medium">
+                  "
+                  {rejectedSettingsDraft.rejection_reason ||
+                    "Tidak ada alasan spesifik."}
+                  "
+                </span>
+                . Gunakan tombol di samping untuk memulihkan draf terakhir Anda.
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={handleRestoreSettingsDraft}
+            className="flex items-center gap-2 px-5 py-2.5 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-xs font-black uppercase tracking-widest transition-all shadow-lg shadow-amber-600/20 active:scale-95">
+            <Plus className="w-4 h-4 rotate-45" /> Restore & Fix Draft
+          </button>
+        </div>
+      )}
       {/* --- HEADER --- */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white p-6 rounded-xl border border-slate-200 shadow-sm top-0 z-20">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white p-6 rounded-2xl border border-slate-200 shadow-sm sticky top-0 z-30">
         <div>
-          <h1 className="text-2xl font-serif font-bold text-slate-900">
-            Investments Manager
-          </h1>
+          <div className="flex items-center gap-3">
+            <h1 className="text-2xl font-serif font-black text-slate-900 tracking-tight">
+              Investments Manager
+            </h1>
+            {settings?.is_locked && (
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-blue-50 text-blue-600 rounded-full text-[10px] font-black uppercase tracking-tighter border border-blue-100 animate-in fade-in zoom-in duration-300">
+                <Lock className="w-3 h-3" /> Pending: {settings.lock_ticket}
+              </span>
+            )}
+          </div>
           <p className="text-sm text-slate-500 mt-1">
             Kelola ekosistem investasi, konten teks promosi, dan logo perusahaan
             afiliasi secara terpusat.
           </p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 w-full sm:w-auto">
           <button
-            onClick={() => setIsEditing(!isEditing)}
-            className={`flex items-center gap-2 px-4 py-2.5 rounded-lg font-bold text-sm transition-colors border ${
+            onClick={() => {
+              if (settings?.is_locked) {
+                return toast.error("Data Terkunci", {
+                  description:
+                    "Konten utama sedang dalam antrean approval Admin.",
+                });
+              }
+              setIsEditing(!isEditing);
+            }}
+            disabled={isSaving}
+            className={`flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl font-black text-[11px] uppercase tracking-widest transition-all border shadow-sm ${
               isEditing
-                ? "bg-amber-100 text-amber-700 border-amber-200"
-                : "bg-slate-100 text-slate-500 border-slate-200 hover:bg-slate-200"
-            }`}
-          >
+                ? "bg-amber-50 text-amber-700 border-amber-200 ring-4 ring-amber-500/5"
+                : settings?.is_locked
+                  ? "bg-slate-50 text-slate-400 border-slate-100 cursor-not-allowed"
+                  : "bg-white text-slate-600 border-slate-200 hover:bg-slate-50 hover:border-slate-300"
+            }`}>
             {isEditing ? (
-              <Unlock className="w-4 h-4" />
-            ) : (
+              <Unlock className="w-4 h-4 text-amber-500" />
+            ) : settings?.is_locked ? (
               <Lock className="w-4 h-4" />
+            ) : (
+              <Lock className="w-4 h-4 text-slate-400" />
             )}
-            <span>{isEditing ? "Editing Mode" : "Locked"}</span>
+            <span>
+              {isEditing
+                ? "Editing Mode"
+                : settings?.is_locked
+                  ? "Locked by System"
+                  : "Locked"}
+            </span>
           </button>
 
           <button
             onClick={handleSave}
-            disabled={isSaving || !isEditing}
-            className="flex items-center gap-2 bg-daw-green hover:bg-[#003b1c] disabled:bg-slate-300 disabled:cursor-not-allowed text-white px-6 py-2.5 rounded-lg font-medium transition-colors shadow-sm"
-          >
-            <Save className="w-5 h-5" />
-            <span>{isSaving ? "Saving..." : "Save Changes"}</span>
+            disabled={isSaving || !isEditing || settings?.is_locked}
+            className="flex-1 sm:flex-none flex items-center justify-center gap-2 bg-daw-green hover:bg-[#003b1c] disabled:bg-slate-100 disabled:text-slate-400 text-white px-6 py-2.5 rounded-xl font-black text-[11px] uppercase tracking-widest transition-all shadow-lg shadow-daw-green/20 active:scale-95">
+            {isSaving ? (
+              <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+            ) : (
+              <Save className="w-4 h-4" />
+            )}
+            <span>{isSaving ? "Syncing..." : "Publish"}</span>
           </button>
         </div>
       </div>
 
       {/* --- TABS NAVIGATION --- */}
       <div className="flex items-end overflow-x-auto border border-slate-200 border-b-0 shadow-sm bg-white rounded-t-xl px-2 pt-2 hide-scrollbar">
+        {/* TAB 1: PAGE CONTENT */}
         <button
-          onClick={() => setActiveTab("content")}
+          onClick={() => !isSaving && setActiveTab("content")}
           className={`flex items-center gap-2 px-6 py-3 font-bold text-sm uppercase tracking-wider border-b-2 transition-colors whitespace-nowrap ${
+            isSaving ? "cursor-wait opacity-80" : ""
+          } ${
             activeTab === "content"
               ? "border-daw-green text-daw-green"
               : "border-transparent text-slate-400 hover:text-slate-700"
-          }`}
-        >
-          <Type className="w-4 h-4" /> Page Content
+          }`}>
+          <Type className="w-4 h-4" />
+          <span>Page Content</span>
+
+          <div className="flex items-center gap-1 ml-1">
+            {rejectedSettingsDraft && (
+              <span title="Revision Required">
+                <div className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
+              </span>
+            )}
+            {settings?.is_locked && (
+              <span title="Pending Approval">
+                <Lock className="w-3 h-3 text-blue-500" />
+              </span>
+            )}
+          </div>
         </button>
+
+        {/* TAB 2: AFFILIATED COMPANIES */}
         <button
-          onClick={() => setActiveTab("companies")}
+          onClick={() => !isSaving && setActiveTab("companies")}
           className={`flex items-center gap-2 px-6 py-3 font-bold text-sm uppercase tracking-wider border-b-2 transition-colors whitespace-nowrap ${
+            isSaving ? "cursor-wait opacity-80" : ""
+          } ${
             activeTab === "companies"
               ? "border-daw-green text-daw-green"
               : "border-transparent text-slate-400 hover:text-slate-700"
-          }`}
-        >
-          <Building className="w-4 h-4" /> Affiliated Companies
+          }`}>
+          <Building className="w-4 h-4" />
+          <span>Affiliated Companies</span>
+
+          <div className="flex items-center gap-1 ml-1">
+            {localCompanies.some((c) => c.has_rejected) && (
+              <span title="Revision Required">
+                <div className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
+              </span>
+            )}
+            {localCompanies.some((c) => c.is_locked) && (
+              <span title="Pending Approval">
+                <Lock className="w-3 h-3 text-blue-500" />
+              </span>
+            )}
+          </div>
         </button>
       </div>
 
       {/* --- TAB CONTENT AREA --- */}
       <div className="bg-white rounded-b-xl border border-t-0 border-slate-200 shadow-sm p-6 lg:p-8 min-h-[500px]">
-        {/* TAB 1: PAGE CONTENT*/}
+        {/* TAB 1: PAGE CONTENT (SINGLETON)              */}
         {activeTab === "content" && (
           <div className="space-y-8 animate-in fade-in duration-300">
-            <div className="bg-slate-50 p-6 rounded-xl border border-slate-200">
+            <div className="bg-slate-50 p-6 rounded-xl border border-slate-200 relative overflow-hidden">
+              {settings?.is_locked && (
+                <div className="absolute top-0 right-0 bg-blue-100 text-blue-700 px-3 py-1 rounded-bl-lg text-[10px] font-black uppercase tracking-wider flex items-center gap-1 shadow-sm">
+                  <Lock className="w-3 h-3" /> Locked
+                </div>
+              )}
+
               <h3 className="text-base font-bold text-slate-900 mb-4 border-b border-slate-200 pb-2">
                 Home Page Teaser Content
               </h3>
@@ -415,9 +563,9 @@ export default function InvestmentsManager() {
                         teaserHeadline: e.target.value,
                       })
                     }
-                    disabled={!isEditing}
+                    disabled={!isEditing || settings?.is_locked}
                     className={`w-full px-3 py-2 rounded-lg font-serif text-lg transition-all duration-300 ${
-                      isEditing
+                      isEditing && !settings?.is_locked
                         ? "bg-white border border-slate-300 text-slate-900 focus:ring-2 focus:ring-daw-green/20 shadow-inner"
                         : "bg-slate-100/50 border-transparent text-slate-500 cursor-not-allowed"
                     }`}
@@ -436,9 +584,9 @@ export default function InvestmentsManager() {
                         teaserBody: e.target.value,
                       })
                     }
-                    disabled={!isEditing}
+                    disabled={!isEditing || settings?.is_locked}
                     className={`w-full px-3 py-2 rounded-lg resize-none transition-all duration-300 ${
-                      isEditing
+                      isEditing && !settings?.is_locked
                         ? "bg-white border border-slate-300 text-slate-900 focus:ring-2 focus:ring-daw-green/20 shadow-inner"
                         : "bg-slate-100/50 border-transparent text-slate-500 cursor-not-allowed"
                     }`}
@@ -447,7 +595,12 @@ export default function InvestmentsManager() {
               </div>
             </div>
 
-            <div className="bg-slate-50 p-6 rounded-xl border border-slate-200">
+            <div className="bg-slate-50 p-6 rounded-xl border border-slate-200 relative overflow-hidden">
+              {settings?.is_locked && (
+                <div className="absolute top-0 right-0 bg-blue-100 text-blue-700 px-3 py-1 rounded-bl-lg text-[10px] font-black uppercase tracking-wider flex items-center gap-1 shadow-sm">
+                  <Lock className="w-3 h-3" /> Locked
+                </div>
+              )}
               <h3 className="text-base font-bold text-slate-900 mb-4 border-b border-slate-200 pb-2">
                 Main Investments Page
               </h3>
@@ -464,9 +617,9 @@ export default function InvestmentsManager() {
                       sectionIntro: e.target.value,
                     })
                   }
-                  disabled={!isEditing}
+                  disabled={!isEditing || settings?.is_locked}
                   className={`w-full px-3 py-2 rounded-lg resize-none transition-all duration-300 ${
-                    isEditing
+                    isEditing && !settings?.is_locked
                       ? "bg-white border border-slate-300 text-slate-900 focus:ring-2 focus:ring-daw-green/20 shadow-inner"
                       : "bg-slate-100/50 border-transparent text-slate-500 cursor-not-allowed"
                   }`}
@@ -476,7 +629,7 @@ export default function InvestmentsManager() {
           </div>
         )}
 
-        {/* TAB 2: AFFILIATED COMPANIES */}
+        {/* TAB 2: AFFILIATED COMPANIES (COLLECTION)     */}
         {activeTab === "companies" && (
           <div className="space-y-6 animate-in fade-in duration-300">
             <div className="flex items-center justify-between mb-4 border-b border-slate-100 pb-4">
@@ -492,8 +645,8 @@ export default function InvestmentsManager() {
               {isEditing && (
                 <button
                   onClick={addCompany}
-                  className="flex items-center gap-1.5 px-4 py-2 bg-daw-green/10 hover:bg-daw-green hover:text-white text-daw-green rounded-lg text-sm font-bold transition-colors"
-                >
+                  disabled={isSaving}
+                  className="flex items-center gap-1.5 px-4 py-2 bg-daw-green/10 hover:bg-daw-green hover:text-white disabled:opacity-50 disabled:cursor-not-allowed text-daw-green rounded-lg text-sm font-bold transition-colors">
                   <Plus className="w-4 h-4" /> Add Company
                 </button>
               )}
@@ -503,21 +656,45 @@ export default function InvestmentsManager() {
               {localCompanies.map((company) => (
                 <div
                   key={company.id}
-                  className="flex gap-4 items-start bg-slate-50 p-5 rounded-xl border border-slate-200 group transition-all"
-                >
+                  className={`flex gap-4 items-start bg-slate-50 p-5 rounded-xl border border-slate-200 group transition-all relative ${
+                    company.is_locked
+                      ? "opacity-60 ring-2 ring-blue-500/20"
+                      : ""
+                  } ${company.has_rejected ? "ring-2 ring-amber-500/40 bg-amber-50/30" : ""}`}>
                   {/* LOGO UPLOAD COMPONENT */}
                   <div className="w-24 shrink-0 relative">
+                    <div className="absolute -top-3 -right-3 z-20 flex flex-col gap-1.5">
+                      {company.has_rejected && (
+                        <span
+                          title="Revisi Ditolak: Butuh Perbaikan"
+                          className="flex h-5 w-5 relative">
+                          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
+                          <span className="relative inline-flex rounded-full h-5 w-5 bg-amber-500 items-center justify-center text-[10px] text-white font-bold shadow-sm ring-2 ring-white">
+                            !
+                          </span>
+                        </span>
+                      )}
+                      {company.is_locked && (
+                        <span
+                          title={`Dikunci oleh OWL (${company.lock_ticket})`}
+                          className="flex h-5 w-5 items-center justify-center bg-blue-500 text-white rounded-full shadow-sm ring-2 ring-white z-10">
+                          <Lock className="w-3 h-3" />
+                        </span>
+                      )}
+                    </div>
+
                     <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-2 text-center">
                       Logo
                     </label>
-                    <div className="relative group">
+                    <div
+                      className={`relative group ${company.is_locked ? "pointer-events-none grayscale-[20%]" : ""}`}>
                       <LogoPreviewer
                         file={company.newLogoFile}
                         savedUrl={company.logoUrl}
-                        isEditing={isEditing}
+                        isEditing={isEditing && !company.is_locked}
                       />
 
-                      {isEditing && (
+                      {isEditing && !company.is_locked && (
                         <input
                           type="file"
                           accept="image/*"
@@ -532,7 +709,9 @@ export default function InvestmentsManager() {
                   </div>
 
                   {/* COMPANY DETAILS */}
-                  <div className="flex-1 space-y-3">
+                  <fieldset
+                    disabled={!isEditing || company.is_locked}
+                    className="flex-1 space-y-3">
                     <div>
                       <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">
                         Company Name
@@ -543,8 +722,11 @@ export default function InvestmentsManager() {
                         onChange={(e) =>
                           updateCompany(company.id, "name", e.target.value)
                         }
-                        disabled={!isEditing}
-                        className={`w-full px-3 py-1.5 text-sm rounded-md font-bold transition-all duration-300 ${isEditing ? "bg-white border border-slate-300 text-slate-900 focus:ring-2 focus:ring-daw-green/20" : "bg-slate-100/50 border-transparent text-slate-500"}`}
+                        className={`w-full px-3 py-1.5 text-sm rounded-md font-bold transition-all duration-300 ${
+                          isEditing && !company.is_locked
+                            ? "bg-white border border-slate-300 text-slate-900 focus:ring-2 focus:ring-daw-green/20"
+                            : "bg-slate-100/50 border-transparent text-slate-500"
+                        }`}
                       />
                     </div>
 
@@ -560,8 +742,11 @@ export default function InvestmentsManager() {
                           onChange={(e) =>
                             updateCompany(company.id, "desc", e.target.value)
                           }
-                          disabled={!isEditing}
-                          className={`w-full px-3 py-1.5 text-xs rounded-md transition-all duration-300 ${isEditing ? "bg-white border border-slate-300 text-slate-900 focus:ring-2 focus:ring-daw-green/20" : "bg-slate-100/50 border-transparent text-slate-500"}`}
+                          className={`w-full px-3 py-1.5 text-xs rounded-md transition-all duration-300 ${
+                            isEditing && !company.is_locked
+                              ? "bg-white border border-slate-300 text-slate-900 focus:ring-2 focus:ring-daw-green/20"
+                              : "bg-slate-100/50 border-transparent text-slate-500"
+                          }`}
                         />
                       </div>
                       <div>
@@ -577,15 +762,26 @@ export default function InvestmentsManager() {
                               e.target.value,
                             )
                           }
-                          disabled={!isEditing}
-                          className={`w-full px-3 py-1.5 text-xs rounded-md transition-all duration-300 ${isEditing ? "bg-white border border-slate-300 text-slate-900 focus:ring-2 focus:ring-daw-green/20" : "bg-slate-100/50 border-transparent text-slate-500 appearance-none"}`}
-                        >
+                          className={`w-full px-3 py-1.5 text-xs rounded-md transition-all duration-300 ${
+                            isEditing && !company.is_locked
+                              ? "bg-white border border-slate-300 text-slate-900 focus:ring-2 focus:ring-daw-green/20"
+                              : "bg-slate-100/50 border-transparent text-slate-500 appearance-none"
+                          }`}>
                           <option value="fnb">Food & Beverage</option>
                           <option value="steel">Steel</option>
                           <option value="finance">
                             Finance / Microfinance
                           </option>
                           <option value="edu">Education</option>
+                          {!["fnb", "steel", "finance", "edu"].includes(
+                            company.category,
+                          ) && (
+                            <option
+                              value={company.category}
+                              className="text-red-500">
+                              ⚠ Unknown Category ({company.category})
+                            </option>
+                          )}
                         </select>
                       </div>
                     </div>
@@ -604,19 +800,21 @@ export default function InvestmentsManager() {
                             e.target.value,
                           )
                         }
-                        disabled={!isEditing}
-                        className={`w-full px-3 py-1.5 text-xs rounded-md transition-all duration-300 ${isEditing ? "bg-white border border-slate-300 text-slate-900 focus:ring-2 focus:ring-daw-green/20" : "bg-slate-100/50 border-transparent text-slate-500"}`}
+                        className={`w-full px-3 py-1.5 text-xs rounded-md transition-all duration-300 ${
+                          isEditing && !company.is_locked
+                            ? "bg-white border border-slate-300 text-slate-900 focus:ring-2 focus:ring-daw-green/20"
+                            : "bg-slate-100/50 border-transparent text-slate-500"
+                        }`}
                       />
                     </div>
-                  </div>
+                  </fieldset>
 
                   {/* DELETE ACTION */}
-                  {isEditing && (
+                  {isEditing && !company.is_locked && (
                     <button
                       onClick={() => removeCompany(company.id)}
                       className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-md transition-colors mt-5 shrink-0"
-                      title="Remove Company"
-                    >
+                      title="Remove Company">
                       <Trash2 className="w-4 h-4" />
                     </button>
                   )}
@@ -624,8 +822,10 @@ export default function InvestmentsManager() {
               ))}
 
               {localCompanies.length === 0 && (
-                <div className="col-span-full py-10 text-center text-slate-500 italic">
-                  No affiliated companies yet. Click "Add Company" to start.
+                <div className="col-span-full py-10 text-center text-slate-500 italic flex flex-col items-center gap-2">
+                  <Building className="w-8 h-8 text-slate-300 mb-2" />
+                  Belum ada perusahaan afiliasi. Klik "Add Company" untuk
+                  memulai.
                 </div>
               )}
             </div>
