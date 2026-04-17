@@ -2,6 +2,7 @@ import { Routes, Route, Navigate } from "react-router-dom";
 import { lazy, Suspense } from "react";
 import { Toaster } from "sonner";
 import { AuthProvider } from "./contexts/AuthContext";
+import { ContentProvider } from "@/contexts/ContentContext";
 
 import MainLayout from "./layouts/MainLayout";
 import AdminLayout from "./layouts/AdminLayout";
@@ -86,7 +87,14 @@ function App() {
 
               {/* Module-Specific Permissions */}
               <Route element={<ProtectedRoute permission="manage_content" />}>
-                <Route path="content" element={<ContentManager />} />
+                <Route
+                  path="content"
+                  element={
+                    <ContentProvider>
+                      <ContentManager />
+                    </ContentProvider>
+                  }
+                />
               </Route>
 
               <Route element={<ProtectedRoute permission="manage_settings" />}>
@@ -98,8 +106,7 @@ function App() {
               </Route>
 
               <Route
-                element={<ProtectedRoute permission="manage_businesses" />}
-              >
+                element={<ProtectedRoute permission="manage_businesses" />}>
                 <Route path="businesses" element={<ManageBusinesses />} />
               </Route>
 
@@ -112,8 +119,7 @@ function App() {
               </Route>
 
               <Route
-                element={<ProtectedRoute permission="manage_investments" />}
-              >
+                element={<ProtectedRoute permission="manage_investments" />}>
                 <Route path="investments" element={<InvestmentsManager />} />
               </Route>
 
