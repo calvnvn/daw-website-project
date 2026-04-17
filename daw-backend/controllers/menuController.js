@@ -71,27 +71,9 @@ exports.getAllMenusFlat = async (req, res) => {
 };
 
 exports.createMenu = async (req, res) => {
-  let newMenu = null;
   try {
-    let {
-      label,
-      parentId,
-      type,
-      pageId,
-      externalLink,
-      isActive,
-      status,
-      previous_notrans,
-    } = req.body;
-    const userRole = req.userRole?.toLowerCase();
+    let { label, parentId, type, pageId, externalLink, isActive } = req.body;
 
-    const globalLock = await Menu.findOne({ where: { is_locked: true } });
-    if (globalLock && userRole === "editor") {
-      return res.status(423).json({
-        message: "Navigasi sedang dikunci oleh pengajuan lain.",
-        ticket: globalLock.lock_ticket,
-      });
-    }
     if (type === "folder") {
       parentId = null;
       pageId = null;
@@ -104,7 +86,7 @@ exports.createMenu = async (req, res) => {
     });
     const nextOrderIndex = lastMenu ? lastMenu.orderIndex + 1 : 0;
 
-    const menuData = {
+    const newMenu = await Menu.create({
       label,
       parentId: parentId || null,
       type,
@@ -114,251 +96,108 @@ exports.createMenu = async (req, res) => {
       orderIndex: nextOrderIndex,
       is_locked: false,
       lock_ticket: null,
-    };
+    });
 
-    // Fast Local Commit
-    const t = await sequelize.transaction();
-    try {
-      newMenu = await Menu.create(menuData, { transaction: t });
-      await t.commit();
-    } catch (dbError) {
-      await t.rollback();
-      throw dbError;
-    }
-
-    // Editor Gate
-    if (userRole === "editor" && status === "Published") {
-      try {
-        if (previous_notrans) {
-          await ApprovalDraft.update(
-            { status: "Replaced" },
-            { where: { notrans: previous_notrans } },
-          );
-        }
-
-        const result = await ErpApprovalService.initiateApproval({
-          model: Menu,
-          targetId: newMenu.id,
-          action: "CREATE",
-          payload: menuData,
-          userId: req.userId,
-          owlUsername: req.owl_username,
-          token: req.owl_token,
-        });
-
-        await newMenu.update({ is_locked: true, lock_ticket: result.notrans });
-        return res.status(202).json({
-          message: "Permintaan buat menu baru dikirim ke OWL.",
-          ticket: result.notrans,
-        });
-      } catch (owlError) {
-        // Orphan Guard
-        console.error(`🚨 [CLEANUP] Menghapus orphan menu ID: ${newMenu.id}`);
-        await newMenu.destroy();
-        throw owlError;
-      }
-    }
-
-    // Superadmin Flow
-    res.status(201).json({ message: "Menu created", menu: newMenu });
+    res.status(201).json({ message: "Menu berhasil dibuat!", menu: newMenu });
   } catch (error) {
     res
       .status(500)
-      .json({ message: "Failed to create menu", error: error.message });
+      .json({ message: "Gagal membuat menu", error: error.message });
   }
 };
 
 exports.updateMenu = async (req, res) => {
   try {
     const { id } = req.params;
-    let {
-      label,
-      parentId,
-      type,
-      pageId,
-      externalLink,
-      isActive,
-      status,
-      previous_notrans,
-    } = req.body;
-    const userRole = req.userRole?.toLowerCase();
+    let { label, parentId, type, pageId, externalLink, isActive } = req.body;
 
     const menu = await Menu.findByPk(id);
-    if (!menu) return res.status(404).json({ message: "Menu not found" });
+    if (!menu) return res.status(404).json({ message: "Menu tidak ditemukan" });
 
-    // Check Lock
-    if (menu.is_locked && userRole === "editor") {
-      return res.status(423).json({
-        message: "Menu ini sedang dikunci oleh proses approval.",
-        ticket: menu.lock_ticket,
-      });
+    // Anti-Loop Guard
+    if (parentId && parentId !== menu.parentId) {
+      if (await isDescendant(id, parentId)) {
+        return res.status(400).json({
+          message: "Struktur ilegal: Menu tidak bisa jadi anak sendiri.",
+        });
+      }
     }
 
-    const updatedData = {
+    await menu.update({
       label,
       parentId: type === "folder" ? null : parentId || null,
       type,
       pageId: type === "page" ? pageId : null,
       externalLink: type === "external" ? externalLink : null,
       isActive,
-    };
+      is_locked: false,
+      lock_ticket: null,
+    });
 
-    // Editor Gate
-    if (userRole === "editor" && status === "Published") {
-      if (previous_notrans) {
-        await ApprovalDraft.update(
-          { status: "Replaced" },
-          { where: { notrans: previous_notrans } },
-        );
-      }
-
-      const result = await ErpApprovalService.initiateApproval({
-        model: Menu,
-        targetId: id,
-        action: "UPDATE",
-        payload: updatedData,
-        userId: req.userId,
-        owlUsername: req.owl_username,
-        token: req.owl_token,
-      });
-
-      await menu.update({ is_locked: true, lock_ticket: result.notrans });
-      return res.status(202).json({
-        message: "Revisi menu dikirim.",
-        ticket: result.notrans,
-      });
-    }
-
-    // Superadmin Flow
-    await menu.update({ ...updatedData, is_locked: false, lock_ticket: null });
-    res.status(200).json({ message: "Menu updated" });
+    res.status(200).json({ message: "Menu berhasil diperbarui!" });
   } catch (error) {
     res
       .status(500)
-      .json({ message: "Failed to update menu", error: error.message });
+      .json({ message: "Gagal memperbarui menu", error: error.message });
   }
 };
 
 exports.deleteMenu = async (req, res) => {
   try {
     const { id } = req.params;
-    const userRole = req.userRole?.toLowerCase();
-
     const menu = await Menu.findByPk(id);
-    if (!menu) return res.status(404).json({ message: "Menu not found" });
+    if (!menu) return res.status(404).json({ message: "Menu tidak ditemukan" });
 
-    if (menu.is_locked && userRole === "editor") {
-      return res.status(423).json({
-        message: "Menu sedang dikunci oleh proses approval.",
-        ticket: menu.lock_ticket,
-      });
-    }
-
-    // Editor Gate
-    if (userRole === "editor") {
-      const result = await ErpApprovalService.initiateApproval({
-        model: Menu,
-        targetId: id,
-        action: "DELETE",
-        payload: { label: menu.label },
-        userId: req.userId,
-        owlUsername: req.owl_username,
-        token: req.owl_token,
-      });
-
-      await menu.update({ is_locked: true, lock_ticket: result.notrans });
-      return res.status(202).json({
-        message: "Permintaan hapus menu dikirim ke OWL.",
-        ticket: result.notrans,
-      });
-    }
-
-    // Superadmin Flow
+    // Hapus anak-anaknya juga secara rekursif agar tidak ada data yatim piatu
     await Menu.destroy({ where: { parentId: id } });
     await menu.destroy();
-    res.status(200).json({ message: "Menu deleted permanently" });
+
+    res.status(200).json({
+      message: "Menu dan sub-menunya berhasil dihapus secara permanen.",
+    });
   } catch (error) {
     res
       .status(500)
-      .json({ message: "Failed to delete menu", error: error.message });
+      .json({ message: "Gagal menghapus menu", error: error.message });
   }
 };
 
 // Endpoint Khusus untuk menangkap hasil Drag & Drop
 exports.reorderMenus = async (req, res) => {
+  const t = await sequelize.transaction();
   try {
-    const { updatedMenus, previous_notrans } = req.body;
-    const userRole = req.userRole?.toLowerCase();
+    const { updatedMenus } = req.body;
 
-    // Global Race Condition Check
-    const lockedMenu = await Menu.findOne({ where: { is_locked: true } });
-    if (lockedMenu && userRole === "editor") {
-      return res.status(423).json({
-        message:
-          "Struktur navigasi tidak dapat diubah karena ada pengajuan menu yang sedang diperiksa Admin.",
-        ticket: lockedMenu.lock_ticket,
-      });
-    }
-
-    // --- JALUR EDITOR: BULK REORDER REQUEST ---
-    if (userRole === "editor") {
-      if (previous_notrans) {
-        await ApprovalDraft.update(
-          { status: "Replaced" },
-          { where: { notrans: previous_notrans } },
-        );
-      }
-
-      const result = await ErpApprovalService.initiateApproval({
-        model: Menu,
-        targetId: "ALL_TREE",
-        action: "BULK_REORDER",
-        payload: { updatedMenus },
-        userId: req.userId,
-        owlUsername: req.owl_username,
-        token: req.owl_token,
-      });
-
-      // 🔒 LOCK ALL_TREE: Kunci seluruh tabel Menu agar tidak ada yang bisa edit/delete
-      await Menu.update(
-        { is_locked: true, lock_ticket: result.notrans },
-        { where: {} },
-      );
-
-      return res.status(202).json({
-        message:
-          "Perubahan urutan menu dikirim ke OWL. Seluruh Navigasi dikunci sementara.",
-        ticket: result.notrans,
-      });
-    }
-
-    // Superadmin Flow
-    const t = await sequelize.transaction();
-    try {
-      for (const item of updatedMenus) {
+    for (const item of updatedMenus) {
+      // Validasi struktur (Bypass check jika parentId null/root)
+      if (item.parentId) {
         const circular = await isDescendant(item.id, item.parentId);
         if (circular)
           throw new Error(
-            `Menu ${item.id} tidak boleh menjadi anak dari dirinya sendiri.`,
+            `Struktur melingkar terdeteksi pada menu ID: ${item.id}`,
           );
-
-        await Menu.update(
-          {
-            orderIndex: item.orderIndex,
-            parentId: item.parentId,
-            is_locked: false,
-            lock_ticket: null,
-          },
-          { where: { id: item.id }, transaction: t },
-        );
       }
-      await t.commit();
-      res.status(200).json({ message: "Menus reordered successfully!" });
-    } catch (error) {
-      await t.rollback();
-      throw error;
+
+      await Menu.update(
+        {
+          orderIndex: item.orderIndex,
+          parentId: item.parentId || null,
+          is_locked: false,
+          lock_ticket: null,
+        },
+        { where: { id: item.id }, transaction: t },
+      );
     }
+
+    await t.commit();
+    res.status(200).json({
+      message: "Struktur navigasi berhasil diperbarui secara instan!",
+    });
   } catch (error) {
-    res.status(500).json({ message: "Reorder failed", error: error.message });
+    if (t) await t.rollback(); // 🛡️ Rollback jika ada satu saja yang gagal
+    console.error("🚨 [REORDER ERROR]:", error.message);
+    res
+      .status(500)
+      .json({ message: "Gagal mengatur ulang urutan.", error: error.message });
   }
 };
