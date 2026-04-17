@@ -1,8 +1,10 @@
 const Menu = require("../models/Menu");
 const Page = require("../models/Page");
+const ApprovalDraft = require("../models/ApprovalDraft");
 const sequelize = require("../config/database");
 const ErpApprovalService = require("../services/erpApprovalService");
-const JENIS_APP_CMS = process.env.CMS_APPROVAL_CODE || "040101";
+
+const JENIS_APP_CMS = process.env.CMS_APPROVAL_CODE;
 
 const isDescendant = async (menuId, targetParentId) => {
   if (!targetParentId) return false;
@@ -23,29 +25,24 @@ exports.getMenuTree = async (req, res) => {
       include: [
         {
           model: Page,
-          attributes: ["slug"], 
+          attributes: ["slug"],
         },
       ],
     });
 
-    // 2. Hash Map Logic (Mengubah Flat Array jadi Nested Tree dalam O(n) Time)
     const menuMap = {};
     const tree = [];
 
-    // Buat kerangka dasar dengan array 'children' kosong
     menus.forEach((menu) => {
       menuMap[menu.id] = { ...menu.toJSON(), children: [] };
     });
 
-    // Rangkai pohonnya
     menus.forEach((menu) => {
       if (menu.parentId) {
-        // Jika dia punya Parent, dorong dia ke dalam array 'children' milik Parent-nya
         if (menuMap[menu.parentId]) {
           menuMap[menu.parentId].children.push(menuMap[menu.id]);
         }
       } else {
-        // Jika tidak punya Parent, dia adalah Akar (Root Menu Utama)
         tree.push(menuMap[menu.id]);
       }
     });
@@ -58,11 +55,7 @@ exports.getMenuTree = async (req, res) => {
   }
 };
 
-// ==========================================
 // ADMIN MENU MANAGEMENT (CRUD & Reorder)
-// ==========================================
-
-// Ambil semua menu dalam bentuk flat (Untuk tabel di Admin)
 exports.getAllMenusFlat = async (req, res) => {
   try {
     const menus = await Menu.findAll({
@@ -79,15 +72,24 @@ exports.getAllMenusFlat = async (req, res) => {
 
 exports.createMenu = async (req, res) => {
   try {
-    let { label, parentId, type, pageId, externalLink, isActive, status } = req.body;
+    let {
+      label,
+      parentId,
+      type,
+      pageId,
+      externalLink,
+      isActive,
+      status,
+      previous_notrans,
+    } = req.body;
+    const userRole = req.userRole?.toLowerCase();
 
     if (type === "folder") {
-      parentId = null; 
-      pageId = null; 
-      externalLink = null; 
+      parentId = null;
+      pageId = null;
+      externalLink = null;
     }
 
-    // Auto hitung orderIndex (taruh di paling bawah)
     const lastMenu = await Menu.findOne({
       where: { parentId: parentId || null },
       order: [["orderIndex", "DESC"]],
@@ -102,56 +104,106 @@ exports.createMenu = async (req, res) => {
       externalLink: type === "external" ? externalLink : null,
       isActive,
       orderIndex: nextOrderIndex,
+      is_locked: false,
+      lock_ticket: null,
     };
 
-    // Editor Flow
-    if (req.userRole?.toLowerCase() === "editor" && status === "Published") {
-      const tokenOWL = req.owl_token;
-      const result = await ErpApprovalService.initiateApproval({
-        model: Menu,
-        targetId: null, // Data baru belum ada ID
-        action: "CREATE",
-        payload: menuData,
-        userId: req.userId,
-        owlUsername: req.owl_username,
-        token: tokenOWL
-      });
+    // Fast Local Commit
+    const t = await sequelize.transaction();
+    try {
+      newMenu = await Menu.create(menuData, { transaction: t });
+      await t.commit();
+    } catch (dbError) {
+      await t.rollback();
+      throw dbError;
+    }
 
-      return res.status(202).json({ message: "Permintaan buat menu baru dikirim ke OWL.", ticket: result.notrans });
+    // Editor Gate
+    if (userRole === "editor" && status === "Published") {
+      try {
+        if (previous_notrans) {
+          await ApprovalDraft.update(
+            { status: "Replaced" },
+            { where: { notrans: previous_notrans } },
+          );
+        }
+
+        const result = await ErpApprovalService.initiateApproval({
+          model: Menu,
+          targetId: newMenu.id,
+          action: "CREATE",
+          payload: menuData,
+          userId: req.userId,
+          owlUsername: req.owl_username,
+          token: req.owl_token,
+        });
+
+        await newMenu.update({ is_locked: true, lock_ticket: result.notrans });
+        return res.status(202).json({
+          message: "Permintaan buat menu baru dikirim ke OWL.",
+          ticket: result.notrans,
+        });
+      } catch (owlError) {
+        // Orphan Guard
+        console.error(`🚨 [CLEANUP] Menghapus orphan menu ID: ${newMenu.id}`);
+        await newMenu.destroy();
+        throw owlError;
+      }
     }
 
     // Superadmin Flow
-    const newMenu = await Menu.create(menuData);
     res.status(201).json({ message: "Menu created", menu: newMenu });
   } catch (error) {
-    res.status(500).json({ message: "Failed to create menu", error: error.message });
+    res
+      .status(500)
+      .json({ message: "Failed to create menu", error: error.message });
   }
 };
 
 exports.updateMenu = async (req, res) => {
   try {
     const { id } = req.params;
-    let { label, parentId, type, pageId, externalLink, isActive, status } = req.body;
+    let {
+      label,
+      parentId,
+      type,
+      pageId,
+      externalLink,
+      isActive,
+      status,
+      previous_notrans,
+    } = req.body;
+    const userRole = req.userRole?.toLowerCase();
 
     const menu = await Menu.findByPk(id);
     if (!menu) return res.status(404).json({ message: "Menu not found" });
 
-    if (menu.is_locked && req.userRole?.toLowerCase() === "editor") {
-      return res.status(423).json({ message: "Menu ini sedang dikunci oleh proses approval.", ticket: menu.lock_ticket });
+    // Check Lock
+    if (menu.is_locked && userRole === "editor") {
+      return res.status(423).json({
+        message: "Menu ini sedang dikunci oleh proses approval.",
+        ticket: menu.lock_ticket,
+      });
     }
 
     const updatedData = {
       label,
-      parentId: type === "folder" ? null : (parentId || null),
+      parentId: type === "folder" ? null : parentId || null,
       type,
       pageId: type === "page" ? pageId : null,
       externalLink: type === "external" ? externalLink : null,
       isActive,
     };
 
-    // Editor Flow
-    if (req.userRole?.toLowerCase() === "editor" && status === "Published") {
-      const tokenOWL = req.owl_token;
+    // Editor Gate
+    if (userRole === "editor" && status === "Published") {
+      if (previous_notrans) {
+        await ApprovalDraft.update(
+          { status: "Replaced" },
+          { where: { notrans: previous_notrans } },
+        );
+      }
+
       const result = await ErpApprovalService.initiateApproval({
         model: Menu,
         targetId: id,
@@ -159,70 +211,115 @@ exports.updateMenu = async (req, res) => {
         payload: updatedData,
         userId: req.userId,
         owlUsername: req.owl_username,
-        token: tokenOWL
+        token: req.owl_token,
       });
-      return res.status(202).json({ message: "Revisi menu dikirim ke OWL.", ticket: result.notrans });
+
+      await menu.update({ is_locked: true, lock_ticket: result.notrans });
+      return res.status(202).json({
+        message: "Revisi menu dikirim.",
+        ticket: result.notrans,
+      });
     }
 
     // Superadmin Flow
     await menu.update({ ...updatedData, is_locked: false, lock_ticket: null });
     res.status(200).json({ message: "Menu updated" });
   } catch (error) {
-    res.status(500).json({ message: "Failed to update menu", error: error.message });
+    res
+      .status(500)
+      .json({ message: "Failed to update menu", error: error.message });
   }
 };
 
 exports.deleteMenu = async (req, res) => {
   try {
     const { id } = req.params;
+    const userRole = req.userRole?.toLowerCase();
+
     const menu = await Menu.findByPk(id);
     if (!menu) return res.status(404).json({ message: "Menu not found" });
 
-    // Editor Flow
-    if (req.userRole?.toLowerCase() === "editor") {
-      const tokenOWL = req.owl_token;
+    if (menu.is_locked && userRole === "editor") {
+      return res.status(423).json({
+        message: "Menu sedang dikunci oleh proses approval.",
+        ticket: menu.lock_ticket,
+      });
+    }
+
+    // Editor Gate
+    if (userRole === "editor") {
       const result = await ErpApprovalService.initiateApproval({
         model: Menu,
         targetId: id,
         action: "DELETE",
-        payload: { label: menu.label }, 
+        payload: { label: menu.label },
         userId: req.userId,
         owlUsername: req.owl_username,
-        token: tokenOWL
+        token: req.owl_token,
       });
-      return res.status(202).json({ message: "Permintaan hapus menu dikirim ke OWL. Menu dikunci.", ticket: result.notrans });
+
+      await menu.update({ is_locked: true, lock_ticket: result.notrans });
+      return res.status(202).json({
+        message: "Permintaan hapus menu dikirim ke OWL.",
+        ticket: result.notrans,
+      });
     }
 
     // Superadmin Flow
-    await menu.destroy(); 
+    await menu.destroy();
     res.status(200).json({ message: "Menu deleted permanently" });
   } catch (error) {
-    res.status(500).json({ message: "Failed to delete menu", error: error.message });
+    res
+      .status(500)
+      .json({ message: "Failed to delete menu", error: error.message });
   }
 };
 
 // Endpoint Khusus untuk menangkap hasil Drag & Drop
 exports.reorderMenus = async (req, res) => {
   try {
-    const { updatedMenus } = req.body; // Array berisi {id, parentId, orderIndex}
+    const { updatedMenus, previous_notrans } = req.body;
+    const userRole = req.userRole?.toLowerCase();
+
+    // Global Race Condition Check
+    const lockedMenu = await Menu.findOne({ where: { is_locked: true } });
+    if (lockedMenu && userRole === "editor") {
+      return res.status(423).json({
+        message:
+          "Struktur navigasi tidak dapat diubah karena ada pengajuan menu yang sedang diperiksa Admin.",
+        ticket: lockedMenu.lock_ticket,
+      });
+    }
 
     // --- JALUR EDITOR: BULK REORDER REQUEST ---
-    if (req.userRole?.toLowerCase() === "editor") {
-      const tokenOWL = req.owl_token;
-      
+    if (userRole === "editor") {
+      if (previous_notrans) {
+        await ApprovalDraft.update(
+          { status: "Replaced" },
+          { where: { notrans: previous_notrans } },
+        );
+      }
+
       const result = await ErpApprovalService.initiateApproval({
         model: Menu,
-        targetId: "ALL_TREE", 
+        targetId: "ALL_TREE",
         action: "BULK_REORDER",
         payload: { updatedMenus },
         userId: req.userId,
         owlUsername: req.owl_username,
-        token: tokenOWL
+        token: req.owl_token,
       });
 
-      return res.status(202).json({ 
-        message: "Perubahan urutan menu (Drag & Drop) dikirim ke antrean OWL.", 
-        ticket: result.notrans 
+      // 🔒 LOCK ALL_TREE: Kunci seluruh tabel Menu agar tidak ada yang bisa edit/delete
+      await Menu.update(
+        { is_locked: true, lock_ticket: result.notrans },
+        { where: {} },
+      );
+
+      return res.status(202).json({
+        message:
+          "Perubahan urutan menu dikirim ke OWL. Seluruh Navigasi dikunci sementara.",
+        ticket: result.notrans,
       });
     }
 
@@ -231,11 +328,19 @@ exports.reorderMenus = async (req, res) => {
     try {
       for (const item of updatedMenus) {
         const circular = await isDescendant(item.id, item.parentId);
-        if (circular) throw new Error(`Menu ${item.id} tidak boleh menjadi anak dari dirinya sendiri.`);
+        if (circular)
+          throw new Error(
+            `Menu ${item.id} tidak boleh menjadi anak dari dirinya sendiri.`,
+          );
 
         await Menu.update(
-          { orderIndex: item.orderIndex, parentId: item.parentId, is_locked: false, lock_ticket: null },
-          { where: { id: item.id }, transaction: t }
+          {
+            orderIndex: item.orderIndex,
+            parentId: item.parentId,
+            is_locked: false,
+            lock_ticket: null,
+          },
+          { where: { id: item.id }, transaction: t },
         );
       }
       await t.commit();

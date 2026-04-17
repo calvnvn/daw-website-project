@@ -122,9 +122,11 @@ exports.executeDecision = async (req, res) => {
       if (action !== "CREATE") {
         const Model = getModelByModuleName(module);
         if (Model && targetId) {
+          const queryWhere = targetId === "ALL_TREE" ? {} : { id: targetId };
+
           await Model.update(
             { is_locked: false, lock_ticket: null },
-            { where: { id: targetId }, transaction: t },
+            { where: queryWhere, transaction: t },
           );
         }
       }
@@ -164,7 +166,6 @@ exports.executeDecision = async (req, res) => {
       );
 
       await t.commit();
-
       handleFileCommit(module, cleanPayload);
 
       res.status(200).json({ message: `Draf ${module} berhasil dipublish!` });
@@ -386,6 +387,10 @@ async function executeModelUpdate(
             { where: { id: item.id }, transaction },
           );
         }
+        await Menu.update(
+          { is_locked: false, lock_ticket: null },
+          { where: {}, transaction },
+        );
       } else {
         await Menu.update(payload, { where: { id: targetId }, transaction });
       }
