@@ -1,14 +1,13 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { useParams, Link } from "react-router-dom";
-import { Share2, ChevronRight } from "lucide-react";
+import { Share2, ChevronRight, AlertTriangle, RefreshCw } from "lucide-react";
 import { Helmet } from "react-helmet-async";
 import DOMPurify from "dompurify";
-import api, { API_URL } from "@/lib/api"; // <-- KUNCI 1: Import API_URL
+import api, { API_URL } from "@/lib/api";
 import ScrollReveal from "@/components/ScrollReveal";
-import { getCleanImageUrl } from "@/lib/utils"; // <-- KUNCI 2: Pastikan ini di-import
+import { getCleanImageUrl } from "@/lib/utils";
 import SEO from "@/components/SEO";
 
-// Data structures for Page and Table of Contents
 interface PageData {
   id: string;
   title: string;
@@ -64,10 +63,11 @@ const ScrollProgressBar = () => {
 export default function DynamicPage() {
   const { slug } = useParams<{ slug: string }>();
 
-  // Page States
+  // STATES
   const [pageData, setPageData] = useState<PageData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isError, setIsError] = useState(false);
+  const [isNotFound, setIsNotFound] = useState(false);
 
   // Table of Contents & Content Processing States
   const [toc, setToc] = useState<TocItem[]>([]);
@@ -77,232 +77,250 @@ export default function DynamicPage() {
   const articleRef = useRef<HTMLElement>(null);
   const isManualScrolling = useRef(false);
 
+  // HELPERS
+  // Safe JSON Parser
+  const safeSidebarLinks = useMemo(() => {
+    const links = pageData?.sidebarLinks;
+    if (!links) return [];
+    if (Array.isArray(links)) return links;
+    try {
+      if (typeof links === "string") {
+        const parsed = JSON.parse(links);
+        return Array.isArray(parsed) ? parsed : [];
+      }
+    } catch (e) {
+      console.error("🚨 JSON Parsing SidebarLinks Failed", e);
+    }
+    return [];
+  }, [pageData?.sidebarLinks]);
+
   // Effect 1: Data Acquisition. Fetches page data based on the URL slug and resets scroll position.
   useEffect(() => {
-    let isMounted = true;
+    const controller = new AbortController();
     const fetchPage = async () => {
       setIsLoading(true);
+      setIsError(false);
+      setIsNotFound(false);
+
       try {
         const res = await api.get(`/pages/slug/${slug}`);
-        if (isMounted) setPageData(res.data);
-      } catch (error) {
-        if (isMounted) setIsError(true);
-        console.error(error);
+        const data = res.data;
+        if (!data || data.status === "Draft") {
+          setIsNotFound(true);
+          return;
+        }
+
+        setPageData(data);
+      } catch (error: any) {
+        if (error.name === "CanceledError") return; // Abaikan jika request dibatalkan
+        if (error.response?.status === 404) setIsNotFound(true);
+        else setIsError(true);
+        console.error("Fetch Page Failure:", error);
       } finally {
-        if (isMounted) setIsLoading(false);
+        setIsLoading(false);
       }
     };
     if (slug) fetchPage();
     window.scrollTo(0, 0);
-    return () => {
-      isMounted = false;
-    };
+    return () => controller.abort();
   }, [slug]);
 
   /**
    * Effect 2: Content Pre-Parsing & Persistent ID Injection
-   * Processes raw HTML string to:
-   * 1. Sanitize content for security.
-   * 2. Generate a structured Table of Contents (ToC).
-   * 3. Inject persistent anchor IDs into headings before rendering to the DOM.
    */
   useEffect(() => {
     if (!pageData?.content) return;
 
-    // Sanitize raw HTML from database
-    const cleanHtml = DOMPurify.sanitize(pageData.content, sanitizeConfig);
+    const transformContent = () => {
+      const cleanHtml = DOMPurify.sanitize(pageData.content, sanitizeConfig);
+      const parser = new DOMParser();
+      const virtualDoc = parser.parseFromString(cleanHtml, "text/html");
 
-    // Initialize virtual DOM parser to manipulate content without triggering layout shifts
-    const parser = new DOMParser();
-    const virtualDoc = parser.parseFromString(cleanHtml, "text/html");
-
-    const walker = document.createTreeWalker(
-      virtualDoc.body,
-      NodeFilter.SHOW_TEXT,
-      null,
-    );
-    let currentNode = walker.nextNode();
-
-    while (currentNode) {
-      if (currentNode.textContent) {
-        // Regex: Cari "-" yang diapit oleh huruf/angka (compound words)
-        // Ubah menjadi Unicode \u2011 (Non-Breaking Hyphen)
-        currentNode.textContent = currentNode.textContent.replace(
-          /(\w)-(\w)/g,
-          "$1\u2011$2",
-        );
-      }
-      currentNode = walker.nextNode();
-    }
-    const headings = Array.from(virtualDoc.querySelectorAll("h2, h3"));
-
-    const items: TocItem[] = [];
-    const idTracker: Record<string, number> = {};
-
-    headings.forEach((heading, index) => {
-      const text = heading.textContent || "";
-      // Generate URL-friendly slug for the ID
-      let baseId =
-        text
-          .toLowerCase()
-          .replace(/[^a-z0-9]+/g, "-")
-          .replace(/(^-|-$)+/g, "") || `sec-${index}`;
-
-      // Handle duplicate IDs to ensure DOM uniqueness
-      if (idTracker[baseId] !== undefined) {
-        idTracker[baseId] += 1;
-        baseId = `${baseId}-${idTracker[baseId]}`;
-      } else {
-        idTracker[baseId] = 0;
+      const walker = document.createTreeWalker(
+        virtualDoc.body,
+        NodeFilter.SHOW_TEXT,
+      );
+      let currentNode = walker.nextNode();
+      while (currentNode) {
+        if (currentNode.textContent) {
+          currentNode.textContent = currentNode.textContent.replace(
+            /(\w)-(\w)/g,
+            "$1\u2011$2",
+          );
+        }
+        currentNode = walker.nextNode();
       }
 
-      heading.id = baseId;
-      items.push({ id: baseId, text, level: heading.tagName === "H2" ? 2 : 3 });
-    });
-    setToc(items);
-    let backendBaseUrl = "";
-    try {
-      backendBaseUrl = new URL(API_URL).origin;
-    } catch (e) {
-      console.error("CRITICAL: Format API_URL di .env tidak valid!", e);
-    }
-    // Cari SEMUA gambar di dalam artikel
-    const contentImages = virtualDoc.querySelectorAll("img");
-    contentImages.forEach((img) => {
-      const src = img.getAttribute("src");
-      // Jika src-nya relatif (berawalan /uploads), gabungkan dengan URL Backend
-      if (src && src.startsWith("/uploads")) {
-        img.src = `${backendBaseUrl}${src}`;
-      }
-    });
-    // ==========================================
+      const headings = Array.from(virtualDoc.querySelectorAll("h2, h3"));
+      const items: TocItem[] = [];
+      const idTracker: Record<string, number> = {};
 
-    // Baris terakhir di Effect 2 (tetap seperti ini):
-    setParsedContent(virtualDoc.body.innerHTML);
-    console.log("Pre-Parsing Selesai, ID Permanen & URL Gambar Ditanam.");
+      headings.forEach((heading, index) => {
+        const text = heading.textContent || "";
+        let baseId =
+          text
+            .toLowerCase()
+            .replace(/[^a-z0-9]+/g, "-")
+            .replace(/(^-|-$)+/g, "") || `sec-${index}`;
+
+        // Handle duplicate IDs to ensure DOM uniqueness
+        if (idTracker[baseId] !== undefined) {
+          idTracker[baseId] += 1;
+          baseId = `${baseId}-${idTracker[baseId]}`;
+        } else {
+          idTracker[baseId] = 0;
+        }
+
+        heading.id = baseId;
+        items.push({
+          id: baseId,
+          text,
+          level: heading.tagName === "H2" ? 2 : 3,
+        });
+      });
+
+      let backendOrigin = "";
+      try {
+        backendOrigin = new URL(API_URL).origin;
+        virtualDoc.querySelectorAll("img").forEach((img) => {
+          const src = img.getAttribute("src");
+          if (src?.startsWith("/uploads")) img.src = `${backendOrigin}${src}`;
+        });
+      } catch (e) {
+        console.error("API_URL Origin Fix Failed", e);
+      }
+      setToc(items);
+      setParsedContent(virtualDoc.body.innerHTML);
+    };
+
+    transformContent();
   }, [pageData?.content]);
 
   /**
-   * Effect 3: Intersection Observer & Deep Linking (SUPERCHARGED 🚀)
+   * Effect 3: Intersection Observer & Deep Linking (PRODUCTION-READY 🚀)
    * Monitors user scroll position to highlight active ToC items and handles initial anchor links.
    */
   useEffect(() => {
     if (toc.length === 0 || !parsedContent || !articleRef.current) return;
 
-    // KUNCI 1: Beri jeda 100ms untuk memastikan dangerouslySetInnerHTML selesai mencetak elemen HTML ke layar
-    const timer = setTimeout(() => {
-      if (!articleRef.current) return;
+    const headingElements = Array.from(
+      articleRef.current.querySelectorAll("h2, h3"),
+    );
+    if (headingElements.length === 0) return;
 
-      const headingElements = articleRef.current.querySelectorAll("h2, h3");
-      console.log(`🔍 Satpam siap menjaga ${headingElements.length} Heading!`); // Cek apakah heading benar-benar terdeteksi
+    const observerOptions = {
+      root: null,
+      rootMargin: "-20% 0px -75% 0px",
+      threshold: 0,
+    };
 
-      const observerOptions = {
-        root: null,
-        rootMargin: "-120px 0px -70% 0px",
-        threshold: 0,
-      };
+    const observer = new IntersectionObserver((entries) => {
+      if (isManualScrolling.current) return;
 
-      const observer = new IntersectionObserver((entries) => {
-        // FASE 3 (ANTI-FLICKER): Kalau bendera ToC lagi diangkat, Satpam tutup mata!
-        if (isManualScrolling.current) return;
+      entries.forEach((entry) => {
+        if (entry.isIntersecting && entry.target.id) {
+          setActiveTocId(entry.target.id);
+        }
+      });
+    }, observerOptions);
 
-        entries.forEach((entry) => {
-          if (entry.isIntersecting && entry.target.id) {
-            console.log("🎯 Aktif saat Scroll:", entry.target.id);
-            setActiveTocId(entry.target.id);
-          }
-        });
-      }, observerOptions);
+    headingElements.forEach((el) => observer.observe(el));
 
-      headingElements.forEach((el) => observer.observe(el));
+    if (window.location.hash) {
+      const hashId = window.location.hash.substring(1);
+      requestAnimationFrame(() => {
+        const element = document.getElementById(hashId);
+        if (element) {
+          const yOffset = -100;
+          const y =
+            element.getBoundingClientRect().top + window.scrollY + yOffset;
+          window.scrollTo({ top: y, behavior: "smooth" });
+          setActiveTocId(hashId);
+        }
+      });
+    }
 
-      // Handle initial deep linking from URL hash
-      if (window.location.hash) {
-        const hashId = window.location.hash.substring(1);
-        setTimeout(() => {
-          const element = document.getElementById(hashId);
-          if (element) {
-            element.scrollIntoView({ behavior: "smooth", block: "start" });
-            setActiveTocId(hashId);
-          }
-        }, 100);
-      }
-
-      // Cleanup
-      return () => observer.disconnect();
-    }, 100);
-
-    return () => clearTimeout(timer);
+    return () => {
+      observer.disconnect();
+    };
   }, [toc, parsedContent]);
 
-  /**
-   * Smooth scroll handler for ToC navigation
-   * @param {string} id - The anchor ID to scroll to
-   */
+  // EVENT HANDLERS
   const scrollToHeading = (id: string) => {
     const element = document.getElementById(id);
-    if (element) {
-      console.log("Mencoba scroll ke:", id);
-
-      isManualScrolling.current = true;
-      setActiveTocId(id);
-
-      element.scrollIntoView({ behavior: "smooth", block: "start" });
-      // Update browser history without triggering page reload
-      window.history.pushState(null, "", `#${id}`);
-
-      setTimeout(() => {
-        isManualScrolling.current = false;
-      }, 800);
-    } else {
-      console.error("Elemen tidak ditemukan untuk ID:", id);
-    }
+    if (!element) return;
+    isManualScrolling.current = true;
+    setActiveTocId(id);
+    const yOffset = -100;
+    const y = element.getBoundingClientRect().top + window.scrollY + yOffset;
+    window.scrollTo({ top: y, behavior: "smooth" });
+    window.history.pushState(null, "", `#${id}`);
+    setTimeout(() => {
+      isManualScrolling.current = false;
+    }, 800);
   };
 
-  // --- Render Conditions ---
+  // RENDER GUARDS
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-white">
-        <div className="h-[85vh] bg-slate-100 animate-pulse" />
-        <div className="max-w-prose mx-auto py-24 px-6 space-y-6">
-          <div className="h-4 bg-slate-100 rounded w-full animate-pulse" />
-        </div>
+      <div className="min-h-screen bg-white flex flex-col items-center justify-center">
+        <div className="w-12 h-12 border-4 border-slate-100 border-t-daw-green rounded-full animate-spin mb-4" />
+        <p className="text-xs font-black uppercase tracking-widest text-slate-400">
+          Loading Article...
+        </p>
       </div>
     );
   }
-  const safeSidebarLinks =
-    typeof pageData?.sidebarLinks === "string"
-      ? JSON.parse(pageData.sidebarLinks)
-      : pageData?.sidebarLinks || [];
-  if (isError || !pageData) return null;
+
+  if (isNotFound) {
+    return (
+      <div className="min-h-screen bg-white flex flex-col items-center justify-center p-6 text-center">
+        <h2 className="text-4xl font-serif font-bold text-slate-900 mb-4">
+          Halaman Tidak Ditemukan
+        </h2>
+        <p className="text-slate-500 mb-8 max-w-md">
+          Maaf, konten yang Anda cari tidak tersedia.
+        </p>
+        <Link
+          to="/"
+          className="px-6 py-3 bg-daw-green text-white font-bold rounded-xl hover:bg-emerald-700 transition-all">
+          Kembali ke Beranda
+        </Link>
+      </div>
+    );
+  }
+
+  if (isError || !pageData) {
+    return (
+      <div className="min-h-screen bg-white flex flex-col items-center justify-center p-6 text-center">
+        <AlertTriangle className="w-12 h-12 text-red-500 mb-4" />
+        <h2 className="text-xl font-bold text-slate-900 mb-2">
+          Terjadi Kesalahan Jaringan
+        </h2>
+        <p className="text-slate-500 mb-6">
+          Gagal memuat konten. Silakan periksa koneksi internet Anda.
+        </p>
+        <button
+          onClick={() => window.location.reload()}
+          className="text-daw-green font-bold flex items-center gap-2">
+          <RefreshCw className="w-4 h-4" /> Coba Lagi
+        </button>
+      </div>
+    );
+  }
 
   return (
     <>
       <SEO
-        title={pageData.title}
-        description={pageData.metaDescription || pageData.subtitle || undefined}
+        title={`${pageData.title} | DAW Group`}
+        description={
+          pageData.metaDescription || pageData.subtitle || "DAW Group Article"
+        }
         image={pageData.heroImage || undefined}
         type="article"
       />
       <div className="min-h-screen bg-white selection:bg-daw-green selection:text-white">
-        <Helmet>
-          <title>{`${pageData.title} | DAW Group`}</title>
-          <meta
-            name="description"
-            content={
-              pageData.metaDescription ||
-              pageData.subtitle ||
-              "DAW Group Article"
-            }
-          />
-          <meta property="og:title" content={pageData.title} />
-          <meta property="og:image" content={pageData.heroImage || ""} />
-          <meta property="og:type" content="article" />
-        </Helmet>
-
-        {/* Progress Bar */}
         <ScrollProgressBar />
-
         {/* Hero Section */}
         <section className="relative h-[85vh] flex items-center justify-center overflow-hidden">
           <div
@@ -372,8 +390,7 @@ export default function DynamicPage() {
                               isActive
                                 ? "text-daw-green bg-gradient-to-r from-daw-green/[0.06] to-transparent"
                                 : "text-slate-400 hover:text-slate-700 hover:bg-slate-50/80"
-                            }`}
-                          >
+                            }`}>
                             {/* Indikator Garis Aktif (Neon Glow) */}
                             {isActive && (
                               <span className="absolute left-[-2px] top-0 bottom-0 w-[2px] bg-daw-green rounded-full shadow-[0_0_10px_rgba(16,185,129,0.7)]" />
@@ -441,7 +458,8 @@ export default function DynamicPage() {
 
               {/* Supplementary Widget */}
               {safeSidebarLinks.length > 0 ? (
-                <aside className="hidden lg:block lg:col-span-3 sticky top-32">
+                // 🛡️ SENIOR FIX: Perbaiki CSS Grid col-span agar tidak pecah di layar LG
+                <aside className="lg:col-span-12 xl:col-span-3 sticky top-32">
                   <div className="p-8 bg-slate-50 rounded-[2rem] border border-slate-100 shadow-sm">
                     <h4 className="text-lg font-serif font-bold text-slate-900 mb-4 flex items-center gap-2">
                       <Share2 className="w-5 h-5 text-daw-green" /> Inside this
@@ -451,31 +469,24 @@ export default function DynamicPage() {
                       Discover more about DAW Group's related initiatives and
                       resources.
                     </p>
-
-                    {/* Looping Link Dinamis */}
                     <div className="flex flex-col gap-2">
-                      {safeSidebarLinks.map(
-                        (
-                          link: { url: string; label: string },
-                          index: number,
-                        ) => (
-                          <Link
-                            key={index}
-                            to={link.url}
-                            className="flex items-center justify-between p-4 bg-white rounded-xl border border-slate-200 hover:border-daw-green hover:shadow-md transition-all group"
-                          >
-                            <span className="text-xs font-bold uppercase tracking-wider text-slate-700 group-hover:text-daw-green transition-colors">
-                              {link.label}
-                            </span>
-                            <ChevronRight className="w-4 h-4 text-slate-300 group-hover:text-daw-green group-hover:translate-x-1 transition-transform" />
-                          </Link>
-                        ),
-                      )}
+                      {safeSidebarLinks.map((link, index) => (
+                        <Link
+                          // Gunakan kombinasi url/index sebagai key agar react map lebih stabil
+                          key={`sidebar-link-${index}`}
+                          to={link.url}
+                          className="flex items-center justify-between p-4 bg-white rounded-xl border border-slate-200 hover:border-daw-green hover:shadow-md transition-all group">
+                          <span className="text-xs font-bold uppercase tracking-wider text-slate-700 group-hover:text-daw-green transition-colors">
+                            {link.label}
+                          </span>
+                          <ChevronRight className="w-4 h-4 text-slate-300 group-hover:text-daw-green group-hover:translate-x-1 transition-transform" />
+                        </Link>
+                      ))}
                     </div>
                   </div>
                 </aside>
               ) : (
-                <div className="hidden lg:block lg:col-span-3" />
+                <div className="hidden xl:block xl:col-span-3" />
               )}
             </div>
           </div>

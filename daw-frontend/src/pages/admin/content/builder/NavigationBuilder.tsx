@@ -12,9 +12,11 @@ import {
   Globe,
   ExternalLink,
   LayoutGrid,
-  Folder, //  TAMBAHAN IKON FOLDER
+  Folder,
+  Lock,
 } from "lucide-react";
 import api from "@/lib/api";
+import { useContent } from "@/contexts/ContentContext";
 
 interface PageOption {
   id: string;
@@ -27,18 +29,26 @@ interface Menu {
   label: string;
   parentId: string | null;
   orderIndex: number;
-  type: "page" | "external" | "folder"; //  TAMBAH TIPE FOLDER
+  type: "page" | "external" | "folder";
   pageId: string | null;
   externalLink: string | null;
   isActive: boolean;
+  is_locked?: boolean;
+  lock_ticket?: string | null;
   children?: Menu[];
 }
 
 export default function NavigationBuilder() {
-  const [menus, setMenus] = useState<Menu[]>([]);
-  const [flatMenus, setFlatMenus] = useState<Menu[]>([]);
-  const [pages, setPages] = useState<PageOption[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const {
+    pages,
+    treeMenus: menus,
+    flatMenus,
+    isLoading,
+    isNavigationLocked,
+    navigationLockTicket,
+    refreshData,
+  } = useContent();
+
   const [isSaving, setIsSaving] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [draggedMenuId, setDraggedMenuId] = useState<string | null>(null);
@@ -52,6 +62,7 @@ export default function NavigationBuilder() {
     externalLink: "",
     parentId: "",
     isActive: true,
+    status: "Published",
   });
 
   const getMaxDepth = (menu: Menu): number => {
@@ -73,43 +84,6 @@ export default function NavigationBuilder() {
     return depth;
   };
 
-  const fetchData = async () => {
-    setIsLoading(true);
-    try {
-      const [treeRes, flatRes, pagesRes] = await Promise.all([
-        api.get("/menus/tree"),
-        api.get("/menus/flat"),
-        api.get("/pages"),
-      ]);
-
-      setMenus(treeRes.data);
-      setFlatMenus(flatRes.data);
-      setPages(pagesRes.data);
-    } catch (error) {
-      console.error("Gagal menarik data menu:", error);
-      toast.error("Gagal menarik struktur menu.");
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    fetchData(); // Fetch awal saat komponen dimuat
-
-    // Bikin fungsi untuk merespon sinyal
-    const handleRefresh = () => {
-      fetchData(); // Tarik data ulang dari database
-    };
-
-    // Pasang "telinga" untuk dengerin event "pagesDataUpdated"
-    window.addEventListener("pagesDataUpdated", handleRefresh);
-
-    // Wajib ada cleanup biar memorinya nggak bocor
-    return () => {
-      window.removeEventListener("pagesDataUpdated", handleRefresh);
-    };
-  }, []);
-
   const resetForm = () => {
     setEditingId(null);
     setFormData({
@@ -119,6 +93,7 @@ export default function NavigationBuilder() {
       externalLink: "",
       parentId: "",
       isActive: true,
+      status: "Published",
     });
   };
 
@@ -137,6 +112,10 @@ export default function NavigationBuilder() {
   };
 
   const handleEdit = (menu: Menu) => {
+    if (isNavigationLocked || menu.is_locked) {
+      return toast.error("Menu sedang terkunci dan tidak dapat diedit.");
+    }
+
     setEditingId(menu.id);
     setFormData({
       label: menu.label,
@@ -145,13 +124,23 @@ export default function NavigationBuilder() {
       externalLink: menu.externalLink || "",
       parentId: menu.parentId || "",
       isActive: menu.isActive,
+      status: "Published",
     });
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (
+    e: React.FormEvent,
+    submitStatus: "Draft" | "Published" = "Published",
+  ) => {
     e.preventDefault();
 
-    // Validasi Circular Move
+    // 🛡️ BLUEPRINT: Guard Lock Global
+    if (isNavigationLocked) {
+      return toast.error(
+        "Struktur navigasi sedang dikunci oleh proses approval.",
+      );
+    }
+
     if (
       editingId &&
       formData.parentId &&
@@ -162,13 +151,14 @@ export default function NavigationBuilder() {
       );
     }
 
-    //  VALIDASI FOLDER: Jika folder, paksa parentId jadi kosong (Root)
     const finalParentId =
       formData.type === "folder" ? null : formData.parentId || null;
 
     setIsSaving(true);
     const toastId = toast.loading(
-      editingId ? "Menyimpan perubahan menu..." : "Menerapkan menu baru...",
+      submitStatus === "Published"
+        ? "Mengirim pengajuan..."
+        : "Menyimpan draf lokal...",
     );
 
     try {
@@ -180,14 +170,16 @@ export default function NavigationBuilder() {
         pageId: formData.type === "page" ? formData.pageId || null : null,
         externalLink:
           formData.type === "external" ? formData.externalLink || null : null,
+        status: submitStatus,
       };
 
       if (editingId) await api.put(`/menus/${editingId}`, payload);
       else await api.post("/menus", payload);
 
-      toast.success("Struktur menu berhasil diperbarui!", { id: toastId });
+      toast.success("Permintaan menu berhasil dikirim!", { id: toastId });
       resetForm();
-      fetchData();
+
+      refreshData();
     } catch (error: unknown) {
       const err = error as { response?: { data?: { message?: string } } };
       toast.error(
@@ -199,27 +191,40 @@ export default function NavigationBuilder() {
     }
   };
 
-  const handleDelete = async (id: string) => {
+  const handleDelete = async (id: string, title: string, isLocked: boolean) => {
+    // 🛡️ BLUEPRINT: Guard
+    if (isNavigationLocked || isLocked) {
+      return toast.error(
+        "Aksi ditolak. Data sedang terkunci oleh proses approval.",
+      );
+    }
+
     if (
       !confirm(
-        "Hapus menu ini? Semua sub-menu di bawahnya juga akan ikut terhapus.",
+        `Hapus "${title}"? Semua sub-menu di bawahnya juga akan ikut terhapus.`,
       )
     )
       return;
-    const toastId = toast.loading("Sedang menghapus item menu...");
+
+    const toastId = toast.loading("Sedang memproses...");
     try {
       await api.delete(`/menus/${id}`);
-      toast.success("Menu berhasil dihapus.", { id: toastId });
-      fetchData();
+      toast.success("Permintaan hapus menu berhasil.", { id: toastId });
+      refreshData(); // Sync context
       if (editingId === id) resetForm();
-    } catch (error) {
-      toast.error("Gagal menghapus menu. Silakan coba lagi.", { id: toastId });
-      console.error(error);
+    } catch (error: any) {
+      toast.error(error.response?.data?.message || "Gagal menghapus menu.", {
+        id: toastId,
+      });
     }
   };
 
   // DRAG LOGIC
   const handleDragStart = (e: React.DragEvent, id: string) => {
+    if (isNavigationLocked) {
+      e.preventDefault();
+      return;
+    }
     e.dataTransfer.setData("text/plain", id);
     setDraggedMenuId(id);
   };
@@ -232,6 +237,9 @@ export default function NavigationBuilder() {
     e.preventDefault();
     setDragOverMenuId(null);
 
+    if (isNavigationLocked)
+      return toast.error("Susunan sedang dikunci oleh admin.");
+
     const sourceId = e.dataTransfer.getData("text/plain");
     if (!sourceId || sourceId === targetMenu.id) {
       setDraggedMenuId(null);
@@ -241,7 +249,6 @@ export default function NavigationBuilder() {
     const newParentId = mode === "child" ? targetMenu.id : targetMenu.parentId;
     const sourceMenu = flatMenus.find((m) => m.id === sourceId);
 
-    //  VALIDASI KHUSUS FOLDER: Folder tidak boleh punya parent!
     if (sourceMenu?.type === "folder" && newParentId !== null) {
       setDraggedMenuId(null);
       return toast.error(
@@ -292,8 +299,8 @@ export default function NavigationBuilder() {
         orderIndex: i,
       }));
       await api.put("/menus/reorder", { updatedMenus: updatedPayload });
-      toast.success("Urutan berhasil diperbarui.", { id: toastId });
-      fetchData();
+      toast.success("Permintaan urutan berhasil diajukan.", { id: toastId });
+      refreshData();
     } catch (error) {
       toast.error("Gagal mengatur ulang urutan.");
       console.error("Error: ", error);
@@ -304,142 +311,177 @@ export default function NavigationBuilder() {
 
   const validParentOptions = useMemo(() => {
     return flatMenus.filter((m) => {
-      if (!editingId) {
+      if (!editingId)
         return getCurrentDepth(m.id, flatMenus) < MAX_ALLOWED_DEPTH + 1;
-      }
+
       const movingMenu = flatMenus.find((f) => f.id === editingId);
       const movingMenuSubtreeDepth = movingMenu ? getMaxDepth(movingMenu) : 0;
       const targetDepth = getCurrentDepth(m.id, flatMenus);
 
       return (
-        m.id !== editingId && // Bukan dirinya sendiri
-        !isCircularMove(editingId, m.id, flatMenus) && // Bukan anaknya sendiri
-        targetDepth + 1 + movingMenuSubtreeDepth <= MAX_ALLOWED_DEPTH + 1 // Kedalaman aman
+        m.id !== editingId &&
+        !isCircularMove(editingId, m.id, flatMenus) &&
+        targetDepth + 1 + movingMenuSubtreeDepth <= MAX_ALLOWED_DEPTH + 1
       );
     });
   }, [flatMenus, editingId]);
 
   const renderMenuTree = (menuList: Menu[], depth = 0) => {
-    return menuList.map((menu) => (
-      <div key={menu.id} className="relative">
-        <div
-          onDragOver={(e) => {
-            e.preventDefault();
-            setDragOverMenuId(`${menu.id}-top`);
-          }}
-          onDragLeave={() => setDragOverMenuId(null)}
-          onDrop={(e) => handleDrop(e, menu, "sibling")}
-          className={`h-1.5 transition-all mx-4 rounded-full ${dragOverMenuId === `${menu.id}-top` ? "bg-emerald-500 my-2" : "bg-transparent"}`}
-        />
+    return menuList.map((menu) => {
+      const isLocked = menu.is_locked;
 
-        <div
-          draggable
-          onDragStart={(e) => handleDragStart(e, menu.id)}
-          onDragEnd={() => {
-            setDraggedMenuId(null);
-            setDragOverMenuId(null);
-          }}
-          onDragOver={(e) => {
-            e.preventDefault();
-            setDragOverMenuId(`${menu.id}-child`);
-          }}
-          onDragLeave={() => setDragOverMenuId(null)}
-          onDrop={(e) => handleDrop(e, menu, "child")}
-          className={`group relative flex items-center justify-between p-4 rounded-2xl border transition-all duration-300
-            ${dragOverMenuId === `${menu.id}-child` ? "border-emerald-500 bg-emerald-50/50 shadow-inner" : "border-slate-200 bg-white"}
-            ${draggedMenuId === menu.id ? "opacity-30 scale-95" : "opacity-100 shadow-sm hover:shadow-md"}
-          `}
-          style={{ marginLeft: `${depth * 1.5}rem` }}
-        >
-          {depth > 0 && (
-            <div className="absolute -left-4 top-1/2 -translate-y-1/2 w-4 h-[2px] bg-slate-200" />
-          )}
+      return (
+        <div key={menu.id} className="relative">
+          <div
+            onDragOver={(e) => {
+              if (isNavigationLocked) return; // Guard
+              e.preventDefault();
+              setDragOverMenuId(`${menu.id}-top`);
+            }}
+            onDragLeave={() => setDragOverMenuId(null)}
+            onDrop={(e) =>
+              !isNavigationLocked && handleDrop(e, menu, "sibling")
+            }
+            className={`h-1.5 transition-all mx-4 rounded-full ${
+              dragOverMenuId === `${menu.id}-top`
+                ? "bg-emerald-500 my-2"
+                : "bg-transparent"
+            }`}
+          />
 
-          <div className="flex items-center gap-4">
-            <GripVertical className="w-4 h-4 text-slate-300 cursor-grab active:cursor-grabbing group-hover:text-slate-400" />
+          <div
+            draggable={!isNavigationLocked && !isLocked}
+            onDragStart={(e) => handleDragStart(e, menu.id)}
+            onDragEnd={() => {
+              setDraggedMenuId(null);
+              setDragOverMenuId(null);
+            }}
+            onDragOver={(e) => {
+              if (isNavigationLocked) return; // Guard
+              e.preventDefault();
+              setDragOverMenuId(`${menu.id}-child`);
+            }}
+            onDragLeave={() => setDragOverMenuId(null)}
+            onDrop={(e) => !isNavigationLocked && handleDrop(e, menu, "child")}
+            className={`group relative flex items-center justify-between p-4 rounded-2xl border transition-all duration-300
+              ${
+                dragOverMenuId === `${menu.id}-child`
+                  ? "border-emerald-500 bg-emerald-50/50 shadow-inner"
+                  : isLocked || isNavigationLocked
+                    ? "border-slate-200 bg-slate-50/50 cursor-not-allowed" // Visual Lockdown
+                    : "border-slate-200 bg-white shadow-sm hover:shadow-md"
+              }
+              ${draggedMenuId === menu.id ? "opacity-30 scale-95" : "opacity-100"}
+            `}
+            style={{ marginLeft: `${depth * 1.5}rem` }}>
+            {depth > 0 && (
+              <div className="absolute -left-4 top-1/2 -translate-y-1/2 w-4 h-[2px] bg-slate-200" />
+            )}
 
-            {/*  LOGIKA WARNA & IKON */}
-            <div
-              className={`w-10 h-10 rounded-xl flex items-center justify-center transition-colors
-              ${menu.type === "page" ? "bg-blue-50 text-blue-500" : menu.type === "folder" ? "bg-daw-green/10 text-daw-green" : "bg-amber-50 text-amber-500"}`}
-            >
-              {menu.type === "page" && <FileText className="w-5 h-5" />}
-              {menu.type === "external" && <LinkIcon className="w-5 h-5" />}
-              {menu.type === "folder" && (
-                <Folder className="w-5 h-5 fill-daw-green/20" />
+            <div className="flex items-center gap-4">
+              {/* Grip hanya muncul/berfungsi jika tidak dikunci */}
+              {!isNavigationLocked && !isLocked ? (
+                <GripVertical className="w-4 h-4 text-slate-300 cursor-grab active:cursor-grabbing group-hover:text-slate-400" />
+              ) : (
+                <Lock className="w-4 h-4 text-blue-400 opacity-50" />
               )}
-            </div>
 
-            <div>
-              <h4
-                className={`text-sm font-bold tracking-tight ${!menu.isActive ? "text-slate-400 line-through" : "text-slate-900"}`}
-              >
-                {menu.label}
-              </h4>
-              <div className="flex items-center gap-2 mt-0.5">
-                <span className="text-[9px] font-black uppercase tracking-widest px-1.5 py-0.5 rounded bg-slate-100 text-slate-500">
-                  {menu.type}
-                </span>
-                <span className="text-[10px] text-slate-400 font-medium italic">
-                  {menu.type === "page" && "Tautan halaman internal"}
-                  {menu.type === "external" && "Tautan halaman luar"}
-                  {menu.type === "folder" && "Dropdown pembuka sub-menu"}
-                </span>
+              <div
+                className={`w-10 h-10 rounded-xl flex items-center justify-center transition-colors
+                ${
+                  menu.type === "page"
+                    ? "bg-blue-50 text-blue-500"
+                    : menu.type === "folder"
+                      ? "bg-daw-green/10 text-daw-green"
+                      : "bg-amber-50 text-amber-500"
+                }`}>
+                {menu.type === "page" && <FileText className="w-5 h-5" />}
+                {menu.type === "external" && <LinkIcon className="w-5 h-5" />}
+                {menu.type === "folder" && (
+                  <Folder className="w-5 h-5 fill-daw-green/20" />
+                )}
+              </div>
+
+              <div>
+                <div className="flex items-center gap-2">
+                  <h4
+                    className={`text-sm font-bold tracking-tight ${
+                      isLocked || isNavigationLocked
+                        ? "text-slate-500"
+                        : "text-slate-900"
+                    } ${!menu.isActive && "line-through opacity-50"}`}>
+                    {menu.label}
+                  </h4>
+
+                  {isLocked && (
+                    <span className="bg-blue-100 text-blue-600 px-1.5 py-0.5 rounded text-[8px] font-black uppercase tracking-tighter flex items-center gap-1">
+                      <Lock className="w-2 h-2" /> Pending
+                    </span>
+                  )}
+                </div>
+                <div className="flex items-center gap-2 mt-0.5">
+                  <span className="text-[9px] font-black uppercase tracking-widest px-1.5 py-0.5 rounded bg-slate-100 text-slate-500">
+                    {menu.type}
+                  </span>
+                </div>
               </div>
             </div>
-          </div>
 
-          <div className="flex items-center gap-1 opacity-100 translate-x-0 lg:opacity-0 lg:translate-x-2 lg:group-hover:opacity-100 lg:group-hover:translate-x-0 transition-all duration-300">
-            <button
-              onClick={() => {
-                if (depth >= MAX_ALLOWED_DEPTH) {
-                  return toast.error("Maksimal sub-menu telah tercapai.");
+            {/* Action Buttons: Disabled jika dikunci */}
+            <div
+              className={`flex items-center gap-1 transition-all duration-300 
+              ${isNavigationLocked || isLocked ? "opacity-50" : "lg:opacity-0 lg:group-hover:opacity-100"}`}>
+              <button
+                onClick={() => {
+                  if (depth >= MAX_ALLOWED_DEPTH)
+                    return toast.error("Maksimal sub-menu tercapai.");
+                  setEditingId(null);
+                  setFormData({
+                    label: "",
+                    type: "page",
+                    pageId: "",
+                    externalLink: "",
+                    parentId: menu.id,
+                    isActive: true,
+                    status: "Published",
+                  });
+                  toast.info(`Menambahkan sub-menu di bawah "${menu.label}"`);
+                }}
+                disabled={
+                  depth >= MAX_ALLOWED_DEPTH || isNavigationLocked || isLocked
                 }
-                setEditingId(null);
-                setFormData({
-                  label: "",
-                  type: "page",
-                  pageId: "",
-                  externalLink: "",
-                  parentId: menu.id,
-                  isActive: true,
-                });
-                toast.info(`Menambahkan sub-menu di bawah "${menu.label}"`);
-              }}
-              disabled={depth >= MAX_ALLOWED_DEPTH}
-              className={`p-2 transition-all ${
-                depth >= MAX_ALLOWED_DEPTH
-                  ? "opacity-20 cursor-not-allowed text-slate-300"
-                  : "text-slate-400 hover:text-daw-green hover:bg-daw-green/10 rounded-lg"
-              }`}
-              title="Tambah Sub-menu"
-            >
-              <Plus className="w-4 h-4" />
-            </button>
-            <button
-              onClick={() => handleEdit(menu)}
-              className="p-2 text-slate-400 hover:text-blue-500 hover:bg-blue-50 rounded-lg transition-all"
-              title="Edit Menu"
-            >
-              <Edit2 className="w-4 h-4" />
-            </button>
-            <button
-              onClick={() => handleDelete(menu.id)}
-              className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all"
-              title="Hapus Menu"
-            >
-              <Trash2 className="w-4 h-4" />
-            </button>
-          </div>
-        </div>
+                className="p-2 text-slate-400 hover:text-daw-green hover:bg-daw-green/10 rounded-lg disabled:cursor-not-allowed"
+                title="Tambah Sub-menu">
+                <Plus className="w-4 h-4" />
+              </button>
 
-        {menu.children && menu.children.length > 0 && (
-          <div className="border-l-2 border-slate-100 ml-6 mt-1">
-            {renderMenuTree(menu.children, depth + 1)}
+              <button
+                onClick={() => handleEdit(menu)}
+                disabled={isNavigationLocked || isLocked}
+                className="p-2 text-slate-400 hover:text-blue-500 hover:bg-blue-50 rounded-lg disabled:cursor-not-allowed"
+                title="Edit Menu">
+                <Edit2 className="w-4 h-4" />
+              </button>
+
+              <button
+                onClick={() => handleDelete(menu.id, menu.label, !!isLocked)}
+                disabled={isNavigationLocked || isLocked}
+                className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg disabled:cursor-not-allowed"
+                title="Hapus Menu">
+                <Trash2 className="w-4 h-4" />
+              </button>
+            </div>
           </div>
-        )}
-      </div>
-    ));
+
+          {/* Recursive Call */}
+          {menu.children && menu.children.length > 0 && (
+            <div className="border-l-2 border-slate-100 ml-6 mt-1">
+              {renderMenuTree(menu.children, depth + 1)}
+            </div>
+          )}
+        </div>
+      );
+    });
   };
 
   return (
@@ -462,40 +504,73 @@ export default function NavigationBuilder() {
           </div>
         </div>
 
+        {isNavigationLocked && (
+          <div className="mb-6 flex items-start gap-3 p-4 bg-blue-50 border border-blue-200 rounded-2xl animate-in fade-in shadow-sm">
+            <div className="p-2 bg-blue-100 text-blue-600 rounded-xl shrink-0">
+              <Lock className="w-5 h-5" />
+            </div>
+            <div>
+              <h4 className="text-sm font-bold text-blue-900">
+                Struktur Terkunci
+              </h4>
+              <p className="text-[11px] text-blue-700 mt-0.5 leading-relaxed">
+                Susunan menu sedang dalam peninjauan Admin (Tiket:{" "}
+                <strong>{navigationLockTicket}</strong>). Fungsi Drag & Drop dan
+                perubahan struktur dinonaktifkan sementara.
+              </p>
+            </div>
+          </div>
+        )}
+
         {isLoading ? (
           <div className="bg-white border border-slate-200 rounded-3xl p-20 text-center">
             <div className="w-12 h-12 border-4 border-slate-200 border-t-daw-green rounded-full animate-spin mx-auto mb-4" />
             <p className="text-sm font-bold text-slate-400 uppercase tracking-widest">
-              Sedang menyelaraskan data menu...
+              Menyelaraskan struktur...
             </p>
           </div>
         ) : (
-          <div className="space-y-1 pb-20">{renderMenuTree(menus)}</div>
+          <div
+            className={`space-y-1 pb-20 transition-opacity ${isNavigationLocked ? "opacity-80" : ""}`}>
+            {renderMenuTree(menus)}
+          </div>
         )}
       </div>
 
       {/* RIGHT: PROPERTY PANEL */}
       <div className="lg:col-span-5 sticky top-24">
-        <div className="bg-white rounded-[2.5rem] border border-slate-200 shadow-xl shadow-slate-200/50 overflow-hidden">
+        <div
+          className={`bg-white rounded-[2.5rem] border border-slate-200 shadow-xl shadow-slate-200/50 overflow-hidden transition-all ${isNavigationLocked ? "ring-4 ring-blue-500/5 opacity-90" : ""}`}>
           <div className="p-8 border-b border-slate-50 bg-slate-50/30">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-slate-900 rounded-2xl flex items-center justify-center text-white">
-                <Settings2 className="w-5 h-5" />
+              <div
+                className={`w-10 h-10 rounded-2xl flex items-center justify-center text-white transition-colors ${isNavigationLocked ? "bg-blue-500" : "bg-slate-900"}`}>
+                {isNavigationLocked ? (
+                  <Lock className="w-5 h-5" />
+                ) : (
+                  <Settings2 className="w-5 h-5" />
+                )}
               </div>
               <div>
                 <h3 className="text-lg font-bold text-slate-900 leading-none">
-                  {editingId ? "Detail Item Menu" : "Navigasi Menu Baru"}
+                  {isNavigationLocked
+                    ? "Detail (Read-Only)"
+                    : editingId
+                      ? "Detail Item Menu"
+                      : "Navigasi Menu Baru"}
                 </h3>
                 <p className="text-[10px] text-slate-400 uppercase font-black tracking-widest mt-1">
-                  {editingId
-                    ? "Perbarui detail menu yang sudah ada."
-                    : "Membuat menu baru"}
+                  {isNavigationLocked
+                    ? "Perubahan dinonaktifkan sementara"
+                    : editingId
+                      ? "Perbarui detail menu yang ada"
+                      : "Membuat menu baru"}
                 </p>
               </div>
             </div>
           </div>
 
-          <form onSubmit={handleSubmit} className="p-8 space-y-6">
+          <form className="p-8 space-y-6">
             <div className="space-y-2">
               <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">
                 Nama Label
@@ -504,33 +579,30 @@ export default function NavigationBuilder() {
                 type="text"
                 required
                 value={formData.label}
+                readOnly={isNavigationLocked} // 🛡️ Visual Lockdown
                 onChange={(e) =>
                   setFormData({ ...formData, label: e.target.value })
                 }
-                className="w-full px-5 py-4 rounded-2xl bg-slate-50 border border-slate-100 focus:bg-white focus:border-daw-green focus:ring-4 focus:ring-daw-green/5 outline-none transition-all font-bold text-slate-700"
+                className="w-full px-5 py-4 rounded-2xl bg-slate-50 border border-slate-100 focus:bg-white focus:border-daw-green outline-none transition-all font-bold text-slate-700 read-only:opacity-60 read-only:cursor-not-allowed"
                 placeholder="e.g. Services / Layanan"
               />
-              <p className="text-[10px] text-slate-400 italic ml-1">
-                Nama menu yang akan muncul di navigasi website.
-              </p>
             </div>
 
-            {/*  GRID BUTTON DIUBAH MENJADI 3 KOLOM */}
-            <div className="grid grid-cols-3 gap-3">
+            {/*  TYPE SELECTION */}
+            <div
+              className={`grid grid-cols-3 gap-3 ${isNavigationLocked ? "pointer-events-none opacity-60" : ""}`}>
               <button
                 type="button"
                 onClick={() =>
                   setFormData({ ...formData, type: "page", externalLink: "" })
                 }
                 className={`p-3 rounded-xl border-2 flex flex-col items-center gap-1.5 transition-all text-center
-                    ${formData.type === "page" ? "border-blue-500 bg-blue-50/30" : "border-slate-100 hover:border-slate-200"}`}
-              >
+                    ${formData.type === "page" ? "border-blue-500 bg-blue-50/30" : "border-slate-100 hover:border-slate-200"}`}>
                 <FileText
                   className={`w-5 h-5 ${formData.type === "page" ? "text-blue-500" : "text-slate-400"}`}
                 />
                 <span
-                  className={`text-[9px] font-black uppercase ${formData.type === "page" ? "text-blue-700" : "text-slate-400"}`}
-                >
+                  className={`text-[9px] font-black uppercase ${formData.type === "page" ? "text-blue-700" : "text-slate-400"}`}>
                   Internal Page
                 </span>
               </button>
@@ -540,18 +612,15 @@ export default function NavigationBuilder() {
                   setFormData({ ...formData, type: "external", pageId: "" })
                 }
                 className={`p-3 rounded-xl border-2 flex flex-col items-center gap-1.5 transition-all text-center
-                    ${formData.type === "external" ? "border-amber-500 bg-amber-50/30" : "border-slate-100 hover:border-slate-200"}`}
-              >
+                    ${formData.type === "external" ? "border-amber-500 bg-amber-50/30" : "border-slate-100 hover:border-slate-200"}`}>
                 <Globe
                   className={`w-5 h-5 ${formData.type === "external" ? "text-amber-500" : "text-slate-400"}`}
                 />
                 <span
-                  className={`text-[9px] font-black uppercase ${formData.type === "external" ? "text-amber-700" : "text-slate-400"}`}
-                >
+                  className={`text-[9px] font-black uppercase ${formData.type === "external" ? "text-amber-700" : "text-slate-400"}`}>
                   External Link
                 </span>
               </button>
-              {/*  TOMBOL BARU: FOLDER */}
               <button
                 type="button"
                 onClick={() =>
@@ -564,20 +633,18 @@ export default function NavigationBuilder() {
                   })
                 }
                 className={`p-3 rounded-xl border-2 flex flex-col items-center gap-1.5 transition-all text-center
-                    ${formData.type === "folder" ? "border-daw-green bg-daw-green/5" : "border-slate-100 hover:border-slate-200"}`}
-              >
+                    ${formData.type === "folder" ? "border-daw-green bg-daw-green/5" : "border-slate-100 hover:border-slate-200"}`}>
                 <Folder
                   className={`w-5 h-5 ${formData.type === "folder" ? "text-daw-green fill-daw-green/20" : "text-slate-400"}`}
                 />
                 <span
-                  className={`text-[9px] font-black uppercase ${formData.type === "folder" ? "text-daw-green" : "text-slate-400"}`}
-                >
+                  className={`text-[9px] font-black uppercase ${formData.type === "folder" ? "text-daw-green" : "text-slate-400"}`}>
                   Dropdown Folder
                 </span>
               </button>
             </div>
 
-            {/*  KONDISIONAL INPUT: HILANG JIKA TIPE ADALAH FOLDER */}
+            {/* CONDITIONAL INPUTS */}
             {formData.type === "page" && (
               <div className="space-y-2 animate-in slide-in-from-top-2 duration-300">
                 <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">
@@ -585,12 +652,12 @@ export default function NavigationBuilder() {
                 </label>
                 <select
                   required
-                  value={formData.pageId}
+                  value={formData.pageId || ""}
+                  disabled={isNavigationLocked}
                   onChange={(e) =>
                     setFormData({ ...formData, pageId: e.target.value })
                   }
-                  className="w-full px-5 py-4 rounded-2xl bg-slate-50 border border-slate-100 outline-none font-bold text-slate-700 appearance-none"
-                >
+                  className="w-full px-5 py-4 rounded-2xl bg-slate-50 border border-slate-100 outline-none font-bold text-slate-700 appearance-none disabled:opacity-60 disabled:cursor-not-allowed">
                   <option value="">-- Pilih Halaman --</option>
                   {pages.map((p) => (
                     <option key={p.id} value={p.id}>
@@ -611,11 +678,12 @@ export default function NavigationBuilder() {
                   <input
                     type="url"
                     required
-                    value={formData.externalLink}
+                    value={formData.externalLink || ""}
+                    readOnly={isNavigationLocked}
                     onChange={(e) =>
                       setFormData({ ...formData, externalLink: e.target.value })
                     }
-                    className="w-full pl-12 pr-5 py-4 rounded-2xl bg-slate-50 border border-slate-100 outline-none font-mono text-xs text-slate-600"
+                    className="w-full pl-12 pr-5 py-4 rounded-2xl bg-slate-50 border border-slate-100 outline-none font-mono text-xs text-slate-600 read-only:opacity-60 read-only:cursor-not-allowed"
                     placeholder="https://example.com"
                   />
                 </div>
@@ -637,14 +705,12 @@ export default function NavigationBuilder() {
                 Posisi Hirarki
               </label>
               <select
-                value={formData.parentId}
+                value={formData.parentId || ""}
+                disabled={formData.type === "folder" || isNavigationLocked} // 🛡️ Visual Lockdown
                 onChange={(e) =>
                   setFormData({ ...formData, parentId: e.target.value })
                 }
-                //  JIKA FOLDER, DISABLE SELECT INI
-                disabled={formData.type === "folder"}
-                className="w-full px-5 py-4 rounded-2xl bg-slate-50 border border-slate-100 outline-none text-sm font-bold text-slate-600 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
+                className="w-full px-5 py-4 rounded-2xl bg-slate-50 border border-slate-100 outline-none text-sm font-bold text-slate-600 disabled:opacity-50 disabled:cursor-not-allowed">
                 <option value=""> Atur sebagai Menu Utama (Root) </option>
                 {validParentOptions.map((m) => (
                   <option key={m.id} value={m.id}>
@@ -652,30 +718,43 @@ export default function NavigationBuilder() {
                   </option>
                 ))}
               </select>
-              <p className="text-[10px] text-slate-400 italic ml-1">
-                {formData.type === "folder"
-                  ? "Tipe Folder wajib berada di posisi Menu Utama."
-                  : "Letakkan menu ini di dalam menu lain (Sub-menu)."}
-              </p>
             </div>
 
-            <div className="pt-4 flex gap-3">
-              <button
-                type="submit"
-                disabled={isSaving}
-                className="flex-1 bg-daw-green hover:bg-[#003b1c] text-white py-4 rounded-2xl font-bold shadow-lg shadow-daw-green/20 transition-all flex items-center justify-center gap-2"
-              >
-                <Plus className="w-5 h-5" />{" "}
-                {editingId ? "Simpan Perubahan" : "Terapkan ke Menu"}
-              </button>
-              {editingId && (
-                <button
-                  type="button"
-                  onClick={resetForm}
-                  className="px-6 bg-slate-100 text-slate-500 py-4 rounded-2xl font-bold hover:bg-slate-200 transition-all"
-                >
-                  <X className="w-5 h-5" />
-                </button>
+            <div className="pt-4 flex flex-col gap-3">
+              {isNavigationLocked ? (
+                <div className="p-4 bg-blue-50 text-blue-600 rounded-2xl font-bold flex items-center justify-center gap-2 border border-blue-200">
+                  <Lock className="w-5 h-5" /> Formulir Terkunci Sementara
+                </div>
+              ) : (
+                <div className="flex flex-col gap-3">
+                  <button
+                    type="button"
+                    onClick={(e) => handleSubmit(e, "Draft")}
+                    disabled={isSaving}
+                    className="w-full bg-slate-100 text-slate-600 hover:bg-slate-200 py-4 rounded-2xl font-bold transition-all disabled:opacity-50">
+                    {isSaving ? "Menyimpan..." : "Simpan Draf Menu"}
+                  </button>
+
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={(e) => handleSubmit(e, "Published")}
+                      disabled={isSaving}
+                      className="flex-1 bg-daw-green hover:bg-[#003b1c] text-white py-4 rounded-2xl font-bold shadow-lg shadow-daw-green/20 transition-all flex items-center justify-center gap-2 disabled:opacity-50">
+                      <Plus className="w-5 h-5" />
+                      {editingId ? "Request Revisi Menu" : "Request Menu Baru"}
+                    </button>
+
+                    {/* Tombol Cancel/Reset selalu muncul selama tidak terkunci */}
+                    <button
+                      type="button"
+                      onClick={resetForm}
+                      className="px-6 bg-slate-100 text-slate-500 py-4 rounded-2xl font-bold hover:bg-red-50 hover:text-red-500 transition-all"
+                      title="Bersihkan Form">
+                      <X className="w-5 h-5" />
+                    </button>
+                  </div>
+                </div>
               )}
             </div>
           </form>
