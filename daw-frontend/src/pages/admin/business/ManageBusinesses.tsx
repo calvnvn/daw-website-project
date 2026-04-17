@@ -44,12 +44,16 @@ export default function ManageBusinesses() {
     deleteSection,
     fetchRejectedDraft,
     clearRejectedDraft,
+    rejectedDraft,
+    refreshData,
   } = useBusiness();
 
   // --- 1. CORE STATES ---
   const [activeTab, setActiveTab] = useState<string>("");
   const [formData, setFormData] =
     useState<Omit<SectionData, "id">>(initialFormData);
+
+  const [rejectedDrafts, setRejectedDrafts] = useState<Record<string, any>>({});
 
   // --- 2. UI & MODAL STATES ---
   const [isEditing, setIsEditing] = useState(false);
@@ -68,19 +72,8 @@ export default function ManageBusinesses() {
   }, [categories]);
 
   const currentSection = sections.find((s) => s.id === activeTab);
-  const isArticleLocked = currentSection?.is_locked === true;
-
+  const isSectionLocked = currentSection?.is_locked === true;
   // DATA ENGINE (SYNC & LOCK ENFORCEMENT)
-
-  // Lock Guard: Paksa keluar dari mode edit jika data tiba-tiba dikunci dari backend
-  useEffect(() => {
-    if (currentSection?.is_locked && isEditing) {
-      setIsEditing(false);
-      toast.info(
-        "Akses edit ditutup. Sektor ini sedang dalam antrean approval.",
-      );
-    }
-  }, [currentSection?.is_locked, isEditing]);
 
   // Safe Form Synchronization
   useEffect(() => {
@@ -118,19 +111,24 @@ export default function ManageBusinesses() {
 
   // PARALLEL FETCHING
   useEffect(() => {
-    const abortController = new AbortController();
-
-    if (activeTab && activeTab !== "categories") {
-      fetchRejectedDraft(activeTab, "BusinessSection", abortController.signal);
-    } else {
+    if (!activeTab || activeTab === "categories") {
       clearRejectedDraft();
+      return;
     }
 
-    return () => {
-      abortController.abort();
-    };
+    const abortController = new AbortController();
+
+    fetchRejectedDraft(activeTab, "BusinessSection", abortController.signal);
+
+    return () => abortController.abort();
   }, [activeTab, fetchRejectedDraft, clearRejectedDraft]);
 
+  useEffect(() => {
+    if (isSectionLocked && isEditing) {
+      setIsEditing(false);
+      toast.info("Akses ditutup. Sektor ini sedang dalam proses review OWL.");
+    }
+  }, [isSectionLocked, isEditing]);
   // SECURITY GUARD
   useEffect(() => {
     const handleBeforeUnload = (e: BeforeUnloadEvent) => {
@@ -199,15 +197,18 @@ export default function ManageBusinesses() {
   const handleSave = async () => {
     if (activeTab === "categories") return;
     setIsSaving(true);
-    const toastId = toast.loading("Memproses data...");
+    const toastId = toast.loading("Mengirim revisi ke sistem OWL...");
     try {
-      await updateSection(activeTab, formData);
-      toast.dismiss(toastId);
+      await updateSection(activeTab, {
+        ...formData,
+        previous_notrans: rejectedDraft?.notrans,
+      });
       setIsEditing(false);
-    } catch {
-      toast.error("Gagal memproses data.", { id: toastId });
+    } catch (err: any) {
+      console.error("Save Error:", err);
     } finally {
       setIsSaving(false);
+      toast.dismiss(toastId);
     }
   };
 
@@ -237,8 +238,7 @@ export default function ManageBusinesses() {
         isSaving={isSaving}
         onSave={handleSave}
         onDeleteClick={() => setIsDeleteModalOpen(true)}
-        // Kirim status lock ke header untuk indikator visual (Badge Pending)
-        isLocked={isArticleLocked}
+        isLocked={isSectionLocked}
         lockTicket={currentSection?.lock_ticket}
       />
 
@@ -252,7 +252,6 @@ export default function ManageBusinesses() {
 
       <main className="bg-white rounded-b-xl border border-t-0 border-slate-200 shadow-sm p-6 lg:p-8 min-h-[500px]">
         {activeTab === "categories" ? (
-          // 💡 Jalur Bypass: CategoryManager tidak terpengaruh is_locked
           <CategoryManager />
         ) : (
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
@@ -261,8 +260,7 @@ export default function ManageBusinesses() {
               activeTab={activeTab}
               formData={formData}
               setFormData={setFormData}
-              // 🛡️ Kunci hanya bagian ini jika is_locked = true
-              isEditing={isEditing && !isArticleLocked}
+              isEditing={isEditing && !isSectionLocked}
             />
 
             {/* 2. MAP MANAGER (BYPASS APPROVAL) */}
@@ -270,7 +268,7 @@ export default function ManageBusinesses() {
               formData={formData}
               setFormData={setFormData}
               // 🚀 Tetap nyala meski artikel sedang dikunci!
-              isEditing={isEditing}
+              isEditing={isEditing && !isSectionLocked}
               categories={categories}
               categoryMap={categoryMap}
               onOpenMapPicker={() => setIsMapModalOpen(true)}

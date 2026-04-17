@@ -1,21 +1,21 @@
-# Dependency folders
+# 1. Dependency raksasa (Tersangka Utama)
 node_modules/
+**/node_modules/
 
-# Build outputs
+# 2. Build Outputs
 dist/
 build/
 .vite/
+.next/
 
-# DAW Project Specific: Jangan biarkan Prettier masuk ke folder upload!
-# Gambar .webp atau .jpg lo bisa korup kalau Prettier maksa "format" isinya
-public/uploads/
-backend/public/uploads/
-
-# Library atau file auto-generated
+# 5. Lock files & Logs
 package-lock.json
-*.min.js
-*.min.css
+yarn.lock
+pnpm-lock.yaml
+*.log
 
-# Config files yang sensitif
+# 6. Config & Cache
 .env
-.env.local
+.env.*
+.cache/
+.eslintcache

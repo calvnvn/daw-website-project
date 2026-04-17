@@ -66,12 +66,11 @@ interface BusinessContextType {
   ) => Promise<void>;
   clearRejectedDraft: () => void;
   refreshData: () => Promise<void>;
-  updateSection: (id: string, data: Partial<SectionData>) => Promise<void>;
-  addSection: (
-    category: string,
-    title: string,
-    status?: string,
+  updateSection: (
+    id: string,
+    data: Partial<SectionData> & { previous_notrans?: string },
   ) => Promise<void>;
+  addSection: (category: string, title: string) => Promise<void>;
   deleteSection: (id: string) => Promise<void>;
   addCategory: (data: MapCategory, status?: string) => Promise<void>;
   updateCategory: (
@@ -131,63 +130,81 @@ export const BusinessProvider = ({ children }: { children: ReactNode }) => {
    * @desc Synchronizes local memory with the remote database.
    * Fetches both business sections and map categories concurrently for performance.
    */
+  // BusinessContext.tsx
   const refreshData = useCallback(async () => {
-    setIsLoading(true);
+    console.log("🚀 [DEBUG] refreshData dipicu!");
+    if (sections.length === 0) setIsLoading(true);
+
     try {
-      const [bizRes, catRes, projRes] = await Promise.all([
+      const results = await Promise.allSettled([
         api.get("/businesses/public"),
         api.get("/map-categories"),
-        api.get("/projects/public"), // Nambah 1 API Call ini bikin sisa web kenceng banget
+        api.get("/projects/public"),
       ]);
-      setSections(bizRes.data);
-      setCategories(catRes.data);
-      setPublicProjects(projRes.data); // Simpan ke state global
+
+      console.log("📦 [DEBUG] Data Bisnis dari API:", results[0]);
+
+      if (results[0].status === "fulfilled") setSections(results[0].value.data);
+      if (results[1].status === "fulfilled")
+        setCategories(results[1].value.data);
+      if (results[2].status === "fulfilled")
+        setPublicProjects(results[2].value.data);
     } catch (error) {
-      console.error("[REFRESH_DATA_FAILURE]:", error);
-      toast.error(
-        "Connectivity issue: Unable to sync with the business database.",
-      );
+      console.error("❌ [DEBUG] refreshData Error:", error);
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, []); // 💡 WAJIB KOSONG! Agar fungsi ini tidak dibuat ulang terus menerus.
 
   // Fungsi untuk menyimpan data ke Backend
   const updateSection = useCallback(
-    async (id: string, data: Partial<SectionData>) => {
+    async (
+      id: string,
+      data: Partial<SectionData> & { previous_notrans?: string },
+    ) => {
       setIsProcessing(true);
+      const toastId = toast.loading(
+        "Menyinkronkan revisi dengan sistem OWL...",
+      );
       try {
         const res = await api.put(`/businesses/admin/${id}`, data);
 
         if (res.status === 202) {
-          toast.success("Draf revisi dikirim ke antrean OWL!", {
-            description: `Tiket: ${res.data.ticket}`,
+          setSections((prev) =>
+            prev.map((s) =>
+              s.id === id
+                ? { ...s, is_locked: true, lock_ticket: res.data.ticket }
+                : s,
+            ),
+          );
+          toast.success("Revisi Diajukan!", {
+            id: toastId,
+            description: `Tiket ${res.data.ticket} berhasil dibuat. Data sementara dikunci.`,
+            duration: 5000,
           });
         } else {
-          toast.success("Data bisnis diperbarui!");
+          toast.success("Data berhasil diperbarui secara langsung!", {
+            id: toastId,
+          });
         }
 
         clearRejectedDraft();
         await refreshData();
       } catch (error: any) {
-        // 💡 Senior Debugging: Log full error biar kita tau strukturnya
-        console.error("🚨 [SAVE_ERROR_DEBUG]:", {
-          message: error.message,
-          response: error.response?.data,
-          status: error.response?.status,
+        console.error(
+          "🚨 [UPDATE_SECTION_FAILURE]:",
+          error.response?.data || error.message,
+        );
+
+        const errorMessage =
+          error.response?.data?.message ||
+          "Gagal memproses perubahan sektor bisnis.";
+
+        toast.error("Gagal Memperbarui", {
+          id: toastId,
+          description: errorMessage,
         });
-
-        // Ambil pesan paling spesifik: dari backend, atau dari axios, atau fallback
-        const backendMessage = error.response?.data?.message;
-        const axiosMessage = error.message;
-        const finalMessage =
-          backendMessage || axiosMessage || "Gagal menyimpan perubahan";
-
-        toast.error("Gagal Memproses Data", {
-          description: finalMessage, // Ini yang bakal nampilin "INSERT command denied..."
-        });
-
-        throw error; // Lempar ke komponen supaya handleSave berhenti
+        throw error;
       } finally {
         setIsProcessing(false); // Mematikan isProcessing global
       }
@@ -252,21 +269,33 @@ export const BusinessProvider = ({ children }: { children: ReactNode }) => {
 
   /**
    * @desc Dispatches a POST request to initialize a new business unit.
-   * @param {string} category - The display name (e.g., "Logistics").
-   * @param {string} title - Initial eyebrow title.
    */
   const addSection = useCallback(
     async (category: string, title: string) => {
       setIsProcessing(true);
+      const toastId = toast.loading("Membuat sektor bisnis baru...");
       try {
-        await api.post("/businesses/admin", { category, title });
+        // 1. FIX: Tambahkan deklarasi 'res'
+        const res = await api.post("/businesses/admin", { category, title });
+
+        if (res.status === 202) {
+          toast.success("Sektor Baru Diajukan!", {
+            id: toastId,
+            description: `Tiket: ${res.data.ticket}. Menunggu approval Admin.`,
+          });
+        } else {
+          toast.success(`Sektor ${category} berhasil dibuat!`, { id: toastId });
+        }
+
+        // 2. Refresh data setelah feedback muncul
         await refreshData();
-        toast.success(`Sektor ${category} berhasil dibuat!`);
-      } catch (error: unknown) {
-        const message =
-          error instanceof Error ? error.message : "Failed to create section";
+      } catch (error: any) {
         console.error("[ADD_SECTION_ERROR]:", error);
-        toast.error(message);
+        // 3. FIX: Gunakan toastId agar loading-nya hilang saat error
+        toast.error("Gagal Membuat Sektor", {
+          id: toastId,
+          description: error.response?.data?.message || error.message,
+        });
         throw error;
       } finally {
         setIsProcessing(false);
@@ -276,18 +305,33 @@ export const BusinessProvider = ({ children }: { children: ReactNode }) => {
   );
 
   /**
-   * @desc Removes an entire business section and its associated map markers.
-   * @param {string} id - The slug-based ID of the section to be purged.
+   * @desc Removes an entire business section.
    */
   const deleteSection = useCallback(
     async (id: string) => {
       setIsProcessing(true);
+      const toastId = toast.loading("Memproses penghapusan...");
       try {
-        await api.delete(`/businesses/admin/${id}`);
+        // 1. FIX: Tambahkan deklarasi 'res'
+        const res = await api.delete(`/businesses/admin/${id}`);
+
+        if (res.status === 202) {
+          toast.success("Permintaan Hapus Dikirim", {
+            id: toastId,
+            description: `Tiket: ${res.data.ticket}. Data akan dikunci sampai disetujui.`,
+          });
+        } else {
+          toast.success("Sektor berhasil dihapus permanen.", { id: toastId });
+        }
+
         await refreshData();
-        toast.success("Sektor bisnis berhasil dihapus");
       } catch (error: any) {
-        toast.error("Gagal menghapus sektor bisnis");
+        console.error("[DELETE_SECTION_ERROR]:", error);
+        toast.error("Gagal Menghapus", {
+          id: toastId,
+          description:
+            error.response?.data?.message || "Terjadi kesalahan server.",
+        });
         throw error;
       } finally {
         setIsProcessing(false);

@@ -93,6 +93,8 @@ exports.getPublicBusinessData = async (req, res) => {
         "htmlContent",
         "hasMap",
         "orderIndex",
+        "is_locked",
+        "lock_ticket",
       ],
       include: [
         {
@@ -122,106 +124,112 @@ exports.getPublicBusinessData = async (req, res) => {
 /**
  * @desc    Update an existing business section and synchronize its map markers
  * @route   PUT /api/businesses/admin/:id
- * @access  Private (Admin)
- */
-/**
- * @desc    Update an existing business section and synchronize its map markers
- * @route   PUT /api/businesses/admin/:id
  * @access  Private (Admin/Editor)
  */
 exports.updateBusinessSection = async (req, res) => {
   const { id } = req.params;
-  const { title, htmlContent, hasMap, mapMarkers } = req.body;
-  const isMapActive =
-    hasMap === true || hasMap === "true" || hasMap === 1 ? 1 : 0;
-  const cleanHtmlContent = htmlContent
-    ? sanitizeHtml(htmlContent, sanitizeOptions)
-    : "";
-
-  const t = await sequelize.transaction();
+  const { title, htmlContent, hasMap, mapMarkers, previous_notrans } = req.body;
+  const userRole = req.userRole?.toLowerCase();
 
   try {
-    const section = await BusinessSection.findByPk(id, {
-      transaction: t,
-      lock: t.LOCK.UPDATE,
-    });
-    if (!section) {
-      await t.rollback();
+    const section = await BusinessSection.findByPk(id);
+    if (!section)
       return res
         .status(404)
         .json({ message: "Sektor Bisnis tidak ditemukan!" });
+
+    if (section.is_locked) {
+      return res.status(423).json({
+        message: "Sektor ini sedang dikunci oleh proses approval OWL.",
+        ticket: section.lock_ticket,
+      });
     }
 
-    // --- JALUR 1: BYPASS (MARKERS & MAP TOGGLE) ---
-    // Editor maupun Admin, update marker dan toggle map LANGSUNG ke database utama
-    await section.update({ hasMap: isMapActive }, { transaction: t });
+    const isMapActive = [true, "true", 1, "1"].includes(hasMap) ? 1 : 0;
+    const cleanHtmlContent = htmlContent
+      ? sanitizeHtml(htmlContent, sanitizeOptions)
+      : "";
 
-    await BusinessMapMarker.destroy({
-      where: { sectionId: id },
-      transaction: t,
-    });
-    if (isMapActive && mapMarkers && mapMarkers.length > 0) {
-      const newMarkers = mapMarkers.map((marker) => ({
-        ...marker,
-        categoryId: marker.categoryId || marker.type,
-        sectionId: id,
-      }));
-      await BusinessMapMarker.bulkCreate(newMarkers, { transaction: t });
-    }
+    // EDITOR (APPROVAL REQUIRED)
+    if (userRole === "editor") {
+      console.log(
+        `>>> [BUSINESS] JALUR EDITOR: INITIATING ATOMIC UPDATE FOR ID: ${id} <<<`,
+      );
 
-    // --- JALUR 2: SELECTIVE APPROVAL (TITLE & HTML CONTENT) ---
-    if (req.userRole && req.userRole.toLowerCase() === "editor") {
-      // Bandingkan apakah Konten Artikel (Title/HTML) berubah?
-      const isContentChanged =
-        section.title !== title || section.htmlContent !== cleanHtmlContent;
+      const packageContent = {
+        title: title || section.title,
+        htmlContent: cleanHtmlContent,
+        hasMap: isMapActive,
+        mapMarkers: mapMarkers || [],
+      };
 
-      if (isContentChanged) {
-        // Cek gembok HANYA jika ingin mengubah konten
-        if (section.is_locked) {
-          await t.rollback();
-          return res.status(423).json({
-            message: "Konten artikel sedang dikunci oleh approval lain.",
-            ticket: section.lock_ticket,
-          });
-        }
-
-        const result = await ErpApprovalService.initiateApproval({
-          model: BusinessSection,
-          targetId: id,
-          action: "UPDATE_ARTICLE_ONLY", // Action spesifik untuk update teks saja
-          payload: { title, htmlContent: cleanHtmlContent },
-          userId: req.userId,
-          owlUsername: req.owl_username,
-          token: req.owl_token,
-          transaction: t,
-        });
-
-        await t.commit();
-        return res.status(202).json({
-          message:
-            "Lokasi peta diperbarui, namun revisi artikel dikirim ke OWL untuk persetujuan.",
-          ticket: result.notrans,
-        });
+      // CLEANUP: Jika ini re-submission, tandai draf lama sebagai Replaced
+      if (previous_notrans) {
+        await ApprovalDraft.update(
+          { status: "Replaced" },
+          { where: { notrans: previous_notrans } },
+        );
       }
+
+      // EXTERNAL HANDSHAKE (Di luar DB Transaction utama)
+      const result = await ErpApprovalService.initiateApproval({
+        model: BusinessSection,
+        targetId: id,
+        action: "UPDATE",
+        payload: packageContent,
+        userId: req.userId,
+        owlUsername: req.owl_username,
+        token: req.owl_token,
+      });
+
+      await section.update({
+        is_locked: true,
+        lock_ticket: result.notrans,
+      });
+
+      return res.status(202).json({
+        message:
+          "Revisi (Artikel & Peta) telah diajukan ke OWL. Sektor berhasil dikunci.",
+        ticket: result.notrans,
+      });
     }
 
-    // JALUR SUPERADMIN: Langsung simpan konten artikel
-    await section.update(
-      { title, htmlContent: cleanHtmlContent },
-      { transaction: t },
-    );
+    // SUPERADMIN (DIRECT UPDATE)
+    console.log(">>> [BUSINESS] JALUR SUPERADMIN: DIRECT COMMIT <<<");
 
-    await t.commit();
-    res
-      .status(200)
-      .json({ message: "Sektor dan lokasi peta berhasil diperbarui!" });
+    const t = await sequelize.transaction();
+    try {
+      await section.update(
+        { title, htmlContent: cleanHtmlContent, hasMap: isMapActive },
+        { transaction: t },
+      );
+
+      await BusinessMapMarker.destroy({
+        where: { sectionId: id },
+        transaction: t,
+      });
+
+      if (isMapActive && mapMarkers && mapMarkers.length > 0) {
+        const newMarkers = mapMarkers.map((marker) => ({
+          ...marker,
+          categoryId: marker.categoryId || marker.type,
+          sectionId: id,
+        }));
+        await BusinessMapMarker.bulkCreate(newMarkers, { transaction: t });
+      }
+
+      await t.commit();
+      return res.status(200).json({
+        message: "Sektor dan lokasi peta berhasil diperbarui secara permanen!",
+      });
+    } catch (dbError) {
+      await t.rollback();
+      throw dbError;
+    }
   } catch (error) {
-    if (t) await t.rollback();
     console.error("🚨 [CONTROLLER ERROR]:", error.message);
-
     return res.status(error.statusCode || 500).json({
       message: error.message || "Internal Server Error",
-      details: error.details || null,
       error: true,
     });
   }
@@ -243,44 +251,83 @@ const slugify = (text) => {
 
 exports.createBusinessSection = async (req, res) => {
   const { category, title } = req.body;
+  const userRole = req.userRole?.toLowerCase();
   const generatedId = slugify(category);
-  const t = await sequelize.transaction();
+
+  let newSection = null;
 
   try {
-    const existing = await BusinessSection.findByPk(generatedId, {
-      transaction: t,
-    });
+    // DISCOVERY: Cek apakah ID sudah dipakai
+    const existing = await BusinessSection.findByPk(generatedId);
     if (existing) {
-      await t.rollback();
       return res.status(400).json({ message: "Sektor bisnis sudah ada!" });
     }
 
-    const maxOrder =
-      (await BusinessSection.max("orderIndex", { transaction: t })) || 0;
+    // PRE-INSERT STRATEGY
+    const maxOrder = (await BusinessSection.max("orderIndex")) || 0;
 
-    const newSection = await BusinessSection.create(
-      {
-        id: generatedId,
-        category,
-        title,
-        htmlContent: "",
-        hasMap: false,
-        orderIndex: maxOrder + 1,
-        is_locked: false, // Bebas akses
-      },
-      { transaction: t },
-    );
+    newSection = await BusinessSection.create({
+      id: generatedId,
+      category,
+      title,
+      htmlContent: "",
+      hasMap: false,
+      orderIndex: maxOrder + 1,
+      is_locked: false,
+    });
 
-    await t.commit();
-    res.status(201).json(newSection);
+    // EDITOR GATE (The Compliance Check)
+    if (userRole === "editor") {
+      console.log(
+        `>>> [BUSINESS] JALUR EDITOR: INITIATING APPROVAL FOR NEW SECTOR: ${generatedId} <<<`,
+      );
+
+      try {
+        const result = await ErpApprovalService.initiateApproval({
+          model: BusinessSection,
+          targetId: generatedId, // ID hasil Pre-insert tadi
+          action: "CREATE",
+          payload: { category, title, status: "Published" },
+          userId: req.userId,
+          owlUsername: req.owl_username,
+          token: req.owl_token,
+        });
+
+        // Jika OWL sukses, baru pasang gembok di lokal
+        await newSection.update({
+          is_locked: true,
+          lock_ticket: result.notrans,
+        });
+
+        return res.status(202).json({
+          message:
+            "Permintaan pembuatan sektor bisnis baru dikirim ke OWL. Data dikunci.",
+          ticket: result.notrans,
+          data: newSection,
+        });
+      } catch (owlError) {
+        // Jika OWL gagal (misal: error 500 atau timeout), kita hapus record draf tadi.
+        if (newSection) {
+          console.error(
+            `>>> [CLEANUP] Deleting orphan section: ${generatedId} due to OWL failure`,
+          );
+          await newSection.destroy();
+        }
+        throw owlError;
+      }
+    }
+
+    // SUPERADMIN
+    console.log(">>> [BUSINESS] JALUR SUPERADMIN: DIRECT CREATE SUCCESS <<<");
+    return res.status(201).json({
+      message: "Sektor bisnis baru berhasil dibuat secara langsung.",
+      data: newSection,
+    });
   } catch (error) {
-    if (t) await t.rollback();
-    console.error("🚨 [CONTROLLER ERROR]:", error.message);
-
-    return res.status(error.statusCode || 500).json({
-      message: error.message || "Internal Server Error",
-      details: error.details || null, // Jika ada detail tambahan
-      error: true,
+    console.error("🚨 [CREATE_SECTION_ERROR]:", error.message);
+    return res.status(500).json({
+      message: "Gagal memproses pembuatan sektor.",
+      error: error.message,
     });
   }
 };

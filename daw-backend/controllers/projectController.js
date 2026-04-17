@@ -52,84 +52,79 @@ exports.getAllProjects = async (req, res) => {
 
 // POST Project Function
 exports.createProject = async (req, res) => {
+  let newProject = null;
+
   try {
-    const {
-      title,
-      excerpt,
-      content,
-      category,
-      status,
-      seo_title,
-      meta_description,
-      author,
-    } = req.body;
+    // Fetch Data
+    const projectData = await prepareProjectData(req);
+    const { previous_notrans } = req.body;
 
-    // --- 1. PRE-PROCESSING DATA (Berlaku untuk semua Role) ---
-    const finalSlug = await generateUniqueProjectSlug(title);
-    let coverImageName = null;
-    let galleryImagesNames = [];
+    // Buat record di lokal dulu
+    // Status default di projectData biasanya 'Draft'
+    newProject = await Project.create(projectData);
 
-    if (req.files) {
-      if (req.files["cover_image"]) {
-        coverImageName = req.files["cover_image"][0].filename;
-      }
-      if (req.files["gallery"]) {
-        galleryImagesNames = req.files["gallery"].map((file) => file.filename);
+    // Editor: Handshake OWL
+    if (
+      req.userRole?.toLowerCase() === "editor" &&
+      req.body.status === "Published"
+    ) {
+      try {
+        // ADDED: Handle Re-submission 
+        // Jika ini adalah pengajuan ulang draf yang pernah ditolak
+        if (previous_notrans) {
+          await ApprovalDraft.update(
+            { status: "Replaced" },
+            { where: { notrans: previous_notrans } }
+          );
+        }
+
+        const result = await ErpApprovalService.initiateApproval({
+          model: Project,
+          targetId: newProject.id,
+          action: "CREATE",
+          payload: { ...projectData, status: "Published" },
+          userId: req.userId,
+          owlUsername: req.owl_username,
+          token: req.owl_token,
+        });
+
+        // Data asli dikunci karena sedang diajukan
+        await newProject.update({
+          is_locked: true,
+          lock_ticket: result.notrans,
+        });
+
+        return res.status(202).json({
+          message: "Diajukan ke OWL. Data dikunci menunggu persetujuan.",
+          ticket: result.notrans,
+          data: newProject,
+        });
+      } catch (owlError) {
+        // Jika jembatan ke OWL putus, hancurkan record draf yang baru dibuat
+        if (newProject) {
+          console.error(`>>> [CLEANUP] Deleting orphan project ID: ${newProject.id} due to OWL failure`);
+          await newProject.destroy();
+        }
+        throw owlError; // Lemparkan ke catch utama
       }
     }
 
-    const projectData = {
-      title,
-      slug: finalSlug,
-      author: author || "Admin DAW",
-      excerpt: excerpt || "",
-      content,
-      category,
-      status: "Draft",
-      cover_image: coverImageName,
-      gallery: galleryImagesNames,
-      seo_title: seo_title || title,
-      meta_description: meta_description || excerpt,
-      views: 0,
-      is_locked: false,
-    };
-
-    const newProject = await Project.create(projectData);
-
-    // --- 2. GATEKEEPER LOGIC ---
-    if (req.userRole?.toLowerCase() === "editor" && status === "Published") {
-      console.log(
-        `>>> [PROJECT] JALUR EDITOR: INITIATING APPROVAL FOR ID: ${newProject.id} <<<`,
-      );
-
-      const result = await ErpApprovalService.initiateApproval({
-        model: Project,
-        targetId: newProject.id, // <--- SEKARANG ID TIDAK NULL
-        action: "CREATE",
-        payload: { ...projectData, status: "Published" }, // Payload tetap minta status Published
-        userId: req.userId,
-        owlUsername: req.owl_username,
-        token: req.owl_token,
-      });
-
-      // Update record lokal agar terkunci
-      await newProject.update({
-        is_locked: true,
-        lock_ticket: result.notrans,
-      });
-
-      return res.status(202).json({
-        message:
-          "Permintaan publish sedang diproses di OWL. Data disimpan sebagai draf terkunci.",
-        ticket: result.notrans,
-        data: newProject, // Kirim data agar Frontend bisa langsung update list
-      });
+    // Superadmin atau Editor save draft
+    if (req.body.status === "Published") {
+      await newProject.update({ status: "Published" });
     }
+
+    return res.status(201).json({ 
+      message: "Proyek berhasil disimpan.", 
+      data: newProject 
+    });
+
   } catch (error) {
     console.error("🚨 Error CREATE Project:", error);
-    res
-      .status(500)
-      .json({ message: "Gagal membuat proyek.", error: error.message });
+    res.status(500).json({
+      message: "Gagal memproses permintaan.",
+      error: error.message,
+    });
   }
 };
 
@@ -276,21 +271,23 @@ exports.updateProject = async (req, res) => {
       existing_gallery,
       seo_title,
       meta_description,
+      previous_notrans,
     } = req.body;
 
-    // Cari data lama (Gak perlu raw query, cukup findByPk)
+    // Ambil Data Original & Cek Lock
     const project = await Project.findByPk(id);
     if (!project) return res.status(404).json({ message: "Project not found" });
+
     if (project.is_locked) {
       return res.status(423).json({
-        message: "Data sedang dalam proses approval di OWL dan terkunci.",
+        message: "Data sedang dikunci oleh proses approval OWL.",
         ticket: project.lock_ticket,
       });
     }
 
-    // Olah Gallery
+    // Olah Aset (Gallery & Cover)
     let finalGallery = [];
-    let filesToDelete = []; // Penampung
+    let filesToDelete = [];
 
     if (existing_gallery) {
       try {
@@ -337,8 +334,6 @@ exports.updateProject = async (req, res) => {
 
     const userRole = req.userRole?.toLowerCase();
     if (userRole === "editor" && status === "Published") {
-      console.log(">>> [PROJECT] JALUR EDITOR: INITIATING WORKFLOW <<<");
-
       const packageContent = {
         title: title || project.title,
         slug: finalSlug,
@@ -352,6 +347,14 @@ exports.updateProject = async (req, res) => {
         meta_description: meta_description || project.meta_description,
       };
 
+      // If ada draf lama (re-submission), tandai 'Replaced
+      if (previous_notrans) {
+        await ApprovalDraft.update(
+          { status: "Replaced" },
+          { where: { notrans: previous_notrans } },
+        );
+      }
+
       const result = await ErpApprovalService.initiateApproval({
         model: Project,
         targetId: id,
@@ -359,7 +362,12 @@ exports.updateProject = async (req, res) => {
         payload: packageContent,
         userId: req.userId,
         owlUsername: req.owl_username,
-        token: req.owl_token, // Pastikan middleware nyimpen ini
+        token: req.owl_token,
+      });
+
+      await project.update({
+        is_locked: true,
+        lock_ticket: result.notrans,
       });
 
       return res.status(202).json({
@@ -368,11 +376,6 @@ exports.updateProject = async (req, res) => {
       });
     }
 
-    // ⚡ JALUR SUPERADMIN ATAU EDITOR SIMPAN DRAFT
-    console.log(">>> [PROJECT] JALUR DIRECT: UPDATING LOCAL DATABASE <<<");
-
-    // HANYA hapus file fisik jika yang melakukan adalah Superadmin
-    // atau jika Editor menyimpan sebagai Draft (dan memang ada file yang diganti)
     if (
       userRole === "superadmin" ||
       (userRole === "editor" && status === "Draft")
@@ -392,7 +395,7 @@ exports.updateProject = async (req, res) => {
       gallery: finalGallery,
       seo_title: seo_title || project.seo_title,
       meta_description: meta_description || project.meta_description,
-      is_locked: false, // Pastikan tidak terkunci
+      is_locked: false,
       lock_ticket: null,
     });
 
