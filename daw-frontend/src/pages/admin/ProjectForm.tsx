@@ -262,21 +262,21 @@ export default function ProjectForm() {
 
     const payload = rejectedDraft.payload;
 
-    setFormData({
-      ...formData, // Spread untuk menjaga field lain yang mungkin tidak ada di payload
-      title: payload.title || "",
-      excerpt: payload.excerpt || "",
-      content: payload.content || "",
-      category: payload.category || "",
-      status: "Draft", // Selalu paksa ke Draft saat restore
-      cover_image: payload.cover_image || "",
+    setFormData((prev) => ({
+      ...prev,
+      title: payload.title ?? prev.title,
+      excerpt: payload.excerpt ?? prev.excerpt,
+      content: payload.content ?? prev.content,
+      category: payload.category ?? prev.category,
+      status: "Draft",
+      cover_image: payload.cover_image ?? prev.cover_image,
       gallery:
         typeof payload.gallery === "string"
           ? payload.gallery
           : JSON.stringify(payload.gallery || []),
-      seo_title: payload.seo_title || "",
-      meta_description: payload.meta_description || "",
-    });
+      seo_title: payload.seo_title ?? prev.seo_title,
+      meta_description: payload.meta_description ?? prev.meta_description,
+    }));
 
     setCoverFile(null);
     setGalleryFiles([]);
@@ -429,28 +429,28 @@ export default function ProjectForm() {
       // Append Author (Dengan fallback aman)
       payload.append("author", user?.name || "Admin DAW");
 
-      // 6. Eksekusi API dengan TIMEOUT (Penting untuk mencegah "Stuck Loading"!)
+      // Eksekusi API dengan TIMEOUT (Penting untuk mencegah "Stuck Loading"!)
       const endpoint = isEditMode ? `/projects/${id}` : "/projects";
       const method = isEditMode ? api.put : api.post;
 
       const response = await method(endpoint, payload, {
-        timeout: 60000, // Timeout 60 detik (Wajib saat proses integrasi dengan sistem eksternal seperti OWL)
+        timeout: 60000, // Timeout 60 detik sesuai Blueprint v2.0
         onUploadProgress: (p) => {
           const percent = Math.round((p.loaded * 100) / (p.total || 1));
-          // Update toast ID yang sama agar tidak muncul notifikasi ganda
           toast.loading(`Mengunggah: ${percent}%...`, { id: loadingToast });
         },
       });
 
       // 7. Handle Success
       if ([200, 201, 202].includes(response.status)) {
-        // Bersihkan state draf agar banner hilang dan memori bersih
+        // BLUEPRINT: Bersihkan state draf agar memori bersih
         setRejectedDraft(null);
         setShowDraftBanner(false);
 
         if (response.status === 202) {
+          // Optimistic Lock untuk UX (Meskipun langsung pindah halaman)
           toast.success(
-            "Draf revisi berhasil dikirim ke ERP DAW. Menunggu approval Admin!",
+            "Revisi diajukan ke ERP DAW! Data dikunci menunggu approval.",
             {
               id: loadingToast,
               duration: 5000,
@@ -458,15 +458,14 @@ export default function ProjectForm() {
           );
         } else {
           toast.success(
-            `Proyek berhasil di${isEditMode ? "perbarui" : "simpan"} secara langsung!`,
+            `Proyek berhasil di${isEditMode ? "perbarui" : "simpan"}!`,
             {
               id: loadingToast,
             },
           );
         }
 
-        // Berikan jeda sedikit agar pesan sukses sempat terbaca user sebelum pindah halaman
-        setTimeout(() => navigate("/admin/projects"), 500);
+        setTimeout(() => navigate("/admin/projects"), 800);
       }
     } catch (err: any) {
       console.error("Save Error:", err);
@@ -878,12 +877,12 @@ export default function ProjectForm() {
                         : `${BASE_UPLOAD_URL}/${formData.cover_image}` // Jika hanya nama file
                     }
                     className="w-full h-full object-cover"
-                    alt="Existing Cover"
+                    alt="Cover Data"
                   />
 
                   {/* Indikator visual jika ini adalah data yang di-restore */}
                   {rejectedDraft && !coverPreview && (
-                    <div className="absolute top-2 left-2 bg-amber-500 text-white text-[8px] font-black px-2 py-1 rounded uppercase tracking-widest shadow-lg">
+                    <div className="absolute top-2 left-2 bg-amber-500 text-white text-[8px] font-black px-2 py-1 rounded uppercase tracking-widest shadow-lg animate-in slide-in-from-top-1">
                       Restored from Draft
                     </div>
                   )}

@@ -307,7 +307,11 @@ export default function ProjectManagement() {
                 filteredProjects.map((project) => (
                   <tr
                     key={project.id}
-                    className="hover:bg-slate-50/80 transition-colors group">
+                    className={`transition-colors group ${
+                      project.is_locked
+                        ? "bg-slate-50/40 opacity-60"
+                        : "hover:bg-slate-50/80"
+                    }`}>
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-3">
                         <div className="w-10 h-10 rounded bg-slate-100 flex items-center justify-center shrink-0 border border-slate-200">
@@ -359,13 +363,11 @@ export default function ProjectManagement() {
                       })()}
                     </td>
                     <td className="px-6 py-4">
-                      <button
-                        onClick={() => toggleStatus(project.id, project.status)}
-                        disabled={project.is_locked}
+                      <span
                         title={
                           project.is_locked
-                            ? "Data sedang terkunci"
-                            : "Klik untuk ubah status"
+                            ? "Data sedang terkunci, status tidak dapat diubah"
+                            : `Status saat ini: ${project.status}`
                         }
                         className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold tracking-wide transition-all ${
                           project.is_locked
@@ -375,7 +377,7 @@ export default function ProjectManagement() {
                               : "bg-amber-100 text-amber-700 border border-amber-200 active:scale-95 hover:brightness-90"
                         }`}>
                         {project.status}
-                      </button>
+                      </span>
                     </td>
                     <td className="px-6 py-4">
                       <p className="text-sm text-slate-600">
