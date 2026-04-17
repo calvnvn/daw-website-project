@@ -17,11 +17,14 @@ import {
   ImagePlus,
   PenTool,
   Search,
+  Lock,
+  RotateCcw,
+  AlertTriangle,
 } from "lucide-react";
 // Tambahkan BASE_UPLOAD_URL
 import api, { BASE_UPLOAD_URL } from "@/lib/api";
 import imageCompression from "browser-image-compression";
-
+import { useContent } from "@/contexts/ContentContext";
 interface Page {
   id: string;
   title: string;
@@ -32,15 +35,32 @@ interface Page {
   content: string;
   showDropCap: boolean;
   sidebarLinks?: { label: string; url: string }[];
+  is_locked?: boolean;
+  lock_ticket?: string | null;
+}
+
+interface RejectedDraft {
+  id: string;
+  notrans: string;
+  payload: Partial<Page>;
+  rejection_reason: string;
 }
 
 export default function PageBuilder() {
-  const [pages, setPages] = useState<Page[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const { pages, isLoading, refreshData } = useContent();
+
   const [isSaving, setIsSaving] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [isPreviewMode, setIsPreviewMode] = useState(false);
+
+  // Approval System State
+  const [activeItemLocked, setActiveItemLocked] = useState<boolean>(false);
+  const [activeLockTicket, setActiveLockTicket] = useState<string | null>(null);
+  const [rejectedDraft, setRejectedDraft] = useState<RejectedDraft | null>(
+    null,
+  );
+
   const [formData, setFormData] = useState({
     title: "",
     slug: "",
@@ -50,18 +70,14 @@ export default function PageBuilder() {
     showDropCap: true,
     sidebarLinks: [] as { label: string; url: string }[],
     metaDescription: "",
+    status: "Published",
   });
+
   const [heroFile, setHeroFile] = useState<File | null>(null);
   const [heroImage, setHeroImage] = useState<string>("");
   const quillRef = useRef<ReactQuill>(null);
 
-  /**
-   * Refactored Image Handler (Enterprise Standard)
-   * @description Migrates from local Base64 string to persistent server-side hosting.
-   * Logic: Compress (Client) -> Upload (Server) -> Optimized WebP Link (Quill).
-   */
   const imageHandler = useCallback(() => {
-    // 1. Create a dynamic hidden input for file selection
     const input = document.createElement("input");
     input.setAttribute("type", "file");
     input.setAttribute("accept", "image/*");
@@ -70,12 +86,9 @@ export default function PageBuilder() {
     input.onchange = async () => {
       const file = input.files?.[0];
       if (file && quillRef.current) {
-        // Feedback visual segera menggunakan Sonner
         const toastId = toast.loading("Optimizing & Uploading to server...");
 
         try {
-          // 2. Client-side compression (Layer 1 Optimization)
-          // We target a slightly higher quality as Sharp on backend will do the final WebP conversion.
           const compressionOptions = {
             maxSizeMB: 0.8,
             maxWidthOrHeight: 1600,
@@ -85,38 +98,25 @@ export default function PageBuilder() {
             file,
             compressionOptions,
           );
-
-          // 3. Construct Multipart Payload
-          // Important: Key must match 'inline_image' as defined in backend/middleware/upload.js
           const uploadPayload = new FormData();
           uploadPayload.append("inline_image", compressedFile);
 
-          // 4. API Request to dedicated Pages upload endpoint
           const response = await api.post(
             "/pages/upload-inline",
             uploadPayload,
           );
-
-          // 5. Integration with Quill Editor
           const editor = quillRef.current.getEditor();
           const range = editor.getSelection();
-
-          // Fallback: If editor is not focused, append to the end
           const cursorIndex = range ? range.index : editor.getLength();
 
-          // FIX: Insert the URL returned by server instead of Base64 string
           if (response.data.url) {
             editor.insertEmbed(cursorIndex, "image", response.data.url);
-
-            // UX Improvement: Move cursor after the inserted image for seamless typing
             editor.setSelection(cursorIndex + 1);
-
             toast.success("Image added to document!", { id: toastId });
           } else {
             throw new Error("Invalid response from server.");
           }
         } catch (error: any) {
-          // Comprehensive error reporting
           const errorMsg =
             error.response?.data?.message || "Internal Upload Error";
           toast.error(`Failed to process asset: ${errorMsg}`, { id: toastId });
@@ -143,22 +143,8 @@ export default function PageBuilder() {
     [imageHandler],
   );
 
-  const fetchPages = async () => {
-    setIsLoading(true);
-    try {
-      const response = await api.get("/pages");
-      setPages(response.data);
-    } catch (error) {
-      toast.error("Failed to fetch page data.");
-      console.error("Error: ", error);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
   useEffect(() => {
     resetForm();
-    fetchPages();
   }, []);
 
   const handleTitleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -189,6 +175,10 @@ export default function PageBuilder() {
   const resetForm = () => {
     setEditingId(null);
     setHeroImage("");
+    setHeroFile(null);
+    setActiveItemLocked(false);
+    setActiveLockTicket(null);
+    setRejectedDraft(null);
     setFormData({
       title: "",
       slug: "",
@@ -198,20 +188,48 @@ export default function PageBuilder() {
       showDropCap: true,
       sidebarLinks: [],
       metaDescription: "",
+      status: "Published",
     });
   };
 
-  const handleEdit = async (page: Page) => {
-    const toastId = toast.loading(`Loading "${page.title}"...`);
+  // Resilient Parallel Fetching & AbortController
+  const handleEdit = async (pageOption: any) => {
+    const toastId = toast.loading(`Membuka "${pageOption.title}"...`);
+    const controller = new AbortController();
     try {
-      const response = await api.get(`/pages/slug/${page.slug}`);
-      const exactData = Array.isArray(response.data)
-        ? response.data[0]
-        : response.data;
+      // Parallel fetch: Data Live vs Draft Ditolak
+      const [liveRes, rejectedRes] = await Promise.allSettled([
+        api.get(`/pages/slug/${pageOption.slug}`, {
+          signal: controller.signal,
+        }),
+        api.get(`/approval/rejected/${pageOption.id}?module=Page`, {
+          signal: controller.signal,
+        }),
+      ]);
+
+      if (liveRes.status === "rejected")
+        throw new Error("Gagal mengambil data live.");
+
+      const exactData = Array.isArray(liveRes.value.data)
+        ? liveRes.value.data[0]
+        : liveRes.value.data;
 
       setEditingId(exactData.id);
+      setActiveItemLocked(exactData.is_locked || false);
+      setActiveLockTicket(exactData.lock_ticket || null);
+
+      // Load Draf Ditolak jika ada
+      if (
+        rejectedRes.status === "fulfilled" &&
+        rejectedRes.value.data?.hasRejected
+      ) {
+        setRejectedDraft(rejectedRes.value.data.data);
+      } else {
+        setRejectedDraft(null);
+      }
+
       setHeroImage(exactData.heroImage || "");
-      setFormData(() => ({
+      setFormData({
         title: exactData.title || "",
         slug: exactData.slug || "",
         subtitle: exactData.subtitle || "",
@@ -219,61 +237,95 @@ export default function PageBuilder() {
         content: exactData.content || "",
         showDropCap: exactData.showDropCap ?? true,
         metaDescription: exactData.metaDescription || "",
+        status: "Published",
         sidebarLinks:
           typeof exactData.sidebarLinks === "string"
             ? JSON.parse(exactData.sidebarLinks)
             : exactData.sidebarLinks || [],
-      }));
+      });
+
       toast.dismiss(toastId);
-    } catch (error) {
-      toast.error("Failed to load details", { id: toastId });
-      console.error("Error: ", error);
+    } catch {
+      toast.error("Gagal memuat detail halaman", { id: toastId });
     }
   };
 
-  const handleDelete = (id: string, title: string) => {
-    toast(`Delete "${title}"?`, {
-      description: "This action is permanent and cannot be undone.",
+  const handleRestoreDraft = () => {
+    if (!rejectedDraft || !rejectedDraft.payload) return;
+    const p = rejectedDraft.payload as any;
+
+    setFormData((prev) => ({
+      ...prev,
+      title: p.title ?? prev.title,
+      slug: p.slug ?? prev.slug,
+      subtitle: p.subtitle ?? prev.subtitle,
+      templateType: p.templateType ?? prev.templateType,
+      content: p.content ?? prev.content,
+      showDropCap: p.showDropCap ?? prev.showDropCap,
+      metaDescription: p.metaDescription ?? prev.metaDescription,
+      sidebarLinks:
+        typeof p.sidebarLinks === "string"
+          ? JSON.parse(p.sidebarLinks)
+          : p.sidebarLinks || prev.sidebarLinks,
+    }));
+
+    setHeroImage(p.heroImage || "");
+    setHeroFile(null);
+
+    toast.success(
+      "Draf berhasil direstorasi. Silakan perbaiki dan submit ulang.",
+    );
+  };
+
+  const handleDelete = (id: string, title: string, isLocked: boolean) => {
+    if (isLocked)
+      return toast.error("Halaman ini sedang dikunci oleh proses approval.");
+
+    toast(`Hapus "${title}"?`, {
+      description: "Aksi ini tidak dapat dibatalkan.",
       action: {
-        label: "Delete",
+        label: "Hapus",
         onClick: async () => {
-          const toastId = toast.loading("Removing document from repository...");
-
+          const toastId = toast.loading("Memproses penghapusan...");
           try {
-            await api.delete(`/pages/${id}`);
-
-            toast.success("Document removed successfully", { id: toastId });
-
-            fetchPages();
+            const res = await api.delete(`/pages/${id}`);
+            if (res.status === 202) {
+              toast.success("Permintaan hapus dikirim ke admin.", {
+                id: toastId,
+              });
+            } else {
+              toast.success("Halaman terhapus", { id: toastId });
+            }
+            refreshData();
             if (editingId === id) resetForm();
           } catch (error: any) {
-            toast.error(
-              error.response?.data?.message || "Failed to delete document",
-              { id: toastId },
-            );
-            console.error("Delete Error: ", error);
+            toast.error(error.response?.data?.message || "Gagal menghapus", {
+              id: toastId,
+            });
           }
         },
       },
-      cancel: {
-        label: "Cancel",
-        onClick: () => {
-          console.log("Delete cancelled");
-        },
-      },
+      cancel: { label: "Batal", onClick: () => {} },
     });
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (
+    e: React.FormEvent,
+    submitStatus: "Draft" | "Published" = "Published",
+  ) => {
     e.preventDefault();
     if (!formData.title || !formData.slug)
       return toast.error("Judul & Slug wajib diisi!");
+
     setIsSaving(true);
-    const toastId = toast.loading("Sedang memproses perubahan...");
+    const toastId = toast.loading(
+      submitStatus === "Published"
+        ? "Mengirim pengajuan..."
+        : "Menyimpan draf lokal...",
+    );
+
     try {
-      // GUNAKAN FORMDATA
       const payload = new FormData();
-      // Masukkan data teks
       payload.append("title", formData.title);
       payload.append("slug", formData.slug);
       payload.append("subtitle", formData.subtitle || "");
@@ -281,41 +333,56 @@ export default function PageBuilder() {
       payload.append("content", formData.content);
       payload.append("metaDescription", formData.metaDescription || "");
       payload.append("showDropCap", String(formData.showDropCap));
-
-      // Array harus di-stringified karena FormData hanya menerima string/blob
       payload.append("sidebarLinks", JSON.stringify(formData.sidebarLinks));
-      if (heroFile) {
-        payload.append("heroImage", heroFile);
-      }
+      payload.append("status", submitStatus);
+
+      if (rejectedDraft)
+        payload.append("previous_notrans", rejectedDraft.notrans);
+      if (heroFile) payload.append("heroImage", heroFile);
+
+      const config = { timeout: 60000 };
+      let res;
 
       if (editingId) {
-        await api.put(`/pages/${editingId}`, payload);
-        toast.success("Halaman berhasil diperbarui!", { id: toastId });
+        res = await api.put(`/pages/${editingId}`, payload, config);
+        toast.success(res.data.message || "Berhasil!", { id: toastId });
       } else {
-        await api.post("/pages", payload);
-        toast.success("Halaman berhasil diterbitkan!", { id: toastId });
+        res = await api.post("/pages", payload, config);
+        toast.success(res.data.message || "Berhasil diterbitkan!", {
+          id: toastId,
+        });
       }
-      resetForm();
-      setHeroFile(null); // Reset file setelah sukses
-      fetchPages();
 
-      window.dispatchEvent(new Event("pagesDataUpdated"));
-    } catch (error) {
-      toast.error("Gagal menyimpan ke server.", { id: toastId });
-      console.error("Error: ", error);
+      if (submitStatus === "Published" && res.status === 202) {
+        setActiveItemLocked(true);
+        setActiveLockTicket(res.data.ticket);
+      }
+
+      if (submitStatus === "Published") setRejectedDraft(null);
+
+      refreshData();
+      if (!editingId && submitStatus === "Published") resetForm();
+    } catch (error: any) {
+      toast.error(
+        error.response?.data?.message || "Gagal menyimpan ke server.",
+        { id: toastId },
+      );
     } finally {
       setIsSaving(false);
     }
   };
 
   const handleImageUpload = async (file: File) => {
+    if (activeItemLocked)
+      return toast.error("Halaman terkunci. Tidak dapat mengubah gambar.");
+
     if (!file) return;
     if (!file.type.startsWith("image/"))
-      return toast.error("Invalid format. Use images only.");
+      return toast.error("Gunakan file gambar saja.");
     if (file.size > 5 * 1024 * 1024)
-      return toast.error("File too large. Max 5MB.");
+      return toast.error("Maksimal ukuran file 5MB.");
 
-    const toastId = toast.loading("Compressing asset...");
+    const toastId = toast.loading("Mengompresi asset...");
     try {
       const compressedFile = await imageCompression(file, {
         maxSizeMB: 0.8,
@@ -327,21 +394,15 @@ export default function PageBuilder() {
       const reader = new FileReader();
       reader.onloadend = () => {
         setHeroImage(reader.result as string);
-        toast.success("Asset optimized & loaded!", { id: toastId });
+        toast.success("Asset dioptimasi!", { id: toastId });
       };
       reader.readAsDataURL(compressedFile);
-    } catch (error) {
-      toast.error("Compression failed.", { id: toastId });
-      console.error("Error: ", error);
+    } catch {
+      toast.error("Kompresi gagal.", { id: toastId });
     }
   };
 
-  /**
-   * Helper: Generate SEO Preview Description
-   * Priority: Manual Meta Description -> Subtitle -> Content Excerpt
-   */
   const getDynamicSeoDescription = () => {
-    // FIX: Menggunakan nama properti yang benar 'metaDescription'
     if (formData.metaDescription && formData.metaDescription.trim() !== "") {
       return formData.metaDescription;
     }
@@ -350,7 +411,6 @@ export default function PageBuilder() {
       return formData.subtitle;
     }
 
-    // Jika keduanya kosong, ambil 150 karakter pertama dari konten artikel (tanpa tag HTML)
     const plainText = formData.content.replace(/<[^>]*>?/gm, "").trim();
     return plainText.slice(0, 150) + (plainText.length > 150 ? "..." : "");
   };
@@ -373,8 +433,7 @@ export default function PageBuilder() {
               {!editingId && (
                 <button
                   onClick={resetForm}
-                  className="text-xs font-bold text-daw-green bg-daw-green/10 px-3 py-2 rounded-xl hover:bg-daw-green hover:text-white transition-all flex items-center gap-1 shadow-sm"
-                >
+                  className="text-xs font-bold text-daw-green bg-daw-green/10 px-3 py-2 rounded-xl hover:bg-daw-green hover:text-white transition-all flex items-center gap-1 shadow-sm">
                   <Plus className="w-4 h-4" /> Buat Halaman Baru
                 </button>
               )}
@@ -404,45 +463,87 @@ export default function PageBuilder() {
                 </p>
                 <button
                   onClick={resetForm}
-                  className="text-xs font-bold text-white bg-daw-green px-5 py-2.5 rounded-xl hover:bg-[#003b1c] shadow-lg shadow-daw-green/20 transition-all"
-                >
+                  className="text-xs font-bold text-white bg-daw-green px-5 py-2.5 rounded-xl hover:bg-[#003b1c] shadow-lg shadow-daw-green/20 transition-all">
                   Buat Halaman
                 </button>
               </div>
             ) : (
               <div className="space-y-3 max-h-[65vh] overflow-y-auto custom-scrollbar pr-2">
-                {pages.map((p) => (
-                  <div
-                    key={p.id}
-                    className={`p-4 rounded-2xl border bg-white transition-all group cursor-pointer hover:border-daw-green/50 hover:shadow-md
-                  ${editingId === p.id ? "border-daw-green ring-4 ring-daw-green/10 shadow-sm" : "border-slate-200"}`}
-                    onClick={() => handleEdit(p)}
-                  >
-                    <div className="flex justify-between items-start">
-                      <div className="min-w-0 pr-2">
-                        <h4
-                          className={`font-bold text-sm truncate ${editingId === p.id ? "text-daw-green" : "text-slate-900"}`}
-                        >
-                          {p.title}
-                        </h4>
-                        <p className="text-[10px] text-slate-400 font-mono mt-1.5 flex items-center gap-1 truncate">
-                          <Globe className="w-3 h-3" /> /page/{p.slug}
-                        </p>
-                      </div>
-                      <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleDelete(p.id, p.title);
-                          }}
-                          className="p-2 bg-slate-50 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
+                {pages.map((p) => {
+                  const isLocked = p.is_locked;
+
+                  return (
+                    <div
+                      key={p.id}
+                      className={`p-4 rounded-2xl border transition-all group cursor-pointer hover:shadow-md
+                      ${
+                        editingId === p.id
+                          ? "border-daw-green ring-4 ring-daw-green/10 shadow-sm bg-white"
+                          : isLocked
+                            ? "border-blue-200 bg-blue-50/40 hover:border-blue-300" // Visual Lockdown Background
+                            : "border-slate-200 bg-white hover:border-daw-green/50"
+                      }`}
+                      onClick={() => handleEdit(p)}>
+                      <div className="flex justify-between items-start">
+                        <div className="min-w-0 pr-2">
+                          <div className="flex items-center gap-2">
+                            <h4
+                              className={`font-bold text-sm truncate transition-colors ${
+                                editingId === p.id
+                                  ? "text-daw-green"
+                                  : isLocked
+                                    ? "text-blue-700" // Teks kebiruan untuk PENDING
+                                    : "text-slate-900"
+                              }`}>
+                              {p.title}
+                            </h4>
+
+                            {/* Double-Badge System (PENDING) */}
+                            {isLocked && (
+                              <span className="flex items-center gap-1 px-1.5 py-0.5 rounded md bg-blue-100 text-blue-600 text-[8px] font-black uppercase tracking-widest shadow-sm">
+                                <Lock className="w-2.5 h-2.5" /> Pending
+                              </span>
+                            )}
+                          </div>
+
+                          <p
+                            className={`text-[10px] font-mono mt-1.5 flex items-center gap-1 truncate transition-colors ${
+                              isLocked ? "text-blue-400" : "text-slate-400"
+                            }`}>
+                            <Globe className="w-3 h-3" /> /page/{p.slug}
+                          </p>
+                        </div>
+
+                        <div
+                          className={`flex gap-1 transition-opacity ${
+                            isLocked
+                              ? "opacity-100"
+                              : "opacity-0 group-hover:opacity-100"
+                          }`}>
+                          {/* Disable tombol Delete jika terkunci */}
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleDelete(p.id, p.title, !!isLocked);
+                            }}
+                            disabled={isLocked}
+                            className={`p-2 rounded-lg transition-all ${
+                              isLocked
+                                ? "text-slate-300 cursor-not-allowed bg-slate-50 opacity-50"
+                                : "bg-slate-50 text-slate-400 hover:text-red-500 hover:bg-red-50"
+                            }`}
+                            title={
+                              isLocked
+                                ? "Data sedang terkunci oleh proses approval"
+                                : "Hapus Halaman"
+                            }>
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </div>
@@ -451,12 +552,10 @@ export default function PageBuilder() {
 
       {/*  RIGHT: EDITORIAL WORKSPACE (Main Form) */}
       <div
-        className={`${isPreviewMode ? "lg:col-span-12 transition-all duration-500" : "lg:col-span-8 transition-all duration-500"}`}
-      >
+        className={`${isPreviewMode ? "lg:col-span-12 transition-all duration-500" : "lg:col-span-8 transition-all duration-500"}`}>
         <form
           onSubmit={handleSubmit}
-          className="bg-white rounded-[2.5rem] border border-slate-200 shadow-xl shadow-slate-200/50 overflow-hidden"
-        >
+          className="bg-white rounded-[2.5rem] border border-slate-200 shadow-xl shadow-slate-200/50 overflow-hidden">
           {/* Header Workspace */}
           <div className="flex justify-between items-center p-8 border-b border-slate-100 bg-slate-50/50">
             <div className="flex items-center gap-3">
@@ -487,8 +586,7 @@ export default function PageBuilder() {
                   isPreviewMode
                     ? "bg-slate-900 text-white border-slate-900"
                     : "bg-white text-slate-600 border-slate-200 hover:border-daw-green"
-                }`}
-              >
+                }`}>
                 {isPreviewMode ? (
                   <PenTool className="w-4 h-4" />
                 ) : (
@@ -496,22 +594,75 @@ export default function PageBuilder() {
                 )}
                 {isPreviewMode ? "Back to Editor" : "Live Preview"}
               </button>
-              {editingId && (
+              {!activeItemLocked && (
                 <button
                   type="button"
                   onClick={resetForm}
                   className="px-4 py-2 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-500 hover:text-red-500 hover:border-red-200 hover:bg-red-50 transition-all flex items-center gap-2 shadow-sm"
-                >
-                  <X className="w-4 h-4" /> Batalkan Perubahan
+                  title="Bersihkan Form">
+                  <X className="w-4 h-4" />{" "}
+                  {editingId ? "Batal Edit" : "Bersihkan Form"}
                 </button>
               )}
             </div>
           </div>
 
+          {/* The Command Center (Banners) */}
+          {(activeItemLocked || rejectedDraft) && (
+            <div className="px-8 pt-6 pb-0 space-y-4">
+              {/* LOCK ALERT BANNER */}
+              {activeItemLocked && (
+                <div className="flex items-start gap-3 p-4 bg-blue-50 border border-blue-200 rounded-2xl animate-in fade-in shadow-sm">
+                  <div className="p-2 bg-blue-100 text-blue-600 rounded-xl shrink-0">
+                    <Lock className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h4 className="text-sm font-bold text-blue-900">
+                      Mode Baca (Read-Only)
+                    </h4>
+                    <p className="text-xs text-blue-700 mt-1 leading-relaxed">
+                      Halaman ini sedang dikunci karena dalam proses peninjauan
+                      Admin (Tiket:{" "}
+                      <strong className="tracking-wider">
+                        {activeLockTicket}
+                      </strong>
+                      ). Anda tidak dapat mengubah data sampai proses selesai.
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              {/* REJECTION BANNER & RESTORE ENGINE */}
+              {rejectedDraft && !activeItemLocked && (
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 p-5 bg-amber-50 border border-amber-200 rounded-2xl animate-in slide-in-from-top-2 shadow-sm">
+                  <div className="flex items-start gap-3">
+                    <div className="p-2 bg-amber-100 text-amber-600 rounded-xl shrink-0">
+                      <AlertTriangle className="w-5 h-5 animate-pulse" />
+                    </div>
+                    <div>
+                      <h4 className="text-sm font-bold text-amber-900">
+                        Revisi Diperlukan
+                      </h4>
+                      <p className="text-xs text-amber-700 mt-1 leading-relaxed">
+                        <span className="font-bold">Catatan Admin:</span> "
+                        {rejectedDraft.rejection_reason}"
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleRestoreDraft}
+                    className="flex items-center gap-2 px-5 py-2.5 bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold rounded-xl shadow-lg shadow-amber-500/20 transition-all shrink-0 transform hover:-translate-y-0.5">
+                    <RotateCcw className="w-4 h-4" /> Pulihkan Draf
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+
           {/* DYNAMIC WORKSPACE CONTENT */}
           <div
-            className={`p-8 ${isPreviewMode ? "grid grid-cols-1 lg:grid-cols-2 gap-8 items-start" : "space-y-10"}`}
-          >
+            className={`p-8 ${isPreviewMode ? "grid grid-cols-1 lg:grid-cols-2 gap-8 items-start" : "space-y-10"}`}>
             {/* SECTION 1: CORE IDENTITY */}
             <div className="space-y-10">
               <div className="flex items-center gap-2 border-b border-slate-100 pb-2">
@@ -530,6 +681,7 @@ export default function PageBuilder() {
                     required
                     value={formData.title}
                     onChange={handleTitleChange}
+                    readOnly={activeItemLocked}
                     className="w-full px-5 py-4 rounded-2xl bg-slate-50 border border-slate-200 focus:bg-white focus:border-daw-green focus:ring-4 focus:ring-daw-green/10 outline-none font-bold text-slate-800 transition-all"
                     placeholder="e.g. Corporate Sustainability Report"
                   />
@@ -548,6 +700,7 @@ export default function PageBuilder() {
                       type="text"
                       required
                       value={formData.slug}
+                      readOnly={activeItemLocked}
                       onChange={(e) =>
                         setFormData((prev) => ({
                           ...prev,
@@ -559,13 +712,12 @@ export default function PageBuilder() {
                       className="w-full p-4 bg-transparent outline-none font-mono text-sm text-slate-600"
                       placeholder="corporate-report"
                     />
-                    {editingId && (
+                    {editingId && !activeItemLocked && (
                       <button
                         type="button"
                         onClick={syncSlugWithTitle}
                         title="Sync Slug dengan Judul"
-                        className="pr-5 pl-3 text-slate-400 hover:text-daw-green transition-colors border-l border-slate-200/50"
-                      >
+                        className="pr-5 pl-3 text-slate-400 hover:text-daw-green transition-colors border-l border-slate-200/50">
                         <RefreshCw className="w-4 h-4" />
                       </button>
                     )}
@@ -579,6 +731,7 @@ export default function PageBuilder() {
                   <input
                     type="text"
                     value={formData.subtitle}
+                    readOnly={activeItemLocked}
                     onChange={(e) =>
                       setFormData((prev) => ({
                         ...prev,
@@ -600,16 +753,12 @@ export default function PageBuilder() {
                   <div className="w-2 h-2 rounded-full bg-green-500" />
                 </div>
 
-                {/* MINI RENDERER (1:1 Mirror dari DynamicPage.tsx) */}
                 <div className="p-8 md:p-10">
-                  {/* Subtitle Rendering dengan Fallback */}
                   {(formData.subtitle || !editingId) && (
                     <p className="text-daw-green font-bold tracking-[0.3em] uppercase text-[10px] mb-5 drop-shadow-sm">
                       {formData.subtitle || "ENTER SUBTITLE HERE"}
                     </p>
                   )}
-
-                  {/* Title Rendering dengan Fallback */}
                   <h1 className="text-3xl md:text-4xl font-serif font-bold text-slate-900 mb-8 leading-[1.15] tracking-tight">
                     {formData.title || "Untitled Document"}
                   </h1>
@@ -619,36 +768,36 @@ export default function PageBuilder() {
                   {/*  Bagian Content: Sinkronisasi 100% dengan DynamicPage.tsx */}
                   <article
                     className={`w-full text-left break-words [&>*:first-child]:mt-0
-                      /* Core Prose */
-                      prose prose-slate max-w-none
-                      prose-p:leading-[1.8] prose-p:text-slate-600 prose-p:mb-8 prose-p:text-[1.05rem]
-                      
-                      /* Headings */
-                      prose-headings:font-serif prose-headings:text-slate-900 prose-headings:tracking-tight prose-headings:font-bold
-                      prose-h2:text-2xl prose-h2:mt-12 prose-h2:mb-6 
-                      prose-h3:text-xl prose-h3:mt-8
-                      
-                      /* Media Styling (Images & iFrames) */
-                      [&_img]:rounded-[1.5rem] [&_img]:my-10 [&_img]:shadow-sm
-                      [&_iframe]:rounded-[1rem] [&_iframe]:shadow-lg [&_iframe]:my-8
-                      
-                      /* Lists */
-                      prose-li:marker:text-daw-green prose-li:my-1.5
-                      
-                      /* Conditional Drop Cap (Disesuaikan proporsinya untuk layar split) */
-                      ${
-                        formData.showDropCap
-                          ? `prose-p:first-of-type:first-letter:text-[4.5rem] 
-                             prose-p:first-of-type:first-letter:font-serif 
-                             prose-p:first-of-type:first-letter:font-black 
-                             prose-p:first-of-type:first-letter:text-daw-green 
-                             prose-p:first-of-type:first-letter:mr-4 
-                             prose-p:first-of-type:first-letter:float-left 
-                             prose-p:first-of-type:first-letter:leading-[0.8] 
-                             prose-p:first-of-type:first-letter:mt-2 
-                             prose-p:first-of-type:first-letter:drop-shadow-sm`
-                          : ""
-                      }`}
+                        /* Core Prose */
+                        prose prose-slate max-w-none
+                        prose-p:leading-[1.8] prose-p:text-slate-600 prose-p:mb-8 prose-p:text-[1.05rem]
+                        
+                        /* Headings */
+                        prose-headings:font-serif prose-headings:text-slate-900 prose-headings:tracking-tight prose-headings:font-bold
+                        prose-h2:text-2xl prose-h2:mt-12 prose-h2:mb-6 
+                        prose-h3:text-xl prose-h3:mt-8
+                        
+                        /* Media Styling (Images & iFrames) */
+                        [&_img]:rounded-[1.5rem] [&_img]:my-10 [&_img]:shadow-sm
+                        [&_iframe]:rounded-[1rem] [&_iframe]:shadow-lg [&_iframe]:my-8
+                        
+                        /* Lists */
+                        prose-li:marker:text-daw-green prose-li:my-1.5
+                        
+                        /* Conditional Drop Cap (Disesuaikan proporsinya untuk layar split) */
+                        ${
+                          formData.showDropCap
+                            ? `prose-p:first-of-type:first-letter:text-[4.5rem] 
+                              prose-p:first-of-type:first-letter:font-serif 
+                              prose-p:first-of-type:first-letter:font-black 
+                              prose-p:first-of-type:first-letter:text-daw-green 
+                              prose-p:first-of-type:first-letter:mr-4 
+                              prose-p:first-of-type:first-letter:float-left 
+                              prose-p:first-of-type:first-letter:leading-[0.8] 
+                              prose-p:first-of-type:first-letter:mt-2 
+                              prose-p:first-of-type:first-letter:drop-shadow-sm`
+                            : ""
+                        }`}
                     dangerouslySetInnerHTML={{
                       __html:
                         formData.content ||
@@ -677,8 +826,7 @@ export default function PageBuilder() {
                         Custom Meta Description
                       </label>
                       <span
-                        className={`text-[9px] font-bold ${formData.metaDescription?.length > 160 ? "text-red-500" : "text-slate-400"}`}
-                      >
+                        className={`text-[9px] font-bold ${formData.metaDescription?.length > 160 ? "text-red-500" : "text-slate-400"}`}>
                         {formData.metaDescription?.length || 0}/160
                       </span>
                     </div>
@@ -687,7 +835,10 @@ export default function PageBuilder() {
                         formData.subtitle ||
                         "Tulis deskripsi SEO manual di sini..."
                       }
+                      readOnly={activeItemLocked}
                       className={`w-full p-4 rounded-2xl bg-white border outline-none text-sm text-slate-600 h-28 resize-none transition-all focus:ring-4 focus:ring-blue-500/5 ${
+                        activeItemLocked ? "opacity-60 cursor-not-allowed" : ""
+                      } ${
                         formData.metaDescription?.length > 160
                           ? "border-red-300 focus:border-red-500"
                           : "border-slate-200 focus:border-blue-400"
@@ -757,57 +908,71 @@ export default function PageBuilder() {
                       alt="Hero Preview"
                       className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
                     />
-                    <div className="absolute inset-0 bg-slate-900/60 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-center justify-center">
-                      <button
-                        type="button"
-                        onClick={() => setHeroImage("")}
-                        className="bg-red-500 text-white px-6 py-3 rounded-2xl flex items-center gap-2 font-bold shadow-lg transform hover:scale-105 transition-all"
-                      >
-                        <Trash2 className="w-5 h-5" /> Remove Asset
-                      </button>
-                    </div>
+                    {!activeItemLocked && (
+                      <div className="absolute inset-0 bg-slate-900/60 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-center justify-center">
+                        <button
+                          type="button"
+                          onClick={() => setHeroImage("")}
+                          className="bg-red-500 text-white px-6 py-3 rounded-2xl flex items-center gap-2 font-bold shadow-lg transform hover:scale-105 transition-all">
+                          <Trash2 className="w-5 h-5" /> Remove Asset
+                        </button>
+                      </div>
+                    )}
                   </div>
                 ) : (
                   <div
                     onDragOver={(e) => {
                       e.preventDefault();
-                      setIsDragging(true);
+                      if (!activeItemLocked) setIsDragging(true);
                     }}
                     onDragLeave={() => setIsDragging(false)}
                     onDrop={(e) => {
                       e.preventDefault();
                       setIsDragging(false);
-                      if (e.dataTransfer.files?.[0])
+                      if (!activeItemLocked && e.dataTransfer.files?.[0])
                         handleImageUpload(e.dataTransfer.files[0]);
                     }}
                     className={`relative border-2 border-dashed rounded-3xl p-14 flex flex-col items-center justify-center transition-all duration-300 group 
-                      ${isDragging ? "border-daw-green bg-daw-green/5 scale-[0.99] ring-4 ring-daw-green/10" : "border-slate-300 bg-slate-50 hover:border-daw-green hover:bg-slate-50/80"}`}
-                  >
+                      ${
+                        activeItemLocked
+                          ? "border-slate-200 bg-slate-100 opacity-60 cursor-not-allowed"
+                          : isDragging
+                            ? "border-daw-green bg-daw-green/5 scale-[0.99] ring-4 ring-daw-green/10"
+                            : "border-slate-300 bg-slate-50 hover:border-daw-green hover:bg-slate-50/80"
+                      }`}>
                     <input
                       type="file"
                       accept="image/*"
+                      disabled={activeItemLocked}
                       onChange={(e) =>
                         e.target.files && handleImageUpload(e.target.files[0])
                       }
-                      className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
+                      className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10 disabled:cursor-not-allowed"
                     />
                     <div
-                      className={`p-5 rounded-2xl mb-4 transition-all duration-500 ${isDragging ? "bg-daw-green text-white scale-110 rotate-6" : "bg-white text-slate-400 shadow-sm group-hover:text-daw-green"}`}
-                    >
-                      <UploadCloud
-                        className={`w-10 h-10 ${isDragging ? "animate-bounce" : ""}`}
-                      />
+                      className={`p-5 rounded-2xl mb-4 transition-all duration-500 ${isDragging ? "bg-daw-green text-white scale-110 rotate-6" : "bg-white text-slate-400 shadow-sm group-hover:text-daw-green"}`}>
+                      {activeItemLocked ? (
+                        <Lock className="w-10 h-10 text-slate-300" />
+                      ) : (
+                        <UploadCloud
+                          className={`w-10 h-10 ${isDragging ? "animate-bounce" : ""}`}
+                        />
+                      )}
                     </div>
                     <div className="text-center space-y-2">
                       <p className="text-base font-bold text-slate-700">
-                        {isDragging
-                          ? "Drop asset here"
-                          : "Drag & Drop cover image"}
+                        {activeItemLocked
+                          ? "Unggah Terkunci"
+                          : isDragging
+                            ? "Drop asset here"
+                            : "Drag & Drop cover image"}
                       </p>
-                      <p className="text-[11px] text-slate-500 font-medium">
-                        or browse from local workstation / atau pilih dari
-                        folder lokal
-                      </p>
+                      {!activeItemLocked && (
+                        <p className="text-[11px] text-slate-500 font-medium">
+                          or browse from local workstation / atau pilih dari
+                          folder lokal
+                        </p>
+                      )}
                     </div>
                   </div>
                 )}
@@ -824,6 +989,7 @@ export default function PageBuilder() {
                 </div>
                 <button
                   type="button"
+                  disabled={activeItemLocked}
                   onClick={() =>
                     setFormData((prev) => ({
                       ...prev,
@@ -833,8 +999,7 @@ export default function PageBuilder() {
                       ],
                     }))
                   }
-                  className="text-[10px] font-black uppercase tracking-widest text-daw-green bg-daw-green/10 px-3 py-1.5 rounded-lg hover:bg-daw-green hover:text-white transition-all flex items-center gap-1"
-                >
+                  className="text-[10px] font-black uppercase tracking-widest text-daw-green bg-daw-green/10 px-3 py-1.5 rounded-lg hover:bg-daw-green hover:text-white transition-all flex items-center gap-1">
                   <Plus className="w-3 h-3" /> Insert Link
                 </button>
               </div>
@@ -851,8 +1016,7 @@ export default function PageBuilder() {
                   formData.sidebarLinks.map((link, index) => (
                     <div
                       key={index}
-                      className="flex gap-4 items-start bg-white p-4 rounded-2xl border border-slate-200 shadow-sm animate-in fade-in"
-                    >
+                      className="flex gap-4 items-start bg-white p-4 rounded-2xl border border-slate-200 shadow-sm animate-in fade-in">
                       <div className="flex-1 space-y-3">
                         <div>
                           <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 mb-1 block">
@@ -860,6 +1024,7 @@ export default function PageBuilder() {
                           </label>
                           <select
                             value={link.url}
+                            disabled={activeItemLocked}
                             onChange={(e) => {
                               const newLinks = [...formData.sidebarLinks];
                               const selectedUrl = e.target.value;
@@ -891,8 +1056,7 @@ export default function PageBuilder() {
                                 sidebarLinks: newLinks,
                               }));
                             }}
-                            className="w-full text-sm p-3 bg-slate-50 outline-none font-bold text-daw-green border border-slate-200 rounded-xl focus:border-daw-green focus:ring-2 focus:ring-daw-green/10 cursor-pointer"
-                          >
+                            className="w-full text-sm p-3 bg-slate-50 outline-none font-bold text-daw-green border border-slate-200 rounded-xl focus:border-daw-green focus:ring-2 focus:ring-daw-green/10 cursor-pointer">
                             <option value="">-- Assign Destination --</option>
                             <optgroup label="Main Pages">
                               <option value="/">Homepage</option>{" "}
@@ -920,6 +1084,7 @@ export default function PageBuilder() {
                             type="text"
                             placeholder="Auto-filled if empty..."
                             value={link.label}
+                            readOnly={activeItemLocked}
                             onChange={(e) => {
                               const newLinks = [...formData.sidebarLinks];
                               newLinks[index].label = e.target.value;
@@ -932,22 +1097,23 @@ export default function PageBuilder() {
                           />
                         </div>
                       </div>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          const newLinks = formData.sidebarLinks.filter(
-                            (_, i) => i !== index,
-                          );
-                          setFormData((prev) => ({
-                            ...prev,
-                            sidebarLinks: newLinks,
-                          }));
-                        }}
-                        className="p-3 bg-slate-50 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-xl transition-colors mt-6 border border-slate-200 hover:border-red-200"
-                        title="Remove Link"
-                      >
-                        <Trash2 className="w-5 h-5" />
-                      </button>
+                      {!activeItemLocked && ( // 🛡️ BLUEPRINT: Sembunyikan tombol hapus link
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const newLinks = formData.sidebarLinks.filter(
+                              (_, i) => i !== index,
+                            );
+                            setFormData((prev) => ({
+                              ...prev,
+                              sidebarLinks: newLinks,
+                            }));
+                          }}
+                          className="p-3 bg-slate-50 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-xl transition-colors mt-6 border border-slate-200 hover:border-red-200"
+                          title="Remove Link">
+                          <Trash2 className="w-5 h-5" />
+                        </button>
+                      )}
                     </div>
                   ))
                 )}
@@ -955,8 +1121,7 @@ export default function PageBuilder() {
             </div>
             <div className="flex items-center gap-3 bg-white p-4 rounded-2xl border border-slate-200 shadow-sm mt-4">
               <div
-                className={`w-10 h-10 rounded-xl flex items-center justify-center transition-colors ${formData.showDropCap ? "bg-daw-green/10 text-daw-green" : "bg-slate-100 text-slate-400"}`}
-              >
+                className={`w-10 h-10 rounded-xl flex items-center justify-center transition-colors ${formData.showDropCap ? "bg-daw-green/10 text-daw-green" : "bg-slate-100 text-slate-400"}`}>
                 <span className="text-xl font-serif font-black">A</span>
               </div>
               <div className="flex-1">
@@ -969,14 +1134,14 @@ export default function PageBuilder() {
               </div>
               <button
                 type="button"
+                disabled={activeItemLocked}
                 onClick={() =>
                   setFormData((prev) => ({
                     ...prev,
                     showDropCap: !prev.showDropCap,
                   }))
                 }
-                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none ${formData.showDropCap ? "bg-daw-green" : "bg-slate-300"}`}
-              >
+                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none ${formData.showDropCap ? "bg-daw-green" : "bg-slate-300"}`}>
                 <span
                   className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${formData.showDropCap ? "translate-x-6" : "translate-x-1"}`}
                 />
@@ -991,11 +1156,14 @@ export default function PageBuilder() {
                 </h3>
               </div>
 
-              <div className="rounded-[1.5rem] border border-slate-200 overflow-hidden bg-white shadow-sm focus-within:ring-4 focus-within:ring-daw-green/10 focus-within:border-daw-green transition-all">
+              <div
+                className={`rounded-[1.5rem] border overflow-hidden bg-white shadow-sm transition-all
+                ${activeItemLocked ? "border-slate-200 opacity-70 pointer-events-none" : "border-slate-200 focus-within:ring-4 focus-within:ring-daw-green/10 focus-within:border-daw-green"}`}>
                 <ReactQuill
                   ref={quillRef}
                   theme="snow"
                   value={formData.content}
+                  readOnly={activeItemLocked} // 🛡️ BLUEPRINT: Kunci Quill Editor
                   onChange={(val) =>
                     setFormData((prev) => ({ ...prev, content: val }))
                   }
@@ -1006,28 +1174,47 @@ export default function PageBuilder() {
             </div>
           </div>
 
-          {/* Footer Workspace (Action Buttons) */}
+          {/* 🛡️ BLUEPRINT: SPLIT SAVE ACTION (Footer) */}
           <div className="px-8 py-6 bg-slate-900 flex justify-between items-center mt-4">
             <div>
               <p className="text-[11px] text-slate-400 font-bold uppercase tracking-widest">
                 System Status
               </p>
               <p className="text-xs text-slate-300 italic mt-0.5">
-                Changes are live upon saving / Perubahan langsung tayang.
+                {activeItemLocked
+                  ? "Form terkunci. Menunggu hasil tinjauan Admin OWL."
+                  : "Perubahan lokal akan ditayangkan setelah disetujui."}
               </p>
             </div>
-            <button
-              type="submit"
-              disabled={isSaving}
-              className="bg-daw-green hover:bg-emerald-500 text-white px-10 py-4 rounded-2xl font-bold shadow-xl shadow-daw-green/20 flex items-center gap-2 disabled:bg-slate-700 transition-all transform hover:-translate-y-0.5"
-            >
-              <Save className="w-5 h-5" />{" "}
-              {isSaving
-                ? "Syncing..."
-                : editingId
-                  ? "Update Publication"
-                  : "Publish Document"}
-            </button>
+
+            {/* Conditional Rendering Footer Buttons */}
+            {activeItemLocked ? (
+              <div className="px-8 py-4 bg-slate-800 border border-slate-700 rounded-2xl flex items-center gap-3">
+                <div className="w-2 h-2 rounded-full bg-blue-500 animate-pulse" />
+                <span className="text-sm font-bold text-slate-300">
+                  Menunggu Review Admin
+                </span>
+              </div>
+            ) : (
+              <div className="flex items-center gap-3">
+                <button
+                  type="button"
+                  disabled={isSaving}
+                  onClick={(e) => handleSubmit(e, "Draft")}
+                  className="bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 px-6 py-4 rounded-2xl font-bold transition-all disabled:opacity-50">
+                  {isSaving ? "..." : "Simpan Draf Lokal"}
+                </button>
+
+                <button
+                  type="button"
+                  disabled={isSaving}
+                  onClick={(e) => handleSubmit(e, "Published")}
+                  className="bg-daw-green hover:bg-emerald-500 text-white px-8 py-4 rounded-2xl font-bold shadow-xl shadow-daw-green/20 flex items-center gap-2 disabled:bg-slate-700 transition-all transform hover:-translate-y-0.5">
+                  <Save className="w-5 h-5" />
+                  {isSaving ? "Menyinkronkan..." : "Request Approval"}
+                </button>
+              </div>
+            )}
           </div>
         </form>
       </div>
