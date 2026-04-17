@@ -21,22 +21,34 @@ const commitTempFile = (fileInput) => {
 
   try {
     if (fs.existsSync(oldPath)) {
-      
-      if (fs.existsSync(newPath) && oldPath !== newPath) {
-        fs.unlinkSync(newPath);
+      if (fs.existsSync(newPath)) {
+        try {
+          fs.unlinkSync(newPath);
+        } catch (unlinkError) {
+          const timestamp = Date.now();
+          const backupFilename = `${timestamp}_${newFilename}`;
+          const backupPath = path.join(uploadPath, backupFilename);
+          fs.renameSync(oldPath, backupPath);
+          return backupFilename;
+        }
       }
 
       fs.renameSync(oldPath, newPath);
-      
+
       console.log(`✅ [FILE COMMITTED] ${filename} -> ${newFilename}`);
       return newFilename;
     } else {
-      console.warn(`⚠️ [FILE NOT FOUND] ${filename} tidak ada di folder uploads. Mungkin sudah permanen?`);
-      return newFilename; 
+      console.warn(
+        `⚠️ [FILE MISSING] ${filename} tidak ditemukan di disk. Mengembalikan nama bersih.`,
+      );
+      return newFilename;
     }
   } catch (error) {
-    console.error(`🚨 [FILE COMMIT ERROR] Gagal merename ${filename}:`, error.message);
-    return filename; 
+    console.error(
+      `🚨 [FILE COMMIT ERROR] Gagal merename ${filename}:`,
+      error.message,
+    );
+    return filename;
   }
 };
 

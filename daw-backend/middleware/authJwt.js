@@ -46,7 +46,7 @@ const verifyToken = (req, res, next) => {
 
       req.userId = decoded.id;
       req.owl_username = decoded.owl_username || decoded.username;
-      req.userRole = decoded.role;
+      req.userRole = decoded.role ? decoded.role.toLowerCase() : null;
       // req.userRole = "Editor";
       req.userPermissions = decoded.permissions || [];
       req.owl_token = decoded.owl_token;

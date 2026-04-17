@@ -148,6 +148,8 @@ exports.executeDecision = async (req, res) => {
       const cleanPayload = { ...payload };
       delete cleanPayload.id;
 
+      handleFileCommit(module, cleanPayload);
+
       cleanPayload.is_locked = false;
       cleanPayload.lock_ticket = null;
 
@@ -166,12 +168,15 @@ exports.executeDecision = async (req, res) => {
       );
 
       await t.commit();
-      handleFileCommit(module, cleanPayload);
 
-      res.status(200).json({ message: `Draf ${module} berhasil dipublish!` });
+      res.status(200).json({
+        message: `Draf ${module} berhasil dipublish! Aset fisik telah dipermanenkan.`,
+        targetId,
+      });
     }
   } catch (error) {
     if (t) await t.rollback();
+    console.error("🚨 [EXECUTE DECISION ERROR]:", error.message);
     res.status(500).json({ message: "Gagal eksekusi.", error: error.message });
   }
 };

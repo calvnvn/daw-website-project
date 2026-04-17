@@ -71,6 +71,7 @@ exports.getAllMenusFlat = async (req, res) => {
 };
 
 exports.createMenu = async (req, res) => {
+  let newMenu = null;
   try {
     let {
       label,
@@ -84,6 +85,13 @@ exports.createMenu = async (req, res) => {
     } = req.body;
     const userRole = req.userRole?.toLowerCase();
 
+    const globalLock = await Menu.findOne({ where: { is_locked: true } });
+    if (globalLock && userRole === "editor") {
+      return res.status(423).json({
+        message: "Navigasi sedang dikunci oleh pengajuan lain.",
+        ticket: globalLock.lock_ticket,
+      });
+    }
     if (type === "folder") {
       parentId = null;
       pageId = null;
@@ -266,6 +274,7 @@ exports.deleteMenu = async (req, res) => {
     }
 
     // Superadmin Flow
+    await Menu.destroy({ where: { parentId: id } });
     await menu.destroy();
     res.status(200).json({ message: "Menu deleted permanently" });
   } catch (error) {

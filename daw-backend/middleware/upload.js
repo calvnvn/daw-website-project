@@ -64,7 +64,7 @@ const optimizeImage = async (req, res, next) => {
     const safeFieldName = file.fieldname.replace(/[^a-zA-Z0-9]/g, "");
 
     // Gatekeeper: Cek Role dari JWT (req.userRole diset di authJwt.js)
-    const prefix = req.userRole === "Editor" ? "TEMP_" : "";
+    const prefix = req.userRole === "editor" ? "TEMP_" : "";
 
     // Paksa ekstensi jadi .webp untuk kompresi terbaik
     const newFilename = `${prefix}${safeFieldName}-${uniqueSuffix}.webp`;
