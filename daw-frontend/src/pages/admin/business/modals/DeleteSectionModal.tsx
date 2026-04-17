@@ -57,7 +57,7 @@ export default function DeleteSectionModal({
   return (
     <div className="fixed inset-0 z-[150] flex items-center justify-center p-4">
       <div
-        className="absolute inset-0 bg-slate-900/70 backdrop-blur-sm animate-in fade-in duration-200"
+        className="absolute inset-0 bg-slate-900/70  animate-in fade-in duration-200"
         onClick={() => !isDeleting && onClose()}
       />
 

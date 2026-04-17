@@ -121,7 +121,7 @@ export default function MapManager({
 
               {canInteract && (
                 <div className="absolute inset-0 bg-slate-900/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                  <span className="text-white text-[10px] font-black uppercase tracking-[0.2em] flex items-center gap-2 bg-slate-800/80 px-4 py-2 rounded-full backdrop-blur-sm border border-white/20">
+                  <span className="text-white text-[10px] font-black uppercase tracking-[0.2em] flex items-center gap-2 bg-slate-800/80 px-4 py-2 rounded-full border border-white/20">
                     <Maximize2 className="w-3 h-3 text-daw-green" /> Atur Titik
                     Lokasi
                   </span>

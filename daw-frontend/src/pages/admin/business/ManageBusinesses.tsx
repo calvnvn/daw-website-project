@@ -310,7 +310,7 @@ export default function ManageBusinesses() {
 
       {/* Discard Modal Tetap Dipertahankan untuk Safety */}
       {isDiscardModalOpen && (
-        <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
+        <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-slate-900/60 ">
           <div className="bg-white rounded-2xl p-6 max-w-sm w-full shadow-2xl">
             <h3 className="text-lg font-serif font-bold text-slate-900 mb-2">
               Perubahan Belum Disimpan

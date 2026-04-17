@@ -138,9 +138,9 @@ exports.updateBusinessSection = async (req, res) => {
         .status(404)
         .json({ message: "Sektor Bisnis tidak ditemukan!" });
 
-    if (section.is_locked) {
+    if (section.is_locked && userRole === "editor") {
       return res.status(423).json({
-        message: "Sektor ini sedang dikunci oleh proses approval OWL.",
+        message: "Sektor ini sedang dalam peninjauan Admin OWL.",
         ticket: section.lock_ticket,
       });
     }
@@ -195,8 +195,6 @@ exports.updateBusinessSection = async (req, res) => {
     }
 
     // SUPERADMIN (DIRECT UPDATE)
-    console.log(">>> [BUSINESS] JALUR SUPERADMIN: DIRECT COMMIT <<<");
-
     const t = await sequelize.transaction();
     try {
       await section.update(
@@ -251,22 +249,17 @@ const slugify = (text) => {
 
 exports.createBusinessSection = async (req, res) => {
   const { category, title } = req.body;
-  const userRole = req.userRole?.toLowerCase();
   const generatedId = slugify(category);
 
-  let newSection = null;
-
   try {
-    // DISCOVERY: Cek apakah ID sudah dipakai
     const existing = await BusinessSection.findByPk(generatedId);
     if (existing) {
       return res.status(400).json({ message: "Sektor bisnis sudah ada!" });
     }
 
-    // PRE-INSERT STRATEGY
     const maxOrder = (await BusinessSection.max("orderIndex")) || 0;
 
-    newSection = await BusinessSection.create({
+    const newSection = await BusinessSection.create({
       id: generatedId,
       category,
       title,
@@ -274,51 +267,10 @@ exports.createBusinessSection = async (req, res) => {
       hasMap: false,
       orderIndex: maxOrder + 1,
       is_locked: false,
+      lock_ticket: null,
     });
 
-    // EDITOR GATE (The Compliance Check)
-    if (userRole === "editor") {
-      console.log(
-        `>>> [BUSINESS] JALUR EDITOR: INITIATING APPROVAL FOR NEW SECTOR: ${generatedId} <<<`,
-      );
-
-      try {
-        const result = await ErpApprovalService.initiateApproval({
-          model: BusinessSection,
-          targetId: generatedId, // ID hasil Pre-insert tadi
-          action: "CREATE",
-          payload: { category, title, status: "Published" },
-          userId: req.userId,
-          owlUsername: req.owl_username,
-          token: req.owl_token,
-        });
-
-        // Jika OWL sukses, baru pasang gembok di lokal
-        await newSection.update({
-          is_locked: true,
-          lock_ticket: result.notrans,
-        });
-
-        return res.status(202).json({
-          message:
-            "Permintaan pembuatan sektor bisnis baru dikirim ke OWL. Data dikunci.",
-          ticket: result.notrans,
-          data: newSection,
-        });
-      } catch (owlError) {
-        // Jika OWL gagal (misal: error 500 atau timeout), kita hapus record draf tadi.
-        if (newSection) {
-          console.error(
-            `>>> [CLEANUP] Deleting orphan section: ${generatedId} due to OWL failure`,
-          );
-          await newSection.destroy();
-        }
-        throw owlError;
-      }
-    }
-
-    // SUPERADMIN
-    console.log(">>> [BUSINESS] JALUR SUPERADMIN: DIRECT CREATE SUCCESS <<<");
+    console.log(`>>> [BUSINESS] SECTOR CREATED INSTANTLY: ${generatedId} <<<`);
     return res.status(201).json({
       message: "Sektor bisnis baru berhasil dibuat secara langsung.",
       data: newSection,
@@ -339,86 +291,93 @@ exports.createBusinessSection = async (req, res) => {
  */
 exports.deleteSection = async (req, res) => {
   const { id } = req.params;
-
-  // 1. INISIALISASI ATOMIC TRANSACTION (SOP Point B)
-  const t = await sequelize.transaction();
+  const userRole = req.userRole?.toLowerCase();
 
   try {
-    // 2. CHECK LOCK (The Gatekeeper) + Pessimistic Lock Database Level
-    const section = await BusinessSection.findByPk(id, {
-      transaction: t,
-      lock: t.LOCK.UPDATE,
-    });
+    // 1. PRE-CHECK: Cari data tanpa ngunci database dulu
+    const section = await BusinessSection.findByPk(id);
 
     if (!section) {
-      await t.rollback();
       return res.status(404).json({ message: "Sektor tidak ditemukan" });
     }
 
+    // 2. GUARD: Cek Gembok & Orphan Projects (Tanpa Transaksi dulu)
     if (section.is_locked) {
-      await t.rollback();
       return res.status(423).json({
-        message:
-          "Sektor ini sedang dikunci oleh antrean approval dan tidak dapat dihapus.",
+        message: "Sektor ini sedang dikunci oleh antrean approval.",
         ticket: section.lock_ticket,
       });
     }
 
-    // 3. ORPHAN GUARD (SOP Integrity)
     const attachedProjectsCount = await Project.count({
       where: { category: id },
-      transaction: t,
     });
-
     if (attachedProjectsCount > 0) {
-      await t.rollback();
       return res.status(400).json({
-        message: `Hapus ditolak! Sektor ini masih memiliki ${attachedProjectsCount} proyek aktif. Harap pindahkan atau hapus proyek terkait terlebih dahulu.`,
+        message: `Hapus ditolak! Sektor ini masih memiliki ${attachedProjectsCount} proyek aktif.`,
       });
     }
 
-    // 4. EDITOR GATE
-    if (req.userRole?.toLowerCase() === "editor") {
-      const tokenOWL = req.owl_token;
-
+    // ==========================================
+    // JALUR EDITOR (ERP Handshake Pertama)
+    // ==========================================
+    if (userRole === "editor") {
+      // 🛡️ SENIOR TIP: Panggil OWL DI LUAR transaksi database
       const result = await ErpApprovalService.initiateApproval({
         model: BusinessSection,
         targetId: id,
         action: "DELETE",
-        payload: { title: section.title }, // Payload minimal untuk keperluan log di OWL/Approval Center
+        payload: { title: section.title },
         userId: req.userId,
         owlUsername: req.owl_username,
-        token: tokenOWL,
-        transaction: t, // Inject transaction agar locking lokal & OWL sinkron
+        token: req.owl_token,
       });
 
-      await t.commit();
-      return res.status(202).json({
-        message:
-          "Permintaan hapus sektor bisnis telah dikirim ke OWL. Data sekarang dikunci.",
-        ticket: result.notrans,
-      });
+      // Baru setelah OWL kasih tiket, kita buka transaksi buat nge-lock lokal
+      const t = await sequelize.transaction();
+      try {
+        await section.update(
+          { is_locked: true, lock_ticket: result.notrans },
+          { transaction: t },
+        );
+        await t.commit();
+
+        return res.status(202).json({
+          message: "Permintaan hapus sektor dikirim ke OWL. Data dikunci.",
+          ticket: result.notrans,
+        });
+      } catch (dbError) {
+        await t.rollback();
+        throw dbError;
+      }
     }
 
-    // 5. SUPERADMIN FLOW (Direct Hard Delete)
-    await BusinessMapMarker.destroy({
-      where: { sectionId: id },
-      transaction: t,
-    });
+    // ==========================================
+    // JALUR SUPERADMIN (Direct Hard Delete)
+    // ==========================================
+    const t = await sequelize.transaction();
+    try {
+      // Re-verify lock inside transaction for Superadmin
+      await section.reload({ transaction: t, lock: t.LOCK.UPDATE });
 
-    // Hapus sektornya
-    await section.destroy({ transaction: t });
+      await BusinessMapMarker.destroy({
+        where: { sectionId: id },
+        transaction: t,
+      });
+      await section.destroy({ transaction: t });
 
-    await t.commit();
-    res.status(200).json({
-      message:
-        "Sektor bisnis beserta marker lokasinya berhasil dihapus secara permanen.",
-    });
+      await t.commit();
+      return res
+        .status(200)
+        .json({ message: "Sektor berhasil dihapus secara permanen." });
+    } catch (dbError) {
+      await t.rollback();
+      throw dbError;
+    }
   } catch (error) {
-    if (t) await t.rollback();
     console.error("🚨 [DELETE_SECTION_ERROR]:", error.message);
-    res
-      .status(500)
-      .json({ message: "Gagal memproses penghapusan", error: error.message });
+    res.status(error.statusCode || 500).json({
+      message: error.message || "Gagal memproses penghapusan",
+    });
   }
 };
