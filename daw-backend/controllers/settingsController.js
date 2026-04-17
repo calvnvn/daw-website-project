@@ -85,7 +85,7 @@ exports.updateSettings = async (req, res) => {
         payload: updatePayload,
         userId: req.userId,
         owlUsername: req.owl_username,
-        token: req.owl_token, // ✅ PAKAI OWL_TOKEN ASLI
+        token: req.owl_token,
       });
 
       return res.status(202).json({
