@@ -4,15 +4,19 @@ import {
   useContext,
   useState,
   useEffect,
+  useCallback,
+  useMemo,
   type ReactNode,
 } from "react";
 import api from "@/lib/api";
 
-// 1. Definisikan Struktur Data
 export interface InvestmentSettings {
+  id?: number; // Singleton ID 1
   teaserHeadline: string;
   teaserBody: string;
   sectionIntro: string;
+  is_locked?: boolean;
+  lock_ticket?: string | null;
 }
 
 export interface Affiliate {
@@ -22,16 +26,18 @@ export interface Affiliate {
   category: "fnb" | "steel" | "finance" | "edu";
   logoUrl: string | null;
   websiteUrl: string | null;
+  is_locked?: boolean;
+  lock_ticket?: string | null;
+  has_rejected?: boolean;
 }
 
 interface InvestmentContextType {
   settings: InvestmentSettings | null;
   companies: Affiliate[];
   isLoading: boolean;
-  refreshData: () => Promise<void>; // Fungsi untuk memanggil ulang data setelah admin nge-save
+  refreshData: () => Promise<void>;
 }
 
-// 2. Buat Context
 export const InvestmentContext = createContext<InvestmentContextType>({
   settings: null,
   companies: [],
@@ -39,38 +45,55 @@ export const InvestmentContext = createContext<InvestmentContextType>({
   refreshData: async () => {},
 });
 
-// 3. Buat Provider
 export function InvestmentProvider({ children }: { children: ReactNode }) {
   const [settings, setSettings] = useState<InvestmentSettings | null>(null);
   const [companies, setCompanies] = useState<Affiliate[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
-  const fetchData = async () => {
+  const fetchData = useCallback(async (signal?: AbortSignal) => {
     try {
-      const res = await api.get("/investment");
+      const res = await api.get("/investment", { signal });
       setSettings(res.data.settings);
       setCompanies(res.data.companies);
-    } catch (err) {
-      console.error("Failed to fetch investment data:", err);
+    } catch (err: any) {
+      if (err.name !== "CanceledError") {
+        console.error("🚨 Investment Sync Error:", err.message);
+      }
     } finally {
       setIsLoading(false);
     }
-  };
-
-  useEffect(() => {
-    fetchData();
   }, []);
 
+  useEffect(() => {
+    const controller = new AbortController();
+    fetchData(controller.signal);
+
+    // 🛡️ BLUEPRINT: Memory Leak Cleanup
+    return () => controller.abort();
+  }, [fetchData]);
+
+  // 🛡️ PERFORMA: Memoize value agar provider tidak re-render anak secara brutal
+  const contextValue = useMemo(
+    () => ({
+      settings,
+      companies,
+      isLoading,
+      refreshData: () => fetchData(),
+    }),
+    [settings, companies, isLoading, fetchData],
+  );
+
   return (
-    <InvestmentContext.Provider
-      value={{ settings, companies, isLoading, refreshData: fetchData }}
-    >
+    <InvestmentContext.Provider value={contextValue}>
       {children}
     </InvestmentContext.Provider>
   );
 }
 
-// 4. Custom Hook
 export function useInvestments() {
-  return useContext(InvestmentContext);
+  const context = useContext(InvestmentContext);
+  if (context === undefined) {
+    throw new Error("useInvestments must be used within an InvestmentProvider");
+  }
+  return context;
 }
