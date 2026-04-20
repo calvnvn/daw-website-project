@@ -15,7 +15,7 @@ const ApprovalDraft = require("../models/ApprovalDraft");
 
 const HeroSlide = require("../models/HeroSlide");
 const History = require("../models/History");
-const HomeSetting = require("../models/HomeSetting");
+const HomeSettings = require("../models/HomeSettings");
 const ImpactStat = require("../models/ImpactStat");
 const InvestmentSettings = require("../models/InvestmentSettings");
 const Settings = require("../models/Settings");
@@ -274,7 +274,7 @@ function getModelByModuleName(module) {
     BusinessSection,
     HeroSlide,
     History,
-    HomeSetting,
+    HomeSettings,
     ImpactStat,
     InvestmentSettings,
     InvestmentSetting: InvestmentSettings,
@@ -347,7 +347,7 @@ async function executeModelUpdate(
 
   switch (module) {
     case "AboutInfo":
-    case "HomeSetting":
+    case "HomeSettings":
     case "InvestmentSettings":
     case "Settings":
       // Singleton
@@ -458,7 +458,7 @@ async function fetchOriginalDataByModule(module, targetId) {
     }
 
     if (
-      ["AboutInfo", "HomeSetting", "InvestmentSettings", "Settings"].includes(
+      ["AboutInfo", "HomeSettings", "InvestmentSettings", "Settings"].includes(
         module,
       )
     ) {

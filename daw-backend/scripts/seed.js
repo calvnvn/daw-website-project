@@ -19,7 +19,7 @@ const BusinessSection = require("../models/BusinessSection");
 const Affiliate = require("../models/Affiliate");
 const BusinessMapMarker = require("../models/BusinessMapMarker");
 const HeroSlide = require("../models/HeroSlide");
-const HomeSetting = require("../models/HomeSetting");
+const HomeSettings = require("../models/HomeSettings");
 const ImpactStat = require("../models/ImpactStat");
 // const Inquiry = require("../models/Inquiry"); // Buka komen ini kalau mau test Inquiries
 const InvestmentSettings = require("../models/InvestmentSettings");
@@ -537,7 +537,7 @@ async function runMasterSeeder() {
     }
 
     // 10. SEED HOME SETTINGS
-    const [homeSet, homeSetCreated] = await HomeSetting.findOrCreate({
+    const [homeSet, homeSetCreated] = await HomeSettings.findOrCreate({
       where: { introHeadline: DEFAULT_HOME_SETTINGS.introHeadline },
       defaults: DEFAULT_HOME_SETTINGS,
     });

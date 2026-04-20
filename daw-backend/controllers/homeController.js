@@ -1,5 +1,5 @@
 const HeroSlide = require("../models/HeroSlide");
-const HomeSetting = require("../models/HomeSetting");
+const HomeSettings = require("../models/HomeSettings");
 const ImpactStat = require("../models/ImpactStat");
 const { deleteSingleFile } = require("../utils/fileRemover");
 const ErpApprovalService = require("../services/erpApprovalService");
@@ -10,12 +10,12 @@ exports.getHomepageData = async (req, res) => {
     const [slides, stats, settings] = await Promise.all([
       HeroSlide.findAll({ order: [["order", "ASC"]] }),
       ImpactStat.findAll({ order: [["order", "ASC"]] }),
-      HomeSetting.findOne(),
+      HomeSettings.findOne(),
     ]);
 
     let currentSettings = settings;
     if (!currentSettings) {
-      currentSettings = await HomeSetting.create({
+      currentSettings = await HomeSettings.create({
         introHeadline: "A Transformation Company.",
         introBody: "Welcome to DAW.",
       });
@@ -37,33 +37,40 @@ exports.getHomepageData = async (req, res) => {
 exports.updateSettings = async (req, res) => {
   try {
     const { introHeadline, introBody, status } = req.body;
-    let settings = await HomeSetting.findOne();
-    if (!settings) settings = await HomeSetting.create({});
+    let settings = await HomeSettings.findOne();
+    if (!settings) settings = await HomeSettings.create({});
 
     // Editor Flow Request Update
     if (req.userRole?.toLowerCase() === "editor" && status === "Published") {
       const result = await ErpApprovalService.initiateApproval({
-        model: HomeSetting,
+        model: HomeSettings,
         targetId: settings.id,
         action: "UPDATE",
         payload: { introHeadline, introBody },
         userId: req.userId,
         owlUsername: req.owl_username,
-        token: req.headers["authorization"]?.split(" ")[1]
+        token: req.headers["authorization"]?.split(" ")[1],
       });
-      return res.status(202).json({ message: "Revisi intro homepage dikirim ke OWL.", ticket: result.notrans });
+      return res.status(202).json({
+        message: "Revisi intro homepage dikirim ke OWL.",
+        ticket: result.notrans,
+      });
     }
 
     // Superadmin Flow
-    await settings.update({ introHeadline, introBody, is_locked: false, lock_ticket: null });
+    await settings.update({
+      introHeadline,
+      introBody,
+      is_locked: false,
+      lock_ticket: null,
+    });
     res.status(200).json({ message: "Intro updated!", data: settings });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
 };
 
-
-// Hero Slides 
+// Hero Slides
 exports.createHeroSlide = async (req, res) => {
   try {
     const { title, subtitle, order, status } = req.body;
@@ -78,9 +85,12 @@ exports.createHeroSlide = async (req, res) => {
         payload: slideData,
         userId: req.userId,
         owlUsername: req.owl_username,
-        token: req.headers["authorization"]?.split(" ")[1]
+        token: req.headers["authorization"]?.split(" ")[1],
       });
-      return res.status(202).json({ message: "Permintaan slide baru dikirim ke OWL.", ticket: result.notrans });
+      return res.status(202).json({
+        message: "Permintaan slide baru dikirim ke OWL.",
+        ticket: result.notrans,
+      });
     }
 
     const slide = await HeroSlide.create(slideData);
@@ -115,12 +125,16 @@ exports.updateHeroSlide = async (req, res) => {
         payload: updatedData,
         userId: req.userId,
         owlUsername: req.owl_username,
-        token: req.headers["authorization"]?.split(" ")[1]
+        token: req.headers["authorization"]?.split(" ")[1],
       });
-      return res.status(202).json({ message: "Revisi slide dikirim ke OWL.", ticket: result.notrans });
+      return res.status(202).json({
+        message: "Revisi slide dikirim ke OWL.",
+        ticket: result.notrans,
+      });
     }
 
-    if (oldImageToDelete && req.userRole?.toLowerCase() !== "editor") deleteSingleFile(oldImageToDelete);
+    if (oldImageToDelete && req.userRole?.toLowerCase() !== "editor")
+      deleteSingleFile(oldImageToDelete);
     await slide.update({ ...updatedData, is_locked: false, lock_ticket: null });
     res.status(200).json(slide);
   } catch (error) {
@@ -141,9 +155,12 @@ exports.deleteHeroSlide = async (req, res) => {
         payload: { title: slide.title },
         userId: req.userId,
         owlUsername: req.owl_username,
-        token: req.headers["authorization"]?.split(" ")[1]
+        token: req.headers["authorization"]?.split(" ")[1],
       });
-      return res.status(202).json({ message: "Permintaan hapus slide dikirim ke OWL.", ticket: result.notrans });
+      return res.status(202).json({
+        message: "Permintaan hapus slide dikirim ke OWL.",
+        ticket: result.notrans,
+      });
     }
 
     if (slide.imageUrl) deleteSingleFile(slide.imageUrl);
@@ -158,7 +175,8 @@ exports.deleteHeroSlide = async (req, res) => {
 exports.createStat = async (req, res) => {
   try {
     const count = await ImpactStat.count();
-    if (count >= 4) return res.status(400).json({ message: "A maximum of 4 stats only!" });
+    if (count >= 4)
+      return res.status(400).json({ message: "A maximum of 4 stats only!" });
 
     const { icon, value, label, desc, order, status } = req.body;
     const statData = { icon, value, label, desc, order };
@@ -171,9 +189,12 @@ exports.createStat = async (req, res) => {
         payload: statData,
         userId: req.userId,
         owlUsername: req.owl_username,
-        token: req.headers["authorization"]?.split(" ")[1]
+        token: req.headers["authorization"]?.split(" ")[1],
       });
-      return res.status(202).json({ message: "Permintaan statistik baru dikirim ke OWL.", ticket: result.notrans });
+      return res.status(202).json({
+        message: "Permintaan statistik baru dikirim ke OWL.",
+        ticket: result.notrans,
+      });
     }
 
     const stat = await ImpactStat.create(statData);
@@ -200,9 +221,12 @@ exports.updateStat = async (req, res) => {
         payload: statData,
         userId: req.userId,
         owlUsername: req.owl_username,
-        token: req.headers["authorization"]?.split(" ")[1]
+        token: req.headers["authorization"]?.split(" ")[1],
       });
-      return res.status(202).json({ message: "Revisi statistik dikirim ke OWL.", ticket: result.notrans });
+      return res.status(202).json({
+        message: "Revisi statistik dikirim ke OWL.",
+        ticket: result.notrans,
+      });
     }
 
     await stat.update({ ...statData, is_locked: false, lock_ticket: null });
@@ -225,9 +249,12 @@ exports.deleteStat = async (req, res) => {
         payload: { label: stat.label },
         userId: req.userId,
         owlUsername: req.owl_username,
-        token: req.headers["authorization"]?.split(" ")[1]
+        token: req.headers["authorization"]?.split(" ")[1],
       });
-      return res.status(202).json({ message: "Permintaan hapus statistik dikirim ke OWL.", ticket: result.notrans });
+      return res.status(202).json({
+        message: "Permintaan hapus statistik dikirim ke OWL.",
+        ticket: result.notrans,
+      });
     }
 
     await stat.destroy();

@@ -1,7 +1,7 @@
 const { DataTypes } = require("sequelize");
 const sequelize = require("../config/database");
 
-const HomeSetting = sequelize.define("HomeSetting", {
+const HomeSettings = sequelize.define("HomeSettings", {
   introHeadline: {
     type: DataTypes.STRING,
   },
@@ -15,9 +15,9 @@ const HomeSetting = sequelize.define("HomeSetting", {
   },
   lock_ticket: {
     type: DataTypes.STRING,
-    allowValue: true,
+    allowNull: true,
     comment: "Menyimpan No. Tiket dari OWL yang sedang mengunci data ini",
   },
 });
 
-module.exports = HomeSetting;
+module.exports = HomeSettings;

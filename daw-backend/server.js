@@ -41,7 +41,7 @@ require("./models/Settings");
 require("./models/AboutInfo");
 require("./models/History");
 require("./models/HeroSlide");
-require("./models/HomeSetting");
+require("./models/HomeSettings");
 require("./models/ImpactStat");
 const BusinessSection = require("./models/BusinessSection");
 const MapCategory = require("./models/MapCategory");

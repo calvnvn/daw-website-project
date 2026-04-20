@@ -17,7 +17,7 @@ export interface HeroSlide {
   order: number;
 }
 
-export interface HomeSetting {
+export interface HomeSettings {
   introHeadline: string;
   introBody: string;
 }
@@ -34,7 +34,7 @@ export interface ImpactStat {
 interface HomeContextType {
   slides: HeroSlide[];
   stats: ImpactStat[];
-  settings: HomeSetting | null;
+  settings: HomeSettings | null;
   isLoading: boolean;
   refreshData: () => Promise<void>;
 }
@@ -52,7 +52,7 @@ export const HomeContext = createContext<HomeContextType>({
 export function HomeProvider({ children }: { children: ReactNode }) {
   const [slides, setSlides] = useState<HeroSlide[]>([]);
   const [stats, setStats] = useState<ImpactStat[]>([]);
-  const [settings, setSettings] = useState<HomeSetting | null>(null);
+  const [settings, setSettings] = useState<HomeSettings | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   const fetchData = async () => {
@@ -77,8 +77,7 @@ export function HomeProvider({ children }: { children: ReactNode }) {
 
   return (
     <HomeContext.Provider
-      value={{ slides, stats, settings, isLoading, refreshData: fetchData }}
-    >
+      value={{ slides, stats, settings, isLoading, refreshData: fetchData }}>
       {children}
     </HomeContext.Provider>
   );
