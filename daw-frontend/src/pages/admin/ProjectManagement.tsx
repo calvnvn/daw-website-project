@@ -406,7 +406,7 @@ export default function ProjectManagement() {
                           <button
                             disabled
                             className="p-2 text-slate-300 cursor-not-allowed"
-                            title="Terkunci di OWL">
+                            title="Locked">
                             <Lock className="w-4 h-4" />
                           </button>
                         ) : (

@@ -355,7 +355,7 @@ export default function InvestmentsManager() {
       } else {
         await handleSaveCompanies();
       }
-      toast.success("Perubahan berhasil dikirim ke OWL!", { id: loadingToast });
+      toast.success("Perubahan berhasil dikirim!", { id: loadingToast });
       await refreshData();
       setIsEditing(false);
     } catch (err) {
@@ -389,7 +389,7 @@ export default function InvestmentsManager() {
             </div>
             <div>
               <h4 className="text-sm font-black text-amber-900 uppercase tracking-tight">
-                Revisi Konten Ditolak Admin OWL
+                Revisi Konten Ditolak
               </h4>
               <p className="text-xs text-amber-700 leading-relaxed max-w-xl">
                 Alasan:{" "}
@@ -676,7 +676,7 @@ export default function InvestmentsManager() {
                       )}
                       {company.is_locked && (
                         <span
-                          title={`Dikunci oleh OWL (${company.lock_ticket})`}
+                          title={`Dikunci (${company.lock_ticket})`}
                           className="flex h-5 w-5 items-center justify-center bg-blue-500 text-white rounded-full shadow-sm ring-2 ring-white z-10">
                           <Lock className="w-3 h-3" />
                         </span>

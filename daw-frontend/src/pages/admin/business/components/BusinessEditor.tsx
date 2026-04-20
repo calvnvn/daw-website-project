@@ -37,8 +37,7 @@ export default function BusinessEditor({
       }));
 
       toast.success("Draf revisi dipulihkan", {
-        description:
-          "Konten dari OWL kini berada di editor. Silakan diperbaiki.",
+        description: "Konten kini berada di editor. Silakan diperbaiki.",
         icon: <CheckCircle2 className="w-4 h-4 text-green-500" />,
       });
     } catch (error) {

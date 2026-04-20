@@ -216,20 +216,21 @@ export default function AdminLayout() {
    * Otherwise, we strictly check their specific permissions.
    */
   const filteredMenuGroups = useMemo(() => {
-  return MENU_GROUPS.map((group) => {
-    return {
-      ...group,
-      items: group.items.filter((item) => {
-        if (!item.perm) return true;
+    return MENU_GROUPS.map((group) => {
+      return {
+        ...group,
+        items: group.items.filter((item) => {
+          if (!item.perm) return true;
 
-        const isMasterAdmin = user?.role === "admin" || user?.role === "Superadmin";
-        if (isMasterAdmin) return true;
+          const isMasterAdmin =
+            user?.role === "admin" || user?.role === "Superadmin";
+          if (isMasterAdmin) return true;
 
-        return can(item.perm);
-      }),
-    };
-  }).filter((group) => group.items.length > 0);
-}, [user, can]);
+          return can(item.perm);
+        }),
+      };
+    }).filter((group) => group.items.length > 0);
+  }, [user, can]);
 
   return (
     <div className="h-[100dvh] bg-slate-50 flex font-sans text-slate-900 overflow-hidden">
@@ -246,8 +247,7 @@ export default function AdminLayout() {
         fixed inset-y-0 left-0 z-50 bg-white border-r border-slate-200 transform transition-transform duration-300 ease-in-out flex flex-col h-full
         ${isMobileMenuOpen ? "translate-x-0" : "-translate-x-full"}
         md:relative md:translate-x-0 ${isDesktopCollapsed ? "md:w-[84px]" : "md:w-[260px]"}
-      `}
-      >
+      `}>
         {/* AREA LOGO (Warna Asli) */}
         <div className="h-20 flex items-center px-8 border-b border-slate-100">
           <img
@@ -255,7 +255,7 @@ export default function AdminLayout() {
               settings?.logoUrl ? getCleanImageUrl(settings.logoUrl) : logoDaw
             }
             alt="DAW Admin Logo"
-            className="h-10 w-auto object-contain"
+            className="h-24 lg:h-32 w-auto object-contain"
           />
         </div>
 
@@ -269,8 +269,7 @@ export default function AdminLayout() {
                   isDesktopCollapsed
                     ? "h-0 overflow-hidden opacity-0 m-0 p-0"
                     : "opacity-100"
-                }`}
-              >
+                }`}>
                 {group.label}
               </p>
 
@@ -298,8 +297,7 @@ export default function AdminLayout() {
                         relative flex items-center px-3 py-3 rounded-xl transition-all duration-200 group
                         ${isActive ? "bg-daw-green/10 text-daw-green font-bold" : "text-slate-600 hover:bg-slate-50 hover:text-daw-green"}
                         ${isDesktopCollapsed ? "justify-center" : "justify-between"}
-                      `}
-                    >
+                      `}>
                       {/* Active Left Border Accent */}
                       {isActive && (
                         <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-6 bg-daw-green rounded-r-full" />
@@ -318,8 +316,7 @@ export default function AdminLayout() {
                             isDesktopCollapsed
                               ? "md:w-0 md:opacity-0 ml-0"
                               : "w-auto opacity-100 ml-3"
-                          }`}
-                        >
+                          }`}>
                           {item.name}
                         </span>
                       </div>
@@ -340,18 +337,15 @@ export default function AdminLayout() {
 
         {/* AREA PROFIL & LOGOUT */}
         <div
-          className={`p-4 border-t border-slate-100 bg-slate-50/50 flex flex-col gap-4 ${isDesktopCollapsed ? "items-center" : ""}`}
-        >
+          className={`p-4 border-t border-slate-100 bg-slate-50/50 flex flex-col gap-4 ${isDesktopCollapsed ? "items-center" : ""}`}>
           <div
-            className={`flex items-center gap-3 ${isDesktopCollapsed ? "justify-center" : "px-2"}`}
-          >
+            className={`flex items-center gap-3 ${isDesktopCollapsed ? "justify-center" : "px-2"}`}>
             <div className="w-10 h-10 shrink-0 rounded-full bg-daw-green text-white flex items-center justify-center font-bold shadow-sm uppercase">
               {user?.name ? user.name.charAt(0) : "U"}
             </div>
             {/* Detail Profil Menghilang saat Collapsed */}
             <div
-              className={`flex-1 min-w-0 transition-all duration-300 overflow-hidden ${isDesktopCollapsed ? "md:w-0 md:opacity-0" : "w-auto opacity-100"}`}
-            >
+              className={`flex-1 min-w-0 transition-all duration-300 overflow-hidden ${isDesktopCollapsed ? "md:w-0 md:opacity-0" : "w-auto opacity-100"}`}>
               <p className="text-sm font-bold text-slate-800 truncate">
                 {user?.name || "Loading..."}
               </p>
@@ -364,12 +358,10 @@ export default function AdminLayout() {
           <button
             onClick={() => setIsLogoutModalOpen(true)}
             title={isDesktopCollapsed ? "Sign Out" : ""}
-            className={`flex items-center justify-center gap-2 py-2.5 rounded-lg text-sm font-medium text-slate-500 bg-white border border-slate-200 hover:bg-red-50 hover:text-red-600 hover:border-red-100 transition-colors shadow-sm ${isDesktopCollapsed ? "w-10 px-0" : "w-full"}`}
-          >
+            className={`flex items-center justify-center gap-2 py-2.5 rounded-lg text-sm font-medium text-slate-500 bg-white border border-slate-200 hover:bg-red-50 hover:text-red-600 hover:border-red-100 transition-colors shadow-sm ${isDesktopCollapsed ? "w-10 px-0" : "w-full"}`}>
             <LogOut className="w-4 h-4 shrink-0" />
             <span
-              className={`whitespace-nowrap overflow-hidden transition-all duration-300 ${isDesktopCollapsed ? "md:w-0 md:opacity-0" : "w-auto opacity-100"}`}
-            >
+              className={`whitespace-nowrap overflow-hidden transition-all duration-300 ${isDesktopCollapsed ? "md:w-0 md:opacity-0" : "w-auto opacity-100"}`}>
               Sign Out
             </span>
           </button>
@@ -382,14 +374,12 @@ export default function AdminLayout() {
           <div className="flex items-center gap-4">
             <button
               className="md:hidden p-2 -ml-2 text-slate-500 hover:bg-slate-100 rounded-lg transition-colors"
-              onClick={() => setIsMobileMenuOpen(true)}
-            >
+              onClick={() => setIsMobileMenuOpen(true)}>
               <Menu className="w-6 h-6" />
             </button>
             <button
               className="hidden md:block p-2 -ml-2 text-slate-500 hover:text-daw-green hover:bg-slate-50 rounded-lg transition-colors"
-              onClick={() => setIsDesktopCollapsed(!isDesktopCollapsed)}
-            >
+              onClick={() => setIsDesktopCollapsed(!isDesktopCollapsed)}>
               {isDesktopCollapsed ? (
                 <PanelLeftOpen className="w-5 h-5" />
               ) : (
@@ -410,8 +400,7 @@ export default function AdminLayout() {
                   return (
                     <div key={path} className="flex items-center gap-2">
                       <span
-                        className={`capitalize ${isLast ? "text-slate-900 font-bold" : "text-slate-400"}`}
-                      >
+                        className={`capitalize ${isLast ? "text-slate-900 font-bold" : "text-slate-400"}`}>
                         {label}
                       </span>
                       {!isLast && (
@@ -427,8 +416,7 @@ export default function AdminLayout() {
             {/* ---> 2. NOTIFICATION BELL & DROPDOWN <--- */}
             <button
               onClick={() => setIsNotifOpen(!isNotifOpen)}
-              className={`p-2 rounded-full transition-colors relative ${isNotifOpen ? "bg-daw-green/10 text-daw-green" : "text-slate-400 hover:text-daw-green hover:bg-slate-50"}`}
-            >
+              className={`p-2 rounded-full transition-colors relative ${isNotifOpen ? "bg-daw-green/10 text-daw-green" : "text-slate-400 hover:text-daw-green hover:bg-slate-50"}`}>
               <Bell className="w-5 h-5" />
               {(unreadInquiries.length > 0 || unreadApprovals.length > 0) && (
                 <span className="absolute top-1 right-1.5 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-white animate-pulse"></span>
@@ -458,8 +446,7 @@ export default function AdminLayout() {
                           navigate("/admin/approvals");
                           setIsNotifOpen(false);
                         }}
-                        className="flex items-center justify-between bg-white p-3 rounded-xl border border-blue-100 shadow-sm cursor-pointer hover:bg-blue-50 transition-colors"
-                      >
+                        className="flex items-center justify-between bg-white p-3 rounded-xl border border-blue-100 shadow-sm cursor-pointer hover:bg-blue-50 transition-colors">
                         <div className="flex items-center gap-3">
                           <div className="p-2 bg-blue-500 text-white rounded-lg">
                             <ClipboardCheck className="w-4 h-4" />
@@ -483,8 +470,7 @@ export default function AdminLayout() {
                             if (can("manage_inbox")) {
                               navigate("/admin/inbox");
                             }
-                          }}
-                        >
+                          }}>
                           <div className="flex gap-3 items-start">
                             <div className="w-8 h-8 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center shrink-0 mt-0.5 group-hover:bg-blue-100">
                               <MessageSquare className="w-4 h-4" />
@@ -526,8 +512,7 @@ export default function AdminLayout() {
                         setIsNotifOpen(false);
                         navigate("/admin/inbox");
                       }}
-                      className="w-full py-2 text-sm font-bold text-daw-green hover:bg-daw-green/10 rounded-lg transition-colors"
-                    >
+                      className="w-full py-2 text-sm font-bold text-daw-green hover:bg-daw-green/10 rounded-lg transition-colors">
                       View All Messages
                     </button>
                   </div>
@@ -561,14 +546,12 @@ export default function AdminLayout() {
             <div className="px-6 py-4 bg-slate-50 border-t border-slate-100 flex gap-3">
               <button
                 onClick={() => setIsLogoutModalOpen(false)}
-                className="flex-1 py-2.5 text-sm font-bold text-slate-600 bg-white border border-slate-200 hover:bg-slate-100 rounded-lg transition-colors"
-              >
+                className="flex-1 py-2.5 text-sm font-bold text-slate-600 bg-white border border-slate-200 hover:bg-slate-100 rounded-lg transition-colors">
                 Cancel
               </button>
               <button
                 onClick={executeLogout}
-                className="flex-1 py-2.5 text-sm font-bold text-white bg-red-600 hover:bg-red-700 rounded-lg transition-colors shadow-sm shadow-red-600/20"
-              >
+                className="flex-1 py-2.5 text-sm font-bold text-white bg-red-600 hover:bg-red-700 rounded-lg transition-colors shadow-sm shadow-red-600/20">
                 Sign Out
               </button>
             </div>

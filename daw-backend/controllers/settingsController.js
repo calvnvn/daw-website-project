@@ -39,7 +39,7 @@ exports.updateSettings = async (req, res) => {
 
     if (userRole === "editor" && settings.is_locked) {
       return res.status(423).json({
-        message: "Pengaturan sedang dikunci oleh antrean approval OWL.",
+        message: "Pengaturan sedang dikunci oleh antrean approval.",
         ticket: settings.lock_ticket,
       });
     }

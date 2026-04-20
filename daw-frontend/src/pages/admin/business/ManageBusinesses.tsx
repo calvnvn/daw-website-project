@@ -126,7 +126,7 @@ export default function ManageBusinesses() {
   useEffect(() => {
     if (isSectionLocked && isEditing) {
       setIsEditing(false);
-      toast.info("Akses ditutup. Sektor ini sedang dalam proses review OWL.");
+      toast.info("Akses ditutup. Sektor ini sedang dalam proses review.");
     }
   }, [isSectionLocked, isEditing]);
   // SECURITY GUARD
@@ -197,7 +197,7 @@ export default function ManageBusinesses() {
   const handleSave = async () => {
     if (activeTab === "categories") return;
     setIsSaving(true);
-    const toastId = toast.loading("Mengirim revisi ke sistem OWL...");
+    const toastId = toast.loading("Mengirim revisi ke sistem...");
     try {
       await updateSection(activeTab, {
         ...formData,

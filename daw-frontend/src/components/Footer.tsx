@@ -75,7 +75,7 @@ export default function Footer() {
                       : logoDaw
                   }
                   alt="DAW Group"
-                  className="h-10 md:h-12 w-auto brightness-0 mb-5 invert opacity-90 transition-opacity hover:opacity-100"
+                  className="h-24 lg:h-32 w-auto brightness-0 mb-5 invert opacity-90 transition-opacity hover:opacity-100"
                 />
               </Link>
               <div className="space-y-6">
@@ -107,8 +107,7 @@ export default function Footer() {
                     <Link
                       to={item.path}
                       onClick={scrollToTop}
-                      className="text-slate-400 hover:text-daw-green transition-all font-medium text-sm flex items-center gap-2 group"
-                    >
+                      className="text-slate-400 hover:text-daw-green transition-all font-medium text-sm flex items-center gap-2 group">
                       <span className="h-px w-0 bg-daw-green group-hover:w-4 transition-all duration-300" />
                       {item.label}
                     </Link>
@@ -160,8 +159,7 @@ export default function Footer() {
                         <Link
                           to={url}
                           onClick={handleClick}
-                          className={classes}
-                        >
+                          className={classes}>
                           {content}
                         </Link>
                       ) : (
@@ -169,8 +167,7 @@ export default function Footer() {
                           href={url}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className={classes}
-                        >
+                          className={classes}>
                           {content}
                         </a>
                       )}
@@ -190,8 +187,7 @@ export default function Footer() {
                   <Link
                     key={sector.label}
                     to={sector.path}
-                    className="text-[11px] font-bold text-slate-400 px-5 py-2.5 bg-white/5 border border-white/10 rounded-full hover:bg-daw-green hover:border-daw-green hover:text-white transition-all flex items-center gap-2 uppercase tracking-wider"
-                  >
+                    className="text-[11px] font-bold text-slate-400 px-5 py-2.5 bg-white/5 border border-white/10 rounded-full hover:bg-daw-green hover:border-daw-green hover:text-white transition-all flex items-center gap-2 uppercase tracking-wider">
                     {sector.label}
                     <ArrowUpRight className="w-3 h-3 opacity-50" />
                   </Link>
@@ -211,8 +207,7 @@ export default function Footer() {
 
             <button
               onClick={scrollToTop}
-              className="group flex items-center gap-3 text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 hover:text-white transition-colors"
-            >
+              className="group flex items-center gap-3 text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 hover:text-white transition-colors">
               Back to Top
               <div className="w-10 h-10 rounded-full border border-white/10 flex items-center justify-center group-hover:border-daw-green group-hover:bg-daw-green transition-all shadow-lg">
                 <ChevronUp className="w-4 h-4 group-hover:-translate-y-1 transition-transform" />

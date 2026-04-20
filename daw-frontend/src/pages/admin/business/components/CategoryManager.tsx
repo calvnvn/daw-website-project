@@ -45,7 +45,9 @@ export default function CategoryManager() {
       // Sesuai SOP, kita kirim status Published agar masuk jalur OWL jika user adalah Editor
       await addCategory({ ...newCat }, "Published");
       setNewCat({ id: "", name: "", color: "#004B23" });
-    } catch (err) {}
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || "Gagal menambah kategori");
+    }
   };
 
   const handleUpdate = async (id: string) => {

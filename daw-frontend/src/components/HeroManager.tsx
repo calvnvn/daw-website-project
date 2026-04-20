@@ -367,7 +367,7 @@ export default function HeroManager() {
 
       await refreshData();
       toast.success(
-        isSuperadmin ? "Slide berhasil diperbarui!" : "Revisi diajukan ke OWL!",
+        isSuperadmin ? "Slide berhasil diperbarui!" : "Revisi diajukan!",
         { id: loadingToast },
       );
       setIsEditing(false);

@@ -86,7 +86,7 @@ export default function AddSectionModal({
                 New Business Sector
               </h3>
               <p className="text-[10px] text-slate-500 uppercase tracking-widest font-bold">
-                Initialize Data & OWL Ticket
+                Initialize Data & Ticket
               </p>
             </div>
           </div>

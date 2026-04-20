@@ -48,14 +48,13 @@ const fileFilter = (req, file, cb) => {
 const upload = multer({
   storage: storage,
   fileFilter: fileFilter,
-  limits: { fileSize: 15 * 1024 * 1024 }, // 15MB Safety Limit
+  limits: { fileSize: 15 * 1024 * 1024 },
 });
 
 const optimizeImage = async (req, res, next) => {
   if (!req.file && !req.files) return next();
 
   const processImage = async (file) => {
-    // 🛡️ BLUEPRINT: Unique Naming Strategy
     const randomSeed = Math.floor(Math.random() * 10000);
     const uniqueSuffix = `${Date.now()}-${randomSeed}`;
     const safeFieldName = file.fieldname.replace(/[^a-zA-Z0-9]/g, "");
@@ -73,6 +72,22 @@ const optimizeImage = async (req, res, next) => {
           background: { r: 0, g: 0, b: 0, alpha: 0 },
         })
         .webp({ quality: 90, lossless: true });
+    } else if (file.fieldname === "logo") {
+      console.log(`>>> [REFINERY] Processing Logo: Trimming and optimizing`);
+      pipeline = pipeline
+        .trim() // Hapus ruang kosong bawaan file asli
+        .resize(1200, null, {
+          withoutEnlargement: true,
+          fit: "inside",
+        })
+        .extend({
+          top: 40, // Kasih jarak 40px atas
+          bottom: 40, // Kasih jarak 40px bawah
+          left: 20, // Kasih jarak 20px kiri
+          right: 20, // Kasih jarak 20px kanan
+          background: { r: 0, g: 0, b: 0, alpha: 0 }, // Tetap transparan
+        })
+        .webp({ quality: 100 }); // Kualitas maksimal untuk aset brand
     } else {
       pipeline = pipeline
         .resize(1920, null, { withoutEnlargement: true, fit: "inside" })

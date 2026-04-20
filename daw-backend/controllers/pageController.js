@@ -166,7 +166,7 @@ exports.createPage = async (req, res) => {
         });
       } catch (owlError) {
         console.error(
-          `🚨 [CLEANUP] Menghapus orphan page ID: ${newPage.id} karena gagal koneksi OWL.`,
+          `🚨 [CLEANUP] Menghapus orphan page ID: ${newPage.id} karena gagal koneksi server.`,
         );
         await newPage.destroy();
         throw owlError;

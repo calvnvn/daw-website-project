@@ -103,7 +103,7 @@ exports.createProject = async (req, res) => {
         // Jika jembatan ke OWL putus, hancurkan record draf yang baru dibuat
         if (newProject) {
           console.error(
-            `>>> [CLEANUP] Deleting orphan project ID: ${newProject.id} due to OWL failure`,
+            `>>> [CLEANUP] Deleting orphan project ID: ${newProject.id} due to server failure`,
           );
           await newProject.destroy();
         }
@@ -156,8 +156,7 @@ exports.deleteProject = async (req, res) => {
 
     if (project.is_locked) {
       return res.status(423).json({
-        message:
-          "Data terkunci karena sedang dalam proses approval. Batalkan tiket di OWL terlebih dahulu.",
+        message: "Data terkunci karena sedang dalam proses approval.",
         ticket: project.lock_ticket,
       });
     }
@@ -172,7 +171,7 @@ exports.deleteProject = async (req, res) => {
       if (!tokenOWL) {
         return res
           .status(401)
-          .json({ message: "Akses ditolak: Token OWL tidak ditemukan." });
+          .json({ message: "Akses ditolak: Token tidak ditemukan." });
       }
 
       // 2. Kirim Niat Hapus ke Orchestrator
@@ -281,7 +280,7 @@ exports.updateProject = async (req, res) => {
 
     if (project.is_locked) {
       return res.status(423).json({
-        message: "Data sedang dikunci oleh proses approval OWL.",
+        message: "Data sedang dikunci oleh proses approval.",
         ticket: project.lock_ticket,
       });
     }

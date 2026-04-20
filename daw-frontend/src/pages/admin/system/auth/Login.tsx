@@ -96,7 +96,7 @@ export default function Login() {
               settings?.logoUrl ? getCleanImageUrl(settings.logoUrl) : logoDaw
             }
             alt="DAW Group Logo"
-            className="h-14 w-auto object-contain"
+            className="h-36 w-auto object-contain"
           />
         </div>
 

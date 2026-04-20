@@ -140,7 +140,7 @@ exports.updateBusinessSection = async (req, res) => {
 
     if (section.is_locked && userRole === "editor") {
       return res.status(423).json({
-        message: "Sektor ini sedang dalam peninjauan Admin OWL.",
+        message: "Sektor ini sedang dalam peninjauan.",
         ticket: section.lock_ticket,
       });
     }

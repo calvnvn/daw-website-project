@@ -1182,7 +1182,7 @@ export default function PageBuilder() {
               </p>
               <p className="text-xs text-slate-300 italic mt-0.5">
                 {activeItemLocked
-                  ? "Form terkunci. Menunggu hasil tinjauan Admin OWL."
+                  ? "Form terkunci. Menunggu hasil tinjauan."
                   : "Perubahan lokal akan ditayangkan setelah disetujui."}
               </p>
             </div>

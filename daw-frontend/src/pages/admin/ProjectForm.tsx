@@ -473,7 +473,7 @@ export default function ProjectForm() {
         id: loadingToast,
         description:
           err.response?.data?.message ||
-          "Koneksi OWL mungkin lambat atau terputus.",
+          "Koneksi server mungkin lambat atau terputus.",
       });
     } finally {
       setIsLoading(false);

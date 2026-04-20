@@ -483,7 +483,7 @@ export default function ApprovalCenter() {
     payload: any,
   ) => {
     const toastId = toast.loading(
-      "Mengeksekusi persetujuan & sinkronisasi OWL...",
+      "Mengeksekusi persetujuan & sinkronisasi server...",
     );
     try {
       await api.post("/approval/decide", {

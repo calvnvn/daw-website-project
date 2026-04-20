@@ -208,7 +208,7 @@ export default function GlobalSettings() {
                 Revisi Settings Ditolak
               </h3>
               <p className="text-xs text-amber-700 leading-relaxed max-w-2xl">
-                Alasan Admin OWL:{" "}
+                Alasan penolakan:{" "}
                 <span className="font-bold italic">
                   "
                   {rejectedDraft.rejection_reason ||
