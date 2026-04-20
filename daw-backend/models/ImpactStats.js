@@ -1,7 +1,7 @@
 const { DataTypes } = require("sequelize");
 const sequelize = require("../config/database");
 
-const ImpactStat = sequelize.define("ImpactStat", {
+const ImpactStats = sequelize.define("ImpactStats", {
   icon: {
     type: DataTypes.STRING,
     defaultValue: "Map",
@@ -33,4 +33,4 @@ const ImpactStat = sequelize.define("ImpactStat", {
   },
 });
 
-module.exports = ImpactStat;
+module.exports = ImpactStats;

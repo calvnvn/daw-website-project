@@ -1,6 +1,6 @@
-const HeroSlide = require("../models/HeroSlide");
+const HeroSlides = require("../models/HeroSlides");
 const HomeSettings = require("../models/HomeSettings");
-const ImpactStat = require("../models/ImpactStat");
+const ImpactStats = require("../models/ImpactStats");
 const { deleteSingleFile } = require("../utils/fileRemover");
 const ErpApprovalService = require("../services/erpApprovalService");
 
@@ -8,8 +8,8 @@ const ErpApprovalService = require("../services/erpApprovalService");
 exports.getHomepageData = async (req, res) => {
   try {
     const [slides, stats, settings] = await Promise.all([
-      HeroSlide.findAll({ order: [["order", "ASC"]] }),
-      ImpactStat.findAll({ order: [["order", "ASC"]] }),
+      HeroSlides.findAll({ order: [["order", "ASC"]] }),
+      ImpactStats.findAll({ order: [["order", "ASC"]] }),
       HomeSettings.findOne(),
     ]);
 
@@ -79,7 +79,7 @@ exports.createHeroSlide = async (req, res) => {
 
     if (req.userRole?.toLowerCase() === "editor" && status === "Published") {
       const result = await ErpApprovalService.initiateApproval({
-        model: HeroSlide,
+        model: HeroSlides,
         targetId: null,
         action: "CREATE",
         payload: slideData,
@@ -93,7 +93,7 @@ exports.createHeroSlide = async (req, res) => {
       });
     }
 
-    const slide = await HeroSlide.create(slideData);
+    const slide = await HeroSlides.create(slideData);
     res.status(201).json(slide);
   } catch (error) {
     res.status(500).json({ message: error.message });
@@ -104,7 +104,7 @@ exports.updateHeroSlide = async (req, res) => {
   try {
     const { id } = req.params;
     const { title, subtitle, order, status } = req.body;
-    const slide = await HeroSlide.findByPk(id);
+    const slide = await HeroSlides.findByPk(id);
     if (!slide) return res.status(404).json({ message: "Slide not found" });
 
     let newImageUrl = slide.imageUrl;
@@ -119,7 +119,7 @@ exports.updateHeroSlide = async (req, res) => {
 
     if (req.userRole?.toLowerCase() === "editor" && status === "Published") {
       const result = await ErpApprovalService.initiateApproval({
-        model: HeroSlide,
+        model: HeroSlides,
         targetId: id,
         action: "UPDATE",
         payload: updatedData,
@@ -144,12 +144,12 @@ exports.updateHeroSlide = async (req, res) => {
 
 exports.deleteHeroSlide = async (req, res) => {
   try {
-    const slide = await HeroSlide.findByPk(req.params.id);
+    const slide = await HeroSlides.findByPk(req.params.id);
     if (!slide) return res.status(404).json({ message: "Slide not found" });
 
     if (req.userRole?.toLowerCase() === "editor") {
       const result = await ErpApprovalService.initiateApproval({
-        model: HeroSlide,
+        model: HeroSlides,
         targetId: slide.id,
         action: "DELETE",
         payload: { title: slide.title },
@@ -174,7 +174,7 @@ exports.deleteHeroSlide = async (req, res) => {
 // Impact Stats CRUD
 exports.createStat = async (req, res) => {
   try {
-    const count = await ImpactStat.count();
+    const count = await ImpactStats.count();
     if (count >= 4)
       return res.status(400).json({ message: "A maximum of 4 stats only!" });
 
@@ -183,7 +183,7 @@ exports.createStat = async (req, res) => {
 
     if (req.userRole?.toLowerCase() === "editor" && status === "Published") {
       const result = await ErpApprovalService.initiateApproval({
-        model: ImpactStat,
+        model: ImpactStats,
         targetId: null,
         action: "CREATE",
         payload: statData,
@@ -197,7 +197,7 @@ exports.createStat = async (req, res) => {
       });
     }
 
-    const stat = await ImpactStat.create(statData);
+    const stat = await ImpactStats.create(statData);
     res.status(201).json(stat);
   } catch (error) {
     res.status(500).json({ message: error.message });
@@ -208,14 +208,14 @@ exports.updateStat = async (req, res) => {
   try {
     const { id } = req.params;
     const { icon, value, label, desc, order, status } = req.body;
-    const stat = await ImpactStat.findByPk(id);
+    const stat = await ImpactStats.findByPk(id);
     if (!stat) return res.status(404).json({ message: "Stat not found" });
 
     const statData = { icon, value, label, desc, order };
 
     if (req.userRole?.toLowerCase() === "editor" && status === "Published") {
       const result = await ErpApprovalService.initiateApproval({
-        model: ImpactStat,
+        model: ImpactStats,
         targetId: id,
         action: "UPDATE",
         payload: statData,
@@ -238,12 +238,12 @@ exports.updateStat = async (req, res) => {
 
 exports.deleteStat = async (req, res) => {
   try {
-    const stat = await ImpactStat.findByPk(req.params.id);
+    const stat = await ImpactStats.findByPk(req.params.id);
     if (!stat) return res.status(404).json({ message: "Stat not found" });
 
     if (req.userRole?.toLowerCase() === "editor") {
       const result = await ErpApprovalService.initiateApproval({
-        model: ImpactStat,
+        model: ImpactStats,
         targetId: stat.id,
         action: "DELETE",
         payload: { label: stat.label },

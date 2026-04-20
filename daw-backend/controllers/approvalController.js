@@ -13,10 +13,10 @@ const BusinessSection = require("../models/BusinessSection");
 const BusinessMapMarker = require("../models/BusinessMapMarker");
 const ApprovalDraft = require("../models/ApprovalDraft");
 
-const HeroSlide = require("../models/HeroSlide");
+const HeroSlides = require("../models/HeroSlides");
 const History = require("../models/History");
 const HomeSettings = require("../models/HomeSettings");
-const ImpactStat = require("../models/ImpactStat");
+const ImpactStats = require("../models/ImpactStats");
 const InvestmentSettings = require("../models/InvestmentSettings");
 const Settings = require("../models/Settings");
 const AboutInfo = require("../models/AboutInfo");
@@ -272,10 +272,10 @@ function getModelByModuleName(module) {
     Menu,
     MapCategory,
     BusinessSection,
-    HeroSlide,
+    HeroSlides,
     History,
     HomeSettings,
-    ImpactStat,
+    ImpactStats,
     InvestmentSettings,
     InvestmentSetting: InvestmentSettings,
     Settings,
@@ -294,8 +294,8 @@ function handleFileCommit(module, payload) {
     Management: ["photoUrl"],
     Affiliate: ["logoUrl"],
     Page: ["heroImage"],
-    HeroSlide: ["imageUrl"],
-    ImpactStat: ["icon"],
+    HeroSlides: ["imageUrl"],
+    ImpactStats: ["icon"],
     Settings: ["logoUrl", "faviconUrl"],
     // AboutInfo, History, dll biasanya teks murni
   };
@@ -407,7 +407,7 @@ async function executeModelUpdate(
       break;
 
     default:
-      // Modul standar (Project, Management, Affiliate, Page, HeroSlide, ImpactStat, MapCategory)
+      // Modul standar (Project, Management, Affiliate, Page, HeroSlides, ImpactStats, MapCategory)
       if (Model) {
         await Model.update(payload, { where: { id: targetId }, transaction });
       } else {

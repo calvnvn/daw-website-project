@@ -18,9 +18,9 @@ const History = require("../models/History");
 const BusinessSection = require("../models/BusinessSection");
 const Affiliate = require("../models/Affiliate");
 const BusinessMapMarker = require("../models/BusinessMapMarker");
-const HeroSlide = require("../models/HeroSlide");
+const HeroSlides = require("../models/HeroSlides");
 const HomeSettings = require("../models/HomeSettings");
-const ImpactStat = require("../models/ImpactStat");
+const ImpactStats = require("../models/ImpactStats");
 // const Inquiry = require("../models/Inquiry"); // Buka komen ini kalau mau test Inquiries
 const InvestmentSettings = require("../models/InvestmentSettings");
 const Management = require("../models/Management");
@@ -530,9 +530,9 @@ async function runMasterSeeder() {
     }
 
     // 9. SEED HERO SLIDES
-    const slideCount = await HeroSlide.count();
+    const slideCount = await HeroSlides.count();
     if (slideCount === 0) {
-      await HeroSlide.bulkCreate(DEFAULT_HERO_SLIDES);
+      await HeroSlides.bulkCreate(DEFAULT_HERO_SLIDES);
       console.log("✅ Data Hero Slides berhasil disuntikkan.");
     }
 
@@ -544,9 +544,9 @@ async function runMasterSeeder() {
     if (homeSetCreated) console.log("✅ Default Home Settings ditambahkan.");
 
     // 11. SEED IMPACT STATS
-    const statCount = await ImpactStat.count();
+    const statCount = await ImpactStats.count();
     if (statCount === 0) {
-      await ImpactStat.bulkCreate(DEFAULT_IMPACT_STATS);
+      await ImpactStats.bulkCreate(DEFAULT_IMPACT_STATS);
       console.log("✅ Data Impact Stats berhasil disuntikkan.");
     }
 

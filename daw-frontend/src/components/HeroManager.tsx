@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { useHome, type HeroSlide } from "@/contexts/HomeContext";
+import { useHome, type HeroSlides } from "@/contexts/HomeContext";
 import {
   Save,
   Plus,
@@ -15,7 +15,7 @@ import {
 import { toast } from "sonner";
 import api, { BASE_UPLOAD_URL } from "@/lib/api";
 
-interface EditableSlide extends Omit<HeroSlide, "id"> {
+interface EditableSlide extends Omit<HeroSlides, "id"> {
   id: string | number;
   file?: File | null;
   previewUrl?: string;
@@ -234,8 +234,7 @@ export default function HeroManager() {
               isEditing
                 ? "bg-amber-100 text-amber-700 border-amber-200"
                 : "bg-slate-100 text-slate-500 border-slate-200 hover:bg-slate-200"
-            }`}
-          >
+            }`}>
             {isEditing ? (
               <Unlock className="w-4 h-4" />
             ) : (
@@ -247,8 +246,7 @@ export default function HeroManager() {
           {isEditing && (
             <button
               onClick={addSlide}
-              className="flex items-center gap-1.5 px-4 py-2 bg-daw-green/10 hover:bg-daw-green hover:text-white text-daw-green rounded-lg text-sm font-bold transition-colors"
-            >
+              className="flex items-center gap-1.5 px-4 py-2 bg-daw-green/10 hover:bg-daw-green hover:text-white text-daw-green rounded-lg text-sm font-bold transition-colors">
               <Plus className="w-4 h-4" /> Tambah Slide Baru
             </button>
           )}
@@ -256,8 +254,7 @@ export default function HeroManager() {
           <button
             onClick={handleSave}
             disabled={isSaving || !isEditing}
-            className="flex items-center gap-2 bg-daw-green hover:bg-[#003b1c] disabled:bg-slate-300 disabled:cursor-not-allowed text-white px-5 py-2 rounded-lg font-medium transition-colors shadow-sm"
-          >
+            className="flex items-center gap-2 bg-daw-green hover:bg-[#003b1c] disabled:bg-slate-300 disabled:cursor-not-allowed text-white px-5 py-2 rounded-lg font-medium transition-colors shadow-sm">
             <Save className="w-4 h-4" /> {isSaving ? "Menyimpan.." : "Save"}
           </button>
         </div>
@@ -283,20 +280,17 @@ export default function HeroManager() {
                 dragOverIndex === index && draggedIndex !== index
                   ? "border-t-4 border-t-daw-green shadow-lg scale-[1.01]" // Indikator garis mau di-drop
                   : ""
-              }`}
-            >
+              }`}>
               {/* Order Control */}
               {isEditing && (
                 <div
                   className="flex flex-row md:flex-col items-center justify-center gap-1 border-b md:border-b-0 md:border-r border-slate-100 pb-4 md:pb-0 md:pr-4 shrink-0 cursor-grab active:cursor-grabbing"
-                  title="Tarik untuk atur urutan"
-                >
+                  title="Tarik untuk atur urutan">
                   {/* Tombol Chevron Up & Down biarkan saja untuk fallback (aksesibilitas) */}
                   <button
                     onClick={() => moveSlide(index, "up")}
                     disabled={index === 0}
-                    className="p-1.5 rounded-md hover:bg-slate-100 disabled:opacity-20 text-slate-500 transition-colors"
-                  >
+                    className="p-1.5 rounded-md hover:bg-slate-100 disabled:opacity-20 text-slate-500 transition-colors">
                     <ChevronUp className="w-5 h-5 pointer-events-none" />
                   </button>
 
@@ -307,8 +301,7 @@ export default function HeroManager() {
                   <button
                     onClick={() => moveSlide(index, "down")}
                     disabled={index === slides.length - 1}
-                    className="p-1.5 rounded-md hover:bg-slate-100 disabled:opacity-20 text-slate-500 transition-colors"
-                  >
+                    className="p-1.5 rounded-md hover:bg-slate-100 disabled:opacity-20 text-slate-500 transition-colors">
                     <ChevronDown className="w-5 h-5 pointer-events-none" />
                   </button>
                 </div>
@@ -338,8 +331,7 @@ export default function HeroManager() {
                     isEditing
                       ? "cursor-pointer border-slate-300 bg-white hover:border-daw-green"
                       : "cursor-not-allowed border-slate-200 bg-slate-100/50"
-                  }`}
-                >
+                  }`}>
                   {displayImage ? (
                     <>
                       <img
@@ -369,8 +361,7 @@ export default function HeroManager() {
                         className={`w-8 h-8 mb-2 ${isEditing ? "text-slate-400" : "text-slate-300"}`}
                       />
                       <span
-                        className={`text-xs font-bold ${isEditing ? "text-slate-500" : "text-slate-400"}`}
-                      >
+                        className={`text-xs font-bold ${isEditing ? "text-slate-500" : "text-slate-400"}`}>
                         Klik untuk Upload
                       </span>
                     </>
@@ -388,8 +379,7 @@ export default function HeroManager() {
                     <button
                       onClick={() => removeSlide(slide.id)}
                       className="text-slate-400 hover:text-red-600 hover:bg-red-50 p-1.5 rounded-md transition-colors"
-                      title="Delete"
-                    >
+                      title="Delete">
                       <Trash2 className="w-4 h-4" />
                     </button>
                   )}

@@ -1,7 +1,7 @@
 const { DataTypes } = require("sequelize");
 const sequelize = require("../config/database");
 
-const HeroSlide = sequelize.define("HeroSlide", {
+const HeroSlides = sequelize.define("HeroSlides", {
   title: {
     type: DataTypes.STRING,
     allowNull: false,
@@ -28,4 +28,4 @@ const HeroSlide = sequelize.define("HeroSlide", {
   },
 });
 
-module.exports = HeroSlide;
+module.exports = HeroSlides;

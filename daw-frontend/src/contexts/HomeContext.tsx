@@ -9,7 +9,7 @@ import {
 
 import api from "@/lib/api";
 // 1. Definisikan Struktur Data (Sesuai dengan Model Database)
-export interface HeroSlide {
+export interface HeroSlides {
   id: number | string;
   title: string;
   subtitle: string;
@@ -22,7 +22,7 @@ export interface HomeSettings {
   introBody: string;
 }
 
-export interface ImpactStat {
+export interface ImpactStats {
   id: number | string;
   icon: string;
   value: string;
@@ -32,8 +32,8 @@ export interface ImpactStat {
 }
 
 interface HomeContextType {
-  slides: HeroSlide[];
-  stats: ImpactStat[];
+  slides: HeroSlides[];
+  stats: ImpactStats[];
   settings: HomeSettings | null;
   isLoading: boolean;
   refreshData: () => Promise<void>;
@@ -50,8 +50,8 @@ export const HomeContext = createContext<HomeContextType>({
 
 // 3. Provider
 export function HomeProvider({ children }: { children: ReactNode }) {
-  const [slides, setSlides] = useState<HeroSlide[]>([]);
-  const [stats, setStats] = useState<ImpactStat[]>([]);
+  const [slides, setSlides] = useState<HeroSlides[]>([]);
+  const [stats, setStats] = useState<ImpactStats[]>([]);
   const [settings, setSettings] = useState<HomeSettings | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 

@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useHome, type ImpactStat } from "@/contexts/HomeContext";
+import { useHome, type ImpactStats } from "@/contexts/HomeContext";
 import { Save, Plus, Trash2, Lock, Unlock } from "lucide-react";
 import * as Icons from "lucide-react";
 import { toast } from "sonner";
@@ -18,7 +18,7 @@ const AVAILABLE_ICONS = [
 
 export default function StatsManager() {
   const { stats: initialStats, refreshData } = useHome();
-  const [stats, setStats] = useState<ImpactStat[]>([]);
+  const [stats, setStats] = useState<ImpactStats[]>([]);
   const [isEditing, setIsEditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
@@ -50,7 +50,7 @@ export default function StatsManager() {
 
   const updateStatField = (
     id: string | number,
-    field: keyof ImpactStat,
+    field: keyof ImpactStats,
     value: string,
   ) => {
     setStats((prevStats) =>
@@ -169,8 +169,7 @@ export default function StatsManager() {
               isEditing
                 ? "bg-amber-100 text-amber-700 border-amber-200"
                 : "bg-slate-100 text-slate-500 border-slate-200 hover:bg-slate-200"
-            }`}
-          >
+            }`}>
             {isEditing ? (
               <Unlock className="w-4 h-4" />
             ) : (
@@ -182,8 +181,7 @@ export default function StatsManager() {
           {isEditing && stats.length < 4 && (
             <button
               onClick={addStat}
-              className="flex items-center gap-1.5 px-4 py-2 bg-daw-green/10 hover:bg-daw-green hover:text-white text-daw-green rounded-lg text-sm font-bold transition-colors"
-            >
+              className="flex items-center gap-1.5 px-4 py-2 bg-daw-green/10 hover:bg-daw-green hover:text-white text-daw-green rounded-lg text-sm font-bold transition-colors">
               <Plus className="w-4 h-4" /> Add Stat
             </button>
           )}
@@ -191,8 +189,7 @@ export default function StatsManager() {
           <button
             onClick={handleSave}
             disabled={isSaving || !isEditing}
-            className="flex items-center gap-2 bg-daw-green hover:bg-[#003b1c] disabled:bg-slate-300 disabled:cursor-not-allowed text-white px-5 py-2 rounded-lg font-medium transition-colors shadow-sm"
-          >
+            className="flex items-center gap-2 bg-daw-green hover:bg-[#003b1c] disabled:bg-slate-300 disabled:cursor-not-allowed text-white px-5 py-2 rounded-lg font-medium transition-colors shadow-sm">
             <Save className="w-4 h-4" /> {isSaving ? "Saving..." : "Save"}
           </button>
         </div>
@@ -214,16 +211,14 @@ export default function StatsManager() {
                 isEditing
                   ? "bg-white border-slate-200 shadow-sm cursor-grab active:cursor-grabbing"
                   : "bg-slate-50 border-slate-100"
-              } ${isDragging ? "opacity-40 scale-95 border-daw-green border-dashed" : "opacity-100"}`}
-            >
+              } ${isDragging ? "opacity-40 scale-95 border-daw-green border-dashed" : "opacity-100"}`}>
               {/* Orders Control */}
               {isEditing && (
                 <div className="flex flex-col items-center gap-1 pr-2 border-r border-slate-100">
                   <button
                     onClick={() => index > 0 && reorderStats(index, index - 1)}
                     disabled={index === 0}
-                    className="p-1 hover:bg-slate-100 rounded disabled:opacity-20"
-                  >
+                    className="p-1 hover:bg-slate-100 rounded disabled:opacity-20">
                     <Icons.ChevronUp className="w-4 h-4 text-slate-500" />
                   </button>
 
@@ -234,8 +229,7 @@ export default function StatsManager() {
                       index < stats.length - 1 && reorderStats(index, index + 1)
                     }
                     disabled={index === stats.length - 1}
-                    className="p-1 hover:bg-slate-100 rounded disabled:opacity-20"
-                  >
+                    className="p-1 hover:bg-slate-100 rounded disabled:opacity-20">
                     <Icons.ChevronDown className="w-4 h-4 text-slate-500" />
                   </button>
                 </div>
@@ -259,8 +253,7 @@ export default function StatsManager() {
                   {isEditing && (
                     <button
                       onClick={() => removeStat(stat.id)}
-                      className="text-slate-400 hover:text-red-600 transition-colors"
-                    >
+                      className="text-slate-400 hover:text-red-600 transition-colors">
                       <Trash2 className="w-4 h-4" />
                     </button>
                   )}
@@ -291,8 +284,7 @@ export default function StatsManager() {
                       onChange={(e) =>
                         updateStatField(stat.id, "icon", e.target.value)
                       }
-                      className={`w-full px-2 py-1.5 text-xs transition-all rounded-md appearance-none ${isEditing ? "bg-white border border-slate-300" : "bg-slate-100/50 border-transparent text-slate-500"}`}
-                    >
+                      className={`w-full px-2 py-1.5 text-xs transition-all rounded-md appearance-none ${isEditing ? "bg-white border border-slate-300" : "bg-slate-100/50 border-transparent text-slate-500"}`}>
                       {AVAILABLE_ICONS.map((i) => (
                         <option key={i.name} value={i.name}>
                           {i.label}
