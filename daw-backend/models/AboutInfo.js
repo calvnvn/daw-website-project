@@ -24,7 +24,7 @@ const AboutInfo = sequelize.define(
     },
     lock_ticket: {
       type: DataTypes.STRING,
-      allowValue: true,
+      allowNull: true,
       comment: "Menyimpan No. Tiket dari OWL yang sedang mengunci data ini",
     },
   },

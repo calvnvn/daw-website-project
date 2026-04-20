@@ -1,11 +1,26 @@
 const Management = require("../models/Management");
 const { deleteSingleFile } = require("../utils/fileRemover");
 const ErpApprovalService = require("../services/erpApprovalService");
+const ApprovalDraft = require("../models/ApprovalDraft");
+const sequelize = require("../config/database");
 
+const getRole = (req) =>
+  req.userRole ? req.userRole.toLowerCase().trim() : "";
 // 1. GET ALL: Tampilkan semua data (Termasuk yang is_locked)
 exports.getAllManagements = async (req, res) => {
   try {
     const managements = await Management.findAll({
+      attributes: [
+        "id",
+        "name",
+        "role",
+        "description",
+        "level",
+        "order",
+        "photoUrl",
+        "is_locked",
+        "lock_ticket",
+      ],
       order: [
         ["level", "ASC"],
         ["order", "ASC"],
@@ -13,19 +28,16 @@ exports.getAllManagements = async (req, res) => {
     });
     res.status(200).json(managements);
   } catch (error) {
-    console.error("GET Management Error:", error);
-    res
-      .status(500)
-      .json({ message: "Gagal mengambil data", error: error.message });
+    res.status(500).json({ message: "Gagal mengambil data management." });
   }
 };
-
-// 2. POST: Create Management (Approval Aware)
 exports.createManagement = async (req, res) => {
+  const t = await sequelize.transaction();
+  const userRole = getRole(req);
+  const photoUrl = req.file ? req.file.filename : null; // Multer sudah beri prefix TEMP_ jika Editor
+
   try {
     const { name, role, description, level, order, status } = req.body;
-    const photoUrl = req.file ? req.file.filename : null;
-
     const managementData = {
       name,
       role,
@@ -35,55 +47,87 @@ exports.createManagement = async (req, res) => {
       photoUrl,
     };
 
-    // --- JALUR EDITOR: REQUEST CREATE ---
-    if (req.userRole?.toLowerCase() === "editor" && status === "Published") {
-      const tokenOWL = req.owl_token;
+    // --- JALUR EDITOR: TWO-PHASE (LOCAL FIRST, THEN NETWORK) ---
+    if (userRole === "editor" && status === "Published") {
+      // Phase 1: Buat record lokal dalam keadaan terkunci
+      const newDraftRecord = await Management.create(
+        { ...managementData, is_locked: true },
+        { transaction: t },
+      );
 
-      const result = await ErpApprovalService.initiateApproval({
-        model: Management,
-        targetId: null, // Masih baru, belum ada ID asli
-        action: "CREATE",
-        payload: managementData,
-        userId: req.userId,
-        owlUsername: req.owl_username,
-        token: tokenOWL,
-      });
+      // Phase 2: Hubungi OWL
+      try {
+        const result = await ErpApprovalService.initiateApproval({
+          model: Management,
+          targetId: newDraftRecord.id, // Sekarang kita punya ID
+          action: "CREATE",
+          payload: managementData,
+          userId: req.userId,
+          owlUsername: req.owl_username,
+          token: req.headers["authorization"]?.split(" ")[1],
+        });
 
-      return res.status(202).json({
-        message: "Permintaan tambah anggota baru telah dikirim .",
-        ticket: result.notrans,
-      });
+        await newDraftRecord.update(
+          { lock_ticket: result.notrans },
+          { transaction: t },
+        );
+        await t.commit();
+
+        return res.status(202).json({
+          message: "Permintaan tambah anggota dikirim.",
+          ticket: result.notrans,
+        });
+      } catch (owlError) {
+        await t.rollback();
+        if (photoUrl) deleteSingleFile(photoUrl); // Hapus file TEMP_ karena draf gagal
+        throw owlError;
+      }
     }
 
     // --- JALUR SUPERADMIN: DIRECT CREATE ---
-    const newPerson = await Management.create(managementData);
+    const newPerson = await Management.create(managementData, {
+      transaction: t,
+    });
+    await t.commit();
     res
       .status(201)
-      .json({ message: "Anggota baru berhasil ditambahkan!", data: newPerson });
+      .json({ message: "Anggota berhasil ditambahkan!", data: newPerson });
   } catch (error) {
-    console.error("CREATE Management Error:", error);
-    res
-      .status(500)
-      .json({ message: "Gagal menambah data", error: error.message });
+    if (t) await t.rollback();
+    res.status(500).json({ message: error.message });
   }
 };
 
-// 3. PUT: Update Management (Orchestrated)
+// 3. PUT: Update Management (Resubmission & Asset Cleanup)
 exports.updateManagement = async (req, res) => {
+  const t = await sequelize.transaction();
+  const userRole = getRole(req);
+  const { id } = req.params;
+
   try {
-    const { id } = req.params;
-    const { name, role, description, level, order, removePhoto, status } =
-      req.body;
+    const {
+      name,
+      role,
+      description,
+      level,
+      order,
+      removePhoto,
+      status,
+      previous_notrans,
+    } = req.body;
+    const person = await Management.findByPk(id, { transaction: t });
 
-    const person = await Management.findByPk(id);
-    if (!person) return res.status(404).json({ message: "Member not found" });
+    if (!person) {
+      await t.rollback();
+      return res.status(404).json({ message: "Data tidak ditemukan." });
+    }
 
-    // Cek jika data sedang dikunci (Safety check)
-    if (person.is_locked && req.userRole?.toLowerCase() === "editor") {
-      return res.status(423).json({
-        message: "Data sedang dalam proses approval dan tidak dapat diubah.",
-        ticket: person.lock_ticket,
-      });
+    // Safety Check: Lock Guard
+    if (person.is_locked && userRole === "editor") {
+      await t.rollback();
+      return res
+        .status(423)
+        .json({ message: "Data terkunci.", ticket: person.lock_ticket });
     }
 
     let finalPhotoUrl = person.photoUrl;
@@ -97,101 +141,113 @@ exports.updateManagement = async (req, res) => {
       finalPhotoUrl = null;
     }
 
-    // --- JALUR EDITOR: REQUEST UPDATE ---
-    if (req.userRole?.toLowerCase() === "editor" && status === "Published") {
-      const packageContent = {
-        name: name || person.name,
-        role: role || person.role,
-        description: description || person.description,
-        level: level || person.level,
-        order: parseInt(order) || person.order,
-        photoUrl: finalPhotoUrl,
-      };
-
-      const tokenOWL = req.owl_token;
-      const result = await ErpApprovalService.initiateApproval({
-        model: Management,
-        targetId: id,
-        action: "UPDATE",
-        payload: packageContent,
-        userId: req.userId,
-        owlUsername: req.owl_username,
-        token: tokenOWL,
-      });
-
-      return res.status(202).json({
-        message: "Draf perubahan berhasil diajukan. Data asli telah dikunci.",
-        ticket: result.notrans,
-      });
-    }
-
-    // --- JALUR SUPERADMIN: DIRECT UPDATE ---
-    if (req.userRole.toLowerCase() !== "editor" && oldPhotoToDelete) {
-      deleteSingleFile(oldPhotoToDelete);
-    }
-
-    await person.update({
+    const updatedData = {
       name: name || person.name,
       role: role || person.role,
       description: description || person.description,
       level: level || person.level,
       order: parseInt(order) || person.order,
       photoUrl: finalPhotoUrl,
-      is_locked: false,
-      lock_ticket: null,
-    });
+    };
 
-    res
-      .status(200)
-      .json({ message: "Data Management berhasil diperbarui langsung!" });
-  } catch (error) {
-    console.error("UPDATE Management Error:", error);
-    res
-      .status(500)
-      .json({ message: "Gagal memperbarui data", error: error.message });
-  }
-};
+    // --- JALUR EDITOR: REQUEST UPDATE ---
+    if (userRole === "editor" && status === "Published") {
+      // A. Cleanup Draf Lama
+      if (previous_notrans) {
+        await ApprovalDraft.update(
+          { status: "Replaced" },
+          { where: { notrans: previous_notrans }, transaction: t },
+        );
+      }
 
-// 4. DELETE: Management (Approval Aware)
-exports.deleteManagement = async (req, res) => {
-  try {
-    const { id } = req.params;
-    const person = await Management.findByPk(id);
-
-    if (!person) return res.status(404).json({ message: "Data not found" });
-
-    // --- JALUR EDITOR: REQUEST DELETE ---
-    if (req.userRole?.toLowerCase() === "editor") {
-      const tokenOWL = req.owl_token;
-
+      // B. Network Call
       const result = await ErpApprovalService.initiateApproval({
         model: Management,
         targetId: id,
-        action: "DELETE",
-        payload: { name: person.name, role: person.role }, // Payload minimal buat info
+        action: "UPDATE",
+        payload: updatedData,
         userId: req.userId,
         owlUsername: req.owl_username,
-        token: tokenOWL,
+        token: req.headers["authorization"]?.split(" ")[1],
       });
 
-      return res.status(202).json({
-        message:
-          "Permintaan penghapusan dikirim. Data telah dikunci sampai disetujui Admin.",
-        ticket: result.notrans,
+      // C. Set Lock
+      await person.update(
+        { is_locked: true, lock_ticket: result.notrans },
+        { transaction: t },
+      );
+      await t.commit();
+
+      return res
+        .status(202)
+        .json({ message: "Draf revisi dikirim.", ticket: result.notrans });
+    }
+
+    // --- JALUR SUPERADMIN: DIRECT UPDATE ---
+    // Cleanup physical file jika Superadmin ganti/hapus foto
+    if (oldPhotoToDelete) deleteSingleFile(oldPhotoToDelete);
+
+    await person.update(
+      { ...updatedData, is_locked: false, lock_ticket: null },
+      { transaction: t },
+    );
+    await t.commit();
+
+    res.status(200).json({ message: "Data berhasil diperbarui langsung!" });
+  } catch (error) {
+    if (t) await t.rollback();
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// 4. DELETE: Management (Row-Level Locking)
+exports.deleteManagement = async (req, res) => {
+  const t = await sequelize.transaction();
+  const userRole = getRole(req);
+
+  try {
+    const person = await Management.findByPk(req.params.id, { transaction: t });
+    if (!person) {
+      await t.rollback();
+      return res.status(404).json({ message: "Data tidak ditemukan." });
+    }
+
+    if (person.is_locked && userRole === "editor") {
+      await t.rollback();
+      return res.status(423).json({
+        message: "Gagal menghapus. Data terkunci.",
+        ticket: person.lock_ticket,
       });
     }
 
-    // --- JALUR SUPERADMIN: DIRECT DELETE ---
-    if (person.photoUrl) deleteSingleFile(person.photoUrl);
-    await person.destroy();
+    if (userRole === "editor") {
+      const result = await ErpApprovalService.initiateApproval({
+        model: Management,
+        targetId: person.id,
+        action: "DELETE",
+        payload: { name: person.name },
+        userId: req.userId,
+        owlUsername: req.owl_username,
+        token: req.headers["authorization"]?.split(" ")[1],
+      });
 
-    res
-      .status(200)
-      .json({ message: "Data Management berhasil dihapus permanen." });
+      await person.update(
+        { is_locked: true, lock_ticket: result.notrans },
+        { transaction: t },
+      );
+      await t.commit();
+      return res
+        .status(202)
+        .json({ message: "Permintaan hapus dikirim.", ticket: result.notrans });
+    }
+
+    // Superadmin: Langsung musnahkan
+    if (person.photoUrl) deleteSingleFile(person.photoUrl);
+    await person.destroy({ transaction: t });
+    await t.commit();
+    res.status(200).json({ message: "Data berhasil dihapus." });
   } catch (error) {
-    console.error("DELETE Management Error:", error);
-    res
-      .status(500)
-      .json({ message: "Gagal menghapus data", error: error.message });
+    if (t) await t.rollback();
+    res.status(500).json({ message: error.message });
   }
 };

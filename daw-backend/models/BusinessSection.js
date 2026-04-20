@@ -47,7 +47,7 @@ const BusinessSection = sequelize.define(
     },
     lock_ticket: {
       type: DataTypes.STRING(255),
-      allowNull: true, // Perbaikan dari allowValue
+      allowNull: true, // Perbaikan dari
     },
   },
   {

@@ -347,6 +347,7 @@ async function executeModelUpdate(
 
   switch (module) {
     case "AboutInfo":
+      return { model: AboutInfo, id: 1 };
     case "HomeSettings":
       return {
         model: HomeSettings,
@@ -364,6 +365,8 @@ async function executeModelUpdate(
         const historyData = payload.histories.map((h) => ({
           year: h.year,
           description: h.text,
+          is_locked: false,
+          lock_ticket: null,
         }));
         await History.bulkCreate(historyData, { transaction });
       }
@@ -394,7 +397,6 @@ async function executeModelUpdate(
 
     case "Menu":
       if (targetId === "ALL_TREE") {
-        // Bulk Update untuk urutan menu
         for (const item of payload.updatedMenus) {
           await Menu.update(
             { orderIndex: item.orderIndex, parentId: item.parentId },
@@ -411,7 +413,6 @@ async function executeModelUpdate(
       break;
 
     default:
-      // Modul standar (Project, Management, Affiliate, Page, HeroSlides, ImpactStats, MapCategory)
       if (Model) {
         await Model.update(payload, { where: { id: targetId }, transaction });
       } else {

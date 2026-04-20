@@ -1,21 +1,28 @@
 const sequelize = require("../config/database");
+const AboutInfo = require("../models/AboutInfo");
+const ApprovalDraft = require("../models/ApprovalDraft");
 const ErpApprovalService = require("../services/erpApprovalService");
 
-const JENIS_APP_CMS = process.env.CMS_APPROVAL_CODE;
-// GET: Data Info & Philosophu
+// Helper untuk Role
+const getRole = (req) =>
+  req.userRole ? req.userRole.toLowerCase().trim() : "";
+
+// GET: Data Info & Philosophy
 exports.getAboutInfo = async (req, res) => {
   try {
-    const [info] = await sequelize.query(
-      "SELECT * FROM AboutInfo WHERE id = 1 LIMIT 1",
-      { type: sequelize.QueryTypes.SELECT },
-    );
+    const info = await AboutInfo.findByPk(1, {
+      attributes: [
+        "spiritText",
+        "missionText",
+        "visionText",
+        "philosophyTitle",
+        "philosophyPillars",
+        "is_locked",
+        "lock_ticket",
+      ],
+    });
 
-    if (!info) {
-      return res.status(404).json({ message: "About info not found" });
-    }
-    if (typeof info.philosophyPillars === "string") {
-      info.philosophyPillars = JSON.parse(info.philosophyPillars);
-    }
+    if (!info) return res.status(404).json({ message: "About info not found" });
 
     res.status(200).json(info);
   } catch (error) {
@@ -24,9 +31,11 @@ exports.getAboutInfo = async (req, res) => {
   }
 };
 
-// PUT: Data Info & Philosophy
+// PUT: Data Info & Philosophy (Singleton Approval Flow)
 exports.updateAboutInfo = async (req, res) => {
+  const t = await sequelize.transaction();
   try {
+    const userRole = getRole(req);
     const {
       spiritText,
       missionText,
@@ -34,20 +43,23 @@ exports.updateAboutInfo = async (req, res) => {
       philosophyTitle,
       philosophyPillars,
       status,
+      previous_notrans,
     } = req.body;
 
-    // Ambil data ID 1
-    const info = await AboutInfo.findByPk(1);
-    if (!info) return res.status(404).json({ message: "About info not found" });
+    const info = await AboutInfo.findByPk(1, { transaction: t });
+    if (!info) {
+      await t.rollback();
+      return res.status(404).json({ message: "About info not found" });
+    }
 
-    // IF locked
-    if (info.is_locked && req.userRole?.toLowerCase() === "editor") {
-      return res
-        .status(423)
-        .json({
-          message: "Data sedang ditinjau Admin.",
-          ticket: info.lock_ticket,
-        });
+    // 1. Pre-Flight Check: Lock Guard
+    if (info.is_locked && userRole === "editor") {
+      await t.rollback();
+      return res.status(423).json({
+        message:
+          "Data sedang ditinjau Admin. Perubahan saat ini tidak diizinkan.",
+        ticket: info.lock_ticket,
+      });
     }
 
     const packageContent = {
@@ -55,14 +67,21 @@ exports.updateAboutInfo = async (req, res) => {
       missionText: missionText || info.missionText,
       visionText: visionText || info.visionText,
       philosophyTitle: philosophyTitle || info.philosophyTitle,
-      philosophyPillars: philosophyPillars || info.philosophyPillars, // Sequelize handle JSON otomatis
+      philosophyPillars: philosophyPillars || info.philosophyPillars,
     };
 
-    // Gatekeeper: Editor Flow
-    if (req.userRole?.toLowerCase() === "editor" && status === "Published") {
+    // --- JALUR EDITOR: TWO-PHASE EXECUTION ---
+    if (userRole === "editor" && status === "Published") {
+      if (previous_notrans) {
+        await ApprovalDraft.update(
+          { status: "Replaced" },
+          { where: { notrans: previous_notrans }, transaction: t },
+        );
+      }
+
       const result = await ErpApprovalService.initiateApproval({
         model: AboutInfo,
-        targetId: 1, // Singleton selalu 1
+        targetId: 1, // Singleton ID
         action: "UPDATE",
         payload: packageContent,
         userId: req.userId,
@@ -70,21 +89,34 @@ exports.updateAboutInfo = async (req, res) => {
         token: req.headers["authorization"]?.split(" ")[1],
       });
 
-      return res
-        .status(202)
-        .json({
-          message: "Revisi About Company dikirim.",
-          ticket: result.notrans,
-        });
+      // C. Set Local Lock
+      await info.update(
+        { is_locked: true, lock_ticket: result.notrans },
+        { transaction: t },
+      );
+
+      await t.commit();
+      return res.status(202).json({
+        message: "Revisi About Company terkirim.",
+        ticket: result.notrans,
+      });
     }
-    // Superadmin Flow
-    await info.update({
-      ...packageContent,
-      is_locked: false,
-      lock_ticket: null,
-    });
+
+    // --- JALUR SUPERADMIN: DIRECT EXECUTION ---
+    await info.update(
+      {
+        ...packageContent,
+        is_locked: false,
+        lock_ticket: null,
+      },
+      { transaction: t },
+    );
+
+    await t.commit();
     res.status(200).json({ message: "About Info updated successfully!" });
   } catch (error) {
+    if (t) await t.rollback();
+    console.error("🚨 [UPDATE ABOUT ERROR]:", error.message);
     res.status(500).json({ message: error.message });
   }
 };
