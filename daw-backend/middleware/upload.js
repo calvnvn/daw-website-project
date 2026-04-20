@@ -3,17 +3,18 @@ const sharp = require("sharp");
 const path = require("path");
 const fs = require("fs");
 
-// 1. Simpan di Memory (RAM) agar bisa diproses Sharp sebelum ditulis ke Disk
+const uploadPath = path.join(process.cwd(), "public", "uploads");
+if (!fs.existsSync(uploadPath)) {
+  fs.mkdirSync(uploadPath, { recursive: true });
+}
+
 const storage = multer.memoryStorage();
 
 const fileFilter = (req, file, cb) => {
-  console.log(
-    `[DEBUG UPLOAD] Nama: ${file.originalname} | Mimetype: ${file.mimetype}`,
-  );
-
-  const allowedExtensions = /\.(jpg|jpeg|png|gif|webp)$/i;
+  const allowedExtensions = /\.(jpg|jpeg|png|gif|webp|ico)$/i;
   const isExtensionValid = allowedExtensions.test(file.originalname);
-  const isMimetypeValid = file.mimetype.startsWith("image/");
+  const isMimetypeValid =
+    file.mimetype.startsWith("image/") || file.mimetype === "image/x-icon";
 
   if (isExtensionValid || isMimetypeValid) {
     const allowedFields = [
@@ -38,9 +39,8 @@ const fileFilter = (req, file, cb) => {
     }
   }
 
-  // Jika dua-duanya gagal, baru kita usir
   cb(
-    new Error(`File ${file.originalname} tidak dikenal sebagai gambar!`),
+    new Error(`File ${file.originalname} bukan format gambar yang didukung!`),
     false,
   );
 };
@@ -48,55 +48,63 @@ const fileFilter = (req, file, cb) => {
 const upload = multer({
   storage: storage,
   fileFilter: fileFilter,
-  limits: { fileSize: 15 * 1024 * 1024 }, // 15MB
+  limits: { fileSize: 15 * 1024 * 1024 }, // 15MB Safety Limit
 });
 
-// 2. Middleware Utama untuk Kompresi & Resize
 const optimizeImage = async (req, res, next) => {
-  // Jika tidak ada file, lanjut ke controller
   if (!req.file && !req.files) return next();
 
-  const uploadPath = path.join(process.cwd(), "public", "uploads");
-
-  // Helper Fungsi untuk memproses gambar
   const processImage = async (file) => {
-    const uniqueSuffix = Date.now() + "-" + Math.round(Math.random() * 1e9);
+    // 🛡️ BLUEPRINT: Unique Naming Strategy
+    const randomSeed = Math.floor(Math.random() * 10000);
+    const uniqueSuffix = `${Date.now()}-${randomSeed}`;
     const safeFieldName = file.fieldname.replace(/[^a-zA-Z0-9]/g, "");
-
-    // Gatekeeper: Cek Role dari JWT (req.userRole diset di authJwt.js)
     const prefix = req.userRole === "editor" ? "TEMP_" : "";
 
-    // Paksa ekstensi jadi .webp untuk kompresi terbaik
     const newFilename = `${prefix}${safeFieldName}-${uniqueSuffix}.webp`;
 
-    await sharp(file.buffer)
-      .resize(1920, null, {
-        // Resize lebar maks 1920px, tinggi otomatis (rasio terjaga)
-        withoutEnlargement: true, // Jangan paksa besarkan jika gambar aslinya kecil
-        fit: "inside",
-      })
-      .webp({ quality: 80 }) // Konversi ke WebP, kualitas 80% (seimbang tajam & ringan)
-      .toFile(path.join(uploadPath, newFilename));
+    let pipeline = sharp(file.buffer);
 
-    // TIMPANI properti file agar Controller menerima nama file yang baru (.webp)
-    file.filename = newFilename;
+    if (file.fieldname === "favicon") {
+      console.log(`>>> [REFINERY] Processing Favicon: Scaling to 64px`);
+      pipeline = pipeline
+        .resize(64, 64, {
+          fit: "contain",
+          background: { r: 0, g: 0, b: 0, alpha: 0 },
+        })
+        .webp({ quality: 90, lossless: true });
+    } else {
+      pipeline = pipeline
+        .resize(1920, null, { withoutEnlargement: true, fit: "inside" })
+        .webp({ quality: 80 });
+    }
+
+    try {
+      await pipeline.toFile(path.join(uploadPath, newFilename));
+      file.filename = newFilename;
+    } catch (err) {
+      console.error(
+        `🚨 [REFINERY ERROR] Failed processing ${file.originalname}:`,
+        err,
+      );
+      throw err;
+    }
   };
 
   try {
     if (req.file) {
-      // Kasus Single File (misal: logo, favicon)
       await processImage(req.file);
     } else if (req.files) {
-      // Kasus Multiple Fields (misal: cover_image + gallery)
-      const fields = Object.keys(req.files);
-      for (const field of fields) {
-        await Promise.all(req.files[field].map((file) => processImage(file)));
+      const fieldKeys = Object.keys(req.files);
+      for (const key of fieldKeys) {
+        await Promise.all(req.files[key].map((file) => processImage(file)));
       }
     }
     next();
   } catch (error) {
-    console.error("🚨 Sharp Optimization Error:", error);
-    res.status(500).json({ message: "Gagal memproses gambar." });
+    res
+      .status(500)
+      .json({ message: "Gagal mengolah aset visual.", error: error.message });
   }
 };
 

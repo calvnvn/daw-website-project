@@ -25,7 +25,7 @@ interface SettingsData {
 interface SettingsContextType {
   settings: SettingsData | null;
   isLoading: boolean;
-  refreshSettings: () => Promise<void>; // 👇 Biar Navbar & SEO bisa update otomatis
+  refreshSettings: () => Promise<void>;
 }
 
 const SettingsContext = createContext<SettingsContextType>({
@@ -60,8 +60,7 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
         settings,
         isLoading,
         refreshSettings: fetchSettings, // Expous fungsi refresh
-      }}
-    >
+      }}>
       {children}
     </SettingsContext.Provider>
   );

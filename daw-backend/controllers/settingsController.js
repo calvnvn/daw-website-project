@@ -1,7 +1,6 @@
 const sequelize = require("../config/database");
 const { deleteSingleFile } = require("../utils/fileRemover");
 const ErpApprovalService = require("../services/erpApprovalService");
-// 🚀 Pastikan import ini sesuai dengan cara lo manggil model lain (lewat index atau langsung)
 const Settings = require("../models/Settings");
 
 // --- 1. GET Data Settings ---
