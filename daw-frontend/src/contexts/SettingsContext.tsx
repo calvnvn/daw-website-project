@@ -4,6 +4,7 @@ import {
   useContext,
   useState,
   useEffect,
+  useMemo,
   type ReactNode,
   useCallback,
 } from "react";
@@ -17,9 +18,13 @@ interface SettingsData {
   website: string;
   googleMapsUrl: string;
   linkedinUrl: string;
-  // 👇 TAMBAHAN FIELD BARU
   logoUrl: string | null;
   faviconUrl: string | null;
+
+  is_locked?: boolean;
+  lock_ticket?: string | null;
+  has_rejected?: boolean;
+  previous_notrans?: string | null;
 }
 
 interface SettingsContextType {
@@ -38,29 +43,40 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
   const [settings, setSettings] = useState<SettingsData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  // Bungkus fetch dalam useCallback biar bisa dipanggil berulang kali
-  const fetchSettings = useCallback(async () => {
+  const fetchSettings = useCallback(async (signal?: AbortSignal) => {
     try {
-      const res = await api.get("/settings");
+      const res = await api.get("/settings", { signal });
       setSettings(res.data);
-    } catch (err) {
-      console.error("Failed to fetch settings:", err);
+    } catch (err: any) {
+      if (err.name !== "CanceledError") {
+        console.error("🚨 Failed to fetch settings:", err);
+      }
     } finally {
       setIsLoading(false);
     }
   }, []);
 
   useEffect(() => {
-    fetchSettings();
+    const controller = new AbortController();
+    fetchSettings(controller.signal);
+
+    // Cleanup: Batalkan request API jika komponen mati sebelum request selesai
+    return () => {
+      controller.abort();
+    };
   }, [fetchSettings]);
 
+  const contextValue = useMemo(
+    () => ({
+      settings,
+      isLoading,
+      refreshSettings: () => fetchSettings(),
+    }),
+    [settings, isLoading, fetchSettings],
+  );
+
   return (
-    <SettingsContext.Provider
-      value={{
-        settings,
-        isLoading,
-        refreshSettings: fetchSettings, // Expous fungsi refresh
-      }}>
+    <SettingsContext.Provider value={contextValue}>
       {children}
     </SettingsContext.Provider>
   );

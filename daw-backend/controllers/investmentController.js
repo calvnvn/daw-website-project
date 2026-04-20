@@ -1,4 +1,4 @@
-const InvestmentSetting = require("../models/InvestmentSettings");
+const InvestmentSettings = require("../models/InvestmentSettings");
 const Affiliate = require("../models/Affiliate");
 const ApprovalDraft = require("../models/ApprovalDraft");
 const { deleteSingleFile } = require("../utils/fileRemover");
@@ -10,9 +10,9 @@ const JENIS_APP_CMS = process.env.CMS_APPROVAL_CODE;
 // 1. GET Data Investasi
 exports.getInvestmentData = async (req, res) => {
   try {
-    let settings = await InvestmentSetting.findOne();
+    let settings = await InvestmentSettings.findOne();
     if (!settings)
-      settings = await InvestmentSetting.create({
+      settings = await InvestmentSettings.create({
         teaserHeadline: "Other Investments.",
         teaserBody: "Beyond our core operations...",
         sectionIntro: "We continuously look for opportunities...",
@@ -35,8 +35,8 @@ exports.updateSettings = async (req, res) => {
       status,
       previous_notrans,
     } = req.body;
-    let settings = await InvestmentSetting.findOne();
-    if (!settings) settings = await InvestmentSetting.create({});
+    let settings = await InvestmentSettings.findOne();
+    if (!settings) settings = await InvestmentSettings.create({});
 
     if (settings.is_locked && req.userRole?.toLowerCase() === "editor") {
       return res.status(423).json({
@@ -55,7 +55,7 @@ exports.updateSettings = async (req, res) => {
       }
 
       const result = await ErpApprovalService.initiateApproval({
-        model: InvestmentSetting,
+        model: InvestmentSettings,
         targetId: 1,
         action: "UPDATE",
         payload: { teaserHeadline, teaserBody, sectionIntro },
@@ -250,12 +250,10 @@ exports.deleteAffiliate = async (req, res) => {
 
     // 🛡️ BLUEPRINT: Check Lock
     if (company.is_locked && req.userRole?.toLowerCase() === "editor") {
-      return res
-        .status(423)
-        .json({
-          message: "Data sedang dikunci oleh proses approval.",
-          ticket: company.lock_ticket,
-        });
+      return res.status(423).json({
+        message: "Data sedang dikunci oleh proses approval.",
+        ticket: company.lock_ticket,
+      });
     }
 
     // --- JALUR EDITOR ---

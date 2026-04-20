@@ -1,61 +1,59 @@
-const sequelize = require("../config/database");
-const { deleteSingleFile } = require("../utils/fileRemover");
-const ErpApprovalService = require("../services/erpApprovalService");
 const Settings = require("../models/Settings");
+const ApprovalDraft = require("../models/ApprovalDraft");
+const ErpApprovalService = require("../services/erpApprovalService");
+const { deleteSingleFile } = require("../utils/fileRemover");
+const sequelize = require("../config/database");
 
-// --- 1. GET Data Settings ---
 exports.getSettings = async (req, res) => {
   try {
-    const settings = await Settings.findByPk(1);
+    const [settings, created] = await Settings.findOrCreate({
+      where: { id: 1 },
+      defaults: {
+        companyName: "PT Dharma Agung Wijaya",
+        is_locked: false,
+      },
+    });
 
-    if (!settings) {
-      return res.status(404).json({ message: "Settings not found" });
-    }
+    if (created)
+      console.log(">>> [SETTINGS] Initialized default record (ID 1)");
+
     res.status(200).json(settings);
   } catch (error) {
     console.error("🚨 Error GET Settings:", error);
-    res.status(500).json({ message: "Failed to fetch settings" });
+    res.status(500).json({ message: "Gagal mengambil pengaturan sistem." });
   }
 };
 
-// --- 2. PUT Data Settings ---
 exports.updateSettings = async (req, res) => {
   try {
-    const id = 1; // Singleton ID
+    const id = 1;
     const settings = await Settings.findByPk(id);
 
-    if (!settings) {
-      return res.status(404).json({ message: "Pengaturan tidak ditemukan." });
-    }
+    if (!settings)
+      return res
+        .status(404)
+        .json({ message: "Record settings tidak ditemukan." });
 
-    const userRole = req.userRole?.toLowerCase();
+    const userRole = req.userRole ? req.userRole.toLowerCase().trim() : "";
+    const { status, previous_notrans, ...textContent } = req.body;
 
-    // 🔒 1. CEK GEMBOK (Hanya untuk Editor)
     if (userRole === "editor" && settings.is_locked) {
       return res.status(423).json({
-        message: "Settings sedang dikunci oleh proses approval di OWL.",
+        message: "Pengaturan sedang dikunci oleh antrean approval OWL.",
         ticket: settings.lock_ticket,
       });
     }
 
-    // 📦 2. PREPARE DATA (Olah Teks & File)
-    let updatePayload = { ...req.body };
+    let updatePayload = { ...textContent };
 
-    // Handle File (Logo & Favicon)
-    if (req.files) {
-      if (req.files["logo"]) {
-        updatePayload.logoUrl = req.files["logo"][0].filename;
-      }
-      if (req.files["favicon"]) {
-        updatePayload.faviconUrl = req.files["favicon"][0].filename;
-      }
-    }
+    // Mapping File Baru (Jika ada upload)
+    if (req.files?.["logo"])
+      updatePayload.logoUrl = req.files["logo"][0].filename;
+    if (req.files?.["favicon"])
+      updatePayload.faviconUrl = req.files["favicon"][0].filename;
+    if (userRole === "superadmin" || userRole === "admin") {
+      console.log(">>> [SETTINGS] JALUR SUPERADMIN: BYPASSING APPROVAL <<<");
 
-    // 🚀 3. JALUR SUPERADMIN (Direct Commit)
-    if (userRole === "superadmin") {
-      console.log(">>> [SETTINGS] JALUR SUPERADMIN: BYPASSING OWL <<<");
-
-      // Hapus file lama jika ada file baru yang diupload
       if (req.files?.["logo"] && settings.logoUrl)
         deleteSingleFile(settings.logoUrl);
       if (req.files?.["favicon"] && settings.faviconUrl)
@@ -67,15 +65,20 @@ exports.updateSettings = async (req, res) => {
         lock_ticket: null,
       });
 
-      return res.status(200).json({
-        message: "Settings updated successfully (Direct Commit)!",
-      });
+      return res
+        .status(200)
+        .json({ message: "Settings diperbarui secara langsung!" });
     }
 
-    // 🕒 4. JALUR EDITOR (Approval Workflow)
-    // Pastikan frontend ngirim status: "Published" kalau mau diajuin ke OWL
     if (userRole === "editor") {
-      console.log(">>> [SETTINGS] JALUR EDITOR: INITIATING WORKFLOW <<<");
+      console.log(">>> [SETTINGS] JALUR EDITOR: INITIATING HANDSHAKE <<<");
+
+      if (previous_notrans) {
+        await ApprovalDraft.update(
+          { status: "Replaced" },
+          { where: { notrans: previous_notrans } },
+        );
+      }
 
       const result = await ErpApprovalService.initiateApproval({
         model: Settings,
@@ -87,18 +90,25 @@ exports.updateSettings = async (req, res) => {
         token: req.owl_token,
       });
 
+      await settings.update({
+        is_locked: true,
+        lock_ticket: result.notrans,
+      });
+
       return res.status(202).json({
-        message: "Revisi Global Settings telah diajukan ke OWL.",
+        message: "Revisi profil dikirim ke OWL. Data sekarang dikunci.",
         ticket: result.notrans,
       });
     }
 
-    // Fallback if role not recognized
     return res
       .status(403)
-      .json({ message: "Role tidak diizinkan mengubah settings." });
+      .json({ message: "Role Anda tidak memiliki akses ke pengaturan ini." });
   } catch (error) {
-    console.error("🚨 ERROR UPDATE SETTINGS:", error);
-    res.status(500).json({ message: error.message });
+    console.error("🚨 ERROR UPDATE SETTINGS:", error.message);
+    res.status(500).json({
+      message: "Gagal memproses pembaruan pengaturan.",
+      error: error.message,
+    });
   }
 };

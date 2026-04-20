@@ -151,7 +151,7 @@ exports.executeDecision = async (req, res) => {
       const cleanPayload = { ...payload };
       delete cleanPayload.id;
 
-      await executeModelUpdate(module, targetId, cleanPayload, action, t);
+      (module, targetId, cleanPayload, action, t);
 
       handleFileCommit(module, cleanPayload);
 
@@ -238,7 +238,7 @@ exports.getRejectedDraftByTarget = async (req, res) => {
     });
 
     if (!draft) {
-      return res.status(404).json({
+      return res.status(200).json({
         message: "Tidak ada draf tertunda yang ditolak untuk entitas ini.",
         hasRejected: false,
       });
@@ -277,6 +277,7 @@ function getModelByModuleName(module) {
     HomeSetting,
     ImpactStat,
     InvestmentSettings,
+    InvestmentSetting: InvestmentSettings,
     Settings,
     AboutInfo,
   };
@@ -349,17 +350,16 @@ async function executeModelUpdate(
     case "HomeSetting":
     case "InvestmentSettings":
     case "Settings":
-      // Modul Singleton (Cuma ada 1 baris, ID biasanya 1)
+      // Singleton
       await Model.update(payload, { where: { id: 1 }, transaction });
       break;
 
     case "History":
-      // Strategi: Wipe and Replace (Hapus semua, isi baru sesuai draf)
       await History.destroy({ where: {}, transaction });
       if (payload.histories && Array.isArray(payload.histories)) {
         const historyData = payload.histories.map((h) => ({
           year: h.year,
-          description: h.text, // Mapping dari draf 'text' ke DB 'description'
+          description: h.text,
         }));
         await History.bulkCreate(historyData, { transaction });
       }

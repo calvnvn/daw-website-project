@@ -1,7 +1,7 @@
 const { DataTypes } = require("sequelize");
 const sequelize = require("../config/database");
 
-const InvestmentSetting = sequelize.define("InvestmentSetting", {
+const InvestmentSettings = sequelize.define("InvestmentSettings", {
   teaserHeadline: {
     type: DataTypes.STRING,
     defaultValue: "Other Investments.",
@@ -20,4 +20,4 @@ const InvestmentSetting = sequelize.define("InvestmentSetting", {
   },
 });
 
-module.exports = InvestmentSetting;
+module.exports = InvestmentSettings;
