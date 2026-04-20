@@ -23,6 +23,7 @@ import api, { BASE_UPLOAD_URL } from "@/lib/api";
 import { useAuth } from "@/contexts/AuthContext";
 import ReactDiffViewer, { DiffMethod } from "react-diff-viewer-continued";
 import DOMPurify from "dompurify";
+import PREVIEW_REGISTRY from "./ModuleRegistry";
 
 interface ApprovalDraft {
   notrans: string;
@@ -239,6 +240,55 @@ const DiffModal = ({
           ) : (
             // TAB 1: VISUAL & METADATA PREVIEW (The Game Changer)
             <div className="space-y-6">
+              {/* 🚀 NEW SECTION: CUSTOM UI PREVIEW (The Game Changer) */}
+              {(() => {
+                const PreviewComponent = PREVIEW_REGISTRY[draft.module_name];
+                if (!PreviewComponent) return null;
+
+                return (
+                  <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+                    <div className="bg-slate-50 px-4 py-3 border-b border-slate-200 flex items-center justify-between">
+                      <h3 className="text-[11px] font-black text-slate-500 uppercase tracking-[0.2em] flex items-center gap-2">
+                        <LayoutTemplate className="w-4 h-4 text-daw-green" />
+                        UI Preview Simulation (Side-by-Side)
+                      </h3>
+                      <span className="text-[10px] font-bold text-daw-green bg-daw-green/5 px-2 py-0.5 rounded border border-daw-green/10">
+                        Render Mode: Mirror
+                      </span>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 divide-x divide-slate-100 bg-slate-50/30">
+                      {/* SISI KIRI: LIVE VERSION */}
+                      <div className="p-6">
+                        <div className="flex items-center gap-2 mb-6 border-b border-slate-100 pb-3">
+                          <div className="w-2 h-2 rounded-full bg-slate-300"></div>
+                          <p className="text-xs font-black text-slate-400 uppercase tracking-widest">
+                            Versi Produksi (Live)
+                          </p>
+                        </div>
+                        {oldData ? (
+                          <PreviewComponent data={oldData} />
+                        ) : (
+                          <div className="h-40 flex items-center justify-center border-2 border-dashed border-slate-200 rounded-2xl text-slate-400 text-xs italic">
+                            Data belum ada di server (Mode Create)
+                          </div>
+                        )}
+                      </div>
+
+                      {/* SISI KANAN: DRAFT PROPOSED */}
+                      <div className="p-6 bg-white">
+                        <div className="flex items-center gap-2 mb-6 border-b border-slate-100 pb-3">
+                          <div className="w-2 h-2 rounded-full bg-daw-green animate-pulse"></div>
+                          <p className="text-xs font-black text-daw-green uppercase tracking-widest">
+                            Usulan Perubahan (Draf)
+                          </p>
+                        </div>
+                        <PreviewComponent data={finalPayload} />
+                      </div>
+                    </div>
+                  </div>
+                );
+              })()}
               {/* SECTION A: METADATA DIFF (Tanpa tag HTML yang panjang) */}
               <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
                 <div className="bg-slate-50 px-4 py-2.5 border-b border-slate-200">

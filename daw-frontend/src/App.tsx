@@ -7,7 +7,7 @@ import { ContentProvider } from "@/contexts/ContentContext";
 import MainLayout from "./layouts/MainLayout";
 import AdminLayout from "./layouts/AdminLayout";
 import ProtectedRoute from "./components/ProtectedRoute";
-import ApprovalCenter from "./pages/admin/ApprovalCenter";
+import ApprovalCenter from "./pages/admin/approvals/ApprovalCenter";
 
 // Lazy Import Public Frontend
 const Home = lazy(() => import("./pages/public/Home"));
