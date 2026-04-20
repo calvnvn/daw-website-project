@@ -348,6 +348,10 @@ async function executeModelUpdate(
   switch (module) {
     case "AboutInfo":
     case "HomeSettings":
+      return {
+        model: HomeSettings,
+        id: 1,
+      };
     case "InvestmentSettings":
     case "Settings":
       // Singleton

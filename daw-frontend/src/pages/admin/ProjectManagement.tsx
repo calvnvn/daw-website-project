@@ -176,7 +176,7 @@ export default function ProjectManagement() {
                 : p,
             ),
           );
-          return "Status diajukan ke OWL. Data dikunci menunggu persetujuan.";
+          return "Status diajukan . Data dikunci menunggu persetujuan.";
         }
 
         // Jalur Eksekusi Langsung (Superadmin / Save Draft)

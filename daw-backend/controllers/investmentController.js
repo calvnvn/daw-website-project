@@ -67,7 +67,7 @@ exports.updateSettings = async (req, res) => {
       await settings.update({ is_locked: true, lock_ticket: result.notrans });
 
       return res.status(202).json({
-        message: "Revisi teks investasi dikirim ke OWL.",
+        message: "Revisi teks investasi dikirim .",
         ticket: result.notrans,
       });
     }
@@ -223,7 +223,7 @@ exports.updateAffiliate = async (req, res) => {
       await company.update({ is_locked: true, lock_ticket: result.notrans });
 
       return res.status(202).json({
-        message: "Revisi afiliasi dikirim ke OWL.",
+        message: "Revisi afiliasi dikirim .",
         ticket: result.notrans,
       });
     }
@@ -272,7 +272,7 @@ exports.deleteAffiliate = async (req, res) => {
       await company.update({ is_locked: true, lock_ticket: result.notrans });
 
       return res.status(202).json({
-        message: "Permintaan hapus afiliasi dikirim ke OWL. Data dikunci.",
+        message: "Permintaan hapus afiliasi dikirim . Data dikunci.",
         ticket: result.notrans,
       });
     }

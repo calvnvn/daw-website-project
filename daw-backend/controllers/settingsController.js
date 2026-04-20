@@ -96,7 +96,7 @@ exports.updateSettings = async (req, res) => {
       });
 
       return res.status(202).json({
-        message: "Revisi profil dikirim ke OWL. Data sekarang dikunci.",
+        message: "Revisi profil dikirim . Data sekarang dikunci.",
         ticket: result.notrans,
       });
     }

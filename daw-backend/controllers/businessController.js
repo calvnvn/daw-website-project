@@ -189,7 +189,7 @@ exports.updateBusinessSection = async (req, res) => {
 
       return res.status(202).json({
         message:
-          "Revisi (Artikel & Peta) telah diajukan ke OWL. Sektor berhasil dikunci.",
+          "Revisi (Artikel & Peta) telah diajukan . Sektor berhasil dikunci.",
         ticket: result.notrans,
       });
     }
@@ -343,7 +343,7 @@ exports.deleteSection = async (req, res) => {
         await t.commit();
 
         return res.status(202).json({
-          message: "Permintaan hapus sektor dikirim ke OWL. Data dikunci.",
+          message: "Permintaan hapus sektor dikirim. Data dikunci.",
           ticket: result.notrans,
         });
       } catch (dbError) {

@@ -32,7 +32,8 @@ exports.updateAboutInfo = async (req, res) => {
       missionText,
       visionText,
       philosophyTitle,
-      philosophyPillars, status
+      philosophyPillars,
+      status,
     } = req.body;
 
     // Ambil data ID 1
@@ -41,7 +42,12 @@ exports.updateAboutInfo = async (req, res) => {
 
     // IF locked
     if (info.is_locked && req.userRole?.toLowerCase() === "editor") {
-      return res.status(423).json({ message: "Data sedang ditinjau Admin.", ticket: info.lock_ticket});
+      return res
+        .status(423)
+        .json({
+          message: "Data sedang ditinjau Admin.",
+          ticket: info.lock_ticket,
+        });
     }
 
     const packageContent = {
@@ -52,7 +58,6 @@ exports.updateAboutInfo = async (req, res) => {
       philosophyPillars: philosophyPillars || info.philosophyPillars, // Sequelize handle JSON otomatis
     };
 
-
     // Gatekeeper: Editor Flow
     if (req.userRole?.toLowerCase() === "editor" && status === "Published") {
       const result = await ErpApprovalService.initiateApproval({
@@ -62,15 +67,23 @@ exports.updateAboutInfo = async (req, res) => {
         payload: packageContent,
         userId: req.userId,
         owlUsername: req.owl_username,
-        token: req.headers["authorization"]?.split(" ")[1]
+        token: req.headers["authorization"]?.split(" ")[1],
       });
 
-      return res.status(202).json({ message: "Revisi About Company dikirim ke OWL.", ticket: result.notrans });
+      return res
+        .status(202)
+        .json({
+          message: "Revisi About Company dikirim.",
+          ticket: result.notrans,
+        });
     }
     // Superadmin Flow
-    await info.update({ ...packageContent, is_locked: false, lock_ticket: null });
+    await info.update({
+      ...packageContent,
+      is_locked: false,
+      lock_ticket: null,
+    });
     res.status(200).json({ message: "About Info updated successfully!" });
-
   } catch (error) {
     res.status(500).json({ message: error.message });
   }

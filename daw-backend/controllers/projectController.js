@@ -69,12 +69,12 @@ exports.createProject = async (req, res) => {
       req.body.status === "Published"
     ) {
       try {
-        // ADDED: Handle Re-submission 
+        // ADDED: Handle Re-submission
         // Jika ini adalah pengajuan ulang draf yang pernah ditolak
         if (previous_notrans) {
           await ApprovalDraft.update(
             { status: "Replaced" },
-            { where: { notrans: previous_notrans } }
+            { where: { notrans: previous_notrans } },
           );
         }
 
@@ -95,14 +95,16 @@ exports.createProject = async (req, res) => {
         });
 
         return res.status(202).json({
-          message: "Diajukan ke OWL. Data dikunci menunggu persetujuan.",
+          message: "Diajukan . Data dikunci menunggu persetujuan.",
           ticket: result.notrans,
           data: newProject,
         });
       } catch (owlError) {
         // Jika jembatan ke OWL putus, hancurkan record draf yang baru dibuat
         if (newProject) {
-          console.error(`>>> [CLEANUP] Deleting orphan project ID: ${newProject.id} due to OWL failure`);
+          console.error(
+            `>>> [CLEANUP] Deleting orphan project ID: ${newProject.id} due to OWL failure`,
+          );
           await newProject.destroy();
         }
         throw owlError; // Lemparkan ke catch utama
@@ -114,11 +116,10 @@ exports.createProject = async (req, res) => {
       await newProject.update({ status: "Published" });
     }
 
-    return res.status(201).json({ 
-      message: "Proyek berhasil disimpan.", 
-      data: newProject 
+    return res.status(201).json({
+      message: "Proyek berhasil disimpan.",
+      data: newProject,
     });
-
   } catch (error) {
     console.error("🚨 Error CREATE Project:", error);
     res.status(500).json({
@@ -371,7 +372,7 @@ exports.updateProject = async (req, res) => {
       });
 
       return res.status(202).json({
-        message: "Revisi diajukan ke OWL. Data asli dikunci.",
+        message: "Revisi diajukan . Data asli dikunci.",
         ticket: result.notrans,
       });
     }

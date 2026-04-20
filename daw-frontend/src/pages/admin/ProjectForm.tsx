@@ -379,7 +379,7 @@ export default function ProjectForm() {
 
     setIsLoading(true);
     const loadingToast = toast.loading(
-      `${isEditMode ? "Memperbarui" : "Menyimpan"} proyek dan sinkronisasi ke OWL...`,
+      `${isEditMode ? "Memperbarui" : "Menyimpan"} proyek dan sinkronisasi ...`,
     );
 
     try {

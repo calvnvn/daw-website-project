@@ -7,13 +7,39 @@ const ErpApprovalService = require("../services/erpApprovalService");
 
 const getRole = (req) =>
   req.userRole ? req.userRole.toLowerCase().trim() : "";
+
 // GET Data di HomePage
 exports.getHomepageData = async (req, res) => {
   try {
+    const lockAttributes = ["is_locked", "lock_ticket"];
+
     const [slides, stats, settings] = await Promise.all([
-      HeroSlides.findAll({ order: [["order", "ASC"]] }),
-      ImpactStats.findAll({ order: [["order", "ASC"]] }),
-      HomeSettings.findByPk(1),
+      HeroSlides.findAll({
+        attributes: [
+          "id",
+          "title",
+          "subtitle",
+          "imageUrl",
+          "order",
+          ...lockAttributes,
+        ],
+        order: [["order", "ASC"]],
+      }),
+      ImpactStats.findAll({
+        attributes: [
+          "id",
+          "icon",
+          "value",
+          "label",
+          "desc",
+          "order",
+          ...lockAttributes,
+        ],
+        order: [["order", "ASC"]],
+      }),
+      HomeSettings.findByPk(1, {
+        attributes: ["introHeadline", "introBody", ...lockAttributes],
+      }),
     ]);
 
     let currentSettings = settings;
@@ -22,17 +48,25 @@ exports.getHomepageData = async (req, res) => {
         id: 1,
         introHeadline: "A Transformation Company.",
         introBody: "Welcome to DAW.",
+        is_locked: false, // Default state
       });
     }
 
-    res.status(200).json({ slides, stats, settings: currentSettings });
-  } catch (error) {
+    // Balikan data lengkap dengan status gemboknya
     res
-      .status(500)
-      .json({ message: "Gagal mengambil data beranda", error: error.message });
+      .status(200)
+      .json({
+        slides,
+        stats,
+        settings: currentSettings ? currentSettings.get({ plain: true }) : null,
+      });
+  } catch (error) {
+    res.status(500).json({
+      message: "Gagal mengambil data beranda",
+      error: error.message,
+    });
   }
 };
-
 // SETTINGS Intro Text
 exports.updateSettings = async (req, res) => {
   try {
@@ -69,7 +103,7 @@ exports.updateSettings = async (req, res) => {
       await settings.update({ is_locked: true, lock_ticket: result.notrans });
 
       return res.status(202).json({
-        message: "Revisi intro homepage dikirim ke OWL. Data dikunci.",
+        message: "Revisi intro homepage dikirim . Data dikunci.",
         ticket: result.notrans,
       });
     }
@@ -166,7 +200,7 @@ exports.updateHeroSlide = async (req, res) => {
       await slide.update({ is_locked: true, lock_ticket: result.notrans });
 
       return res.status(202).json({
-        message: "Revisi slide dikirim ke OWL.",
+        message: "Revisi slide dikirim .",
         ticket: result.notrans,
       });
     }
@@ -209,7 +243,7 @@ exports.deleteHeroSlide = async (req, res) => {
       await slide.update({ is_locked: true, lock_ticket: result.notrans });
 
       return res.status(202).json({
-        message: "Permintaan hapus slide dikirim ke OWL.",
+        message: "Permintaan hapus slide dikirim .",
         ticket: result.notrans,
       });
     }
@@ -298,7 +332,7 @@ exports.updateStat = async (req, res) => {
       await stat.update({ is_locked: true, lock_ticket: result.notrans });
 
       return res.status(202).json({
-        message: "Revisi statistik dikirim ke OWL.",
+        message: "Revisi statistik dikirim .",
         ticket: result.notrans,
       });
     }

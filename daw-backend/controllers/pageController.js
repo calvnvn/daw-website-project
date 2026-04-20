@@ -161,8 +161,7 @@ exports.createPage = async (req, res) => {
 
         await newPage.update({ is_locked: true, lock_ticket: result.notrans });
         return res.status(202).json({
-          message:
-            "Permintaan pembuatan halaman baru dikirim ke OWL. Data dikunci.",
+          message: "Permintaan pembuatan halaman baru dikirim . Data dikunci.",
           ticket: result.notrans,
         });
       } catch (owlError) {
@@ -279,7 +278,7 @@ exports.updatePage = async (req, res) => {
 
       await page.update({ is_locked: true, lock_ticket: result.notrans });
       return res.status(202).json({
-        message: "Revisi halaman dikirim ke OWL.",
+        message: "Revisi halaman dikirim .",
         ticket: result.notrans,
       });
     }
@@ -332,7 +331,7 @@ exports.deletePage = async (req, res) => {
       });
       await page.update({ is_locked: true, lock_ticket: result.notrans });
       return res.status(202).json({
-        message: "Permintaan hapus dikirim ke OWL. Data dikunci.",
+        message: "Permintaan hapus dikirim . Data dikunci.",
         ticket: result.notrans,
       });
     }
