@@ -4,17 +4,18 @@ const homeController = require("../controllers/homeController");
 const { upload, optimizeImage } = require("../middleware/upload");
 const { verifyToken, checkPermission } = require("../middleware/authJwt");
 
-// Public Site
+// --- 1. Public Site ---
 router.get("/", homeController.getHomepageData);
 
-// Protected Site
+// --- 2. Home Intro Settings (Singleton) ---
 router.put(
   "/settings",
   [verifyToken, checkPermission("manage_homepage")],
+  upload.none(),
   homeController.updateSettings,
 );
 
-// Hero Slides (Protected)
+// --- 3. Hero Slides (Collection with Assets) ---
 router.post(
   "/hero",
   [verifyToken, checkPermission("manage_homepage")],
@@ -22,6 +23,7 @@ router.post(
   optimizeImage,
   homeController.createHeroSlide,
 );
+
 router.put(
   "/hero/:id",
   [verifyToken, checkPermission("manage_homepage")],
@@ -29,23 +31,28 @@ router.put(
   optimizeImage,
   homeController.updateHeroSlide,
 );
+
 router.delete(
   "/hero/:id",
   [verifyToken, checkPermission("manage_homepage")],
   homeController.deleteHeroSlide,
 );
 
-// Impact Stats Route (Protected)
+// --- 4. Impact Stats (Collection - Text Only) ---
 router.post(
   "/stats",
   [verifyToken, checkPermission("manage_homepage")],
+  upload.none(),
   homeController.createStat,
 );
+
 router.put(
   "/stats/:id",
   [verifyToken, checkPermission("manage_homepage")],
+  upload.none(),
   homeController.updateStat,
 );
+
 router.delete(
   "/stats/:id",
   [verifyToken, checkPermission("manage_homepage")],
