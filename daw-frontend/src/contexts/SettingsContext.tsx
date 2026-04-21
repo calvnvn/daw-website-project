@@ -10,7 +10,7 @@ import {
 } from "react";
 import api from "@/lib/api";
 
-interface SettingsData {
+export interface SettingsData {
   companyName: string;
   address: string;
   phone: string;
@@ -29,27 +29,51 @@ interface SettingsData {
 
 interface SettingsContextType {
   settings: SettingsData | null;
+  rejectedSettings: any | null;
   isLoading: boolean;
   refreshSettings: () => Promise<void>;
 }
 
 const SettingsContext = createContext<SettingsContextType>({
   settings: null,
+  rejectedSettings: null,
   isLoading: true,
   refreshSettings: async () => {},
 });
 
 export function SettingsProvider({ children }: { children: ReactNode }) {
   const [settings, setSettings] = useState<SettingsData | null>(null);
+  const [rejectedSettings, setRejectedSettings] = useState<any | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   const fetchSettings = useCallback(async (signal?: AbortSignal) => {
+    setIsLoading(true);
     try {
-      const res = await api.get("/settings", { signal });
-      setSettings(res.data);
-    } catch (err: any) {
-      if (err.name !== "CanceledError") {
-        console.error("🚨 Failed to fetch settings:", err);
+      // Mengambil data Live dan data Rejected (Draft) secara bersamaan tanpa saling memblokir
+      const results = await Promise.allSettled([
+        api.get("/settings", { signal }),
+        api.get("/approval/rejected/1?module=Settings", { signal }),
+      ]);
+
+      // 1. Handle Live Data
+      if (results[0].status === "fulfilled") {
+        // Backend baru membalas dengan { success: true, data: {...} }
+        const liveData = results[0].value.data.data || results[0].value.data;
+        setSettings(liveData);
+      } else {
+        if (results[0].reason?.name !== "CanceledError") {
+          console.error("🚨 Failed to fetch live settings:", results[0].reason);
+        }
+      }
+
+      // 2. Handle Rejected Draft Data
+      if (
+        results[1].status === "fulfilled" &&
+        results[1].value.data.hasRejected
+      ) {
+        setRejectedSettings(results[1].value.data.data);
+      } else {
+        setRejectedSettings(null); // Bersihkan jika tidak ada atau API gagal
       }
     } finally {
       setIsLoading(false);
@@ -60,7 +84,6 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
     const controller = new AbortController();
     fetchSettings(controller.signal);
 
-    // Cleanup: Batalkan request API jika komponen mati sebelum request selesai
     return () => {
       controller.abort();
     };
@@ -69,10 +92,11 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
   const contextValue = useMemo(
     () => ({
       settings,
+      rejectedSettings,
       isLoading,
       refreshSettings: () => fetchSettings(),
     }),
-    [settings, isLoading, fetchSettings],
+    [settings, rejectedSettings, isLoading, fetchSettings],
   );
 
   return (
