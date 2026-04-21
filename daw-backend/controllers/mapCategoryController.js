@@ -1,57 +1,91 @@
 const sequelize = require("../config/database");
 const MapCategory = require("../models/MapCategory");
-// 🚀 ErpApprovalService DIHAPUS dari file ini karena kita bypass sepenuhnya.
+const { invalidateOldDrafts } = require("../utils/draftCleanup");
 
+/**
+ * @desc    Get all Map Categories
+ * @route   GET /api/map-categories
+ * @access  Public / Admin
+ */
 exports.getAllCategories = async (req, res) => {
   try {
-    const categories = await MapCategory.findAll({ order: [["name", "ASC"]] });
-    res.status(200).json(categories);
+    const categories = await MapCategory.findAll({
+      // 💡 BLUEPRINT: Query Normalization (Eksplisit memanggil atribut gembok)
+      attributes: ["id", "name", "color", "is_locked", "lock_ticket"],
+      order: [["name", "ASC"]],
+    });
+    res.status(200).json({ success: true, data: categories });
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    res.status(500).json({ success: false, message: error.message });
   }
 };
 
-// --- 1. CREATE (LANGSUNG LIVE) ---
+// --- 1. CREATE (ABSOLUTE ADMIN RESTRICTION) ---
 exports.createCategory = async (req, res) => {
-  const { id, name, color } = req.body; // Parameter 'status' tidak lagi relevan di sini
+  const { id, name, color } = req.body;
+  const userRole = req.userRole?.toLowerCase();
 
-  // Tetap gunakan transaksi untuk atomic safety
+  // 🔒 GATEKEEPER: Blokir Editor (Master Data hanya boleh disentuh Admin)
+  if (userRole === "editor") {
+    return res.status(403).json({
+      success: false,
+      message:
+        "Akses Ditolak. Hanya Admin yang dapat mengelola Master Data Kategori.",
+    });
+  }
+
   const t = await sequelize.transaction();
 
   try {
-    // Cek Duplikasi (Mencegah Error 500 karena Primary Key Clash)
     const existing = await MapCategory.findByPk(id, { transaction: t });
     if (existing) {
       await t.rollback();
-      return res.status(400).json({ message: "ID Kategori sudah digunakan!" });
+      return res
+        .status(400)
+        .json({ success: false, message: "ID Kategori sudah digunakan!" });
     }
 
-    // Eksekusi langsung tanpa mengecek role Editor/Admin
     const categoryData = {
       id,
       name,
       color,
-      is_locked: false, // Pastikan tidak terkunci
+      is_locked: false,
     };
 
     await MapCategory.create(categoryData, { transaction: t });
 
     await t.commit();
-    res.status(201).json({ message: "Kategori berhasil dibuat permanen." });
+    res
+      .status(201)
+      .json({ success: true, message: "Kategori berhasil dibuat permanen." });
   } catch (error) {
     if (t) await t.rollback();
-    res.status(500).json({ message: error.message });
+    res.status(500).json({ success: false, message: error.message });
   }
 };
 
-// --- 2. UPDATE (LANGSUNG LIVE) ---
+// --- 2. UPDATE (ABSOLUTE ADMIN RESTRICTION) ---
 exports.updateCategory = async (req, res) => {
   const { id } = req.params;
   const { name, color } = req.body;
+  const userRole = req.userRole?.toLowerCase();
+
+  // 🔒 GATEKEEPER: Blokir Editor
+  if (userRole === "editor") {
+    return res.status(403).json({
+      success: false,
+      message:
+        "Akses Ditolak. Hanya Admin yang dapat mengelola Master Data Kategori.",
+    });
+  }
+
   const t = await sequelize.transaction();
 
   try {
-    // PESSIMISTIC LOCKING: Tetap dipakai untuk mencegah race condition sesama Editor
+    // 1. Bunuh draf lama (Mencegah Zombie Drafts dari sistem sebelum refactor)
+    await invalidateOldDrafts("MapCategory", id, t);
+
+    // 2. Pessimistic Locking
     const category = await MapCategory.findByPk(id, {
       transaction: t,
       lock: t.LOCK.UPDATE,
@@ -59,31 +93,47 @@ exports.updateCategory = async (req, res) => {
 
     if (!category) {
       await t.rollback();
-      return res.status(404).json({ message: "Category not found" });
+      return res
+        .status(404)
+        .json({ success: false, message: "Kategori tidak ditemukan" });
     }
 
-    // 💡 SENIOR FIX: Force is_locked menjadi false dan bersihkan lock_ticket
-    // Ini berguna sebagai "Pembersih Zombie" jika sebelumnya ada data yang sempat
-    // terkunci oleh sistem approval lama sebelum kita refactor ke Bypass mode.
+    // 3. Update Live Data & Force Unlock
     await category.update(
       { name, color, is_locked: false, lock_ticket: null },
       { transaction: t },
     );
 
     await t.commit();
-    res.status(200).json({ message: "Kategori diperbarui secara permanen!" });
+    res
+      .status(200)
+      .json({ success: true, message: "Kategori diperbarui secara permanen!" });
   } catch (error) {
     if (t) await t.rollback();
-    res.status(500).json({ message: error.message });
+    res.status(500).json({ success: false, message: error.message });
   }
 };
 
-// --- 3. DELETE (LANGSUNG LIVE) ---
+// --- 3. DELETE (ABSOLUTE ADMIN RESTRICTION) ---
 exports.deleteCategory = async (req, res) => {
   const { id } = req.params;
+  const userRole = req.userRole?.toLowerCase();
+
+  // 🔒 GATEKEEPER: Blokir Editor
+  if (userRole === "editor") {
+    return res.status(403).json({
+      success: false,
+      message:
+        "Akses Ditolak. Hanya Admin yang dapat mengelola Master Data Kategori.",
+    });
+  }
+
   const t = await sequelize.transaction();
 
   try {
+    // 1. Bunuh draf lama (Mencegah Zombie Drafts)
+    await invalidateOldDrafts("MapCategory", id, t);
+
     const category = await MapCategory.findByPk(id, {
       transaction: t,
       lock: t.LOCK.UPDATE,
@@ -91,21 +141,26 @@ exports.deleteCategory = async (req, res) => {
 
     if (!category) {
       await t.rollback();
-      return res.status(404).json({ message: "Category not found" });
+      return res
+        .status(404)
+        .json({ success: false, message: "Kategori tidak ditemukan" });
     }
 
-    // Langsung hancurkan data tanpa melalui OWL
     await category.destroy({ transaction: t });
 
     await t.commit();
-    res.status(200).json({ message: "Category deleted!" });
+    res
+      .status(200)
+      .json({ success: true, message: "Kategori berhasil dihapus!" });
   } catch (error) {
     if (t) await t.rollback();
-    // Penanganan Foreign Key Constraint tetap dipertahankan (Sangat Krusial)
+
+    // Penanganan Foreign Key Constraint (Sangat Krusial)
     const msg =
       error.name === "SequelizeForeignKeyConstraintError"
         ? "Gagal hapus! Kategori ini masih digunakan oleh titik peta (markers)."
         : error.message;
-    res.status(400).json({ message: msg });
+
+    res.status(400).json({ success: false, message: msg });
   }
 };

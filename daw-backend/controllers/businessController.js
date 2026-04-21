@@ -4,9 +4,11 @@ const Project = require("../models/Project");
 const MapCategory = require("../models/MapCategory");
 const sequelize = require("../config/database");
 const sanitizeHtml = require("sanitize-html");
+const { invalidateOldDrafts } = require("../utils/draftCleanup");
+const { deleteSingleFile } = require("../utils/fileRemover");
 
 const ErpApprovalService = require("../services/erpApprovalService");
-const JENIS_APP_CMS = process.env.CMS_APPROVAL_CODE || "040101";
+const JENIS_APP_CMS = process.env.CMS_APPROVAL_CODE;
 
 /**
  * @constant sanitizeOptions
@@ -14,7 +16,6 @@ const JENIS_APP_CMS = process.env.CMS_APPROVAL_CODE || "040101";
  * Custom-built to support rich typography, tables, and YouTube embeds.
  */
 const sanitizeOptions = {
-  // Allow all standard editorial tags including tables
   allowedTags: sanitizeHtml.defaults.allowedTags.concat([
     "img",
     "h1",
@@ -77,6 +78,21 @@ const sanitizeOptions = {
     },
   },
 };
+
+/**
+ * @desc    Utility function to generate URL-friendly slugs
+ * @example "Renewable Energy" -> "renewable-energy"
+ */
+const slugify = (text) => {
+  return text
+    .toString()
+    .toLowerCase()
+    .replace(/\s+/g, "-") // Replace spaces with -
+    .replace(/[^\w\-]+/g, "") // Remove all non-word chars
+    .replace(/\-\-+/g, "-") // Replace multiple - with single -
+    .trim(); // Trim whitespace
+};
+
 /**
  * @desc    Fetch all business sections for the public-facing website
  * @route   GET /api/businesses/public
@@ -85,7 +101,6 @@ const sanitizeOptions = {
 exports.getPublicBusinessData = async (req, res) => {
   try {
     const sections = await BusinessSection.findAll({
-      // Eager load nested associations: Section -> Markers -> Category Details
       attributes: [
         "id",
         "category",
@@ -110,7 +125,6 @@ exports.getPublicBusinessData = async (req, res) => {
           ],
         },
       ],
-      // Maintain sequence based on creation time or orderIndex
       order: [["orderIndex", "ASC"]],
     });
 
@@ -138,9 +152,12 @@ exports.updateBusinessSection = async (req, res) => {
         .status(404)
         .json({ message: "Sektor Bisnis tidak ditemukan!" });
 
+    // 🔒 THE GATEKEEPER (Blueprint 1.1)
     if (section.is_locked && userRole === "editor") {
       return res.status(423).json({
-        message: "Sektor ini sedang dalam peninjauan.",
+        success: false,
+        message:
+          "Akses Dibatasi. Sektor ini sedang dalam proses peninjauan pusat.",
         ticket: section.lock_ticket,
       });
     }
@@ -150,20 +167,16 @@ exports.updateBusinessSection = async (req, res) => {
       ? sanitizeHtml(htmlContent, sanitizeOptions)
       : "";
 
-    // EDITOR (APPROVAL REQUIRED)
+    const packageContent = {
+      title: title || section.title,
+      htmlContent: cleanHtmlContent,
+      hasMap: isMapActive,
+      mapMarkers: mapMarkers || [],
+    };
+
+    // --- JALUR EDITOR ---
     if (userRole === "editor") {
-      console.log(
-        `>>> [BUSINESS] JALUR EDITOR: INITIATING ATOMIC UPDATE FOR ID: ${id} <<<`,
-      );
-
-      const packageContent = {
-        title: title || section.title,
-        htmlContent: cleanHtmlContent,
-        hasMap: isMapActive,
-        mapMarkers: mapMarkers || [],
-      };
-
-      // CLEANUP: Jika ini re-submission, tandai draf lama sebagai Replaced
+      // CLEANUP: Resubmission Check
       if (previous_notrans) {
         await ApprovalDraft.update(
           { status: "Replaced" },
@@ -171,37 +184,73 @@ exports.updateBusinessSection = async (req, res) => {
         );
       }
 
-      // EXTERNAL HANDSHAKE (Di luar DB Transaction utama)
-      const result = await ErpApprovalService.initiateApproval({
-        model: BusinessSection,
-        targetId: id,
-        action: "UPDATE",
-        payload: packageContent,
-        userId: req.userId,
-        owlUsername: req.owl_username,
-        token: req.owl_token,
-      });
+      // External Handshake
+      try {
+        const result = await ErpApprovalService.initiateApproval({
+          model: BusinessSection,
+          targetId: id,
+          action: "UPDATE",
+          payload: packageContent,
+          userId: req.userId,
+          owlUsername: req.owl_username,
+          token: req.owl_token,
+        });
 
-      await section.update({
-        is_locked: true,
-        lock_ticket: result.notrans,
-      });
+        // Kunci Data Lokal
+        await section.update({ is_locked: true, lock_ticket: result.notrans });
 
-      return res.status(202).json({
-        message:
-          "Revisi (Artikel & Peta) telah diajukan . Sektor berhasil dikunci.",
-        ticket: result.notrans,
-      });
+        return res.status(202).json({
+          message:
+            "Revisi (Artikel & Peta) telah diajukan. Sektor berhasil dikunci.",
+          ticket: result.notrans,
+        });
+      } catch (owlError) {
+        throw owlError;
+      }
     }
 
-    // SUPERADMIN (DIRECT UPDATE)
+    // --- JALUR SUPERADMIN (DIRECT OVERRIDE) ---
     const t = await sequelize.transaction();
     try {
+      console.log(
+        `>>> [BUSINESS] SUPERADMIN OVERRIDE: Editing Section ID ${id}`,
+      );
+
+      // 1. Bunuh draf lama (Atomic Draft Killer)
+      await invalidateOldDrafts("BusinessSection", id, t);
+
+      // 2. Physical File Cleanup Logic
+      // Mencari gambar lama di HTML untuk dihapus jika tidak ada di HTML baru
+      if (section.htmlContent) {
+        const oldImages = [];
+        const newImages = [];
+        const imgRegex = /src="[^"]*\/uploads\/([^"'\s>]+)"/g;
+        let match;
+
+        while ((match = imgRegex.exec(section.htmlContent)) !== null)
+          oldImages.push(match[1]);
+        while ((match = imgRegex.exec(cleanHtmlContent)) !== null)
+          newImages.push(match[1]);
+
+        const imagesToDelete = oldImages.filter(
+          (img) => !newImages.includes(img),
+        );
+        imagesToDelete.forEach((img) => deleteSingleFile(img)); // Hapus gambar fisik lama
+      }
+
+      // 3. Update Text Content & Unlock
       await section.update(
-        { title, htmlContent: cleanHtmlContent, hasMap: isMapActive },
+        {
+          title,
+          htmlContent: cleanHtmlContent,
+          hasMap: isMapActive,
+          is_locked: false,
+          lock_ticket: null,
+        },
         { transaction: t },
       );
 
+      // 4. Sinkronisasi Map Markers
       await BusinessMapMarker.destroy({
         where: { sectionId: id },
         transaction: t,
@@ -233,23 +282,10 @@ exports.updateBusinessSection = async (req, res) => {
   }
 };
 
-/**
- * @desc    Utility function to generate URL-friendly slugs
- * @example "Renewable Energy" -> "renewable-energy"
- */
-const slugify = (text) => {
-  return text
-    .toString()
-    .toLowerCase()
-    .replace(/\s+/g, "-") // Replace spaces with -
-    .replace(/[^\w\-]+/g, "") // Remove all non-word chars
-    .replace(/\-\-+/g, "-") // Replace multiple - with single -
-    .trim(); // Trim whitespace
-};
-
 exports.createBusinessSection = async (req, res) => {
   const { category, title } = req.body;
   const generatedId = slugify(category);
+  const userRole = req.userRole?.toLowerCase();
 
   try {
     const existing = await BusinessSection.findByPk(generatedId);
@@ -259,17 +295,55 @@ exports.createBusinessSection = async (req, res) => {
 
     const maxOrder = (await BusinessSection.max("orderIndex")) || 0;
 
-    const newSection = await BusinessSection.create({
+    const sectionPayload = {
       id: generatedId,
       category,
       title,
       htmlContent: "",
       hasMap: false,
       orderIndex: maxOrder + 1,
-      is_locked: false,
+      is_locked: false, // Default
       lock_ticket: null,
-    });
+    };
 
+    // --- JALUR EDITOR ---
+    if (userRole === "editor") {
+      // Phase 1: Local DB (Simpan sebagai Draft Terkunci)
+      sectionPayload.is_locked = true;
+      const newSection = await BusinessSection.create(sectionPayload);
+
+      try {
+        // Phase 2: Network Call (OWL)
+        const result = await ErpApprovalService.initiateApproval({
+          model: BusinessSection,
+          targetId: generatedId,
+          action: "CREATE",
+          payload: { category, title },
+          userId: req.userId,
+          owlUsername: req.owl_username,
+          token: req.owl_token,
+        });
+
+        // Kunci Data Lokal
+        await newSection.update({ lock_ticket: result.notrans });
+
+        return res.status(202).json({
+          message:
+            "Pembuatan sektor diajukan. Sektor terkunci menunggu persetujuan.",
+          ticket: result.notrans,
+        });
+      } catch (owlError) {
+        // Blueprint: Jika gagal, hancurkan record "Yatim Piatu"
+        console.error(
+          `>>> [CLEANUP] Menghapus orphan section ID: ${generatedId}`,
+        );
+        await newSection.destroy();
+        throw owlError; // Lemparkan ke catch utama
+      }
+    }
+
+    // --- JALUR SUPERADMIN ---
+    const newSection = await BusinessSection.create(sectionPayload);
     console.log(`>>> [BUSINESS] SECTOR CREATED INSTANTLY: ${generatedId} <<<`);
     return res.status(201).json({
       message: "Sektor bisnis baru berhasil dibuat secara langsung.",
@@ -294,17 +368,16 @@ exports.deleteSection = async (req, res) => {
   const userRole = req.userRole?.toLowerCase();
 
   try {
-    // 1. PRE-CHECK: Cari data tanpa ngunci database dulu
     const section = await BusinessSection.findByPk(id);
-
-    if (!section) {
+    if (!section)
       return res.status(404).json({ message: "Sektor tidak ditemukan" });
-    }
 
-    // 2. GUARD: Cek Gembok & Orphan Projects (Tanpa Transaksi dulu)
-    if (section.is_locked) {
+    // 🔒 THE GATEKEEPER
+    if (section.is_locked && userRole === "editor") {
       return res.status(423).json({
-        message: "Sektor ini sedang dikunci oleh antrean approval.",
+        success: false,
+        message:
+          "Akses Dibatasi. Sektor ini sedang dikunci oleh antrean approval.",
         ticket: section.lock_ticket,
       });
     }
@@ -318,11 +391,8 @@ exports.deleteSection = async (req, res) => {
       });
     }
 
-    // ==========================================
-    // JALUR EDITOR (ERP Handshake Pertama)
-    // ==========================================
+    // --- JALUR EDITOR ---
     if (userRole === "editor") {
-      // 🛡️ SENIOR TIP: Panggil OWL DI LUAR transaksi database
       const result = await ErpApprovalService.initiateApproval({
         model: BusinessSection,
         targetId: id,
@@ -333,32 +403,30 @@ exports.deleteSection = async (req, res) => {
         token: req.owl_token,
       });
 
-      // Baru setelah OWL kasih tiket, kita buka transaksi buat nge-lock lokal
-      const t = await sequelize.transaction();
-      try {
-        await section.update(
-          { is_locked: true, lock_ticket: result.notrans },
-          { transaction: t },
-        );
-        await t.commit();
+      await section.update({ is_locked: true, lock_ticket: result.notrans });
 
-        return res.status(202).json({
-          message: "Permintaan hapus sektor dikirim. Data dikunci.",
-          ticket: result.notrans,
-        });
-      } catch (dbError) {
-        await t.rollback();
-        throw dbError;
-      }
+      return res.status(202).json({
+        message: "Permintaan hapus sektor dikirim. Data dikunci.",
+        ticket: result.notrans,
+      });
     }
 
-    // ==========================================
-    // JALUR SUPERADMIN (Direct Hard Delete)
-    // ==========================================
+    // --- JALUR SUPERADMIN ---
     const t = await sequelize.transaction();
     try {
-      // Re-verify lock inside transaction for Superadmin
+      // 1. Bunuh draf lama (Atomic Draft Killer)
+      await invalidateOldDrafts("BusinessSection", id, t);
+
       await section.reload({ transaction: t, lock: t.LOCK.UPDATE });
+
+      // 2. Physical HTML File Cleanup
+      if (section.htmlContent) {
+        const imgRegex = /src="[^"]*\/uploads\/([^"'\s>]+)"/g;
+        let match;
+        while ((match = imgRegex.exec(section.htmlContent)) !== null) {
+          deleteSingleFile(match[1]); // Hapus semua gambar fisik di HTML
+        }
+      }
 
       await BusinessMapMarker.destroy({
         where: { sectionId: id },
