@@ -10,16 +10,15 @@ import {
 } from "react";
 import api from "@/lib/api";
 
-// 🛡️ Interface Terpusat dengan "Gembok Awareness"
 export interface HeroSlides {
   id: number | string;
   title: string;
   subtitle: string;
   imageUrl: string | null;
   order: number;
-  is_locked?: boolean; // Status gembok dari backend
-  lock_ticket?: string; // Nomor tiket OWL
-  has_rejected?: boolean; // Indikator draf ditolak
+  is_locked?: boolean;
+  lock_ticket?: string;
+  has_rejected?: boolean;
 }
 
 export interface HomeSettings {
@@ -46,6 +45,7 @@ interface HomeContextType {
   slides: HeroSlides[];
   stats: ImpactStats[];
   settings: HomeSettings | null;
+  rejectedIntro: any | null; //
   isLoading: boolean;
   refreshData: () => Promise<void>;
 }
@@ -54,6 +54,7 @@ export const HomeContext = createContext<HomeContextType>({
   slides: [],
   stats: [],
   settings: null,
+  rejectedIntro: null,
   isLoading: true,
   refreshData: async () => {},
 });
@@ -62,19 +63,40 @@ export function HomeProvider({ children }: { children: ReactNode }) {
   const [slides, setSlides] = useState<HeroSlides[]>([]);
   const [stats, setStats] = useState<ImpactStats[]>([]);
   const [settings, setSettings] = useState<HomeSettings | null>(null);
+  const [rejectedIntro, setRejectedIntro] = useState<any | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   const fetchData = useCallback(async (signal?: AbortSignal) => {
     try {
-      const res = await api.get("/homepage", { signal });
-      const data = res.data;
+      const results = await Promise.allSettled([
+        api.get("/homepage", { signal }),
+        // Kita tarik draf rejected untuk Intro (Singleton ID 1) di level context
+        api.get("/approval/rejected/1?module=HomeSettings", { signal }),
+      ]);
 
-      setSlides(data.slides || []);
-      setStats(data.stats || []);
-      setSettings(data.settings || null);
-    } catch (err: any) {
-      if (err.name !== "CanceledError") {
-        console.error("🚨 Failed to fetch homepage data:", err);
+      // 1. Handle Live Homepage Data
+      if (results[0].status === "fulfilled") {
+        const data = results[0].value.data.data || results[0].value.data;
+        setSlides(data.slides || []);
+        setStats(data.stats || []);
+        setSettings(data.settings || null);
+      } else {
+        if (results[0].reason?.name !== "CanceledError") {
+          console.error(
+            "🚨 Failed to fetch live homepage data:",
+            results[0].reason,
+          );
+        }
+      }
+
+      // 2. Handle Rejected Intro Draft (Singleton)
+      if (
+        results[1].status === "fulfilled" &&
+        results[1].value.data.hasRejected
+      ) {
+        setRejectedIntro(results[1].value.data.data);
+      } else {
+        setRejectedIntro(null);
       }
     } finally {
       setIsLoading(false);
@@ -95,10 +117,12 @@ export function HomeProvider({ children }: { children: ReactNode }) {
       slides,
       stats,
       settings,
+      rejectedIntro,
       isLoading,
+      refreshSettings: () => fetchData(), // Alias konsisten
       refreshData: () => fetchData(),
     }),
-    [slides, stats, settings, isLoading, fetchData],
+    [slides, stats, settings, rejectedIntro, isLoading, fetchData],
   );
 
   return (
