@@ -267,7 +267,7 @@ sequelize
 
     //   // 2. SEED ROLES
     //   const [superAdminRole] = await Role.findOrCreate({
-    //     where: { name: "Superadmin" },
+    //     where: { name: "superadmin" },
     //     defaults: { description: "Ultimate Access (Bypass System)" },
     //   });
 
@@ -286,8 +286,8 @@ sequelize
     //       `intl [MIGRATION] Found ${usersToMigrate.length} users to migrate to RBAC...`,
     //     );
     //     for (const user of usersToMigrate) {
-    //       // Jika role lamanya Superadmin, arahkan ke UUID Superadmin yang baru
-    //       if (user.role === "Superadmin") {
+    //       // Jika role lamanya superadmin, arahkan ke UUID superadmin yang baru
+    //       if (user.role === "superadmin") {
     //         await user.update({ roleId: superAdminRole.id });
     //       } else {
     //         // Default ke Editor

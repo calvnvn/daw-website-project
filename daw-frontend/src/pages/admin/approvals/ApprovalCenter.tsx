@@ -27,6 +27,7 @@ import PREVIEW_REGISTRY from "./ModuleRegistry";
 
 interface ApprovalDraft {
   notrans: string;
+  nourut: string;
   module_name: string;
   action: string;
   target_id: string;
@@ -38,8 +39,10 @@ interface ApprovalDraft {
 }
 
 // Helper: Memburu semua value gambar
-const extractImagesFromPayload = (obj: any): string[] => {
-  let images: string[] = [];
+const extractImagesFromPayload = (
+  obj: any,
+  images: string[] = [],
+): string[] => {
   if (!obj || typeof obj !== "object") return images;
 
   Object.values(obj).forEach((val) => {
@@ -52,7 +55,7 @@ const extractImagesFromPayload = (obj: any): string[] => {
         images.push(val);
       }
     } else if (typeof val === "object") {
-      images = [...images, ...extractImagesFromPayload(val)];
+      extractImagesFromPayload(val, images);
     }
   });
   return [...new Set(images)];
@@ -102,8 +105,16 @@ const DiffModal = ({
     module: string,
     targetId: string,
     payload: any,
+    nourut: string,
   ) => void;
-  onReject: (notrans: string, reason: string) => void;
+  onReject: (
+    notrans: string,
+    module: string,
+    targetId: string,
+    action: string,
+    reason: string,
+    nourut: string,
+  ) => void;
 }) => {
   const [rejectReason, setRejectReason] = useState("");
   const [isRejecting, setIsRejecting] = useState(false);
@@ -113,8 +124,10 @@ const DiffModal = ({
 
   // Fetch Live Data
   useEffect(() => {
+    const abortController = new AbortController(); // 🚀 Cegah Race Condition
+    setLoadingOld(true);
+
     const fetchOriginal = async () => {
-      setLoadingOld(true);
       try {
         const response = await api.get("/approval/original-data", {
           params: {
@@ -122,15 +135,19 @@ const DiffModal = ({
             targetId: draft.target_id,
             action: draft.action,
           },
+          signal: abortController.signal,
         });
         setOldData(response.data);
-      } catch {
-        setOldData({ _system_note: "Gagal menarik data Live dari Server." });
+      } catch (error: any) {
+        if (error.name !== "CanceledError") {
+          setOldData({ _system_note: "Gagal menarik data Live dari Server." });
+        }
       } finally {
         setLoadingOld(false);
       }
     };
     fetchOriginal();
+    return () => abortController.abort();
   }, [draft]);
 
   const finalPayload = draft.payload;
@@ -404,7 +421,7 @@ const DiffModal = ({
           {isReadOnly ? (
             <div className="w-full flex items-center justify-center p-3 bg-amber-50 border border-amber-200 rounded-lg text-amber-800 text-sm font-bold gap-2">
               <ShieldAlert className="w-5 h-5 text-amber-600" />
-              Mode Pemantau (Superadmin). Eksekusi hanya dapat dilakukan oleh
+              Mode Pemantau (superadmin). Eksekusi hanya dapat dilakukan oleh
               Approver terkait.
             </div>
           ) : (
@@ -422,7 +439,16 @@ const DiffModal = ({
                       autoFocus
                     />
                     <button
-                      onClick={() => onReject(draft.notrans, rejectReason)}
+                      onClick={() =>
+                        onReject(
+                          draft.notrans,
+                          draft.module_name,
+                          draft.target_id,
+                          draft.action,
+                          rejectReason,
+                          (draft as any).nourut,
+                        )
+                      }
                       disabled={!rejectReason.trim()}
                       className="px-6 py-2 bg-red-600 hover:bg-red-700 disabled:opacity-50 text-white text-sm font-bold rounded-lg transition-colors">
                       Kirim Tolak
@@ -451,6 +477,7 @@ const DiffModal = ({
                       draft.module_name,
                       draft.target_id,
                       finalPayload,
+                      (draft as any).nourut,
                     )
                   }
                   disabled={loadingOld}
@@ -504,12 +531,16 @@ export default function ApprovalCenter() {
     null,
   );
 
-  const isSuperadmin = user?.role === "Superadmin" || user?.role === "admin";
+  const isSuperadmin = user?.role === "superadmin" || user?.role === "admin";
 
   const fetchApprovals = async () => {
     setIsLoading(true);
     try {
       const response = await api.get("/approval/list");
+      console.log(
+        ">>> [DEBUG FRONTEND] Raw Drafts from Server:",
+        response.data,
+      ); // 🚀 CEK INI!
       const data = response.data;
       setDrafts(Array.isArray(data) ? data : []);
     } catch {
@@ -531,13 +562,20 @@ export default function ApprovalCenter() {
     module: string,
     targetId: string,
     payload: any,
+    nourut: string,
   ) => {
+    if (!nourut) {
+      return toast.error(
+        "Gagal eksekusi: Identitas baris (nourut) tidak ditemukan. Coba refresh antrean.",
+      );
+    }
     const toastId = toast.loading(
       "Mengeksekusi persetujuan & sinkronisasi server...",
     );
     try {
       await api.post("/approval/decide", {
         notrans,
+        nourut,
         status: "1",
         module,
         targetId,
@@ -558,8 +596,14 @@ export default function ApprovalCenter() {
     }
   };
 
-  const handleReject = async (draft: any, reason: string) => {
-    // 1. Validasi: Jangan kasih ampun buat Approver yang malas nulis alasan
+  const handleReject = async (
+    notrans: string,
+    module: string,
+    targetId: string,
+    action: string,
+    reason: string,
+    nourut: string,
+  ) => {
     if (!reason.trim() || reason.length < 5) {
       return toast.error("Alasan penolakan terlalu singkat atau kosong.");
     }
@@ -568,13 +612,13 @@ export default function ApprovalCenter() {
 
     try {
       await api.post("/approval/decide", {
-        notrans: draft.notrans,
-        status: "2", // Status Reject
+        notrans: notrans,
+        nourut: nourut,
+        status: "2",
         keteranganRejek: reason,
-        // PENTING: Kirim metadata ini agar gembok di tabel utama terbuka
-        module: draft.module_name,
-        targetId: draft.target_id,
-        action: draft.action,
+        module: module,
+        targetId: targetId,
+        action: action,
       });
 
       toast.success(
@@ -585,7 +629,7 @@ export default function ApprovalCenter() {
       );
 
       setSelectedDraft(null);
-      fetchApprovals(); // Refresh list
+      fetchApprovals();
     } catch (err: any) {
       toast.error(err.response?.data?.message || "Gagal mengirim penolakan", {
         id: toastId,

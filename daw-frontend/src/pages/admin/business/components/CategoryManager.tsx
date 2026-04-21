@@ -15,7 +15,7 @@ import { toast } from "sonner";
 
 export default function CategoryManager() {
   const { user } = useAuth();
-  const isSuperadmin = user?.role === "Superadmin" || user?.role === "admin";
+  const isSuperadmin = user?.role === "superadmin" || user?.role === "admin";
 
   const {
     categories,
@@ -270,7 +270,7 @@ export default function CategoryManager() {
                     </div>
                   </td>
 
-                  {/* 🚀 Kolom Action hanya di-render untuk Superadmin */}
+                  {/* 🚀 Kolom Action hanya di-render untuk superadmin */}
                   {isSuperadmin && (
                     <td className="px-6 py-4 text-right">
                       <div className="flex justify-end gap-2">

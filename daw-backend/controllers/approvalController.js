@@ -32,7 +32,7 @@ exports.getPendingApprovals = async (req, res) => {
       userRole === "administrator"
     ) {
       console.log(
-        ">>> [APPROVAL CENTER] Authorized as Admin/Superadmin (Fetching All Pending Drafts)",
+        ">>> [APPROVAL CENTER] Authorized as Admin/superadmin (Fetching All Pending Drafts)",
       );
 
       const allPendingDrafts = await ApprovalDraft.findAll({
@@ -50,25 +50,31 @@ exports.getPendingApprovals = async (req, res) => {
 
     const tokenOWL = req.owl_token;
     const karyawanId = req.owl_username || req.userId;
+    const karyawanIdForOwl = req.karyawanId;
+    console.log(
+      `>>> [DEBUG PIPELINE] NIK untuk getPendingList:`,
+      karyawanIdForOwl,
+    );
 
     const owlResponse = await ErpApprovalService.getPendingList(
-      karyawanId,
+      karyawanIdForOwl,
       tokenOWL,
     );
+
+    // console.log(">>> [DEBUG OWL DATA] KaryawanID:", karyawanId);
+    // console.log(
+    //   ">>> [DEBUG OWL DATA] Raw Response:",
+    //   JSON.stringify(owlResponse, null, 2),
+    // );
+
     let pendingTickets = [];
 
-    if (Array.isArray(owlResponse)) {
-      // Kasus 1: langsung balikin Array
-      pendingTickets = owlResponse;
-    } else if (owlResponse && Array.isArray(owlResponse.data)) {
-      // Kasus 2: balikin { error: false, data: [...] }
-      pendingTickets = owlResponse.data;
-    } else if (
+    if (
       owlResponse &&
       owlResponse.data &&
       Array.isArray(owlResponse.data.rows)
     ) {
-      // Kasus 3: balikin { error: false, data: { rows: [...] } }
+      // Sesuai dengan JSON: { data: { rows: [...] } }
       pendingTickets = owlResponse.data.rows;
     }
 
@@ -81,7 +87,8 @@ exports.getPendingApprovals = async (req, res) => {
     }
 
     // Merge OWL dengan LOKAL
-    const ticketNumbers = pendingTickets.map((item) => item.notrans);
+    const ticketNumbers = pendingTickets.map((item) => item.notransaksi);
+    console.log(">>> [DEBUG] Mencari Tiket di DB Lokal:", ticketNumbers);
 
     const detailedDrafts = await ApprovalDraft.findAll({
       where: {
@@ -91,7 +98,20 @@ exports.getPendingApprovals = async (req, res) => {
       order: [["createdAt", "DESC"]],
     });
 
-    return res.status(200).json(detailedDrafts);
+    const draftsWithExtraData = detailedDrafts.map((draft) => {
+      const owlMatch = pendingTickets.find(
+        (t) => t.notransaksi === draft.notrans,
+      );
+
+      return {
+        ...draft.toJSON(),
+        nourut: owlMatch ? owlMatch.nourut : null,
+        level: owlMatch ? owlMatch.level : null,
+        jenispersetujuan: owlMatch ? owlMatch.jenispersetujuan : "CMS",
+      };
+    });
+
+    return res.status(200).json(draftsWithExtraData);
   } catch (error) {
     console.error("🚨 [FETCH PENDING ERROR]:", error.message);
     res.status(error.statusCode || 500).json({ message: error.message });
@@ -103,7 +123,9 @@ exports.executeDecision = async (req, res) => {
   const t = await sequelize.transaction();
   try {
     const {
-      notrans,
+      notrans: bodyNotrans,
+      notransaksi,
+      nourut,
       status,
       keteranganRejek,
       module,
@@ -111,73 +133,94 @@ exports.executeDecision = async (req, res) => {
       payload,
       action,
     } = req.body;
+
+    const notrans = bodyNotrans || notransaksi;
+    if (!notrans)
+      throw new Error("Nomor transaksi (notrans) wajib disertakan.");
+
     const tokenOWL = req.owl_token;
+    const nikApprover = String(req.karyawanId); // Pastikan selalu String
 
-    // 1. JIKA REJECT
+    const erpResult = await ErpApprovalService.submitDecision(
+      notrans,
+      status,
+      keteranganRejek ||
+        (status === "1" ? "Disetujui via CMS" : "Ditolak via CMS"),
+      tokenOWL,
+      nikApprover,
+      nourut,
+    );
+
+    // Asumsi: OWL mengembalikan flag 'is_final' atau jika tidak ada sistem multi-layer, nilainya true.
+    const isFinalApproval = erpResult?.data?.is_final !== false;
+
+    // --- LOGIKA REJECT ---
     if (status === "2") {
-      await ErpApprovalService.submitDecision(
-        notrans,
-        "2",
-        keteranganRejek || "Ditolak",
-        tokenOWL,
-      );
-
       if (action !== "CREATE") {
         const Model = getModelByModuleName(module);
         if (Model && targetId) {
           const queryWhere = targetId === "ALL_TREE" ? {} : { id: targetId };
-
           await Model.update(
             { is_locked: false, lock_ticket: null },
             { where: queryWhere, transaction: t },
           );
         }
       }
-
       await ApprovalDraft.update(
         { status: "Rejected", rejection_reason: keteranganRejek },
-
-        { where: { notrans: notrans }, transaction: t },
+        { where: { notrans }, transaction: t },
       );
 
       await t.commit();
       return res
         .status(200)
-        .json({ message: "Draf ditolak dan gembok dibuka." });
+        .json({ message: "Draf ditolak dan gembok data telah dibuka." });
     }
 
-    // 2. JIKA APPROVE
+    // --- LOGIKA APPROVE ---
     if (status === "1") {
-      const cleanPayload = { ...payload };
-      delete cleanPayload.id;
+      if (isFinalApproval) {
+        // 🚀 STRICT PAYLOAD SANITIZATION
+        const cleanPayload = { ...payload };
+        // Blacklist: Field ini HARAM di-override oleh payload dari frontend
+        const forbiddenFields = [
+          "id",
+          "createdAt",
+          "updatedAt",
+          "is_locked",
+          "lock_ticket",
+        ];
+        forbiddenFields.forEach((field) => delete cleanPayload[field]);
 
-      (module, targetId, cleanPayload, action, t);
+        // 1. Tangani File Fisik (Commit dari TEMP_)
+        handleFileCommit(module, cleanPayload);
 
-      handleFileCommit(module, cleanPayload);
+        // 2. Buka Gembok secara Paksa di Payload
+        cleanPayload.is_locked = false;
+        cleanPayload.lock_ticket = null;
 
-      cleanPayload.is_locked = false;
-      cleanPayload.lock_ticket = null;
+        // 3. Eksekusi Update ke Tabel Asli
+        await executeModelUpdate(module, targetId, cleanPayload, action, t);
 
-      await executeModelUpdate(module, targetId, cleanPayload, action, t);
+        // 4. Update Status Draf di Lokal menjadi "Approved"
+        await ApprovalDraft.update(
+          { status: "Approved" },
+          { where: { notrans }, transaction: t },
+        );
 
-      await ApprovalDraft.update(
-        { status: "Approved" },
-        { where: { notrans: notrans }, transaction: t },
-      );
-
-      await ErpApprovalService.submitDecision(
-        notrans,
-        "1",
-        "Disetujui via CMS",
-        tokenOWL,
-      );
-
-      await t.commit();
-
-      res.status(200).json({
-        message: `Draf ${module} berhasil dipublish! Aset fisik telah dipermanenkan.`,
-        targetId,
-      });
+        await t.commit();
+        return res.status(200).json({
+          message: `Draf ${module} telah Final dan berhasil dipublish ke Production!`,
+          targetId,
+        });
+      } else {
+        // Jika ERP mengindikasikan ada layer berikutnya (belum final)
+        await t.commit();
+        return res.status(200).json({
+          message: `Approval berhasil dicatat oleh ERP. Menunggu persetujuan layer berikutnya.`,
+          targetId,
+        });
+      }
     }
   } catch (error) {
     if (t) await t.rollback();
@@ -334,37 +377,37 @@ async function executeModelUpdate(
   transaction,
 ) {
   const Model = getModelByModuleName(module);
+  if (!Model)
+    throw new Error(`Mapping Model untuk modul '${module}' tidak ditemukan.`);
 
   if (action === "DELETE") {
     return await Model.destroy({ where: { id: targetId }, transaction });
   }
 
   if (action === "CREATE") {
-    payload.is_locked = false;
-    payload.lock_ticket = null;
     return await Model.create(payload, { transaction });
   }
 
-  switch (module) {
-    case "AboutInfo":
-      return { model: AboutInfo, id: 1 };
-    case "HomeSettings":
-      return {
-        model: HomeSettings,
-        id: 1,
-      };
-    case "InvestmentSettings":
-    case "Settings":
-      // Singleton
-      await Model.update(payload, { where: { id: 1 }, transaction });
-      break;
+  // Semua modul yang cuma punya 1 row otomatis dialihkan ke ID 1
+  const singletonModules = [
+    "AboutInfo",
+    "HomeSettings",
+    "InvestmentSettings",
+    "Settings",
+  ];
 
+  if (singletonModules.includes(module)) {
+    return await Model.update(payload, { where: { id: 1 }, transaction });
+  }
+
+  switch (module) {
     case "History":
+      // Pola Replace-All untuk tabel anak (child table)
       await History.destroy({ where: {}, transaction });
       if (payload.histories && Array.isArray(payload.histories)) {
         const historyData = payload.histories.map((h) => ({
           year: h.year,
-          description: h.text,
+          description: h.text, // Pastikan ini match dengan nama kolom MySQL lo
           is_locked: false,
           lock_ticket: null,
         }));
@@ -373,12 +416,12 @@ async function executeModelUpdate(
       break;
 
     case "BusinessSection":
-      // Update Section Utama
+      // 1. Update Induk
       await BusinessSection.update(payload, {
         where: { id: targetId },
         transaction,
       });
-      // Update Markers (Hapus yang lama, pasang yang baru dari draf)
+      // 2. Update Anak (Markers) dengan pola Replace-All
       if (payload.mapMarkers && Array.isArray(payload.mapMarkers)) {
         await BusinessMapMarker.destroy({
           where: { sectionId: targetId },
@@ -386,7 +429,7 @@ async function executeModelUpdate(
         });
         const newMarkers = payload.mapMarkers.map((m) => ({
           ...m,
-          id: undefined, // Buat ID baru (Auto Increment)
+          id: undefined, // Paksa MySQL bikin ID auto-increment baru
           sectionId: targetId,
           is_locked: false,
           lock_ticket: null,
@@ -413,11 +456,11 @@ async function executeModelUpdate(
       break;
 
     default:
-      if (Model) {
-        await Model.update(payload, { where: { id: targetId }, transaction });
-      } else {
-        throw new Error(`Execution Logic for ${module} not implemented.`);
-      }
+      // Modul Standar (Project, Affiliate, Management, Page, HeroSlides, ImpactStats)
+      return await Model.update(payload, {
+        where: { id: targetId },
+        transaction,
+      });
   }
 }
 

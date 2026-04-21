@@ -24,8 +24,8 @@ const checkLock = (Model) => {
       const { id } = req.params;
       const userRole = req.userRole; // Diambil dari middleware authJwt
 
-      // IF  Superadmin, langsung kasih jalan
-      if (userRole === "Superadmin") {
+      // IF  superadmin, langsung kasih jalan
+      if (userRole === "superadmin") {
         return next();
       }
 

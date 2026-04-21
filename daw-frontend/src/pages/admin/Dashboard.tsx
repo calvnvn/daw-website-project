@@ -131,22 +131,19 @@ export default function Dashboard() {
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <Link
           to="/admin/inbox"
-          className="bg-white rounded-xl border border-slate-200 p-6 shadow-sm hover:shadow-md transition-all group flex flex-col justify-between hover:border-amber-300 relative overflow-hidden"
-        >
+          className="bg-white rounded-xl border border-slate-200 p-6 shadow-sm hover:shadow-md transition-all group flex flex-col justify-between hover:border-amber-300 relative overflow-hidden">
           {stats.unreadInquiries > 0 && (
             <div className="absolute top-0 right-0 w-16 h-16 bg-amber-500/10 rounded-bl-full pointer-events-none"></div>
           )}
           <div className="flex items-start justify-between mb-4">
             <div
-              className={`p-3 rounded-lg transition-colors ${stats.unreadInquiries > 0 ? "bg-amber-100 text-amber-600" : "bg-slate-100 text-slate-400"}`}
-            >
+              className={`p-3 rounded-lg transition-colors ${stats.unreadInquiries > 0 ? "bg-amber-100 text-amber-600" : "bg-slate-100 text-slate-400"}`}>
               <Mail className="w-6 h-6" strokeWidth={2} />
             </div>
           </div>
           <div>
             <h3
-              className={`text-4xl font-bold mb-1 tracking-tight ${stats.unreadInquiries > 0 ? "text-amber-600" : "text-slate-900"}`}
-            >
+              className={`text-4xl font-bold mb-1 tracking-tight ${stats.unreadInquiries > 0 ? "text-amber-600" : "text-slate-900"}`}>
               {stats.unreadInquiries}
             </h3>
             <p className="text-sm font-semibold text-slate-700">Pesan Baru</p>
@@ -158,19 +155,16 @@ export default function Dashboard() {
 
         <Link
           to="/admin/projects"
-          className="bg-white rounded-xl border border-slate-200 p-6 shadow-sm hover:shadow-md transition-all group flex flex-col justify-between hover:border-blue-300 relative overflow-hidden"
-        >
+          className="bg-white rounded-xl border border-slate-200 p-6 shadow-sm hover:shadow-md transition-all group flex flex-col justify-between hover:border-blue-300 relative overflow-hidden">
           <div className="flex items-start justify-between mb-4">
             <div
-              className={`p-3 rounded-lg transition-colors ${stats.draftProjects > 0 ? "bg-blue-100 text-blue-600" : "bg-slate-100 text-slate-400"}`}
-            >
+              className={`p-3 rounded-lg transition-colors ${stats.draftProjects > 0 ? "bg-blue-100 text-blue-600" : "bg-slate-100 text-slate-400"}`}>
               <FileEdit className="w-6 h-6" strokeWidth={2} />
             </div>
           </div>
           <div>
             <h3
-              className={`text-4xl font-bold mb-1 tracking-tight ${stats.draftProjects > 0 ? "text-blue-600" : "text-slate-900"}`}
-            >
+              className={`text-4xl font-bold mb-1 tracking-tight ${stats.draftProjects > 0 ? "text-blue-600" : "text-slate-900"}`}>
               {stats.draftProjects}
             </h3>
             <p className="text-sm font-semibold text-slate-700">Draf Proyek</p>
@@ -211,8 +205,7 @@ export default function Dashboard() {
             </h3>
             <Link
               to="/admin/inbox"
-              className="text-xs font-bold text-daw-green hover:underline flex items-center gap-1"
-            >
+              className="text-xs font-bold text-daw-green hover:underline flex items-center gap-1">
               Lihat Semua Pesan <ArrowRight className="w-3 h-3" />
             </Link>
           </div>
@@ -222,8 +215,7 @@ export default function Dashboard() {
               recentInquiries.map((inq) => (
                 <div
                   key={inq.id}
-                  className="p-5 hover:bg-amber-50/30 transition-colors flex gap-4 items-start group"
-                >
+                  className="p-5 hover:bg-amber-50/30 transition-colors flex gap-4 items-start group">
                   <div className="mt-1 w-8 h-8 rounded-full bg-amber-100 text-amber-600 flex items-center justify-center shrink-0">
                     <Mail className="w-4 h-4" />
                   </div>
@@ -276,7 +268,7 @@ export default function Dashboard() {
                 {user?.name || "Administrator"}
               </h3>
               <p className="text-[10px] font-bold text-daw-green uppercase tracking-widest mt-0.5">
-                {user?.role || "Superadmin"}
+                {user?.role || "superadmin"}
               </p>
               <p className="text-xs text-slate-500 truncate mt-1">
                 {user?.email || "admin@daw.com"}
@@ -291,8 +283,7 @@ export default function Dashboard() {
             <div className="space-y-3">
               <Link
                 to="/admin/projects/create"
-                className="flex items-center justify-between p-4 rounded-xl border border-slate-100 bg-white hover:border-daw-green hover:bg-green-50 group transition-all shadow-sm hover:shadow-md"
-              >
+                className="flex items-center justify-between p-4 rounded-xl border border-slate-100 bg-white hover:border-daw-green hover:bg-green-50 group transition-all shadow-sm hover:shadow-md">
                 <div className="flex items-center gap-3">
                   <div className="bg-white p-1.5 rounded-md shadow-sm text-daw-green">
                     <Plus className="w-4 h-4" />
@@ -307,8 +298,7 @@ export default function Dashboard() {
               {can("manage_users") && (
                 <Link
                   to="/admin/users"
-                  className="flex items-center justify-between p-4 rounded-xl border border-slate-100 bg-white hover:border-blue-300 hover:bg-blue-50 group transition-all shadow-sm hover:shadow-md"
-                >
+                  className="flex items-center justify-between p-4 rounded-xl border border-slate-100 bg-white hover:border-blue-300 hover:bg-blue-50 group transition-all shadow-sm hover:shadow-md">
                   <div className="flex items-center gap-3">
                     <div className="bg-white p-1.5 rounded-md shadow-sm text-blue-600">
                       <Users className="w-4 h-4" />

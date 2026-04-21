@@ -112,7 +112,7 @@ exports.createProject = async (req, res) => {
       }
     }
 
-    // Superadmin atau Editor save draft
+    // superadmin atau Editor save draft
     if (req.body.status === "Published") {
       await newProject.update({ status: "Published" });
     }
@@ -305,9 +305,9 @@ exports.updateProject = async (req, res) => {
         });
       }
 
-      // Jika Superadmin, kita lanjut tapi catat log
+      // Jika superadmin, kita lanjut tapi catat log
       console.log(
-        `>>> [OVERRIDE] Superadmin mem-bypass kunci pada Proyek ID: ${id}`,
+        `>>> [OVERRIDE] superadmin mem-bypass kunci pada Proyek ID: ${id}`,
       );
     }
 

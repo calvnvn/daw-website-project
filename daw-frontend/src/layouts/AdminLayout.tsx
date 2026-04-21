@@ -211,7 +211,7 @@ export default function AdminLayout() {
 
   /**
    * FILTERED MENU LOGIC
-   * @concept: "Superadmin Bypass"
+   * @concept: "superadmin Bypass"
    * If the user role is 'admin' (from OWL), they get access to everything.
    * Otherwise, we strictly check their specific permissions.
    */
@@ -223,7 +223,7 @@ export default function AdminLayout() {
           if (!item.perm) return true;
 
           const isMasterAdmin =
-            user?.role === "admin" || user?.role === "Superadmin";
+            user?.role === "admin" || user?.role === "superadmin";
           if (isMasterAdmin) return true;
 
           return can(item.perm);

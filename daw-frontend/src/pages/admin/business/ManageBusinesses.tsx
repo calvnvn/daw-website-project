@@ -74,7 +74,7 @@ export default function ManageBusinesses() {
     return Object.fromEntries(categories.map((cat) => [cat.id, cat.color]));
   }, [categories]);
 
-  const isSuperadmin = user?.role === "Superadmin" || user?.role === "admin";
+  const isSuperadmin = user?.role === "superadmin" || user?.role === "admin";
   const currentSection = sections.find((s) => s.id === activeTab);
   const isSectionLocked = currentSection?.is_locked === true;
 
@@ -303,7 +303,7 @@ export default function ManageBusinesses() {
   return (
     <div className="max-w-6xl mx-auto space-y-6 animate-in fade-in duration-500 pb-12">
       {/* 🚀 THE SOVEREIGN BANNERS (Contextual Awareness) */}
-      {/* 1. Amber Banner (Superadmin Override) */}
+      {/* 1. Amber Banner (superadmin Override) */}
       {isOverrideMode && activeTab !== "categories" && (
         <div className="bg-amber-50 border border-amber-200 p-4 rounded-xl flex items-center gap-4 animate-in slide-in-from-top-4 shadow-sm">
           <div className="bg-amber-100 p-2 rounded-full text-amber-600 shrink-0">
@@ -311,7 +311,7 @@ export default function ManageBusinesses() {
           </div>
           <div>
             <h4 className="text-xs font-black text-amber-900 uppercase tracking-tight">
-              Mode Override Superadmin
+              Mode Override superadmin
             </h4>
             <p className="text-xs text-amber-700 leading-relaxed mt-0.5">
               Data sektor ini sedang dikunci oleh tiket peninjauan{" "}
@@ -332,7 +332,7 @@ export default function ManageBusinesses() {
           </div>
           <div>
             <h4 className="text-xs font-black text-blue-900 uppercase tracking-tight">
-              Sedang Ditinjau
+              Akses Dibatasi
             </h4>
             <p className="text-xs text-blue-700 leading-relaxed mt-0.5">
               Akses Dibatasi. Anda tidak dapat mengubah data ini karena revisi

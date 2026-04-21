@@ -174,9 +174,9 @@ export default function UserManagement() {
     }
 
     const targetUser = users.find((u) => String(u.id) === String(id));
-    if (targetUser?.roleData?.name === "Superadmin") {
+    if (targetUser?.roleData?.name === "superadmin") {
       return toast.error("Action Denied", {
-        description: "Superadmin accounts are immutable.",
+        description: "superadmin accounts are immutable.",
       });
     }
 
@@ -217,16 +217,16 @@ export default function UserManagement() {
     if (isEditingSelf) {
       toast.error("Security Lock", {
         description:
-          "You cannot demote your own Superadmin status for safety reasons.",
+          "You cannot demote your own superadmin status for safety reasons.",
       });
       return;
     }
 
-    // 3. GUARD: Hierarchy Protection (Superadmin vs Superadmin)
-    if (targetUser?.roleData?.name === "Superadmin" && !isEditingSelf) {
+    // 3. GUARD: Hierarchy Protection (superadmin vs superadmin)
+    if (targetUser?.roleData?.name === "superadmin" && !isEditingSelf) {
       toast.error("Action Denied", {
         description:
-          "Hierarchy Protection: Superadmin accounts are immutable by other administrators.",
+          "Hierarchy Protection: superadmin accounts are immutable by other administrators.",
       });
       return;
     }
@@ -256,8 +256,8 @@ export default function UserManagement() {
     };
 
     // --- LOGIKA KONFIRMASI ---
-    if (newRole?.name === "Superadmin") {
-      toast("Elevate to Superadmin?", {
+    if (newRole?.name === "superadmin") {
+      toast("Elevate to superadmin?", {
         description: `This grants ${targetUser?.name} full administrative control. Proceed with caution.`,
         duration: Infinity,
         action: {
@@ -279,7 +279,7 @@ export default function UserManagement() {
 
   const getRoleBadgeColor = (role: string) => {
     switch (role) {
-      case "Superadmin":
+      case "superadmin":
         return "bg-purple-100 text-purple-700 border-purple-200";
       case "Editor":
         return "bg-blue-100 text-blue-700 border-blue-200";
@@ -375,7 +375,7 @@ export default function UserManagement() {
                 filteredUsers.map((user: any) => {
                   const isSelf = String(user.id) === String(currentUserId);
                   const roleName = user.roleData?.name || "Unknown Role";
-                  const isSuperadmin = roleName === "Superadmin";
+                  const isSuperadmin = roleName === "superadmin";
 
                   // DETEKSI STATUS SYNC SSO
                   const isPendingSync = user.name === "Menunggu Sync Login...";
@@ -428,7 +428,7 @@ export default function UserManagement() {
 
                       {/* KOLOM 2: TINGKAT AKSES */}
                       <td className="px-6 py-4">
-                        {currentUser?.role === "Superadmin" && !isSelf ? (
+                        {currentUser?.role === "superadmin" && !isSelf ? (
                           <div className="relative inline-block">
                             <select
                               value={user.roleId}
@@ -513,7 +513,7 @@ export default function UserManagement() {
                             isSelf
                               ? "Tidak bisa hapus diri sendiri"
                               : isSuperadmin
-                                ? "Superadmin dilindungi"
+                                ? "superadmin dilindungi"
                                 : "Hapus Akun"
                           }
                           className={`p-2 rounded-lg transition-all border shadow-sm flex items-center justify-center ml-auto

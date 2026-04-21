@@ -98,7 +98,7 @@ LogoPreviewer.displayName = "LogoPreviewer";
 
 export default function InvestmentsManager() {
   const { user } = useAuth();
-  const isSuperadmin = user?.role === "Superadmin" || user?.role === "admin";
+  const isSuperadmin = user?.role === "superadmin" || user?.role === "admin";
 
   const [activeTab, setActiveTab] = useState<"content" | "companies">(
     "content",
@@ -409,7 +409,7 @@ export default function InvestmentsManager() {
   return (
     <div className="max-w-6xl mx-auto space-y-6 animate-in fade-in duration-500 pb-12">
       {/* --- SOVEREIGN BANNERS (Contextual Awareness) --- */}
-      {/* 1. Amber Banner (Superadmin Override Warning) */}
+      {/* 1. Amber Banner (superadmin Override Warning) */}
       {isOverrideMode && (
         <div className="bg-amber-50 border border-amber-200 p-4 rounded-xl flex items-center gap-4 animate-in slide-in-from-top-4 shadow-sm">
           <div className="bg-amber-100 p-2 rounded-full text-amber-600 shrink-0">
@@ -437,7 +437,7 @@ export default function InvestmentsManager() {
           </div>
           <div>
             <h4 className="text-xs font-black text-blue-900 uppercase tracking-tight">
-              🔒 Akses Dibatasi
+              Akses Dibatasi
             </h4>
             <p className="text-xs text-blue-700 leading-relaxed mt-0.5">
               Data pada halaman ini sedang ditinjau. Anda tidak dapat melakukan

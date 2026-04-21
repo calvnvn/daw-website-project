@@ -1,7 +1,7 @@
 const ApprovalDraft = require("../models/ApprovalDraft");
 
 /**
- * Membatalkan draf pending yang ada jika Superadmin melakukan bypass/update langsung.
+ * Membatalkan draf pending yang ada jika superadmin melakukan bypass/update langsung.
  * @param {string} moduleName - Nama model (Project, Management, dll)
  * @param {string|number} targetId - ID baris data yang sedang di-lock
  * @param {object} transaction - Objek transaksi Sequelize (opsional)
@@ -15,7 +15,7 @@ const invalidateOldDrafts = async (
     {
       status: "Replaced",
       rejection_reason:
-        "Otomatis dibatalkan: Superadmin melakukan perubahan langsung pada data asli (Override).",
+        "Otomatis dibatalkan: superadmin melakukan perubahan langsung pada data asli (Override).",
     },
     {
       where: {

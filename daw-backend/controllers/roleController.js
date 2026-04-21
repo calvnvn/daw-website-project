@@ -56,11 +56,11 @@ exports.updateRole = async (req, res) => {
     if (!role)
       return res.status(404).json({ message: "Role tidak ditemukan." });
 
-    // 🛡️ Hierarchy Protection: Jangan biarkan user mengubah nama Superadmin via API
-    if (role.name === "Superadmin" && name !== "Superadmin") {
+    // 🛡️ Hierarchy Protection: Jangan biarkan user mengubah nama superadmin via API
+    if (role.name === "superadmin" && name !== "superadmin") {
       return res
         .status(403)
-        .json({ message: "Dilarang mengubah nama role sistem (Superadmin)." });
+        .json({ message: "Dilarang mengubah nama role sistem (superadmin)." });
     }
 
     await role.update({ name, description });
@@ -83,7 +83,7 @@ exports.deleteRole = async (req, res) => {
       return res.status(404).json({ message: "Role tidak ditemukan." });
 
     // 🛡️ System Protection: Role krusial DAW CMS nggak boleh dihapus
-    if (["Superadmin", "Editor", "Approver"].includes(role.name)) {
+    if (["superadmin", "Editor", "Approver"].includes(role.name)) {
       return res.status(403).json({
         message: `Role sistem '${role.name}' dilindungi dan tidak dapat dihapus.`,
       });

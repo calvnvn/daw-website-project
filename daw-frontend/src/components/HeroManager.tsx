@@ -71,7 +71,7 @@ export default function HeroManager() {
   }, [initialSlides, isEditing]);
 
   useEffect(() => {
-    // Superadmin tidak perlu melihat banner restorasi draf
+    // superadmin tidak perlu melihat banner restorasi draf
     if (isSuperadmin) return;
 
     const controller = new AbortController();
@@ -214,8 +214,7 @@ export default function HeroManager() {
   const moveSlide = (index: number, direction: "up" | "down") => {
     if (shouldLockGlobalActions) {
       return toast.error("Urutan terkunci", {
-        description:
-          "Terdapat slide yang sedang dalam proses peninjauan.",
+        description: "Terdapat slide yang sedang dalam proses peninjauan.",
       });
     }
 
@@ -400,7 +399,7 @@ export default function HeroManager() {
   return (
     <div className="space-y-6 animate-in fade-in duration-300">
       {/* --- SOVEREIGN BANNERS (Contextual Awareness) --- */}
-      {/* 1. Amber Banner (Superadmin Override Warning) */}
+      {/* 1. Amber Banner (superadmin Override Warning) */}
       {hasLockedSlides && isSuperadmin && (
         <div className="bg-amber-50 border border-amber-200 p-4 md:p-5 rounded-xl flex items-center gap-4 animate-in slide-in-from-top-4 shadow-sm mb-4">
           <div className="bg-amber-100 p-2 rounded-full text-amber-600 shrink-0">
@@ -428,11 +427,11 @@ export default function HeroManager() {
           </div>
           <div>
             <h4 className="text-xs md:text-sm font-black text-blue-900 uppercase tracking-tight">
-              🔒 Interaksi Dibatasi
+              Akses Dibatasi
             </h4>
             <p className="text-[11px] md:text-xs text-blue-700 leading-relaxed mt-0.5 max-w-2xl">
-              Urutan slide dan data tertentu sedang ditinjau. Anda tidak
-              dapat melakukan perubahan kolektif hingga proses selesai.
+              Urutan slide dan data tertentu sedang ditinjau. Anda tidak dapat
+              melakukan perubahan kolektif hingga proses selesai.
             </p>
           </div>
         </div>
@@ -583,7 +582,7 @@ export default function HeroManager() {
 
               {shouldLockRowUI && (
                 <div className="absolute top-0 left-0 right-0 bg-blue-50 border-b border-blue-100 text-blue-600 text-[10px] font-black px-3 py-1 flex items-center justify-center gap-1.5 z-10 uppercase tracking-widest">
-                  <Lock className="w-3 h-3" /> Sedang Ditinjau
+                  <Lock className="w-3 h-3" /> Akses Dibatasi
                 </div>
               )}
 

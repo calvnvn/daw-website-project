@@ -96,7 +96,7 @@ exports.updateSettings = async (req, res) => {
     // --- JALUR SUPERADMIN (SOVEREIGN BYPASS) ---
     const t = await sequelize.transaction();
     try {
-      // 1. The Atomic Draft Killer: Bunuh draf editor jika Superadmin intervensi
+      // 1. The Atomic Draft Killer: Bunuh draf editor jika superadmin intervensi
       await invalidateOldDrafts("InvestmentSettings", 1, t);
 
       // 2. Override Live Data & Force Unlock

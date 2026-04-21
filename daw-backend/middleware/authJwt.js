@@ -1,4 +1,3 @@
-const axios = require("axios");
 const jwt = require("jsonwebtoken");
 
 const verifyToken = (req, res, next) => {
@@ -6,28 +5,27 @@ const verifyToken = (req, res, next) => {
     const authHeader =
       req.headers["authorization"] || req.headers["x-access-token"];
 
-    if (!authHeader) {
-      return res.status(403).json({ message: "No token provided!" });
+    if (!authHeader || typeof authHeader !== "string") {
+      return res
+        .status(401)
+        .json({ message: "Unauthorized! Token is missing." });
     }
 
     let token = authHeader;
     if (authHeader.toLowerCase().startsWith("bearer ")) {
-      token = authHeader.split(" ")[1];
+      token = authHeader.substring(7).trim();
     }
 
     if (!token || token === "undefined" || token === "null") {
-      return res.status(401).json({ message: "Invalid token format!" });
+      return res
+        .status(401)
+        .json({ message: "Unauthorized! Invalid token format." });
     }
-
-    // 3. LOCAL DECODING (The Magic Bypass)
-    // jwt.decode() HANYA membaca isi paket, TANPA mengecek tanda tangan (Secret)
-    // const decoded = jwt.decode(token);
 
     jwt.verify(token, process.env.JWT_SECRET, (err, decoded) => {
       if (err) {
         console.error(
-          "❌ [AUTH ERROR] Token Verification Failed:",
-          err.message,
+          `❌ [AUTH ERROR] Token Verification Failed: ${err.message}`,
         );
 
         if (err.name === "TokenExpiredError") {
@@ -40,24 +38,32 @@ const verifyToken = (req, res, next) => {
           .json({ message: "Unauthorized Access! Invalid token signature." });
       }
 
-      // console.log("--- ISI TOKEN DECODED ---");
-      // console.log(decoded);
-      // console.log("-------------------------");
+      const rawRole = decoded.role
+        ? String(decoded.role).toLowerCase().trim()
+        : "";
+
+      const normalizedRole = rawRole === "admin" ? "superadmin" : rawRole;
 
       req.userId = decoded.id;
       req.owl_username = decoded.owl_username || decoded.username;
-      req.userRole = decoded.role ? decoded.role.toLowerCase() : null;
-      // req.userRole = "Editor";
-      req.userPermissions = decoded.permissions || [];
+
+      req.karyawanId =
+        decoded.karyawanid || decoded.karyawanId || decoded.userid;
+
+      req.userRole = normalizedRole;
+      req.userPermissions = Array.isArray(decoded.permissions)
+        ? decoded.permissions
+        : [];
       req.owl_token = decoded.owl_token;
 
-      // console.log(
-      //   `[AUTH DEBUG] User: ${req.userName} | Role Forced to: ${req.userRole}`,
-      // );
+      console.log(
+        `✅ [AUTH SUCCESS] User: ${req.owl_username} | Internal Role: ${req.userRole}`,
+      );
+
       next();
     });
   } catch (error) {
-    console.error("[MIDDLEWARE CRASH]", error);
+    console.error("🚨 [MIDDLEWARE CRASH]", error);
     return res
       .status(500)
       .json({ message: "Internal Server Error in Middleware" });
@@ -69,25 +75,18 @@ const verifyToken = (req, res, next) => {
  */
 const checkPermission = (requiredPermission) => {
   return (req, res, next) => {
-    // 1. Logic bypass untuk Role 'admin' (karena dari OWL rolenya 'admin')
-    const isAllowed =
-      req.userRole === "admin" ||
-      req.userRole === "Superadmin" ||
-      req.userRole === "Editor";
-
-    if (isAllowed) {
+    if (req.userRole === "superadmin") {
       return next();
     }
 
-    const permissions = Array.isArray(req.userPermissions)
-      ? req.userPermissions
-      : [];
+    const permissions = req.userPermissions || [];
 
     if (!permissions.includes(requiredPermission)) {
       return res.status(403).json({
         message: `Forbidden! You need '${requiredPermission}' permission to perform this action.`,
       });
     }
+
     next();
   };
 };

@@ -93,7 +93,7 @@ export default function ProjectForm() {
   const isEditMode = !!id;
   const quillRef = useRef<ReactQuill>(null);
   const { user, can } = useAuth();
-  const isSuperadmin = user?.role === "Superadmin" || user?.role === "admin";
+  const isSuperadmin = user?.role === "superadmin" || user?.role === "admin";
   const isEditor = !isSuperadmin;
   const { sections } = useBusiness();
 
@@ -512,13 +512,10 @@ export default function ProjectForm() {
             is_locked: true,
             lock_ticket: response.data.ticket,
           }));
-          toast.success(
-            "Revisi berhasil diajukan! Menunggu persetujuan.",
-            {
-              id: loadingToast,
-              duration: 5000,
-            },
-          );
+          toast.success("Revisi berhasil diajukan! Menunggu persetujuan.", {
+            id: loadingToast,
+            duration: 5000,
+          });
         } else {
           toast.success(
             isSuperadmin
@@ -604,7 +601,7 @@ export default function ProjectForm() {
 
   return (
     <div className="max-w-7xl mx-auto animate-in fade-in duration-500">
-      {/* Warning Banner (Superadmin Only) */}
+      {/* Warning Banner (superadmin Only) */}
       {isOverrideMode && (
         <div className="mb-6 bg-amber-50 border border-amber-200 p-4 rounded-xl flex items-center gap-4 animate-in slide-in-from-top-4 shadow-sm">
           <div className="bg-amber-100 p-2 rounded-full text-amber-600 shrink-0">
@@ -612,7 +609,7 @@ export default function ProjectForm() {
           </div>
           <div>
             <h4 className="text-xs font-black text-amber-900 uppercase tracking-tight">
-              Mode Override Superadmin
+              Mode Override superadmin
             </h4>
             <p className="text-xs text-amber-700 leading-relaxed mt-0.5">
               Data ini sedang dikunci oleh tiket peninjauan{" "}
@@ -634,7 +631,7 @@ export default function ProjectForm() {
           </div>
           <div>
             <h4 className="text-xs font-black text-blue-900 uppercase tracking-tight">
-              Sedang Ditinjau
+              Akses Dibatasi
             </h4>
             <p className="text-xs text-blue-700 leading-relaxed mt-0.5">
               Anda tidak dapat mengubah data ini karena revisi sebelumnya sedang

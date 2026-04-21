@@ -22,16 +22,16 @@ exports.getAllUsers = async (req, res) => {
   }
 };
 
-// --- 1. CREATE USER (Tambahkan Guard Role) ---
+// --- 1. CREATE USER (Sync with Lowercase Middleware) ---
 exports.createUser = async (req, res) => {
   try {
     const { email, roleId, owl_username } = req.body;
-    const requesterRole = req.userRole;
 
-    // Protection: Hanya Superadmin yang bisa buat user baru
-    if (requesterRole !== "Superadmin") {
+    // 🚀 FIX: Gunakan lowercase 'superadmin' sesuai output middleware
+    if (req.userRole !== "superadmin") {
       return res.status(403).json({
-        message: "Access Denied: Only Admin can create new users.",
+        message:
+          "Access Denied: Hanya superadmin yang berwenang mendaftarkan user baru.",
       });
     }
 
@@ -53,12 +53,13 @@ exports.createUser = async (req, res) => {
       email: email && email.trim() !== "" ? email : null,
       owl_username: owl_username.trim(),
       roleId: roleId,
-      password: "SSO_USER_NO_LOCAL_LOGIN", // Unused
+      password: "SSO_USER_NO_LOCAL_LOGIN",
       status: "Active",
     });
+
     res.status(201).json({
       success: true,
-      message: `User '${owl_username}' berhasil di-whitelist. Nama asli akan otomatis tersinkronisasi saat user tersebut login pertama kali via OWL.`,
+      message: `User '${owl_username}' berhasil di-whitelist.`,
     });
   } catch (error) {
     console.error("Create User Error:", error);
@@ -66,13 +67,13 @@ exports.createUser = async (req, res) => {
   }
 };
 
-// --- 2. UPDATE USER (Sudah Bagus, Tambahkan 1 Guard lagi) ---
+// --- 2. UPDATE USER (Hierarchy & Case Guard) ---
 exports.updateUser = async (req, res) => {
   try {
     const { id } = req.params;
     const { name, email, roleId, status } = req.body;
-    const requesterRole = req.userRole; // Role si pengeklik (dari JWT)
-    const requesterId = req.userId; // ID si pengeklik
+    const requesterId = req.userId;
+    const requesterRole = req.userRole; // Pasti lowercase dari middleware
 
     const user = await User.findByPk(id, {
       include: [{ model: Role, as: "roleData" }],
@@ -80,38 +81,34 @@ exports.updateUser = async (req, res) => {
 
     if (!user) return res.status(404).json({ message: "User not found" });
 
-    // 🛡️ 1. ULTIMATE HIERARCHY GUARD
-    // Siapapun (termasuk Superadmin lain) dilarang mengubah Role/Status seorang Superadmin,
-    // KECUALI Superadmin itu sendiri yang mengubah datanya (misal: ganti nama/email).
-    const targetIsSuperadmin = user.roleData?.name === "Superadmin";
+    const targetRoleName = user.roleData?.name?.toLowerCase() || "";
+    const targetIsSuperadmin = targetRoleName === "superadmin";
     const isEditingSelf = String(requesterId) === String(id);
 
     if (targetIsSuperadmin && !isEditingSelf) {
-      if (roleId || status) {
+      if (roleId || status || email || name) {
         return res.status(403).json({
           message:
-            "Hierarchy Protection: Superadmin access levels are immutable by other users.",
+            "Hierarchy Protection: Akun superadmin tidak bisa diubah oleh administrator lain.",
         });
       }
     }
 
-    // 🛡️ 2. EDITOR ACCESS RESTRICTION
-    if (requesterRole === "Editor" && (roleId || status)) {
+    // 🛡️ 2. EDITOR ACCESS RESTRICTION (Fix Case)
+    if (requesterRole === "editor" && (roleId || status)) {
       return res.status(403).json({
         message:
-          "Forbidden: Editors are not authorized to elevate roles or change account status.",
+          "Forbidden: Editor tidak diizinkan mengubah Role atau Status akun.",
       });
     }
 
-    // 🛡️ 3. PARTIAL UPDATE PATTERN (Surgical Precision)
-    // Kita hanya memasukkan data ke objek update jika nilainya benar-benar dikirim.
+    // 🛡️ 3. PARTIAL UPDATE PATTERN
     const updatePayload = {};
     if (name !== undefined) updatePayload.name = name;
     if (email !== undefined) updatePayload.email = email;
     if (roleId !== undefined) updatePayload.roleId = roleId;
     if (status !== undefined) updatePayload.status = status;
 
-    // Pastikan tidak ada payload kosong yang dikirim ke .update()
     if (Object.keys(updatePayload).length === 0) {
       return res
         .status(400)
@@ -122,7 +119,7 @@ exports.updateUser = async (req, res) => {
 
     res.json({
       success: true,
-      message: `User ${user.name} updated successfully.`,
+      message: `User ${user.name} berhasil diperbarui.`,
     });
   } catch (error) {
     console.error("[UPDATE USER ERROR]:", error);
@@ -149,18 +146,18 @@ exports.deleteUser = async (req, res) => {
       });
     }
 
-    // 🛡️ GUARD 2: Proteksi Sejenjang (Superadmin dilarang hapus sesama Superadmin)
-    if (user.roleData?.name === "Superadmin") {
+    // 🛡️ GUARD 2: Proteksi Sejenjang (superadmin dilarang hapus sesama superadmin)
+    if (user.roleData?.name === "superadmin") {
       return res.status(403).json({
-        message: "Hierarchy Protection: Superadmin accounts are protected.",
+        message: "Hierarchy Protection: superadmin accounts are protected.",
       });
     }
 
     // 🛡️ GUARD 3: Editor dilarang hapus siapapun (Double Check)
-    if (requesterRole !== "Superadmin") {
+    if (requesterRole !== "superadmin") {
       return res
         .status(403)
-        .json({ message: "Forbidden: Only Superadmin can delete users." });
+        .json({ message: "Forbidden: Only superadmin can delete users." });
     }
 
     await user.destroy();

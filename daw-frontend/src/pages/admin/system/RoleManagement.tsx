@@ -140,7 +140,7 @@ export default function RoleManagement() {
   };
 
   const handleDeleteRole = async (id: string, roleName: string) => {
-    if (["Superadmin", "Editor"].includes(roleName)) {
+    if (["superadmin", "Editor"].includes(roleName)) {
       return toast.error("System roles cannot be deleted.");
     }
 
@@ -195,8 +195,7 @@ export default function RoleManagement() {
         </div>
         <button
           onClick={() => handleOpenModal()}
-          className="flex items-center gap-2 bg-slate-900 hover:bg-slate-800 text-white px-5 py-2.5 rounded-lg font-medium transition-colors shadow-sm"
-        >
+          className="flex items-center gap-2 bg-slate-900 hover:bg-slate-800 text-white px-5 py-2.5 rounded-lg font-medium transition-colors shadow-sm">
           <Plus className="w-5 h-5" />
           <span>Create New Role</span>
         </button>
@@ -210,8 +209,7 @@ export default function RoleManagement() {
           {roles.map((role) => (
             <div
               key={role.id}
-              className="bg-white rounded-xl border border-slate-200 p-6 flex flex-col h-full hover:shadow-md transition-shadow group"
-            >
+              className="bg-white rounded-xl border border-slate-200 p-6 flex flex-col h-full hover:shadow-md transition-shadow group">
               <div className="flex justify-between items-start mb-4">
                 <div className="flex items-center gap-3">
                   <div className="w-10 h-10 rounded-lg bg-daw-green/10 text-daw-green flex items-center justify-center">
@@ -233,7 +231,7 @@ export default function RoleManagement() {
                   {role.description || "No description provided."}
                 </p>
                 <div className="flex flex-wrap gap-1.5 mb-6">
-                  {role.name === "Superadmin" ? (
+                  {role.name === "superadmin" ? (
                     <span className="text-xs bg-purple-100 text-purple-700 px-2 py-1 rounded-md font-medium border border-purple-200">
                       Unrestricted Access (All Modules)
                     </span>
@@ -241,8 +239,7 @@ export default function RoleManagement() {
                     role.permissions.slice(0, 3).map((p) => (
                       <span
                         key={p.id}
-                        className="text-[10px] bg-slate-100 text-slate-600 px-2 py-1 rounded border border-slate-200 font-medium"
-                      >
+                        className="text-[10px] bg-slate-100 text-slate-600 px-2 py-1 rounded border border-slate-200 font-medium">
                         {formatPermName(p.name)}
                       </span>
                     ))
@@ -263,17 +260,15 @@ export default function RoleManagement() {
               <div className="flex items-center gap-2 pt-4 border-t border-slate-100">
                 <button
                   onClick={() => handleOpenModal(role)}
-                  className="flex-1 flex justify-center items-center gap-1.5 py-2 text-sm font-medium text-slate-600 hover:text-daw-green hover:bg-slate-50 rounded-lg transition-colors"
-                >
+                  className="flex-1 flex justify-center items-center gap-1.5 py-2 text-sm font-medium text-slate-600 hover:text-daw-green hover:bg-slate-50 rounded-lg transition-colors">
                   <Edit className="w-4 h-4" /> Edit Role
                 </button>
-                {/* Disable Delete for Superadmin & Editor */}
-                {!["Superadmin", "Editor"].includes(role.name) && (
+                {/* Disable Delete for superadmin & Editor */}
+                {!["superadmin", "Editor"].includes(role.name) && (
                   <button
                     onClick={() => handleDeleteRole(role.id, role.name)}
                     className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                    title="Delete Role"
-                  >
+                    title="Delete Role">
                     <Trash2 className="w-4 h-4" />
                   </button>
                 )}
@@ -296,8 +291,7 @@ export default function RoleManagement() {
               </h2>
               <button
                 onClick={handleCloseModal}
-                className="p-2 hover:bg-slate-200 rounded-full transition-colors"
-              >
+                className="p-2 hover:bg-slate-200 rounded-full transition-colors">
                 <X className="w-5 h-5" />
               </button>
             </div>
@@ -311,7 +305,7 @@ export default function RoleManagement() {
                   </label>
                   <input
                     type="text"
-                    disabled={editingRole?.name === "Superadmin"}
+                    disabled={editingRole?.name === "superadmin"}
                     className="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-lg focus:ring-2 focus:ring-daw-green/20 focus:border-daw-green disabled:bg-slate-100 disabled:text-slate-500"
                     placeholder="e.g. Human Capital"
                     value={formData.name}
@@ -340,10 +334,10 @@ export default function RoleManagement() {
                   Module Permissions
                 </label>
 
-                {editingRole?.name === "Superadmin" ? (
+                {editingRole?.name === "superadmin" ? (
                   <div className="p-4 bg-purple-50 border border-purple-200 rounded-xl text-purple-700 text-sm font-medium flex items-start gap-3">
                     <Shield className="w-5 h-5 shrink-0 mt-0.5" />
-                    Superadmin has unrestricted access to all modules.
+                    superadmin has unrestricted access to all modules.
                     Checkboxes are disabled.
                   </div>
                 ) : (
@@ -359,8 +353,7 @@ export default function RoleManagement() {
                       return (
                         <div
                           key={group.label}
-                          className="bg-slate-50/50 p-4 rounded-xl border border-slate-100"
-                        >
+                          className="bg-slate-50/50 p-4 rounded-xl border border-slate-100">
                           <h4 className="text-[11px] font-black text-slate-400 uppercase tracking-[0.15em] mb-3">
                             {group.label}
                           </h4>
@@ -378,11 +371,9 @@ export default function RoleManagement() {
                                     isChecked
                                       ? "border-daw-green bg-daw-green/5"
                                       : "border-slate-100 bg-white hover:border-slate-200"
-                                  }`}
-                                >
+                                  }`}>
                                   <div
-                                    className={`mt-0.5 ${isChecked ? "text-daw-green" : "text-slate-300"}`}
-                                  >
+                                    className={`mt-0.5 ${isChecked ? "text-daw-green" : "text-slate-300"}`}>
                                     {isChecked ? (
                                       <CheckSquare className="w-5 h-5" />
                                     ) : (
@@ -391,8 +382,7 @@ export default function RoleManagement() {
                                   </div>
                                   <div>
                                     <p
-                                      className={`text-sm font-bold ${isChecked ? "text-slate-900" : "text-slate-600"}`}
-                                    >
+                                      className={`text-sm font-bold ${isChecked ? "text-slate-900" : "text-slate-600"}`}>
                                       {formatPermName(perm.name)}
                                     </p>
                                     <p className="text-[10px] text-slate-400 mt-0.5 leading-tight">
@@ -436,11 +426,9 @@ export default function RoleManagement() {
                                     isChecked
                                       ? "border-orange-500 bg-orange-50"
                                       : "border-slate-100 bg-white hover:border-slate-200"
-                                  }`}
-                                >
+                                  }`}>
                                   <div
-                                    className={`mt-0.5 ${isChecked ? "text-orange-500" : "text-slate-300"}`}
-                                  >
+                                    className={`mt-0.5 ${isChecked ? "text-orange-500" : "text-slate-300"}`}>
                                     {isChecked ? (
                                       <CheckSquare className="w-5 h-5" />
                                     ) : (
@@ -449,8 +437,7 @@ export default function RoleManagement() {
                                   </div>
                                   <div>
                                     <p
-                                      className={`text-sm font-bold ${isChecked ? "text-slate-900" : "text-slate-600"}`}
-                                    >
+                                      className={`text-sm font-bold ${isChecked ? "text-slate-900" : "text-slate-600"}`}>
                                       {formatPermName(perm.name)}
                                     </p>
                                     <p className="text-[10px] text-slate-400 mt-0.5 leading-tight">
@@ -474,19 +461,17 @@ export default function RoleManagement() {
             <div className="px-6 py-4 border-t border-slate-100 flex items-center justify-end gap-3 bg-slate-50 shrink-0">
               <button
                 onClick={handleCloseModal}
-                className="px-5 py-2.5 text-sm font-bold text-slate-600 hover:bg-slate-200 rounded-lg transition-colors"
-              >
+                className="px-5 py-2.5 text-sm font-bold text-slate-600 hover:bg-slate-200 rounded-lg transition-colors">
                 Cancel
               </button>
               <button
                 onClick={handleSaveRole}
-                disabled={editingRole?.name === "Superadmin"}
+                disabled={editingRole?.name === "superadmin"}
                 className={`px-5 py-2.5 text-sm font-bold text-white bg-daw-green hover:bg-[#003b1c] rounded-lg transition-colors ${
-                  editingRole?.name === "Superadmin"
+                  editingRole?.name === "superadmin"
                     ? "opacity-50 cursor-not-allowed"
                     : ""
-                }`}
-              >
+                }`}>
                 Save Role Config
               </button>
             </div>

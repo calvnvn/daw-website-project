@@ -34,7 +34,7 @@ interface AdminProject {
 
 export default function ProjectManagement() {
   const { user } = useAuth();
-  const isSuperadmin = user?.role === "Superadmin" || user?.role === "admin";
+  const isSuperadmin = user?.role === "superadmin" || user?.role === "admin";
   const [projects, setProjects] = useState<AdminProject[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
@@ -158,7 +158,7 @@ export default function ProjectManagement() {
           return "Status diajukan . Data dikunci menunggu persetujuan.";
         }
 
-        // Jalur Eksekusi Langsung (Superadmin / Save Draft)
+        // Jalur Eksekusi Langsung (superadmin / Save Draft)
         setProjects((prev) =>
           prev.map((p) => (p.id === id ? { ...p, status: newStatus } : p)),
         );

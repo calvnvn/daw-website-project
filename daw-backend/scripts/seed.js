@@ -427,7 +427,7 @@ const DEFAULT_USERS = [
     name: "Jap Calvin",
     email: "jf.calvin20@gmail.com",
     password: "AdminDaw123!",
-    role: "Superadmin",
+    role: "superadmin",
     status: "Active",
   },
   {
@@ -435,7 +435,7 @@ const DEFAULT_USERS = [
     name: "Rama Ilyasyah",
     email: "rama.ilyasyah@daw.co.id",
     password: "Daw9795!",
-    role: "Superadmin",
+    role: "superadmin",
     status: "Active",
   },
   {

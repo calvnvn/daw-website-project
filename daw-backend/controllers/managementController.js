@@ -184,7 +184,7 @@ exports.updateManagement = async (req, res) => {
     }
 
     // --- JALUR SUPERADMIN: DIRECT UPDATE ---
-    // Cleanup physical file jika Superadmin ganti/hapus foto
+    // Cleanup physical file jika superadmin ganti/hapus foto
     if (oldPhotoToDelete) deleteSingleFile(oldPhotoToDelete);
 
     await person.update(
@@ -241,7 +241,7 @@ exports.deleteManagement = async (req, res) => {
         .json({ message: "Permintaan hapus dikirim.", ticket: result.notrans });
     }
 
-    // Superadmin: Langsung musnahkan
+    // superadmin: Langsung musnahkan
     if (person.photoUrl) deleteSingleFile(person.photoUrl);
     await person.destroy({ transaction: t });
     await t.commit();

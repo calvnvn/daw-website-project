@@ -702,7 +702,7 @@ export default function AboutUsManager() {
               <div className="flex items-center gap-1 ml-1">
                 {isLocked && (
                   <div
-                    title="Sedang ditinjau"
+                    title="Akses Dibatasi"
                     className="w-2 h-2 rounded-full bg-blue-500 animate-pulse shadow-[0_0_8px_rgba(59,130,246,0.5)]"
                   />
                 )}
@@ -784,7 +784,7 @@ export default function AboutUsManager() {
                   </h3>
                   {isItemLocked && (
                     <span className="flex items-center gap-1.5 text-xs font-bold text-blue-600 bg-blue-50 px-3 py-1.5 rounded-full border border-blue-100">
-                      <Lock className="w-3.5 h-3.5" /> Sedang Ditinjau
+                      <Lock className="w-3.5 h-3.5" /> Akses Dibatasi
                     </span>
                   )}
                 </div>
@@ -958,7 +958,7 @@ export default function AboutUsManager() {
                   <div className="flex items-center gap-3">
                     {isModuleLocked && (
                       <span className="flex items-center gap-1.5 text-xs font-bold text-blue-600 bg-blue-50 px-3 py-1.5 rounded-full border border-blue-100">
-                        <Lock className="w-3.5 h-3.5" /> Sedang Ditinjau
+                        <Lock className="w-3.5 h-3.5" /> Akses Dibatasi
                       </span>
                     )}
                     {isEditing && !isModuleLocked && (
@@ -1113,7 +1113,7 @@ export default function AboutUsManager() {
 
                   {isItemLocked && (
                     <span className="flex items-center gap-1.5 text-xs font-bold text-blue-600 bg-blue-50 px-3 py-1.5 rounded-full border border-blue-100 mt-6">
-                      <Lock className="w-3.5 h-3.5" /> Sedang Ditinjau
+                      <Lock className="w-3.5 h-3.5" /> Akses Dibatasi
                     </span>
                   )}
                 </div>
@@ -1347,7 +1347,7 @@ export default function AboutUsManager() {
                             <td className="px-6 py-4 text-right">
                               {isRowLocked ? (
                                 <span className="inline-flex items-center gap-1 text-xs font-medium text-blue-600 bg-blue-50 px-2.5 py-1 rounded-md border border-blue-100">
-                                  <Lock className="w-3 h-3" /> Sedang Ditinjau
+                                  <Lock className="w-3 h-3" /> Akses Dibatasi
                                 </span>
                               ) : isEditing ? (
                                 <div className="flex items-center justify-end gap-2">

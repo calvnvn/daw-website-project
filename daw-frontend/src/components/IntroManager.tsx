@@ -9,6 +9,7 @@ import {
   RotateCcw,
   Send,
   ShieldAlert,
+  Loader2,
 } from "lucide-react";
 import { toast } from "sonner";
 import api from "@/lib/api";
@@ -153,7 +154,7 @@ export default function IntroManager() {
   return (
     <div className="space-y-6 animate-in fade-in duration-300">
       {/* --- SOVEREIGN BANNERS (Contextual Awareness) --- */}
-      {/* 1. Amber Banner (Superadmin Override Warning) */}
+      {/* 1. Amber Banner (superadmin Override Warning) */}
       {isOverrideMode && (
         <div className="bg-amber-50 border border-amber-200 p-4 md:p-5 rounded-xl flex items-center gap-4 animate-in slide-in-from-top-4 shadow-sm">
           <div className="bg-amber-100 p-2 rounded-full text-amber-600 shrink-0">
@@ -182,7 +183,7 @@ export default function IntroManager() {
           </div>
           <div>
             <h4 className="text-xs md:text-sm font-black text-blue-900 uppercase tracking-tight">
-              🔒 Akses Dibatasi
+              Akses Dibatasi
             </h4>
             <p className="text-[11px] md:text-xs text-blue-700 leading-relaxed mt-0.5 max-w-2xl">
               Pengaturan ini sedang ditinjau. Anda tidak dapat melakukan

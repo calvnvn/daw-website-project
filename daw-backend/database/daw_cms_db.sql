@@ -895,7 +895,7 @@ CREATE TABLE `user` (
   `name` varchar(255) NOT NULL,
   `email` varchar(255) NOT NULL,
   `password` varchar(255) NOT NULL,
-  `role` enum('Superadmin','Editor') DEFAULT 'Editor',
+  `role` enum('superadmin','Editor') DEFAULT 'Editor',
   `status` enum('Active','Suspended') DEFAULT 'Active',
   `lastLogin` datetime DEFAULT NULL,
   `resetPasswordToken` varchar(255) DEFAULT NULL,
@@ -928,7 +928,7 @@ CREATE TABLE `users` (
   `name` varchar(255) COLLATE utf8mb4_general_ci NOT NULL,
   `email` varchar(255) COLLATE utf8mb4_general_ci NOT NULL,
   `password` varchar(255) COLLATE utf8mb4_general_ci NOT NULL,
-  `role` enum('Superadmin','Editor') COLLATE utf8mb4_general_ci DEFAULT 'Editor',
+  `role` enum('superadmin','Editor') COLLATE utf8mb4_general_ci DEFAULT 'Editor',
   `status` enum('Active','Suspended') COLLATE utf8mb4_general_ci DEFAULT 'Active',
   `lastLogin` datetime DEFAULT NULL,
   `createdAt` datetime NOT NULL,
@@ -949,7 +949,7 @@ CREATE TABLE `users` (
 
 LOCK TABLES `users` WRITE;
 /*!40000 ALTER TABLE `users` DISABLE KEYS */;
-INSERT INTO `users` VALUES ('195fc498-ac3a-4bfa-a3a2-30b2613cb680','Joko Sudibah','jap.calv@gmail.com','$2b$10$.VSR6Et55lzJ4IRY9hGG8utmTdcpK6rMhbMk1.N3RCrkw/DwwHzCe','Editor','Active','2026-03-30 01:39:40','2026-03-25 07:21:35','2026-03-30 01:39:40',NULL,NULL),('51ba09b4-edc5-4ccd-8aae-802647f0ba1d','Jap Calvin','jf.calvin20@gmail.com','$2b$10$cuWSoCIM6btWmSRp3JaC4O1k/4iOl9cSGemodrzETUJlVO9OJRKjy','Superadmin','Active','2026-03-30 01:38:08','2026-03-13 01:41:04','2026-03-30 01:38:08',NULL,NULL),('b9e90a55-9b6f-4386-b022-3ab92bf49180','Rama Ilyasyah','rama.ilyasyah@daw.co.id','$2b$10$4USMWL50q8UbuGJp.iBG1OKLSe/YMrqSc1pseXJcBLoAbtScmuOdG','Superadmin','Active',NULL,'2026-03-17 08:48:52','2026-03-17 08:48:52',NULL,NULL),('ca2f5579-6f9c-4eda-b9a1-48e029db6f53','John Doe','john@daw.co.id','$2b$10$a3gkUJk.Vattnu5kztVbuO6LsXSfL0aBjYcER6EIZk6pKIuXTM9t6','Editor','Active',NULL,'2026-03-25 09:21:54','2026-03-25 09:21:54',NULL,NULL);
+INSERT INTO `users` VALUES ('195fc498-ac3a-4bfa-a3a2-30b2613cb680','Joko Sudibah','jap.calv@gmail.com','$2b$10$.VSR6Et55lzJ4IRY9hGG8utmTdcpK6rMhbMk1.N3RCrkw/DwwHzCe','Editor','Active','2026-03-30 01:39:40','2026-03-25 07:21:35','2026-03-30 01:39:40',NULL,NULL),('51ba09b4-edc5-4ccd-8aae-802647f0ba1d','Jap Calvin','jf.calvin20@gmail.com','$2b$10$cuWSoCIM6btWmSRp3JaC4O1k/4iOl9cSGemodrzETUJlVO9OJRKjy','superadmin','Active','2026-03-30 01:38:08','2026-03-13 01:41:04','2026-03-30 01:38:08',NULL,NULL),('b9e90a55-9b6f-4386-b022-3ab92bf49180','Rama Ilyasyah','rama.ilyasyah@daw.co.id','$2b$10$4USMWL50q8UbuGJp.iBG1OKLSe/YMrqSc1pseXJcBLoAbtScmuOdG','superadmin','Active',NULL,'2026-03-17 08:48:52','2026-03-17 08:48:52',NULL,NULL),('ca2f5579-6f9c-4eda-b9a1-48e029db6f53','John Doe','john@daw.co.id','$2b$10$a3gkUJk.Vattnu5kztVbuO6LsXSfL0aBjYcER6EIZk6pKIuXTM9t6','Editor','Active',NULL,'2026-03-25 09:21:54','2026-03-25 09:21:54',NULL,NULL);
 /*!40000 ALTER TABLE `users` ENABLE KEYS */;
 UNLOCK TABLES;
 /*!40103 SET TIME_ZONE=@OLD_TIME_ZONE */;

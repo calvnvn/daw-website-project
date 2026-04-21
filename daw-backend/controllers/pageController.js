@@ -173,7 +173,7 @@ exports.createPage = async (req, res) => {
       }
     }
 
-    // Superadmin Flow
+    // superadmin Flow
     if (status === "Published") await newPage.update({ status: "Published" });
     res
       .status(201)
@@ -283,7 +283,7 @@ exports.updatePage = async (req, res) => {
       });
     }
 
-    // Superadmin Flow / Local Draft
+    // superadmin Flow / Local Draft
     if (oldHeroToDelete && (userRole === "superadmin" || status === "Draft")) {
       deleteSingleFile(oldHeroToDelete); // Hanya hapus file lama jika benar-benar commit
     }
@@ -336,7 +336,7 @@ exports.deletePage = async (req, res) => {
       });
     }
 
-    // Superadmin Flow
+    // superadmin Flow
     deleteSingleFile(page.heroImage);
     if (page.content) {
       const imgRegex = /src="[^"]*\/uploads\/([^"'\s>]+)"/g;

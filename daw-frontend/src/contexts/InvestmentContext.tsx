@@ -64,7 +64,11 @@ export function InvestmentProvider({ children }: { children: ReactNode }) {
       setSettings(results[0].value.data.settings);
       setCompanies(results[0].value.data.companies);
     } else {
-      console.error("🚨 Live Data Fetch Failed:", results[0].reason);
+      const error = results[0].reason;
+
+      if (error?.name !== "CanceledError" && error?.code !== "ERR_CANCELED") {
+        console.error("🚨 Live Data Fetch Failed:", error);
+      }
     }
 
     // Handle Rejected Draft (Singleton Settings)

@@ -18,7 +18,7 @@ export default function HomepageManager() {
   const activeTab = searchParams.get("tab") || "hero";
 
   const { user } = useAuth();
-  const isSuperadmin = user?.role === "Superadmin" || user?.role === "admin";
+  const isSuperadmin = user?.role === "superadmin" || user?.role === "admin";
 
   const { slides, stats, settings, rejectedIntro } = useHome();
 

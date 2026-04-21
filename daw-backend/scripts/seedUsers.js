@@ -12,25 +12,27 @@ const seedDatabase = async () => {
   try {
     // 1. Alter: true memaksa Sequelize ngecek ulang kolom di MySQL
     // Kalau roleId belum ada, dia bakal otomatis bikinin kolomnya.
-    await sequelize.sync({ alter: true }); 
+    await sequelize.sync({ alter: true });
     console.log("✅ Database tables synced and updated.");
 
-    // Ambil Role Superadmin
-    const superadminRole = await Role.findOne({ where: { name: "Superadmin" } });
+    // Ambil Role superadmin
+    const superadminRole = await Role.findOne({
+      where: { name: "superadmin" },
+    });
 
     if (!superadminRole) {
-      console.log("❌ Role Superadmin belum ada, jalanin seed roles dulu!");
+      console.log("❌ Role superadmin belum ada, jalanin seed roles dulu!");
       return;
     }
 
     const [user, created] = await User.findOrCreate({
       where: { owl_username: "bcs.dev" },
       defaults: {
-        name: "Superadmin Dev",
+        name: "superadmin Dev",
         email: "it@daw.co.id",
-        roleId: superadminRole.id, 
-        status: "Active"
-      }
+        roleId: superadminRole.id,
+        status: "Active",
+      },
     });
 
     if (!created) {

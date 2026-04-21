@@ -30,7 +30,7 @@ export default function StatsManager() {
   const { user } = useAuth();
 
   // 🚀 Sub-Langkah 3.1: Identity Alignment
-  const isSuperadmin = user?.role === "Superadmin" || user?.role === "admin";
+  const isSuperadmin = user?.role === "superadmin" || user?.role === "admin";
   const isEditor = user?.role?.toLowerCase() === "editor";
 
   // --- States ---
@@ -261,9 +261,7 @@ export default function StatsManager() {
 
     setIsSaving(true);
     const loadingToast = toast.loading(
-      isSuperadmin
-        ? "Menerapkan perubahan live..."
-        : "Mengajukan revisi...",
+      isSuperadmin ? "Menerapkan perubahan live..." : "Mengajukan revisi...",
     );
 
     try {
@@ -462,7 +460,7 @@ export default function StatsManager() {
 
               {shouldLockThisRowUI && (
                 <div className="absolute top-0 left-0 right-0 bg-blue-50 border-b border-blue-100 text-blue-600 text-[10px] font-black px-3 py-1 flex items-center justify-center gap-1.5 z-10 uppercase tracking-widest">
-                  <Lock className="w-3 h-3" /> Sedang Ditinjau
+                  <Lock className="w-3 h-3" /> Akses Dibatasi
                 </div>
               )}
 
@@ -525,7 +523,7 @@ export default function StatsManager() {
                       </label>
                       <input
                         type="text"
-                        value={stat.value}
+                        value={stat.value || ""}
                         disabled={!isEditing || shouldLockThisRowUI}
                         onChange={(e) =>
                           updateStatField(stat.id, "value", e.target.value)
@@ -559,7 +557,7 @@ export default function StatsManager() {
                     </label>
                     <input
                       type="text"
-                      value={stat.label}
+                      value={stat.label || ""}
                       disabled={!isEditing || shouldLockThisRowUI}
                       onChange={(e) =>
                         updateStatField(stat.id, "label", e.target.value)
@@ -573,7 +571,7 @@ export default function StatsManager() {
                     </label>
                     <input
                       type="text"
-                      value={stat.desc}
+                      value={stat.desc || ""}
                       disabled={!isEditing || shouldLockThisRowUI}
                       onChange={(e) =>
                         updateStatField(stat.id, "desc", e.target.value)

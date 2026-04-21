@@ -25,7 +25,7 @@ import { useAuth } from "@/contexts/AuthContext";
 
 export default function GlobalSettings() {
   const { user } = useAuth();
-  const isSuperadmin = user?.role === "Superadmin" || user?.role === "admin";
+  const isSuperadmin = user?.role === "superadmin" || user?.role === "admin";
 
   const [formData, setFormData] = useState({
     companyName: "",
@@ -230,7 +230,7 @@ export default function GlobalSettings() {
   return (
     <div className="max-w-6xl mx-auto space-y-6 pb-12">
       {/* --- SOVEREIGN BANNERS (Contextual Awareness) --- */}
-      {/* 1. Amber Banner (Superadmin Override Warning) */}
+      {/* 1. Amber Banner (superadmin Override Warning) */}
       {isOverrideMode && (
         <div className="bg-amber-50 border border-amber-200 p-4 md:p-5 rounded-xl flex items-center gap-4 animate-in slide-in-from-top-4 shadow-sm">
           <div className="bg-amber-100 p-2 rounded-full text-amber-600 shrink-0">
@@ -259,7 +259,7 @@ export default function GlobalSettings() {
           </div>
           <div>
             <h4 className="text-xs md:text-sm font-black text-blue-900 uppercase tracking-tight">
-              🔒 Akses Dibatasi
+              Akses Dibatasi
             </h4>
             <p className="text-[11px] md:text-xs text-blue-700 leading-relaxed mt-0.5 max-w-2xl">
               Pengaturan ini sedang ditinjau. Anda tidak dapat melakukan
@@ -316,7 +316,7 @@ export default function GlobalSettings() {
 
       {/* --- HEADER (MATRIX BUTTONS) --- */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white p-6 rounded-xl border border-slate-200 shadow-sm sticky top-0 z-30">
-        <div className="w-full flex flex-col md:flex-row items-start md:items-center gap-2 md:gap-3">
+        <div className="flex-1 flex flex-col md:flex-row items-start md:items-center gap-2 md:gap-3">
           <div>
             <h1 className="text-xl md:text-2xl font-serif font-bold text-slate-900">
               Global Settings
@@ -411,7 +411,6 @@ export default function GlobalSettings() {
         <div className="space-y-6 md:col-span-1">
           {/* Corporate Identity Card */}
           <div
-            // 🚀 APLIKASIKAN LOCKSTYLES GLOBAL
             className={`bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden transition-all duration-300 ${lockStyles}`}>
             <div className="px-5 py-4 border-b border-slate-100 bg-slate-50/50 flex items-center gap-2">
               <Building2 className="w-5 h-5 text-daw-green" />
