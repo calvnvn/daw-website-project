@@ -142,7 +142,6 @@ export default function SubjectManagerModal({
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
-      {/* Backdrop */}
       <div className="absolute inset-0 bg-slate-900/80" onClick={onClose} />
 
       {/* Modal Container */}
@@ -164,8 +163,7 @@ export default function SubjectManagerModal({
                 redirect_url: "",
               });
             }}
-            className="text-slate-400 hover:text-slate-600"
-          >
+            className="text-slate-400 hover:text-slate-600">
             <X className="w-5 h-5" />
           </button>
         </div>
@@ -203,8 +201,7 @@ export default function SubjectManagerModal({
                       !newSubject.is_redirect
                         ? "bg-white text-daw-green shadow-sm ring-1 ring-slate-200"
                         : "text-slate-500 hover:text-slate-700 hover:bg-slate-200/50"
-                    }`}
-                  >
+                    }`}>
                     <Mail className="w-3.5 h-3.5" /> Email Routing
                   </button>
                   <button
@@ -215,8 +212,7 @@ export default function SubjectManagerModal({
                       newSubject.is_redirect
                         ? "bg-blue-600 text-white shadow-sm ring-1 ring-blue-700"
                         : "text-slate-500 hover:text-slate-700 hover:bg-slate-200/50"
-                    }`}
-                  >
+                    }`}>
                     <LinkIcon className="w-3.5 h-3.5" /> External Link
                   </button>
                 </div>
@@ -305,8 +301,7 @@ export default function SubjectManagerModal({
                   newSubject.is_redirect
                     ? "bg-blue-600 hover:bg-blue-700 text-white shadow-blue-500/30"
                     : "bg-daw-green hover:bg-emerald-700 text-white shadow-emerald-500/30"
-                }`}
-              >
+                }`}>
                 {newSubject.is_redirect ? (
                   <LinkIcon className="w-3.5 h-3.5" />
                 ) : (
@@ -332,8 +327,7 @@ export default function SubjectManagerModal({
                   <tr>
                     <td
                       colSpan={3}
-                      className="text-center py-6 text-slate-500 text-xs bg-white"
-                    >
+                      className="text-center py-6 text-slate-500 text-xs bg-white">
                       No subjects found. Add one above.
                     </td>
                   </tr>
@@ -341,8 +335,7 @@ export default function SubjectManagerModal({
                   subjects.map((s) => (
                     <tr
                       key={s.id}
-                      className="hover:bg-slate-50 transition-colors bg-white"
-                    >
+                      className="hover:bg-slate-50 transition-colors bg-white">
                       <td className="px-4 py-3 font-medium text-slate-700">
                         <div className="flex items-center gap-2">
                           {/* Ikon penanda visual di tabel */}
@@ -366,8 +359,7 @@ export default function SubjectManagerModal({
                             s.isActive
                               ? "bg-emerald-100 text-emerald-700"
                               : "bg-slate-100 text-slate-400"
-                          }`}
-                        >
+                          }`}>
                           {s.isActive ? "ACTIVE" : "INACTIVE"}
                         </span>
                       </td>
@@ -383,14 +375,12 @@ export default function SubjectManagerModal({
                             });
                             setEditingSubjectId(s.id);
                           }}
-                          className="text-daw-green font-medium hover:underline text-xs"
-                        >
+                          className="text-daw-green font-medium hover:underline text-xs">
                           Edit
                         </button>
                         <button
                           onClick={() => handleDelete(s.id)}
-                          className="text-red-500 font-medium hover:underline text-xs"
-                        >
+                          className="text-red-500 font-medium hover:underline text-xs">
                           Delete
                         </button>
                       </td>

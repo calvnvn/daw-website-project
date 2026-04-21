@@ -458,7 +458,7 @@ export default function InvestmentsManager() {
               {isEditing
                 ? "Editing Mode"
                 : settings?.is_locked
-                  ? "Locked by System"
+                  ? "Locked"
                   : "Locked"}
             </span>
           </button>

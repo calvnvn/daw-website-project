@@ -4,6 +4,7 @@ const { deleteSingleFile } = require("../utils/fileRemover");
 const { Op } = require("sequelize");
 const ErpApprovalService = require("../services/erpApprovalService");
 const { token } = require("morgan");
+const { invalidateOldDrafts } = require("../utils/draftCleanup");
 
 const JENIS_APP_CMS = process.env.CMS_APPROVAL_CODE;
 
@@ -149,74 +150,91 @@ exports.uploadInlineImage = async (req, res) => {
 };
 
 exports.deleteProject = async (req, res) => {
+  const t = await sequelize.transaction(); // 🛡️ Buka Transaksi
   try {
     const { id } = req.params;
-    const project = await Project.findByPk(id);
-    if (!project) return res.status(404).json({ message: "Project not found" });
+    const userRole = req.userRole?.toLowerCase();
 
-    if (project.is_locked) {
+    const project = await Project.findByPk(id, { transaction: t });
+    if (!project) {
+      await t.rollback();
+      return res.status(404).json({ message: "Project not found" });
+    }
+
+    // 🔒 THE GATEKEEPER
+    if (project.is_locked && userRole === "editor") {
+      await t.rollback();
       return res.status(423).json({
         message: "Data terkunci karena sedang dalam proses approval.",
         ticket: project.lock_ticket,
       });
     }
 
-    // Editor Flow
-    if (req.userRole && req.userRole.toLowerCase() === "editor") {
-      console.log(
-        `>>> [PROJECT] JALUR EDITOR: REQUESTING DELETE FOR ID: ${id} <<<`,
-      );
-
+    // --- JALUR EDITOR: REQUEST DELETE ---
+    if (userRole === "editor") {
       const tokenOWL = req.owl_token;
       if (!tokenOWL) {
+        await t.rollback();
         return res
           .status(401)
           .json({ message: "Akses ditolak: Token tidak ditemukan." });
       }
 
-      // 2. Kirim Niat Hapus ke Orchestrator
-      // Kita kirim payload minimal saja agar Approver tahu data mana yang mau dihapus
-      const result = await ErpApprovalService.initiateApproval({
-        model: Project,
-        targetId: id,
-        action: "DELETE",
-        payload: {
-          title: project.title,
-          reason: "User meminta penghapusan proyek",
-        },
-        userId: req.userId,
-        owlUsername: req.owl_username,
-        token: tokenOWL,
-      });
+      await project.update({ is_locked: true }, { transaction: t });
 
-      // 3. Respon ke Frontend
-      // Catatan: is_locked otomatis diset true oleh initiateApproval
-      return res.status(202).json({
-        message:
-          "Permintaan penghapusan telah dikirim. Data akan tetap ada (dikunci) sampai disetujui Admin.",
-        ticket: result.notrans,
-      });
+      try {
+        const result = await ErpApprovalService.initiateApproval({
+          model: "Project",
+          targetId: id,
+          action: "DELETE",
+          payload: {
+            title: project.title,
+            reason: "User meminta penghapusan proyek",
+          },
+          userId: req.userId,
+          owlUsername: req.owl_username,
+          token: tokenOWL,
+        });
+
+        await project.update(
+          { lock_ticket: result.notrans },
+          { transaction: t },
+        );
+        await t.commit(); // ✅ Selesai jalur Editor
+
+        return res.status(202).json({
+          message:
+            "Permintaan penghapusan dikirim. Data dikunci sampai disetujui.",
+          ticket: result.notrans,
+        });
+      } catch (owlError) {
+        await project.update({ is_locked: false }, { transaction: t });
+        await t.commit();
+        throw owlError;
+      }
     }
 
-    // --- JALUR SUPERADMIN: EKSEKUSI LANGSUNG ---
-    console.log(">>> [PROJECT] JALUR SUPERADMIN: PERMANENT DELETION <<<");
+    // --- JALUR SUPERADMIN: PERMANENT DELETION ---
+    console.log(`>>> [PROJECT] ADMIN OVERRIDE: Deleting Project ID ${id}`);
 
-    // 1. Hapus File Fisik (Cover Image)
-    if (project.cover_image) {
-      deleteSingleFile(project.cover_image);
-    }
+    // 1. Bunuh draf lama (misal draf update/delete yang lagi gantung)
+    await invalidateOldDrafts("Project", id, t);
 
-    // 2. Hapus Gallery (Parsing dulu jika perlu)
+    // 2. Hapus DB
+    await project.destroy({ transaction: t });
+
+    await t.commit(); // ✅ Selesai jalur Admin (Database bersih)
+
+    // 3. Hapus File Fisik (Setelah DB dipastikan terhapus)
+    if (project.cover_image) deleteSingleFile(project.cover_image);
+
     const gallery =
       typeof project.gallery === "string"
         ? JSON.parse(project.gallery || "[]")
         : project.gallery;
-
-    if (Array.isArray(gallery)) {
+    if (Array.isArray(gallery))
       gallery.forEach((file) => deleteSingleFile(file));
-    }
 
-    // 3. Hapus Gambar di dalam Konten (Quill Regex)
     if (project.content) {
       const imgRegex = /src="[^"]*\/uploads\/([^"'\s>]+)"/g;
       let match;
@@ -225,18 +243,13 @@ exports.deleteProject = async (req, res) => {
       }
     }
 
-    // 4. Hapus Record di Database
-    await project.destroy();
-
     res
       .status(200)
       .json({ message: "Project and associated files deleted permanently!" });
   } catch (error) {
+    if (t) await t.rollback();
     console.error("🚨 Error DELETE Project:", error);
-    res.status(500).json({
-      message: "Failed to process delete request.",
-      error: error.message,
-    });
+    res.status(500).json({ message: error.message });
   }
 };
 
@@ -257,10 +270,12 @@ exports.getProjectById = async (req, res) => {
 };
 
 exports.updateProject = async (req, res) => {
+  const t = await sequelize.transaction(); // 🛡️ Buka Transaksi
   try {
     const { id } = req.params;
-    console.log("DEBUG ROLE:", req.userRole);
-    console.log("DEBUG USER ID:", req.userId);
+    const userRole = req.userRole?.toLowerCase();
+    console.log(">>> DEBUG ROLE:", userRole, "ID:", req.userId);
+
     const {
       title,
       slug,
@@ -274,18 +289,29 @@ exports.updateProject = async (req, res) => {
       previous_notrans,
     } = req.body;
 
-    // Ambil Data Original & Cek Lock
-    const project = await Project.findByPk(id);
-    if (!project) return res.status(404).json({ message: "Project not found" });
-
-    if (project.is_locked) {
-      return res.status(423).json({
-        message: "Data sedang dikunci oleh proses approval.",
-        ticket: project.lock_ticket,
-      });
+    const project = await Project.findByPk(id, { transaction: t });
+    if (!project) {
+      await t.rollback();
+      return res.status(404).json({ message: "Project not found" });
     }
 
-    // Olah Aset (Gallery & Cover)
+    // 🔒 THE GATEKEEPER (Role-Aware Lock Guard)
+    if (project.is_locked) {
+      if (userRole === "editor") {
+        await t.rollback();
+        return res.status(423).json({
+          message: "Data sedang dikunci oleh proses approval OWL.",
+          ticket: project.lock_ticket,
+        });
+      }
+
+      // Jika Superadmin, kita lanjut tapi catat log
+      console.log(
+        `>>> [OVERRIDE] Superadmin mem-bypass kunci pada Proyek ID: ${id}`,
+      );
+    }
+
+    // 📸 ASSET PROCESSING (Sama seperti logika lo sebelumnya)
     let finalGallery = [];
     let filesToDelete = [];
 
@@ -295,12 +321,10 @@ exports.updateProject = async (req, res) => {
           typeof existing_gallery === "string"
             ? JSON.parse(existing_gallery)
             : existing_gallery;
-
         const oldGallery =
           typeof project.gallery === "string"
             ? JSON.parse(project.gallery || "[]")
             : project.gallery;
-
         filesToDelete = oldGallery.filter(
           (file) => !remainingGallery.includes(file),
         );
@@ -315,7 +339,6 @@ exports.updateProject = async (req, res) => {
       finalGallery = [...finalGallery, ...newImages];
     }
 
-    // Olah Cover Image
     let coverImageName = project.cover_image;
     let oldCoverToDelete = null;
 
@@ -324,7 +347,7 @@ exports.updateProject = async (req, res) => {
       coverImageName = req.files["cover_image"][0].filename;
     }
 
-    // Olah Slug
+    // 📝 SLUG PROCESSING
     let finalSlug = project.slug;
     if (slug && slug !== project.slug) {
       finalSlug = await generateUniqueProjectSlug(slug, id);
@@ -332,50 +355,82 @@ exports.updateProject = async (req, res) => {
       finalSlug = await generateUniqueProjectSlug(title, id);
     }
 
-    const userRole = req.userRole?.toLowerCase();
-    if (userRole === "editor" && status === "Published") {
-      const packageContent = {
-        title: title || project.title,
-        slug: finalSlug,
-        excerpt: excerpt !== undefined ? excerpt : project.excerpt,
-        content: content || project.content,
-        category: category || project.category,
-        status: "Published",
-        cover_image: coverImageName,
-        gallery: finalGallery,
-        seo_title: seo_title || project.seo_title,
-        meta_description: meta_description || project.meta_description,
-      };
+    const packageContent = {
+      title: title || project.title,
+      slug: finalSlug,
+      excerpt: excerpt !== undefined ? excerpt : project.excerpt,
+      content: content || project.content,
+      category: category || project.category,
+      status: status || project.status, // Gunakan status dari body jika ada
+      cover_image: coverImageName,
+      gallery: finalGallery,
+      seo_title: seo_title || project.seo_title,
+      meta_description: meta_description || project.meta_description,
+    };
 
-      // If ada draf lama (re-submission), tandai 'Replaced
+    // --- JALUR EDITOR: REQUEST UPDATE ---
+    if (userRole === "editor" && status === "Published") {
+      // 1. Cleanup draf lama (Resubmission)
       if (previous_notrans) {
         await ApprovalDraft.update(
           { status: "Replaced" },
-          { where: { notrans: previous_notrans } },
+          { where: { notrans: previous_notrans }, transaction: t },
         );
       }
 
-      const result = await ErpApprovalService.initiateApproval({
-        model: Project,
-        targetId: id,
-        action: "UPDATE",
-        payload: packageContent,
-        userId: req.userId,
-        owlUsername: req.owl_username,
-        token: req.owl_token,
-      });
+      // 2. Lock Data Lokal
+      await project.update({ is_locked: true }, { transaction: t });
 
-      await project.update({
-        is_locked: true,
-        lock_ticket: result.notrans,
-      });
+      // 3. Network Call (Di luar transaksi untuk menghindari pool exhaustion)
+      try {
+        const result = await ErpApprovalService.initiateApproval({
+          model: "Project", // Sesuai Registry
+          targetId: id,
+          action: "UPDATE",
+          payload: { ...packageContent, status: "Published" }, // Paksa status published untuk draf
+          userId: req.userId,
+          owlUsername: req.owl_username,
+          token: req.owl_token,
+        });
 
-      return res.status(202).json({
-        message: "Revisi diajukan . Data asli dikunci.",
-        ticket: result.notrans,
-      });
+        // 4. Catat tiket
+        await project.update(
+          { lock_ticket: result.notrans },
+          { transaction: t },
+        );
+        await t.commit(); // ✅ Selesai jalur Editor
+
+        return res.status(202).json({
+          message: "Revisi diajukan. Data asli dikunci.",
+          ticket: result.notrans,
+        });
+      } catch (owlError) {
+        // Rollback lock jika network gagal
+        await project.update({ is_locked: false }, { transaction: t });
+        await t.commit(); // Commit rollback manual ini
+        throw owlError;
+      }
     }
 
+    // --- JALUR SUPERADMIN ATAU EDITOR SAVE DRAFT: DIRECT COMMIT ---
+    // 1. Bunuh draf lama jika Admin nge-bypass (PENTING!)
+    if (userRole === "superadmin" || userRole === "admin") {
+      await invalidateOldDrafts("Project", id, t);
+    }
+
+    // 2. Update Database (Buka gembok jika sedang terkunci)
+    await project.update(
+      {
+        ...packageContent,
+        is_locked: false,
+        lock_ticket: null,
+      },
+      { transaction: t },
+    );
+
+    await t.commit(); // ✅ Selesai jalur Admin/Draft
+
+    // 3. Cleanup File Fisik (Setelah DB aman)
     if (
       userRole === "superadmin" ||
       (userRole === "editor" && status === "Draft")
@@ -384,28 +439,14 @@ exports.updateProject = async (req, res) => {
       if (oldCoverToDelete) deleteSingleFile(oldCoverToDelete);
     }
 
-    await project.update({
-      title: title || project.title,
-      slug: finalSlug,
-      excerpt: excerpt !== undefined ? excerpt : project.excerpt,
-      content: content || project.content,
-      category: category || project.category,
-      status: status || project.status,
-      cover_image: coverImageName,
-      gallery: finalGallery,
-      seo_title: seo_title || project.seo_title,
-      meta_description: meta_description || project.meta_description,
-      is_locked: false,
-      lock_ticket: null,
-    });
-
     res.status(200).json({
       message:
         status === "Draft"
-          ? "Draf berhasil disimpan."
-          : "Update berhasil di-commit langsung.",
+          ? "Draf lokal disimpan."
+          : "Pembaruan langsung berhasil (Override).",
     });
   } catch (error) {
+    if (t) await t.rollback(); // ❌ Batalkan semua perubahan jika error
     console.error("🚨 ERROR UPDATE PROJECT:", error);
     res.status(500).json({ message: error.message });
   }

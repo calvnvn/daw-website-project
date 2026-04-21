@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/ban-ts-comment */
 /**
  * MODULE: Universal Project Form (Create & Edit)
  * PATH: /src/pages/admin/ProjectForm.tsx
@@ -24,6 +25,11 @@ import {
   Link as LinkIcon,
   Plus,
   AlertTriangle,
+  LockIcon,
+  Loader2,
+  AlertCircle,
+  Clock,
+  RotateCcw,
 } from "lucide-react";
 import { useDropzone } from "react-dropzone";
 import api, { BASE_UPLOAD_URL } from "@/lib/api";
@@ -38,6 +44,7 @@ interface RejectedDraft {
   payload: any;
   rejection_reason: string | null; // Kolom baru dari backend
   createdAt: string;
+  updatedAt: string;
 }
 
 // --- SUB-COMPONENT: GALLERY PREVIEW ---
@@ -82,21 +89,53 @@ const GalleryPreviewItem = ({
 // --- MAIN COMPONENT ---
 export default function ProjectForm() {
   const navigate = useNavigate();
-  const { id } = useParams(); // Jika ada ID, berarti Edit Mode
+  const { id } = useParams();
   const isEditMode = !!id;
   const quillRef = useRef<ReactQuill>(null);
   const { user, can } = useAuth();
-  const isEditor = user?.roleData?.name === "Editor" || user?.role === "Editor";
+  const isSuperadmin = user?.role === "Superadmin" || user?.role === "admin";
+  const isEditor = !isSuperadmin;
   const { sections } = useBusiness();
+
   const [isLoading, setIsLoading] = useState(false);
+  const [isFetching, setIsFetching] = useState(isEditMode);
+  const [isSaving, setIsSaving] = useState(false);
+
+  // State Data
+  const initialFormState = {
+    title: "",
+    excerpt: "",
+    content: "",
+    category: "",
+    status: "Draft",
+    cover_image: "",
+    gallery: "[]",
+    seo_title: "",
+    meta_description: "",
+    is_locked: false,
+    lock_ticket: "",
+  };
+
+  const [formData, setFormData] = useState(initialFormState);
+
+  // Diff Engine
+  const [originalData, setOriginalData] = useState(initialFormState);
 
   const [rejectedDraft, setRejectedDraft] = useState<RejectedDraft | null>(
     null,
   );
   const [showDraftBanner, setShowDraftBanner] = useState(false);
-
   const [isRestoring, setIsRestoring] = useState(false);
-  const [isFetching, setIsFetching] = useState(isEditMode); // Fetching hanya aktif jika Edit Mode
+
+  // Sovereign Bypass Constants
+  const isDataLocked = formData.is_locked;
+  const shouldLockUI = isDataLocked && !isSuperadmin;
+  const isOverrideMode = isDataLocked && isSuperadmin;
+
+  // Locked State Tailwind CLass
+  const lockStyles = shouldLockUI
+    ? "opacity-60 grayscale-[30%] pointer-events-none cursor-not-allowed select-none"
+    : "";
 
   /**
    * @memo validSectorIds
@@ -107,18 +146,6 @@ export default function ProjectForm() {
     () => new Set(sections.map((s) => s.id)),
     [sections],
   );
-
-  const [formData, setFormData] = useState({
-    title: "",
-    excerpt: "",
-    content: "",
-    category: "",
-    status: "Draft",
-    cover_image: "",
-    gallery: "[]",
-    seo_title: "",
-    meta_description: "",
-  });
 
   const parsedGallery = useMemo(() => {
     try {
@@ -154,11 +181,7 @@ export default function ProjectForm() {
     return () => URL.revokeObjectURL(objectUrl);
   }, [coverFile]);
 
-  /**
-   * EFFECT: Default Category Initialization
-   * Handles setting the initial category for NEW projects only.
-   * Dependency guard prevents overwriting existing data during Edit Mode.
-   */
+  // Default Category Initialization
   useEffect(() => {
     if (!isEditMode && sections.length > 0 && !formData.category) {
       setFormData((prev) => ({ ...prev, category: sections[0].id }));
@@ -166,22 +189,13 @@ export default function ProjectForm() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sections, isEditMode]);
 
-  // --- LOGIC: FETCH EXISTING DATA (EDIT MODE ONLY) ---
+  // Fetch Existing Data & Lock State (Edit Mode Only)
   useEffect(() => {
     const controller = new AbortController();
 
     if (!isEditMode) {
-      setFormData({
-        title: "",
-        excerpt: "",
-        content: "",
-        category: "",
-        status: "Draft",
-        cover_image: "",
-        gallery: "[]",
-        seo_title: "",
-        meta_description: "",
-      });
+      setFormData(initialFormState);
+      setOriginalData(initialFormState);
       setCoverFile(null);
       setGalleryFiles([]);
       setCoverPreview(null);
@@ -194,7 +208,7 @@ export default function ProjectForm() {
 
       try {
         const [projectRes, draftRes] = await Promise.allSettled([
-          api.get(`/projects/${id}`, { signal: controller.signal }), // Selipkan signal di config axios
+          api.get(`/projects/${id}`, { signal: controller.signal }),
           api.get(`/approval/rejected/${id}?module=Project`, {
             signal: controller.signal,
           }),
@@ -203,8 +217,9 @@ export default function ProjectForm() {
         if (projectRes.status === "fulfilled") {
           const data = projectRes.value.data.data || projectRes.value.data;
 
-          setFormData((prev) => ({
-            ...prev,
+          // Normalisasi Payload
+          const normalizedData = {
+            ...initialFormState,
             title: data.title || "",
             excerpt: data.excerpt || "",
             content: data.content || "",
@@ -217,11 +232,17 @@ export default function ProjectForm() {
                 : JSON.stringify(data.gallery || []),
             seo_title: data.seo_title || "",
             meta_description: data.meta_description || "",
-          }));
+            is_locked: Boolean(data.is_locked),
+            lock_ticket: data.lock_ticket || "",
+          };
+
+          setFormData(normalizedData);
+          setOriginalData(normalizedData);
         } else if (projectRes.reason.name !== "CanceledError") {
           throw projectRes.reason;
         }
 
+        // Logic Restoration Engine (Draft Rejected)
         if (
           draftRes.status === "fulfilled" &&
           draftRes.value.data?.hasRejected
@@ -238,7 +259,9 @@ export default function ProjectForm() {
       } catch (error: any) {
         if (error.name !== "CanceledError") {
           console.error("Fetch Error:", error);
-          toast.error("Gagal memuat data proyek");
+          toast.error("Gagal memuat data proyek", {
+            description: "Mohon periksa koneksi atau hubungi IT.",
+          });
           navigate("/admin/projects");
         }
       } finally {
@@ -253,9 +276,10 @@ export default function ProjectForm() {
     return () => {
       controller.abort();
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id, isEditMode, navigate]);
 
-  // --- DRAFT RECOVERY HANDLER ---
+  // Restoration Function
   const handleRestoreDraft = () => {
     if (!rejectedDraft?.payload) return;
     setIsRestoring(true);
@@ -298,8 +322,15 @@ export default function ProjectForm() {
     setFormData({ ...formData, gallery: JSON.stringify(updatedGallery) });
   };
 
-  // --- QUILL: IMAGE HANDLER ---
+  // Quill Image Handler
   const imageHandler = useCallback(() => {
+    if (shouldLockUI) {
+      toast.error("Akses Dibatasi", {
+        description: "Data terkunci, tidak dapat mengunggah gambar.",
+      });
+      return;
+    }
+
     const input = document.createElement("input");
     input.setAttribute("type", "file");
     input.setAttribute("accept", "image/*");
@@ -335,7 +366,7 @@ export default function ProjectForm() {
         }
       }
     };
-  }, []);
+  }, [shouldLockUI]);
 
   const modules = useMemo(
     () => ({
@@ -353,9 +384,41 @@ export default function ProjectForm() {
     [imageHandler],
   );
 
-  // --- UNIFIED SAVE LOGIC ---
+  // The Diff Function (Spam Prevention)
+  const hasDataChanged = () => {
+    if (!isEditMode) return true;
+    if (coverFile !== null || galleryFiles.length > 0) return true;
+    if (rejectedDraft !== null && !showDraftBanner) return true;
+
+    const keysToCheck = [
+      "title",
+      "excerpt",
+      "content",
+      "category",
+      "seo_title",
+      "meta_description",
+      "gallery",
+    ];
+
+    for (const key of keysToCheck) {
+      // @ts-expect-error
+      if (formData[key] !== originalData[key]) {
+        return true;
+      }
+    }
+
+    return false;
+  };
+
+  // Unified Save Logic
   const handleSave = async (targetStatus: string) => {
-    // 1. Validasi Dasar
+    if (shouldLockUI) {
+      return toast.error("Akses Dibatasi.", {
+        description:
+          "Data ini sedang dalam proses peninjauan dan tidak dapat diubah.",
+      });
+    }
+
     if (!formData.title.trim())
       return toast.error("Judul proyek tidak boleh kosong.");
 
@@ -368,42 +431,42 @@ export default function ProjectForm() {
       (sec) => sec.id === formData.category,
     );
     if (!isCategoryValid) {
-      return toast.error(
-        "Kategori proyek tidak valid atau telah terhapus. Silakan pilih kategori yang baru.",
-      );
+      return toast.error("Kategori proyek tidak valid atau telah terhapus.");
     }
 
     if (targetStatus === "Published" && !coverFile && !formData.cover_image) {
       return toast.error("Gambar sampul wajib ada untuk publikasi.");
     }
 
-    setIsLoading(true);
+    if (targetStatus === "Published" && !hasDataChanged()) {
+      return toast.info("Tidak ada perubahan terdeteksi.", {
+        description: "Data masih sama dengan versi live.",
+        duration: 4000,
+      });
+    }
+
+    setIsSaving(true);
     const loadingToast = toast.loading(
-      `${isEditMode ? "Memperbarui" : "Menyimpan"} proyek dan sinkronisasi ...`,
+      `${isEditMode ? "Memperbarui" : "Menyimpan"} proyek dan sinkronisasi...`,
     );
 
     try {
       const payload = new FormData();
 
-      // 2. Optimize & Append Cover Image
       if (coverFile) {
         payload.append("cover_image", await compressImage(coverFile));
       } else if (formData.cover_image) {
         payload.append("cover_image", formData.cover_image);
       }
 
-      // 3. Append Identity (Auto-Recovery Cleanup)
-      // FIX: Sebelumnya kode ini tertulis 2x di kodingan lo. Cukup 1x saja.
       if (rejectedDraft?.notrans) {
         payload.append("previous_notrans", rejectedDraft.notrans);
       }
 
-      // 4. Optimize & Append Gallery
       for (const file of galleryFiles) {
         payload.append("gallery", await compressImage(file));
       }
 
-      // 5. Append Texts
       payload.append("title", formData.title.trim());
       if (generatedSlug) {
         payload.append("slug", generatedSlug);
@@ -412,6 +475,7 @@ export default function ProjectForm() {
       payload.append("content", formData.content);
       payload.append("category", formData.category);
       payload.append("status", targetStatus);
+
       payload.append(
         "seo_title",
         formData.seo_title.trim() || formData.title.trim(),
@@ -421,36 +485,35 @@ export default function ProjectForm() {
         formData.meta_description.trim() || formData.excerpt.trim(),
       );
 
-      // Jika Edit Mode, kirim sisa galeri lama agar tidak terhapus di backend
       if (isEditMode) {
         payload.append("existing_gallery", formData.gallery);
       }
 
-      // Append Author (Dengan fallback aman)
       payload.append("author", user?.name || "Admin DAW");
 
-      // Eksekusi API dengan TIMEOUT (Penting untuk mencegah "Stuck Loading"!)
       const endpoint = isEditMode ? `/projects/${id}` : "/projects";
       const method = isEditMode ? api.put : api.post;
 
       const response = await method(endpoint, payload, {
-        timeout: 60000, // Timeout 60 detik sesuai Blueprint v2.0
+        timeout: 60000,
         onUploadProgress: (p) => {
           const percent = Math.round((p.loaded * 100) / (p.total || 1));
           toast.loading(`Mengunggah: ${percent}%...`, { id: loadingToast });
         },
       });
 
-      // 7. Handle Success
       if ([200, 201, 202].includes(response.status)) {
-        // BLUEPRINT: Bersihkan state draf agar memori bersih
         setRejectedDraft(null);
         setShowDraftBanner(false);
 
         if (response.status === 202) {
-          // Optimistic Lock untuk UX (Meskipun langsung pindah halaman)
+          setFormData((prev) => ({
+            ...prev,
+            is_locked: true,
+            lock_ticket: response.data.ticket,
+          }));
           toast.success(
-            "Revisi diajukan ke ERP DAW! Data dikunci menunggu approval.",
+            "Revisi berhasil diajukan! Menunggu persetujuan pusat.",
             {
               id: loadingToast,
               duration: 5000,
@@ -458,10 +521,10 @@ export default function ProjectForm() {
           );
         } else {
           toast.success(
-            `Proyek berhasil di${isEditMode ? "perbarui" : "simpan"}!`,
-            {
-              id: loadingToast,
-            },
+            isSuperadmin
+              ? "Perubahan berhasil di-publish secara live!"
+              : "Draf berhasil disimpan.",
+            { id: loadingToast },
           );
         }
 
@@ -476,27 +539,26 @@ export default function ProjectForm() {
           "Koneksi server mungkin lambat atau terputus.",
       });
     } finally {
-      setIsLoading(false);
+      setIsSaving(false);
     }
   };
 
-  // --- DROPZONE HANDLERS ---
+  // DROPZONE HANDLERS
   const MAX_FILE_SIZE = 10 * 1024 * 1024; // Limit 10MB per file
   const {
     getRootProps: getRootCoverProps,
     getInputProps: getInputCoverProps,
     isDragActive: isCoverDragActive,
   } = useDropzone({
+    disabled: shouldLockUI,
     onDrop: (files) => {
       if (files.length === 0) return;
-
       if (files[0].size > MAX_FILE_SIZE) {
         toast.error("Ukuran gambar sampul maksimal 10MB.");
         return;
       }
       setCoverFile(files[0]);
     },
-    // Hanya terima format gambar standar web yang aman dikompres
     accept: { "image/jpeg": [], "image/png": [], "image/webp": [] },
     multiple: false,
   });
@@ -506,6 +568,7 @@ export default function ProjectForm() {
     getInputProps: getInputGalleryProps,
     isDragActive: isGalleryDragActive,
   } = useDropzone({
+    disabled: shouldLockUI, // 👈 Guard Dropzone
     onDrop: (files) => {
       if (files.length === 0) return;
 
@@ -518,11 +581,9 @@ export default function ProjectForm() {
         const newFiles = validFiles.filter(
           (vf) => !prev.some((pf) => pf.name === vf.name),
         );
-
         if (newFiles.length < validFiles.length) {
           toast.warning("Gambar duplikat dibuang dari antrean.");
         }
-
         return [...prev, ...newFiles];
       });
     },
@@ -543,12 +604,52 @@ export default function ProjectForm() {
 
   return (
     <div className="max-w-7xl mx-auto animate-in fade-in duration-500">
+      {/* Warning Banner (Superadmin Only) */}
+      {isOverrideMode && (
+        <div className="mb-6 bg-amber-50 border border-amber-200 p-4 rounded-xl flex items-center gap-4 animate-in slide-in-from-top-4 shadow-sm">
+          <div className="bg-amber-100 p-2 rounded-full text-amber-600 shrink-0">
+            <ShieldAlert className="w-5 h-5" />
+          </div>
+          <div>
+            <h4 className="text-xs font-black text-amber-900 uppercase tracking-tight">
+              Mode Override Superadmin
+            </h4>
+            <p className="text-xs text-amber-700 leading-relaxed mt-0.5">
+              Data ini sedang dikunci oleh tiket peninjauan{" "}
+              <strong>{formData.lock_ticket}</strong>. Anda dapat melakukan
+              perubahan langsung.
+              <span className="font-bold underline ml-1">
+                Menyimpan akan otomatis membatalkan draf tersebut.
+              </span>
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* Locked Banner (Editor Only) */}
+      {shouldLockUI && (
+        <div className="mb-6 bg-blue-50 border border-blue-200 p-4 rounded-xl flex items-center gap-4 animate-pulse shadow-sm">
+          <div className="bg-blue-100 p-2 rounded-full text-blue-600 shrink-0">
+            <LockIcon className="w-5 h-5" />
+          </div>
+          <div>
+            <h4 className="text-xs font-black text-blue-900 uppercase tracking-tight">
+              Sedang Ditinjau
+            </h4>
+            <p className="text-xs text-blue-700 leading-relaxed mt-0.5">
+              Anda tidak dapat mengubah data ini karena revisi sebelumnya sedang
+              menunggu persetujuan.
+            </p>
+          </div>
+        </div>
+      )}
       {/* TOOLBAR HEADER */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white p-6 rounded-xl border border-slate-200 shadow-sm top-0 z-20">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white p-6 rounded-xl border border-slate-200 shadow-sm top-0 z-20 mb-6">
+        {/* Kiri: Back Button & Title */}
         <div className="flex items-center gap-4">
           <button
             onClick={() => navigate("/admin/projects")}
-            className="p-2 hover:bg-white rounded-lg transition-all border border-transparent hover:border-slate-200 shadow-sm">
+            className="p-2 hover:bg-slate-50 rounded-lg transition-all border border-transparent hover:border-slate-200 shadow-sm">
             <ArrowLeft className="w-5 h-5 text-slate-500" />
           </button>
           <div>
@@ -558,81 +659,84 @@ export default function ProjectForm() {
             {formData.title && (
               <p className="text-[10px] font-mono text-slate-400 uppercase tracking-tighter mt-1 flex items-center gap-1">
                 <LinkIcon className="w-2.5 h-2.5" /> preview: daw.co.id/page/
-                {generatedSlug}*
+                {generatedSlug}
               </p>
             )}
           </div>
         </div>
-        <div className="flex flex-col items-end gap-1">
-          {/* Tambah container agar hint rapi */}
-          <div className="flex gap-3">
-            {/* TOMBOL DRAF: Selalu Lokal (MySQL) */}
+
+        {/* Kanan: STANDARDIZED ACTION BUTTONS */}
+        <div className="flex flex-col items-end gap-1 w-full sm:w-auto">
+          <div className="flex gap-3 w-full sm:w-auto">
+            {/* Tombol Simpan Draf Lokal */}
             <button
               type="button"
               onClick={() => handleSave("Draft")}
-              disabled={isLoading || !can("manage_projects")}
-              className="px-5 py-2 bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 rounded-lg font-bold text-sm shadow-sm transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed">
-              <Save className="w-4 h-4 inline mr-2 text-slate-400" />
+              disabled={isSaving || shouldLockUI || !can("manage_projects")}
+              className="px-5 py-2 bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 rounded-lg font-bold text-sm shadow-sm transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center">
+              <Save className="w-4 h-4 mr-2 text-slate-400" />
               Simpan Draf Lokal
             </button>
-            {/* TOMBOL UTAMA: Berdasarkan Role */}
+
+            {/* Tombol Aksi Utama (Berdasarkan Kasta & State) */}
             <button
               type="button"
               onClick={() => handleSave("Published")}
-              disabled={isLoading || !can("manage_projects")}
-              className={`px-5 py-2 text-white rounded-lg font-bold text-sm shadow-sm transition-all active:scale-95 disabled:opacity-50 ${
-                isEditor
-                  ? "bg-blue-600 hover:bg-blue-700 shadow-blue-100" // Warna Biru untuk Editor
-                  : "bg-daw-green hover:bg-[#003b1c] shadow-green-100" // Warna Hijau untuk Admin
+              disabled={isSaving || shouldLockUI || !can("manage_projects")}
+              className={`px-5 py-2 text-white rounded-lg font-bold text-sm transition-all shadow-sm active:scale-95 disabled:cursor-not-allowed flex items-center justify-center gap-2 ${
+                isSaving
+                  ? "bg-slate-300 text-slate-700"
+                  : shouldLockUI
+                    ? "bg-slate-200 text-slate-500"
+                    : isSuperadmin
+                      ? "bg-daw-green hover:bg-[#003b1c]"
+                      : "bg-blue-600 hover:bg-blue-700"
               }`}>
-              {isLoading ? (
-                <div className="flex items-center gap-2">
-                  <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                  <span>Processing...</span>
-                </div>
+              {isSaving ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" /> Memproses...
+                </>
+              ) : shouldLockUI ? (
+                <>
+                  <LockIcon className="w-4 h-4" /> Akses Terbatas
+                </>
+              ) : isSuperadmin ? (
+                <>
+                  <Save className="w-4 h-4" /> Publish Live
+                </>
               ) : (
-                <div className="flex items-center gap-2">
-                  {isEditor ? (
-                    <Send className="w-4 h-4" />
-                  ) : (
-                    <Save className="w-4 h-4" />
-                  )}
-                  <span>
-                    {isEditor
-                      ? "Request Approval"
-                      : isEditMode
-                        ? "Update & Publish"
-                        : "Publish Now"}
-                  </span>
-                </div>
+                <>
+                  <Send className="w-4 h-4" /> Request Approval
+                </>
               )}
             </button>
           </div>
-          {/* HINT KHUSUS EDITOR */}
-          {isEditor && !isLoading && (
+
+          {/* Hint Khusus Editor (Hanya muncul jika tidak dilock dan bukan admin) */}
+          {isEditor && !shouldLockUI && !isSaving && (
             <p className="text-[10px] text-blue-500 font-bold mt-1 flex items-center gap-1 animate-in slide-in-from-top-1">
               <span className="w-1.5 h-1.5 bg-blue-500 rounded-full animate-pulse"></span>
-              Status 'Published' akan dikirim ke ERP DAW untuk diperiksa Admin.
+              Pembaruan akan dikirim ke pusat untuk disetujui.
             </p>
           )}
         </div>
       </div>
 
-      {/* RECOVERY BANNER SYSTEM */}
+      {/* ⚠️ 3. RECOVERY BANNER SYSTEM (DRAF DITOLAK) */}
       {showDraftBanner && rejectedDraft && (
         <div className="mb-8 animate-in fade-in slide-in-from-top-4 duration-500">
           <div className="bg-amber-50 border border-amber-200 rounded-2xl overflow-hidden shadow-sm">
             <div className="p-5 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
               <div className="flex items-start gap-4">
-                <div className="p-3 bg-amber-100 rounded-xl text-amber-600">
-                  <AlertCircle className="w-6 h-6" />
+                <div className="p-3 bg-amber-100 rounded-xl text-amber-600 shrink-0">
+                  <AlertTriangle className="w-6 h-6" />{" "}
+                  {/* Icon disesuaikan dengan status warning */}
                 </div>
                 <div>
                   <h4 className="text-sm font-bold text-amber-900 mb-1">
-                    Draf Revisi Ditolak oleh Approver
+                    ⚠️ Catatan Peninjau
                   </h4>
-                  <p className="text-xs text-amber-700 leading-relaxed max-w-2xl">
-                    <span className="font-bold italic">Alasan Penolakan: </span>
+                  <p className="text-xs text-amber-700 leading-relaxed max-w-2xl font-bold italic">
                     "
                     {rejectedDraft.rejection_reason ||
                       "Tidak ada alasan spesifik yang diberikan."}
@@ -656,8 +760,13 @@ export default function ProjectForm() {
                 <button
                   type="button"
                   onClick={handleRestoreDraft}
-                  disabled={isRestoring}
-                  className="flex-1 md:flex-none flex items-center justify-center gap-2 bg-amber-600 hover:bg-amber-700 text-white px-5 py-2.5 rounded-xl text-xs font-bold transition-all active:scale-95 shadow-sm shadow-amber-200">
+                  disabled={isRestoring || shouldLockUI}
+                  title={
+                    shouldLockUI
+                      ? "Selesaikan proses peninjauan aktif untuk memulihkan draf lama"
+                      : "Pulihkan data draf"
+                  }
+                  className="flex-1 md:flex-none flex items-center justify-center gap-2 bg-amber-600 hover:bg-amber-700 text-white px-5 py-2.5 rounded-xl text-xs font-bold transition-all active:scale-95 shadow-sm shadow-amber-200 disabled:opacity-50 disabled:grayscale disabled:cursor-not-allowed">
                   <RotateCcw
                     className={`w-4 h-4 ${isRestoring ? "animate-spin" : ""}`}
                   />
@@ -674,7 +783,7 @@ export default function ProjectForm() {
               </div>
             </div>
 
-            {/* Visual Progress Bar (Optional) */}
+            {/* Visual Progress Bar - Memberikan kesan dinamis */}
             <div className="h-1 bg-amber-200 w-full overflow-hidden">
               <div className="h-full bg-amber-500 w-1/3 animate-pulse"></div>
             </div>
@@ -682,14 +791,17 @@ export default function ProjectForm() {
         </div>
       )}
 
-      <div className="mt-4 grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
+      {/* MAIN FORM GRID */}
+      <div
+        className={`mt-4 grid grid-cols-1 lg:grid-cols-3 gap-8 items-start transition-all duration-500 ${lockStyles}`}>
         {/* KIRI: CONTENT AREA */}
         <div className="lg:col-span-2 space-y-6">
           <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden flex flex-col p-0 md:p-8 space-y-8">
             <input
               type="text"
               placeholder="Masukkan judul proyek yang menarik..."
-              className="w-full px-6 pt-6 pb-4 text-3xl font-serif font-bold border-b border-slate-100 focus:outline-none placeholder:text-slate-300"
+              disabled={shouldLockUI}
+              className="w-full px-6 pt-6 pb-4 text-3xl font-serif font-bold border-b border-slate-100 focus:outline-none placeholder:text-slate-300 disabled:bg-transparent disabled:text-slate-500"
               value={formData.title}
               onChange={(e) =>
                 setFormData({ ...formData, title: e.target.value })
@@ -707,10 +819,11 @@ export default function ProjectForm() {
                 </span>
               </label>
               <textarea
-                placeholder="Tulis ringkasan singkat untuk tampilan beranda (Maks. 150 karakter)..."
+                placeholder="Tulis ringkasan singkat untuk tampilan beranda..."
                 maxLength={150}
+                disabled={shouldLockUI} // 🔒 Guard
                 rows={2}
-                className="w-full p-4 bg-slate-50 border border-slate-100 rounded-xl outline-none text-slate-600 text-sm h-[80px] resize-none focus:ring-2 focus:ring-daw-green/10"
+                className="w-full p-4 bg-slate-50 border border-slate-100 rounded-xl outline-none text-slate-600 text-sm h-[80px] resize-none focus:ring-2 focus:ring-daw-green/10 disabled:bg-slate-100 disabled:text-slate-500"
                 value={formData.excerpt}
                 onChange={(e) =>
                   setFormData({ ...formData, excerpt: e.target.value })
@@ -722,11 +835,13 @@ export default function ProjectForm() {
               <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
                 Isi Artikel Utama
               </label>
-              <div className="min-h-[400px] max-h-[600px] border border-slate-100 rounded-xl overflow-hidden shadow-inner flex flex-col bg-white">
+              <div
+                className={`min-h-[400px] border border-slate-100 rounded-xl overflow-hidden shadow-inner flex flex-col bg-white ${shouldLockUI ? "bg-slate-50 opacity-80" : ""}`}>
                 <ReactQuill
                   ref={quillRef}
                   theme="snow"
                   modules={modules}
+                  readOnly={shouldLockUI} // 🔒 Guard khusus untuk ReactQuill
                   value={formData.content}
                   onChange={(v) => setFormData({ ...formData, content: v })}
                   className="min-h-[300px]"
@@ -746,7 +861,8 @@ export default function ProjectForm() {
                 <input
                   type="text"
                   placeholder="Judul Khusus Tampilan Google"
-                  className="w-full p-3 bg-white border border-slate-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-500/20"
+                  disabled={shouldLockUI} // 🔒 Guard
+                  className="w-full p-3 bg-white border border-slate-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-500/20 disabled:bg-slate-100 disabled:text-slate-500"
                   value={formData.seo_title}
                   onChange={(e) =>
                     setFormData({ ...formData, seo_title: e.target.value })
@@ -754,7 +870,8 @@ export default function ProjectForm() {
                 />
                 <textarea
                   placeholder="Deskripsi SEO (Disarankan < 160 karakter)"
-                  className="w-full p-3 bg-white border border-slate-200 rounded-xl text-sm h-24 resize-none outline-none focus:ring-2 focus:ring-blue-500/20"
+                  disabled={shouldLockUI}
+                  className="w-full p-3 bg-white border border-slate-200 rounded-xl text-sm h-24 resize-none outline-none focus:ring-2 focus:ring-blue-500/20 disabled:bg-slate-100 disabled:text-slate-500"
                   value={formData.meta_description}
                   onChange={(e) =>
                     setFormData({
@@ -764,6 +881,8 @@ export default function ProjectForm() {
                   }
                 />
               </div>
+
+              {/* Pratinjau SEO */}
               <div className="bg-white p-5 rounded-xl border border-slate-100 shadow-sm flex flex-col justify-center">
                 <p className="text-[10px] font-black text-slate-300 uppercase mb-3">
                   Pratinjau Tampilan Google
@@ -810,7 +929,8 @@ export default function ProjectForm() {
             ) : (
               <>
                 <select
-                  className={`w-full p-3 bg-slate-50 border rounded-xl font-bold outline-none transition-all ${
+                  disabled={shouldLockUI} // 🔒 Guard
+                  className={`w-full p-3 bg-slate-50 border rounded-xl font-bold outline-none transition-all disabled:bg-slate-100 disabled:text-slate-500 disabled:cursor-not-allowed ${
                     formData.category && !validSectorIds.has(formData.category)
                       ? "border-red-500 text-red-600 ring-2 ring-red-100"
                       : "border-slate-100 text-slate-700 focus:ring-2 focus:ring-daw-green/20"
@@ -852,14 +972,15 @@ export default function ProjectForm() {
             <h3 className="text-xs font-black uppercase tracking-widest mb-4 flex items-center gap-2">
               <ImageIcon className="w-4 h-4 text-daw-green" /> Gambar Sampul
             </h3>
+
+            {/* Guard UI ditambahkan pada class Dropzone */}
             <div
               {...getRootCoverProps()}
-              className={`aspect-video rounded-xl border-2 border-dashed flex items-center justify-center cursor-pointer transition-all relative overflow-hidden 
-      ${isCoverDragActive ? "border-daw-green bg-green-50" : "border-slate-100 bg-slate-50 hover:bg-slate-100"}
-      ${showDraftBanner && !coverPreview ? "border-amber-400 ring-4 ring-amber-50" : ""} 
-    `}>
-              <input {...getInputCoverProps()} />
-
+              className={`aspect-video rounded-xl flex items-center justify-center transition-all relative overflow-hidden
+                ${shouldLockUI ? "border-2 border-slate-200 bg-slate-100 opacity-80 cursor-not-allowed" : "border-2 border-dashed cursor-pointer hover:bg-slate-50"}
+                ${isCoverDragActive && !shouldLockUI ? "border-daw-green bg-green-50" : "border-slate-200"}
+              `}>
+              {!shouldLockUI && <input {...getInputCoverProps()} />}{" "}
               {/* Kasus A: Ada File Baru yang baru saja di-drop */}
               {coverPreview ? (
                 <img
@@ -905,27 +1026,25 @@ export default function ProjectForm() {
               <Images className="w-4 h-4 text-daw-green" /> Galeri
             </h3>
 
-            {(galleryFiles.length > 0 ||
-              (formData.gallery &&
-                JSON.parse(formData.gallery).length > 0)) && (
+            {(galleryFiles.length > 0 || parsedGallery.length > 0) && (
               <div className="grid grid-cols-3 gap-2 mb-4">
                 {isEditMode &&
-                  formData.gallery &&
-                  JSON.parse(formData.gallery || "[]").map(
-                    (imgName: string, idx: number) => (
-                      <div
-                        key={`old-${idx}`}
-                        className="relative aspect-square group rounded-xl overflow-hidden border border-slate-100 shadow-sm">
-                        <img
-                          src={`${BASE_UPLOAD_URL}/${imgName}`}
-                          className="w-full h-full object-cover"
-                          alt="Saved"
-                        />
-                        <div className="absolute inset-0 bg-black/10 group-hover:bg-black/20 flex items-center justify-center pointer-events-none">
-                          <span className="text-[9px] text-white font-black uppercase bg-daw-green/80 px-2 py-0.5 rounded-full shadow-sm tracking-tighter">
-                            Saved
-                          </span>
-                        </div>
+                  parsedGallery.map((imgName: string, idx: number) => (
+                    <div
+                      key={`old-${idx}`}
+                      className="relative aspect-square group rounded-xl overflow-hidden border border-slate-100 shadow-sm">
+                      <img
+                        src={`${BASE_UPLOAD_URL}/${imgName}`}
+                        className="w-full h-full object-cover"
+                        alt="Saved"
+                      />
+                      <div className="absolute inset-0 bg-black/10 group-hover:bg-black/20 flex items-center justify-center pointer-events-none">
+                        <span className="text-[9px] text-white font-black uppercase bg-daw-green/80 px-2 py-0.5 rounded-full shadow-sm tracking-tighter">
+                          Saved
+                        </span>
+                      </div>
+
+                      {!shouldLockUI && (
                         <button
                           type="button"
                           onClick={(e) => {
@@ -935,10 +1054,11 @@ export default function ProjectForm() {
                           className="absolute top-1.5 right-1.5 bg-red-500 hover:bg-red-600 text-white rounded-full p-1.5 shadow-lg opacity-0 group-hover:opacity-100 transition-all transform hover:scale-110 z-30">
                           <X className="w-3 h-3" />
                         </button>
-                      </div>
-                    ),
-                  )}
+                      )}
+                    </div>
+                  ))}
 
+                {/* File Baru yang belum disave */}
                 {galleryFiles.map((file, idx) => (
                   <GalleryPreviewItem
                     key={`new-${idx}`}
@@ -953,19 +1073,29 @@ export default function ProjectForm() {
               </div>
             )}
 
-            <div
-              {...getRootGalleryProps()}
-              className={`p-6 border-2 border-dashed rounded-lg text-center cursor-pointer transition-all ${isGalleryDragActive ? "border-daw-green bg-green-50" : "border-slate-200 hover:bg-slate-50"}`}>
-              <input {...getInputGalleryProps()} />
-              <Plus
-                className={`w-6 h-6 mx-auto mb-2 transition-transform ${isGalleryDragActive ? "scale-150 text-daw-green" : "text-slate-300"}`}
-              />
-              <p className="text-[11px] font-bold text-slate-600 uppercase tracking-tight">
-                {isGalleryDragActive
-                  ? "Lepaskan gambar!"
-                  : "Tambah Foto Galeri"}
-              </p>
-            </div>
+            {!shouldLockUI && (
+              <div
+                {...getRootGalleryProps()}
+                className={`p-6 border-2 border-dashed rounded-lg text-center cursor-pointer transition-all ${
+                  isGalleryDragActive
+                    ? "border-daw-green bg-green-50"
+                    : "border-slate-200 hover:bg-slate-50"
+                }`}>
+                <input {...getInputGalleryProps()} />
+                <Plus
+                  className={`w-6 h-6 mx-auto mb-2 transition-transform ${
+                    isGalleryDragActive
+                      ? "scale-150 text-daw-green"
+                      : "text-slate-300"
+                  }`}
+                />
+                <p className="text-[11px] font-bold text-slate-600 uppercase tracking-tight">
+                  {isGalleryDragActive
+                    ? "Lepaskan gambar!"
+                    : "Tambah Foto Galeri"}
+                </p>
+              </div>
+            )}
           </div>
         </div>
       </div>

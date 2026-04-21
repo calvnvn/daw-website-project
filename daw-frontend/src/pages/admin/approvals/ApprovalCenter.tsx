@@ -159,7 +159,7 @@ const DiffModal = ({
   }, [oldData, finalPayload]);
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/80 backdrop-blur-sm animate-in fade-in duration-200">
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/80 animate-in fade-in duration-200">
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-6xl max-h-[95vh] flex flex-col overflow-hidden animate-in zoom-in-95 duration-200">
         {/* HEADER MODAL DENGAN TABS */}
         <div className="px-6 py-4 border-b border-slate-200 flex justify-between items-center bg-slate-50">
@@ -219,7 +219,7 @@ const DiffModal = ({
         {/* BODY: KONTEN BERDASARKAN TAB */}
         <div className="flex-1 overflow-y-auto bg-slate-100/50 p-6 relative">
           {loadingOld ? (
-            <div className="absolute inset-0 bg-white/70 backdrop-blur-sm z-10 flex flex-col items-center justify-center">
+            <div className="absolute inset-0 bg-white/70 z-10 flex flex-col items-center justify-center">
               <Loader2 className="w-10 h-10 animate-spin text-daw-green mb-3" />
               <p className="text-sm font-bold text-slate-600 tracking-wide">
                 Menarik Data Live dari Server...
