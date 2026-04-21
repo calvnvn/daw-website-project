@@ -29,7 +29,7 @@ interface MapManagerProps {
 export default function MapManager({
   formData,
   setFormData,
-  isEditing,
+  isEditing, // 🚀 SEKARANG 100% TUNDUK PADA PARENT (Sovereign Gatekeeper)
   categories,
   categoryMap,
   onOpenMapPicker,
@@ -47,9 +47,9 @@ export default function MapManager({
     toast.success("Koordinat berhasil disalin ke clipboard!");
   };
 
-  // Guard: Jika data terkunci (Sedang Pending Approval), matikan semua interaksi
-  const isLocked = formData.is_locked;
-  const canInteract = isEditing && !isLocked;
+  // 🚀 DIHAPUS: const isLocked = formData.is_locked;
+  // 🚀 DIHAPUS: const canInteract = isEditing && !isLocked;
+  // Kita langsung menggunakan prop `isEditing` di seluruh interaksi.
 
   return (
     <div className="lg:col-span-5 space-y-6">
@@ -71,12 +71,12 @@ export default function MapManager({
           </div>
 
           <label
-            className={`relative inline-flex items-center ${canInteract ? "cursor-pointer" : "cursor-not-allowed"}`}>
+            className={`relative inline-flex items-center ${isEditing ? "cursor-pointer" : "cursor-not-allowed"}`}>
             <input
               type="checkbox"
               className="sr-only peer"
               checked={Boolean(formData.hasMap)}
-              disabled={!canInteract}
+              disabled={!isEditing}
               onChange={(e) =>
                 setFormData((prev: any) => ({
                   ...prev,
@@ -93,11 +93,11 @@ export default function MapManager({
             {/* 1. Mini Map Preview */}
             <div
               className={`relative group rounded-xl border-2 transition-all overflow-hidden ${
-                canInteract
+                isEditing
                   ? "cursor-crosshair border-daw-green/20 hover:border-daw-green/50"
                   : "cursor-default border-slate-100 grayscale-[0.5]"
               }`}
-              onClick={() => canInteract && onOpenMapPicker()}>
+              onClick={() => isEditing && onOpenMapPicker()}>
               <div className="w-full aspect-video bg-slate-50 relative shadow-inner flex items-center justify-center">
                 <img
                   src={mapBase}
@@ -108,7 +108,7 @@ export default function MapManager({
                 {/* Looping Marker di Atas Peta */}
                 {formData.mapMarkers.map((m: MapMarker, idx: number) => (
                   <div
-                    key={m.id || `marker-${idx}`} // Gunakan ID yang stabil
+                    key={m.id || `marker-${idx}`}
                     className="absolute w-3 h-3 rounded-full border-2 border-white shadow-md -translate-x-1/2 -translate-y-1/2 transition-transform hover:scale-150 z-10"
                     style={{
                       left: m.dotX,
@@ -119,7 +119,7 @@ export default function MapManager({
                 ))}
               </div>
 
-              {canInteract && (
+              {isEditing && (
                 <div className="absolute inset-0 bg-slate-900/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
                   <span className="text-white text-[10px] font-black uppercase tracking-[0.2em] flex items-center gap-2 bg-slate-800/80 px-4 py-2 rounded-full border border-white/20">
                     <Maximize2 className="w-3 h-3 text-daw-green" /> Atur Titik
@@ -145,7 +145,7 @@ export default function MapManager({
                       title="Copy coordinates">
                       <Copy className="w-3 h-3" />
                     </button>
-                    {canInteract && (
+                    {isEditing && (
                       <button
                         onClick={() => removeMarker(index)}
                         className="p-1.5 bg-white text-slate-300 hover:text-red-500 rounded-lg shadow-sm border border-slate-100"
@@ -165,12 +165,12 @@ export default function MapManager({
                         }}
                       />
                       <input
-                        className="flex-1 text-xs font-bold bg-transparent border-b border-transparent focus:border-slate-300 outline-none transition-colors"
+                        className="flex-1 text-xs font-bold bg-transparent border-b border-transparent focus:border-slate-300 outline-none transition-colors disabled:opacity-70"
                         value={marker.title || ""}
                         onChange={(e) =>
                           updateMarker(index, "title", e.target.value)
                         }
-                        disabled={!canInteract}
+                        disabled={!isEditing}
                         placeholder="Nama Lokasi (e.g. Site Muara Enim)"
                       />
                     </div>
@@ -181,12 +181,12 @@ export default function MapManager({
                           Kategori
                         </span>
                         <select
-                          className="w-full text-[10px] bg-white border border-slate-200 rounded-lg px-2 py-1.5 outline-none appearance-none cursor-pointer focus:ring-2 focus:ring-daw-green/10"
+                          className="w-full text-[10px] bg-white border border-slate-200 rounded-lg px-2 py-1.5 outline-none appearance-none cursor-pointer focus:ring-2 focus:ring-daw-green/10 disabled:bg-slate-50 disabled:cursor-not-allowed"
                           value={marker.categoryId}
                           onChange={(e) =>
                             updateMarker(index, "categoryId", e.target.value)
                           }
-                          disabled={!canInteract}>
+                          disabled={!isEditing}>
                           {categories.map((c) => (
                             <option key={c.id} value={c.id}>
                               {c.name}
@@ -199,12 +199,12 @@ export default function MapManager({
                           Kapasitas/Ket
                         </span>
                         <input
-                          className="w-full text-[10px] bg-white border border-slate-200 rounded-lg px-2 py-1.5 outline-none focus:ring-2 focus:ring-daw-green/10"
+                          className="w-full text-[10px] bg-white border border-slate-200 rounded-lg px-2 py-1.5 outline-none focus:ring-2 focus:ring-daw-green/10 disabled:bg-slate-50 disabled:cursor-not-allowed"
                           value={marker.desc || ""}
                           onChange={(e) =>
                             updateMarker(index, "desc", e.target.value)
                           }
-                          disabled={!canInteract}
+                          disabled={!isEditing}
                           placeholder="Contoh: 15.4 MW"
                         />
                       </div>
@@ -213,13 +213,13 @@ export default function MapManager({
                     <div className="flex items-center gap-2 text-[10px] bg-slate-100/50 p-2 rounded-lg border border-dashed border-slate-200 group-hover:bg-daw-green/5 group-hover:border-daw-green/20 transition-colors">
                       <LinkIcon className="w-3 h-3 text-slate-400" />
                       <input
-                        className="flex-1 bg-transparent outline-none truncate font-mono text-[9px] text-slate-500 italic"
+                        className="flex-1 bg-transparent outline-none truncate font-mono text-[9px] text-slate-500 italic disabled:opacity-70"
                         value={marker.mapUrl || ""}
                         onChange={(e) =>
                           updateMarker(index, "mapUrl", e.target.value)
                         }
                         placeholder="Google Maps URL"
-                        disabled={!canInteract}
+                        disabled={!isEditing}
                       />
                     </div>
                   </div>

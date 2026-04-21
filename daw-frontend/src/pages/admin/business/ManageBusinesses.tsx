@@ -19,6 +19,8 @@ import CategoryManager from "./components/CategoryManager";
 import AddSectionModal from "./modals/AddSectionModal";
 import DeleteSectionModal from "./modals/DeleteSectionModal";
 import MapPickerModal from "./modals/MapPickerModal";
+import { useAuth } from "@/contexts/AuthContext";
+import { LockIcon, ShieldAlert } from "lucide-react";
 
 const normalizeBool = (val: any): boolean => {
   return val === true || val === "true" || val === 1 || val === "1";
@@ -35,6 +37,7 @@ const initialFormData: Omit<SectionData, "id"> = {
 };
 
 export default function ManageBusinesses() {
+  const { user } = useAuth();
   const {
     sections,
     categories,
@@ -45,19 +48,19 @@ export default function ManageBusinesses() {
     fetchRejectedDraft,
     clearRejectedDraft,
     rejectedDraft,
-    refreshData,
   } = useBusiness();
 
   // --- 1. CORE STATES ---
   const [activeTab, setActiveTab] = useState<string>("");
   const [formData, setFormData] =
     useState<Omit<SectionData, "id">>(initialFormData);
-
-  const [rejectedDrafts, setRejectedDrafts] = useState<Record<string, any>>({});
+  const [originalData, setOriginalData] =
+    useState<Omit<SectionData, "id">>(initialFormData);
 
   // --- 2. UI & MODAL STATES ---
   const [isEditing, setIsEditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [isDiscardModalOpen, setIsDiscardModalOpen] = useState(false);
@@ -71,11 +74,33 @@ export default function ManageBusinesses() {
     return Object.fromEntries(categories.map((cat) => [cat.id, cat.color]));
   }, [categories]);
 
+  const isSuperadmin = user?.role === "Superadmin" || user?.role === "admin";
   const currentSection = sections.find((s) => s.id === activeTab);
   const isSectionLocked = currentSection?.is_locked === true;
-  // DATA ENGINE (SYNC & LOCK ENFORCEMENT)
 
-  // Safe Form Synchronization
+  const shouldLockUI = isSectionLocked && !isSuperadmin;
+  const isOverrideMode = isSectionLocked && isSuperadmin;
+
+  const lockStyles = shouldLockUI
+    ? "opacity-60 grayscale-[30%] pointer-events-none cursor-not-allowed select-none"
+    : "";
+
+  // LOGIC: DIFF ENGINE (Mencegah Spam Approval)
+  const hasDataChanged = useCallback(() => {
+    // Clone data dan hapus metadata sistem agar komparasi murni pada konten
+    const currentData = { ...formData };
+    delete (currentData as any).is_locked;
+    delete (currentData as any).lock_ticket;
+
+    const baseData = { ...originalData };
+    delete (baseData as any).is_locked;
+    delete (baseData as any).lock_ticket;
+
+    // Deep compare menggunakan JSON stringify (aman untuk array MapMarkers)
+    return JSON.stringify(currentData) !== JSON.stringify(baseData);
+  }, [formData, originalData]);
+
+  // DATA ENGINE (SAFE SYNC & SNAPSHOT)
   useEffect(() => {
     if (!sections || sections.length === 0) {
       if (activeTab !== "categories") setActiveTab("categories");
@@ -89,15 +114,18 @@ export default function ManageBusinesses() {
 
     if (activeTab === "categories") {
       setFormData(initialFormData);
+      setOriginalData(initialFormData);
       return;
     }
 
+    // Sync Form Data & Anchor Original Data
     if (currentSection && !isEditing) {
       const rawMarkers =
         (currentSection as any).mapMarkers ||
         (currentSection as any).BusinessMapMarkers ||
         [];
-      setFormData({
+
+      const normalizedData = {
         category: currentSection.category || "",
         title: currentSection.title || "",
         htmlContent: currentSection.htmlContent || "",
@@ -105,11 +133,25 @@ export default function ManageBusinesses() {
         orderIndex: currentSection.orderIndex || 0,
         mapMarkers: Array.isArray(rawMarkers) ? [...rawMarkers] : [],
         is_locked: currentSection.is_locked || false,
-      });
+        lock_ticket: (currentSection as any).lock_ticket || "",
+      };
+
+      setFormData(normalizedData);
+      setOriginalData(normalizedData); // ⚓ The Diff Anchor
     }
   }, [activeTab, sections, currentSection, isEditing]);
 
-  // PARALLEL FETCHING
+  // AGGRESSIVE LOCKDOWN GUARD (Consolidated)
+  useEffect(() => {
+    if (shouldLockUI && isEditing) {
+      setIsEditing(false);
+      toast.info(
+        "Akses ditutup. Sektor ini sedang dalam proses peninjauan pusat.",
+      );
+    }
+  }, [shouldLockUI, isEditing]);
+
+  // PARALLEL FETCHING (REJECTED DRAFT)
   useEffect(() => {
     if (!activeTab || activeTab === "categories") {
       clearRejectedDraft();
@@ -117,19 +159,12 @@ export default function ManageBusinesses() {
     }
 
     const abortController = new AbortController();
-
     fetchRejectedDraft(activeTab, "BusinessSection", abortController.signal);
 
     return () => abortController.abort();
   }, [activeTab, fetchRejectedDraft, clearRejectedDraft]);
 
-  useEffect(() => {
-    if (isSectionLocked && isEditing) {
-      setIsEditing(false);
-      toast.info("Akses ditutup. Sektor ini sedang dalam proses review.");
-    }
-  }, [isSectionLocked, isEditing]);
-  // SECURITY GUARD
+  // SECURITY GUARD (Unsaved changes warning)
   useEffect(() => {
     const handleBeforeUnload = (e: BeforeUnloadEvent) => {
       if (isEditing) {
@@ -141,7 +176,7 @@ export default function ManageBusinesses() {
     return () => window.removeEventListener("beforeunload", handleBeforeUnload);
   }, [isEditing]);
 
-  // DATA HANDLERS (Dikirim ke MapManager sebagai Props)
+  // DATA HANDLERS (MapManager Props)
   const updateMarker = useCallback(
     (index: number, field: keyof MapMarker, value: string) => {
       setFormData((prev) => {
@@ -196,19 +231,54 @@ export default function ManageBusinesses() {
 
   const handleSave = async () => {
     if (activeTab === "categories") return;
+
+    // 1. Sovereign Guard: Cegah submit dari Inspect Element
+    if (shouldLockUI) {
+      return toast.error("Akses Dibatasi.", {
+        description: "Data ini sedang dalam peninjauan pusat.",
+      });
+    }
+
+    // 2. Anti-Spam Check: Jangan kirim ke server jika tidak ada perubahan
+    if (!hasDataChanged()) {
+      setIsEditing(false);
+      return toast.info("Tidak ada perubahan terdeteksi.", {
+        description: "Data Anda masih sama dengan versi live.",
+        duration: 3000,
+      });
+    }
+
+    // 3. Execution
     setIsSaving(true);
-    const toastId = toast.loading("Mengirim revisi ke sistem...");
+    const toastId = toast.loading(
+      isSuperadmin
+        ? "Menyimpan langsung (Override)..."
+        : "Mengirim revisi ke sistem...",
+    );
+
     try {
       await updateSection(activeTab, {
         ...formData,
         previous_notrans: rejectedDraft?.notrans,
       });
+
+      // Cleanup setelah sukses
+      clearRejectedDraft();
       setIsEditing(false);
+
+      toast.success(
+        isSuperadmin
+          ? "Pembaruan berhasil diterapkan."
+          : "Revisi diajukan! Menunggu persetujuan.",
+        { id: toastId },
+      );
     } catch (err: any) {
       console.error("Save Error:", err);
+      toast.error(err.response?.data?.message || "Gagal menyimpan perubahan.", {
+        id: toastId,
+      });
     } finally {
       setIsSaving(false);
-      toast.dismiss(toastId);
     }
   };
 
@@ -222,8 +292,11 @@ export default function ManageBusinesses() {
 
   if (isLoading && sections.length === 0) {
     return (
-      <div className="p-12 text-center text-slate-500 font-bold animate-pulse">
-        Menyinkronkan dengan Database...
+      <div className="h-[60vh] flex items-center justify-center text-slate-500">
+        <div className="animate-pulse flex flex-col items-center gap-4">
+          <div className="w-10 h-10 border-4 border-daw-green border-t-transparent rounded-full animate-spin"></div>
+          Memuat tata letak bisnis...
+        </div>
       </div>
     );
   }
@@ -231,6 +304,46 @@ export default function ManageBusinesses() {
   // --- 8. RENDER LAYOUT ---
   return (
     <div className="max-w-6xl mx-auto space-y-6 animate-in fade-in duration-500 pb-12">
+      {/* 🚀 THE SOVEREIGN BANNERS (Contextual Awareness) */}
+      {/* 1. Amber Banner (Superadmin Override) */}
+      {isOverrideMode && activeTab !== "categories" && (
+        <div className="bg-amber-50 border border-amber-200 p-4 rounded-xl flex items-center gap-4 animate-in slide-in-from-top-4 shadow-sm">
+          <div className="bg-amber-100 p-2 rounded-full text-amber-600 shrink-0">
+            <ShieldAlert className="w-5 h-5" />
+          </div>
+          <div>
+            <h4 className="text-xs font-black text-amber-900 uppercase tracking-tight">
+              Mode Override Superadmin
+            </h4>
+            <p className="text-xs text-amber-700 leading-relaxed mt-0.5">
+              Data sektor ini sedang dikunci oleh tiket peninjauan{" "}
+              <strong>{currentSection?.lock_ticket}</strong>.
+              <span className="font-bold underline ml-1">
+                Menyimpan akan membatalkan draf tersebut secara sepihak.
+              </span>
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* 2. Blue Banner (Editor Locked) */}
+      {shouldLockUI && activeTab !== "categories" && (
+        <div className="bg-blue-50 border border-blue-200 p-4 rounded-xl flex items-center gap-4 animate-pulse shadow-sm">
+          <div className="bg-blue-100 p-2 rounded-full text-blue-600 shrink-0">
+            <LockIcon className="w-5 h-5" />
+          </div>
+          <div>
+            <h4 className="text-xs font-black text-blue-900 uppercase tracking-tight">
+              🔒 Sedang Ditinjau Pusat
+            </h4>
+            <p className="text-xs text-blue-700 leading-relaxed mt-0.5">
+              Akses Dibatasi. Anda tidak dapat mengubah data ini karena revisi
+              sebelumnya sedang menunggu persetujuan pusat.
+            </p>
+          </div>
+        </div>
+      )}
+
       <SectionHeader
         activeTab={activeTab}
         isEditing={isEditing}
@@ -238,8 +351,9 @@ export default function ManageBusinesses() {
         isSaving={isSaving}
         onSave={handleSave}
         onDeleteClick={() => setIsDeleteModalOpen(true)}
-        isLocked={isSectionLocked}
+        isLocked={shouldLockUI}
         lockTicket={currentSection?.lock_ticket}
+        isSuperadmin={isSuperadmin}
       />
 
       <SectionTabs
@@ -250,7 +364,10 @@ export default function ManageBusinesses() {
         onAddClick={() => setIsAddModalOpen(true)}
       />
 
-      <main className="bg-white rounded-b-xl border border-t-0 border-slate-200 shadow-sm p-6 lg:p-8 min-h-[500px]">
+      {/* 🚀 AGGRESSIVE VISUAL LOCKDOWN */}
+      {/* lockStyles disuntikkan ke class utama main */}
+      <main
+        className={`bg-white rounded-b-xl border border-t-0 border-slate-200 shadow-sm p-6 lg:p-8 min-h-[500px] transition-all duration-500 ${lockStyles}`}>
         {activeTab === "categories" ? (
           <CategoryManager />
         ) : (
@@ -260,15 +377,14 @@ export default function ManageBusinesses() {
               activeTab={activeTab}
               formData={formData}
               setFormData={setFormData}
-              isEditing={isEditing && !isSectionLocked}
+              isEditing={isEditing && !shouldLockUI} // Guard ganda
             />
 
             {/* 2. MAP MANAGER (BYPASS APPROVAL) */}
             <MapManager
               formData={formData}
               setFormData={setFormData}
-              // 🚀 Tetap nyala meski artikel sedang dikunci!
-              isEditing={isEditing && !isSectionLocked}
+              isEditing={isEditing && !shouldLockUI} // Guard ganda
               categories={categories}
               categoryMap={categoryMap}
               onOpenMapPicker={() => setIsMapModalOpen(true)}

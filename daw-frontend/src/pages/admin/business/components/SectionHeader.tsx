@@ -1,4 +1,4 @@
-import { Trash2, Lock, Unlock, Save, ShieldAlert, Clock } from "lucide-react";
+import { Trash2, Lock, Unlock, Save, Clock, Send, Loader2 } from "lucide-react";
 
 interface SectionHeaderProps {
   activeTab: string;
@@ -7,8 +7,9 @@ interface SectionHeaderProps {
   isSaving: boolean;
   onSave: () => void;
   onDeleteClick: () => void;
-  isLocked: boolean;
+  isLocked: boolean; // 🚀 Menerima 'shouldLockUI' dari parent
   lockTicket?: string;
+  isSuperadmin: boolean; // 🚀 Prop baru untuk Matrix Button
 }
 
 export default function SectionHeader({
@@ -20,6 +21,7 @@ export default function SectionHeader({
   onDeleteClick,
   isLocked,
   lockTicket,
+  isSuperadmin,
 }: SectionHeaderProps) {
   const isCategoryTab = activeTab === "categories";
 
@@ -58,8 +60,8 @@ export default function SectionHeader({
       </div>
 
       {/* KELOMPOK TOMBOL AKSI */}
-      <div className="flex items-center gap-3">
-        {/* 1. Tombol Hapus (Disabled if Locked) */}
+      <div className="flex flex-wrap items-center gap-3">
+        {/* 1. Tombol Hapus */}
         {!isCategoryTab && isEditing && (
           <button
             onClick={onDeleteClick}
@@ -74,7 +76,7 @@ export default function SectionHeader({
           </button>
         )}
 
-        {/* 2. Tombol Kunci/Buka Mode Edit (The Gatekeeper Logic) */}
+        {/* 2. Tombol Kunci/Buka Mode Edit */}
         <button
           onClick={() => !isLocked && setIsEditing(!isEditing)}
           disabled={isLocked}
@@ -97,20 +99,37 @@ export default function SectionHeader({
           </span>
         </button>
 
-        {/* 3. Tombol Save ke Database */}
+        {/* 3. 🚀 THE MATRIX ACTION BUTTON (STANDAR BLUEPRINT IV.A) */}
         {!isCategoryTab && (
           <button
             onClick={onSave}
             disabled={isSaving || !isEditing || isLocked}
-            className="flex items-center gap-2 bg-daw-green hover:bg-[#003b1c] disabled:bg-slate-300 disabled:cursor-not-allowed text-white px-6 py-2.5 rounded-lg font-bold text-sm transition-all shadow-sm active:scale-95">
+            className={`flex items-center justify-center gap-2 px-6 py-2.5 rounded-lg font-bold text-sm transition-all shadow-sm active:scale-95 disabled:cursor-not-allowed ${
+              isSaving
+                ? "bg-slate-300 text-slate-700"
+                : isLocked
+                  ? "bg-slate-200 text-slate-500"
+                  : isSuperadmin
+                    ? "bg-daw-green hover:bg-[#003b1c] text-white"
+                    : "bg-blue-600 hover:bg-blue-700 text-white"
+            }`}>
             {isSaving ? (
-              <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+              <>
+                <Loader2 className="w-4 h-4 animate-spin" /> Memproses...
+              </>
+            ) : isLocked ? (
+              <>
+                <Lock className="w-4 h-4" /> Akses Terbatas
+              </>
+            ) : isSuperadmin ? (
+              <>
+                <Save className="w-4 h-4" /> Publish Live
+              </>
             ) : (
-              <Save className="w-5 h-5" />
+              <>
+                <Send className="w-4 h-4" /> Request Approval
+              </>
             )}
-            <span>
-              {isSaving ? "Saving..." : `Update ${activeTab.toUpperCase()}`}
-            </span>
           </button>
         )}
       </div>

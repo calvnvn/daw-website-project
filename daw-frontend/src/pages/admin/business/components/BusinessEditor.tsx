@@ -1,6 +1,12 @@
 import { useCallback, useMemo } from "react";
 import ReactQuill from "react-quill-new";
-import { AlertCircle, RotateCcw, Info, CheckCircle2 } from "lucide-react";
+import {
+  AlertTriangle,
+  RotateCcw,
+  Info,
+  CheckCircle2,
+  Clock,
+} from "lucide-react";
 import { useBusiness, type SectionData } from "@/contexts/BusinessContext";
 import "react-quill-new/dist/quill.snow.css";
 import { toast } from "sonner";
@@ -62,38 +68,46 @@ export default function BusinessEditor({
 
   return (
     <div className="lg:col-span-7 space-y-6">
-      {/* REJECTION BANNER */}
+      {/* 🚀 THE REJECTION RIBBON (Blueprint IV.B) */}
       {rejectedDraft && (
         <div className="bg-amber-50 border border-amber-200 rounded-xl overflow-hidden shadow-sm animate-in slide-in-from-top-4 duration-300">
-          <div className="p-4 flex gap-4">
-            <div className="bg-amber-100 p-2 rounded-lg h-fit">
-              <AlertCircle className="w-5 h-5 text-amber-600" />
+          <div className="p-4 flex gap-4 items-start">
+            <div className="bg-amber-100 p-2 rounded-lg h-fit shrink-0">
+              <AlertTriangle className="w-5 h-5 text-amber-600" />
             </div>
-            <div className="flex-1 space-y-1">
+            <div className="flex-1 space-y-2">
               <div className="flex justify-between items-center">
                 <h4 className="text-xs font-black text-amber-900 uppercase tracking-tighter">
-                  Revisi Perlu Perbaikan
+                  ⚠️ Catatan Peninjau
                 </h4>
-                <span className="text-[9px] bg-amber-200 px-1.5 py-0.5 rounded text-amber-700 font-mono">
-                  Ticket: {rejectedDraft.notrans}
+                <span className="text-[9px] flex items-center gap-1 bg-amber-200 px-1.5 py-0.5 rounded text-amber-800 font-bold tracking-widest">
+                  <Clock className="w-3 h-3" />
+                  DITOLAK
                 </span>
               </div>
-              <blockquote className="text-xs text-amber-800 leading-relaxed italic bg-white/40 p-2 rounded border border-amber-100/50">
+              <p className="text-xs text-amber-800 leading-relaxed font-bold italic bg-white/60 p-2.5 rounded border border-amber-200/50">
                 "
                 {rejectedDraft.rejection_reason ||
-                  "Check internal documentation for details."}
+                  "Silakan hubungi peninjau terkait alasan penolakan."}
                 "
-              </blockquote>
-              <div className="pt-3 flex items-center gap-3">
+              </p>
+              <div className="pt-2 flex flex-col sm:flex-row sm:items-center gap-3">
                 <button
                   onClick={handleRestoreDraft}
                   disabled={!isEditing}
-                  className="flex items-center gap-2 bg-amber-600 hover:bg-amber-700 disabled:bg-amber-300 text-white px-4 py-2 rounded-lg text-xs font-bold transition-all shadow-sm">
-                  <RotateCcw className="w-3.5 h-3.5" />
-                  RESTORE DRAFT
+                  title={
+                    !isEditing
+                      ? "Buka mode edit untuk memulihkan data"
+                      : "Pulihkan draf yang ditolak"
+                  }
+                  className="flex items-center justify-center gap-2 bg-amber-600 hover:bg-amber-700 disabled:bg-amber-300 disabled:cursor-not-allowed text-white px-5 py-2.5 rounded-lg text-xs font-bold transition-all shadow-sm active:scale-95">
+                  <RotateCcw
+                    className={`w-3.5 h-3.5 ${isEditing ? "" : "opacity-50"}`}
+                  />
+                  PULIHKAN DATA
                 </button>
                 {!isEditing && (
-                  <p className="text-[10px] text-amber-600 font-medium italic">
+                  <p className="text-[10px] text-amber-600 font-medium italic animate-pulse">
                     * Aktifkan "Editing Mode" untuk memulihkan draf.
                   </p>
                 )}
@@ -115,11 +129,11 @@ export default function BusinessEditor({
               <Info className="w-4 h-4 text-slate-400" />
             </div>
             <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500">
-              Informasi & Kontent Artikel
+              Informasi & Konten Artikel
             </h3>
           </header>
 
-          <div className="space-y-8">
+          <div className="space-y-8 mt-4">
             {/* Input: Judul Pendek */}
             <div>
               <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-2">
@@ -138,7 +152,7 @@ export default function BusinessEditor({
                 className={`w-full px-4 py-3 rounded-xl font-serif text-xl transition-all ${
                   isEditing
                     ? "bg-white border border-slate-300 shadow-sm focus:ring-4 focus:ring-daw-green/10 focus:border-daw-green outline-none"
-                    : "bg-slate-50 border-transparent text-slate-400"
+                    : "bg-slate-50 border-transparent text-slate-400 disabled:cursor-not-allowed"
                 }`}
                 placeholder="e.g., Sustainable Natural Resources"
               />
@@ -149,6 +163,7 @@ export default function BusinessEditor({
               <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-2">
                 Narasi Konten (Rich Text)
               </label>
+              {/* 🚀 Aggressive visual lockdown logic (already correct) */}
               <div
                 className={`rounded-xl overflow-hidden border transition-all duration-300 ${
                   isEditing

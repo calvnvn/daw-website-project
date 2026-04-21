@@ -1,14 +1,11 @@
 import { useState, useMemo } from "react";
-import { Plus, X, Save } from "lucide-react";
-import { toast } from "sonner"; // Asumsi menggunakan sonner seperti komponen lain
+import { Plus, X, Save, Loader2 } from "lucide-react";
+import { toast } from "sonner";
 
 interface AddSectionModalProps {
   onClose: () => void;
-  addSection: (
-    category: string,
-    title: string,
-    status: string,
-  ) => Promise<void>;
+  // 🚀 MENGHAPUS PARAMETER 'STATUS' (Backend The Gatekeeper yang akan menentukan ini)
+  addSection: (category: string, title: string) => Promise<void>;
 }
 
 export default function AddSectionModal({
@@ -23,10 +20,10 @@ export default function AddSectionModal({
     return newSectionName
       .toLowerCase()
       .trim()
-      .replace(/[^\w\s-]/g, "") // Hapus simbol kecuali spasi/dash
-      .replace(/[\s_]+/g, "-") // Spasi & underscore jadi satu dash
-      .replace(/-+/g, "-") // Hapus dash ganda
-      .replace(/^-+|-+$/g, ""); // Hapus dash di awal/akhir
+      .replace(/[^\w\s-]/g, "")
+      .replace(/[\s_]+/g, "-")
+      .replace(/-+/g, "-")
+      .replace(/^-+|-+$/g, "");
   }, [newSectionName]);
 
   const handleSubmit = async () => {
@@ -39,19 +36,12 @@ export default function AddSectionModal({
 
     setIsSubmitting(true);
     try {
-      /**
-       * SOP DAW CMS:
-       * Kita kirim status "Published" agar Controller memicu alur OWL jika user adalah Editor.
-       * Default title dibiarkan diproses oleh Backend atau dikirim secara eksplisit di sini.
-       */
       await addSection(
         trimmedName,
-        `Explore Our ${trimmedName} Operations`, // Tetap dikirim, tapi idealnya title dinamis
-        "Published",
+        `Explore Our ${trimmedName} Operations`, // Title default
       );
 
       onClose();
-      // Toast sukses biasanya ditangani oleh Context, tapi kita jaga-jaga di sini.
     } catch (error: any) {
       const errMsg =
         error.response?.data?.message || "Gagal membuat sektor baru";
@@ -151,7 +141,7 @@ export default function AddSectionModal({
             onClick={handleSubmit}
             className="flex items-center gap-2 bg-slate-900 hover:bg-daw-green disabled:bg-slate-200 disabled:text-slate-400 text-white px-7 py-2.5 rounded-xl font-bold text-sm transition-all shadow-md active:scale-95">
             {isSubmitting ? (
-              <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+              <Loader2 className="w-4 h-4 animate-spin" />
             ) : (
               <Save className="w-4 h-4" />
             )}

@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState } from "react";
 import {
   Plus,
   Save,
@@ -9,10 +9,14 @@ import {
   Lock,
   Clock,
 } from "lucide-react";
-import { useBusiness, type MapCategory } from "@/contexts/BusinessContext";
+import { useBusiness } from "@/contexts/BusinessContext";
+import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
 
 export default function CategoryManager() {
+  const { user } = useAuth();
+  const isSuperadmin = user?.role === "Superadmin" || user?.role === "admin";
+
   const {
     categories,
     addCategory,
@@ -42,7 +46,6 @@ export default function CategoryManager() {
       return toast.error("Warna Hex harus lengkap (contoh: #004B23)");
     }
     try {
-      // Sesuai SOP, kita kirim status Published agar masuk jalur OWL jika user adalah Editor
       await addCategory({ ...newCat }, "Published");
       setNewCat({ id: "", name: "", color: "#004B23" });
     } catch (err: any) {
@@ -60,97 +63,113 @@ export default function CategoryManager() {
 
   return (
     <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
-      {/* 1. Info Banner */}
-      <div className="bg-daw-green/5 border border-daw-green/20 p-4 rounded-xl flex items-start gap-3">
-        <MapIcon className="w-5 h-5 text-daw-green shrink-0 mt-0.5" />
-        <div>
-          <p className="text-sm text-daw-green font-bold">
-            Pengaturan Kategori Peta
-          </p>
-          <p className="text-xs text-daw-green/80 leading-relaxed">
-            Perubahan nama atau warna akan berdampak pada seluruh titik lokasi
-            (pin) yang menggunakan kategori tersebut. Data yang sedang dalam
-            proses approval tidak dapat diubah.
-          </p>
+      {/* 1. Info Banner & Restriction Warning */}
+      <div className="bg-daw-green/5 border border-daw-green/20 p-4 rounded-xl flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+        <div className="flex items-start gap-3">
+          <MapIcon className="w-5 h-5 text-daw-green shrink-0 mt-0.5" />
+          <div>
+            <p className="text-sm text-daw-green font-bold">
+              Pengaturan Kategori Peta
+            </p>
+            <p className="text-xs text-daw-green/80 leading-relaxed">
+              Perubahan nama atau warna akan berdampak pada seluruh titik lokasi
+              yang menggunakan kategori tersebut.
+            </p>
+          </div>
         </div>
+
+        {/* BANNER KASTA (Hanya Editor yang melihat ini) */}
+        {!isSuperadmin && (
+          <div className="flex items-center gap-2 bg-amber-50 border border-amber-200 px-3 py-2 rounded-lg text-amber-700 shrink-0 shadow-sm">
+            <ShieldAlert className="w-4 h-4" />
+            <span className="text-[10px] font-bold uppercase tracking-widest">
+              Akses Mutasi Terkunci (Read-Only)
+            </span>
+          </div>
+        )}
       </div>
 
-      {/* 2. Category Creation Form */}
-      <div className="bg-slate-50 p-6 rounded-xl border border-slate-200">
-        <h3 className="font-bold text-slate-900 flex items-center gap-2 text-xs uppercase tracking-widest mb-4">
-          <Plus className="w-4 h-4 text-daw-green" /> Tambah Kategori Baru
-        </h3>
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
-          <div>
-            <label className="text-[10px] font-black text-slate-500 uppercase mb-1.5 block">
-              ID Referensi (Slug)
-            </label>
-            <input
-              type="text"
-              placeholder="e.g., office-loc"
-              className="w-full px-3 py-2 rounded-lg border border-slate-300 text-sm focus:ring-4 focus:ring-daw-green/10 focus:border-daw-green outline-none font-mono"
-              value={newCat.id}
-              onChange={(e) =>
-                setNewCat({ ...newCat, id: slugify(e.target.value) })
-              }
-            />
-          </div>
-          <div>
-            <label className="text-[10px] font-black text-slate-500 uppercase mb-1.5 block">
-              Nama Label
-            </label>
-            <input
-              type="text"
-              placeholder="e.g., Kantor Pusat"
-              className="w-full px-3 py-2 rounded-lg border border-slate-300 text-sm focus:ring-4 focus:ring-daw-green/10 focus:border-daw-green outline-none"
-              value={newCat.name}
-              onChange={(e) => setNewCat({ ...newCat, name: e.target.value })}
-            />
-          </div>
-          <div>
-            <label className="text-[10px] font-black text-slate-500 uppercase mb-1.5 block">
-              Warna Pin
-            </label>
-            <div className="flex items-center gap-2 bg-white px-2 py-1 rounded-lg border border-slate-300">
-              <input
-                type="color"
-                className="w-8 h-8 rounded cursor-pointer border-none bg-transparent"
-                value={newCat.color}
-                onChange={(e) =>
-                  setNewCat({ ...newCat, color: e.target.value.toUpperCase() })
-                }
-              />
+      {/* 2. Category Creation Form ( DISEMBUNYIKAN UNTUK EDITOR) */}
+      {isSuperadmin && (
+        <div className="bg-slate-50 p-6 rounded-xl border border-slate-200">
+          <h3 className="font-bold text-slate-900 flex items-center gap-2 text-xs uppercase tracking-widest mb-4">
+            <Plus className="w-4 h-4 text-daw-green" /> Tambah Kategori Baru
+          </h3>
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
+            <div>
+              <label className="text-[10px] font-black text-slate-500 uppercase mb-1.5 block">
+                ID Referensi (Slug)
+              </label>
               <input
                 type="text"
-                maxLength={7}
-                className="flex-1 text-xs font-mono font-bold text-slate-600 outline-none"
-                value={newCat.color}
-                onChange={(e) => {
-                  const val = e.target.value.toUpperCase();
-                  if (/^#[0-9A-F]{0,6}$/.test(val))
-                    setNewCat({ ...newCat, color: val });
-                }}
+                placeholder="e.g., office-loc"
+                className="w-full px-3 py-2 rounded-lg border border-slate-300 text-sm focus:ring-4 focus:ring-daw-green/10 focus:border-daw-green outline-none font-mono"
+                value={newCat.id}
+                onChange={(e) =>
+                  setNewCat({ ...newCat, id: slugify(e.target.value) })
+                }
               />
             </div>
+            <div>
+              <label className="text-[10px] font-black text-slate-500 uppercase mb-1.5 block">
+                Nama Label
+              </label>
+              <input
+                type="text"
+                placeholder="e.g., Kantor Pusat"
+                className="w-full px-3 py-2 rounded-lg border border-slate-300 text-sm focus:ring-4 focus:ring-daw-green/10 focus:border-daw-green outline-none"
+                value={newCat.name}
+                onChange={(e) => setNewCat({ ...newCat, name: e.target.value })}
+              />
+            </div>
+            <div>
+              <label className="text-[10px] font-black text-slate-500 uppercase mb-1.5 block">
+                Warna Pin
+              </label>
+              <div className="flex items-center gap-2 bg-white px-2 py-1 rounded-lg border border-slate-300">
+                <input
+                  type="color"
+                  className="w-8 h-8 rounded cursor-pointer border-none bg-transparent"
+                  value={newCat.color}
+                  onChange={(e) =>
+                    setNewCat({
+                      ...newCat,
+                      color: e.target.value.toUpperCase(),
+                    })
+                  }
+                />
+                <input
+                  type="text"
+                  maxLength={7}
+                  className="flex-1 text-xs font-mono font-bold text-slate-600 outline-none"
+                  value={newCat.color}
+                  onChange={(e) => {
+                    const val = e.target.value.toUpperCase();
+                    if (/^#[0-9A-F]{0,6}$/.test(val))
+                      setNewCat({ ...newCat, color: val });
+                  }}
+                />
+              </div>
+            </div>
+            <button
+              disabled={
+                isProcessing ||
+                !newCat.id ||
+                !newCat.name ||
+                newCat.color.length < 7
+              }
+              onClick={handleAdd}
+              className="bg-daw-green text-white h-[40px] px-6 rounded-lg font-bold text-xs hover:bg-[#003b1c] disabled:bg-slate-300 transition-all flex items-center justify-center gap-2 shadow-sm">
+              {isProcessing ? (
+                <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+              ) : (
+                <Save className="w-4 h-4" />
+              )}
+              CREATE
+            </button>
           </div>
-          <button
-            disabled={
-              isProcessing ||
-              !newCat.id ||
-              !newCat.name ||
-              newCat.color.length < 7
-            }
-            onClick={handleAdd}
-            className="bg-daw-green text-white h-[40px] px-6 rounded-lg font-bold text-xs hover:bg-[#003b1c] disabled:bg-slate-300 transition-all flex items-center justify-center gap-2 shadow-sm">
-            {isProcessing ? (
-              <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-            ) : (
-              <Save className="w-4 h-4" />
-            )}
-            CREATE
-          </button>
         </div>
-      </div>
+      )}
 
       {/* 3. Table List */}
       <div className="overflow-hidden border border-slate-200 rounded-xl shadow-sm bg-white">
@@ -160,13 +179,15 @@ export default function CategoryManager() {
               <th className="px-6 py-4">Status</th>
               <th className="px-6 py-4">ID / Label</th>
               <th className="px-6 py-4">Visual Color</th>
-              <th className="px-6 py-4 text-right">Actions</th>
+              {isSuperadmin && (
+                <th className="px-6 py-4 text-right">Actions</th>
+              )}{" "}
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
             {categories.map((cat) => {
               const isEditingThis = editingCatId === cat.id;
-              const isLocked = cat.is_locked; // 🛡️ Integrasi DB Lock
+              const isLocked = cat.is_locked;
 
               return (
                 <tr
@@ -248,52 +269,56 @@ export default function CategoryManager() {
                       )}
                     </div>
                   </td>
-                  <td className="px-6 py-4 text-right">
-                    <div className="flex justify-end gap-2">
-                      {isEditingThis ? (
-                        <>
-                          <button
-                            onClick={() => handleUpdate(cat.id)}
-                            className="p-1.5 text-daw-green hover:bg-green-50 rounded shadow-sm border border-green-100">
-                            <Save className="w-4 h-4" />
-                          </button>
-                          <button
-                            onClick={() => setEditingCatId(null)}
-                            className="p-1.5 text-slate-400 hover:bg-slate-50 rounded">
-                            <X className="w-4 h-4" />
-                          </button>
-                        </>
-                      ) : (
-                        <>
-                          <button
-                            disabled={isLocked}
-                            onClick={() => {
-                              setEditingCatId(cat.id);
-                              setEditCatData({
-                                name: cat.name,
-                                color: cat.color,
-                              });
-                            }}
-                            className="p-1.5 text-slate-400 hover:text-daw-green disabled:opacity-30 transition-colors">
-                            {isLocked ? (
-                              <Lock className="w-4 h-4" />
-                            ) : (
-                              <Edit className="w-4 h-4" />
-                            )}
-                          </button>
-                          <button
-                            disabled={isLocked}
-                            onClick={() =>
-                              confirm(`Hapus kategori "${cat.name}"?`) &&
-                              deleteCategory(cat.id)
-                            }
-                            className="p-1.5 text-slate-300 hover:text-red-600 disabled:opacity-30 transition-colors">
-                            <Trash2 className="w-4 h-4" />
-                          </button>
-                        </>
-                      )}
-                    </div>
-                  </td>
+
+                  {/* 🚀 Kolom Action hanya di-render untuk Superadmin */}
+                  {isSuperadmin && (
+                    <td className="px-6 py-4 text-right">
+                      <div className="flex justify-end gap-2">
+                        {isEditingThis ? (
+                          <>
+                            <button
+                              onClick={() => handleUpdate(cat.id)}
+                              className="p-1.5 text-daw-green hover:bg-green-50 rounded shadow-sm border border-green-100">
+                              <Save className="w-4 h-4" />
+                            </button>
+                            <button
+                              onClick={() => setEditingCatId(null)}
+                              className="p-1.5 text-slate-400 hover:bg-slate-50 rounded">
+                              <X className="w-4 h-4" />
+                            </button>
+                          </>
+                        ) : (
+                          <>
+                            <button
+                              disabled={isLocked}
+                              onClick={() => {
+                                setEditingCatId(cat.id);
+                                setEditCatData({
+                                  name: cat.name,
+                                  color: cat.color,
+                                });
+                              }}
+                              className="p-1.5 text-slate-400 hover:text-daw-green disabled:opacity-30 transition-colors">
+                              {isLocked ? (
+                                <Lock className="w-4 h-4" />
+                              ) : (
+                                <Edit className="w-4 h-4" />
+                              )}
+                            </button>
+                            <button
+                              disabled={isLocked}
+                              onClick={() =>
+                                confirm(`Hapus kategori "${cat.name}"?`) &&
+                                deleteCategory(cat.id)
+                              }
+                              className="p-1.5 text-slate-300 hover:text-red-600 disabled:opacity-30 transition-colors">
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </>
+                        )}
+                      </div>
+                    </td>
+                  )}
                 </tr>
               );
             })}
