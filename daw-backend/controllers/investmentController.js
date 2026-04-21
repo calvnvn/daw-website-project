@@ -59,7 +59,7 @@ exports.updateSettings = async (req, res) => {
       return res.status(423).json({
         success: false,
         message:
-          "Akses Dibatasi. Pengaturan Investasi sedang dikunci oleh proses approval pusat.",
+          "Akses Dibatasi. Pengaturan Investasi sedang dikunci oleh proses approval.",
         ticket: settings.lock_ticket,
       });
     }
@@ -366,12 +366,10 @@ exports.deleteAffiliate = async (req, res) => {
       // 3. Final Physical Asset Management
       if (company.logoUrl) deleteSingleFile(company.logoUrl);
 
-      res
-        .status(200)
-        .json({
-          success: true,
-          message: "Affiliate deleted successfully live!",
-        });
+      res.status(200).json({
+        success: true,
+        message: "Affiliate deleted successfully live!",
+      });
     } catch (dbError) {
       await t.rollback();
       throw dbError;

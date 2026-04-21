@@ -104,7 +104,7 @@ exports.updateSettings = async (req, res) => {
       return res.status(423).json({
         success: false,
         message:
-          "Akses Dibatasi. Intro sedang dikunci oleh proses approval pusat.",
+          "Akses Dibatasi. Intro sedang dikunci oleh proses approval.",
         ticket: settings.lock_ticket,
       });
     }
@@ -525,7 +525,7 @@ exports.updateStat = async (req, res) => {
       return res.status(423).json({
         success: false,
         message:
-          "Akses Dibatasi. Statistik ini sedang dikunci oleh proses approval pusat.",
+          "Akses Dibatasi. Statistik ini sedang dikunci oleh proses approval.",
         ticket: stat.lock_ticket,
       });
     }

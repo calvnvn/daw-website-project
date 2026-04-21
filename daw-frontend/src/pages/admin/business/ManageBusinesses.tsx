@@ -332,11 +332,11 @@ export default function ManageBusinesses() {
           </div>
           <div>
             <h4 className="text-xs font-black text-blue-900 uppercase tracking-tight">
-              🔒 Sedang Ditinjau Pusat
+              Sedang Ditinjau
             </h4>
             <p className="text-xs text-blue-700 leading-relaxed mt-0.5">
               Akses Dibatasi. Anda tidak dapat mengubah data ini karena revisi
-              sebelumnya sedang menunggu persetujuan pusat.
+              sebelumnya sedang menunggu persetujuan.
             </p>
           </div>
         </div>

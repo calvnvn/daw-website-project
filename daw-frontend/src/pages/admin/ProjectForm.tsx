@@ -513,7 +513,7 @@ export default function ProjectForm() {
             lock_ticket: response.data.ticket,
           }));
           toast.success(
-            "Revisi berhasil diajukan! Menunggu persetujuan pusat.",
+            "Revisi berhasil diajukan! Menunggu persetujuan.",
             {
               id: loadingToast,
               duration: 5000,
@@ -716,7 +716,7 @@ export default function ProjectForm() {
           {isEditor && !shouldLockUI && !isSaving && (
             <p className="text-[10px] text-blue-500 font-bold mt-1 flex items-center gap-1 animate-in slide-in-from-top-1">
               <span className="w-1.5 h-1.5 bg-blue-500 rounded-full animate-pulse"></span>
-              Pembaruan akan dikirim ke pusat untuk disetujui.
+              Pembaruan akan dikirim untuk disetujui.
             </p>
           )}
         </div>

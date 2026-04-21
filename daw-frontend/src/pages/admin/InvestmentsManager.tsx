@@ -420,8 +420,7 @@ export default function InvestmentsManager() {
               Mode Override Aktif
             </h4>
             <p className="text-xs text-amber-700 leading-relaxed mt-0.5">
-              Anda sedang mengedit data yang sedang dalam antrean peninjauan
-              pusat.{" "}
+              Anda sedang mengedit data yang sedang dalam antrean peninjauan.{" "}
               <span className="font-bold underline">
                 Direct Commit akan membatalkan draf Editor secara sepihak.
               </span>
@@ -441,8 +440,8 @@ export default function InvestmentsManager() {
               🔒 Akses Dibatasi
             </h4>
             <p className="text-xs text-blue-700 leading-relaxed mt-0.5">
-              Data pada halaman ini sedang ditinjau pusat. Anda tidak dapat
-              melakukan perubahan hingga proses selesai.
+              Data pada halaman ini sedang ditinjau. Anda tidak dapat melakukan
+              perubahan hingga proses selesai.
             </p>
           </div>
         </div>

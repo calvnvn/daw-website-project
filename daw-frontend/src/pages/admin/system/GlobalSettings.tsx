@@ -262,7 +262,7 @@ export default function GlobalSettings() {
               🔒 Akses Dibatasi
             </h4>
             <p className="text-[11px] md:text-xs text-blue-700 leading-relaxed mt-0.5 max-w-2xl">
-              Pengaturan ini sedang ditinjau pusat. Anda tidak dapat melakukan
+              Pengaturan ini sedang ditinjau. Anda tidak dapat melakukan
               perubahan hingga proses selesai.
             </p>
           </div>
@@ -340,7 +340,7 @@ export default function GlobalSettings() {
             onClick={() => {
               if (shouldLockUI) {
                 return toast.error("Akses Dibatasi", {
-                  description: "Data sedang dalam antrean approval pusat.",
+                  description: "Data sedang dalam antrean approval.",
                 });
               }
               setIsEditing(!isEditing);

@@ -89,7 +89,7 @@ export default function IntroManager() {
     // Guardrail tambahan: Cegah eksekusi paksa jika form sedang terkunci
     if (shouldLockUI) {
       return toast.error("Akses Dibatasi", {
-        description: "Data ini sedang ditinjau pusat.",
+        description: "Data ini sedang ditinjau.",
       });
     }
 
@@ -106,7 +106,7 @@ export default function IntroManager() {
     const loadingToast = toast.loading(
       isSuperadmin
         ? "Menerapkan pembaruan live..."
-        : "Mengajukan persetujuan pusat...",
+        : "Mengajukan persetujuan...",
     );
 
     try {
@@ -133,7 +133,7 @@ export default function IntroManager() {
       toast.success(
         isSuperadmin
           ? "Intro berhasil diupdate secara live!"
-          : "Revisi intro diajukan ke pusat!",
+          : "Revisi intro diajukan!",
         { id: loadingToast },
       );
     } catch (error: any) {
@@ -165,7 +165,7 @@ export default function IntroManager() {
             </h4>
             <p className="text-[11px] md:text-xs text-amber-700 leading-relaxed mt-0.5 max-w-2xl">
               Anda sedang mengedit pengaturan yang sedang dalam antrean
-              peninjauan pusat.{" "}
+              peninjauan.{" "}
               <span className="font-bold underline">
                 Direct Commit akan membatalkan draf Editor secara sepihak.
               </span>
@@ -185,7 +185,7 @@ export default function IntroManager() {
               🔒 Akses Dibatasi
             </h4>
             <p className="text-[11px] md:text-xs text-blue-700 leading-relaxed mt-0.5 max-w-2xl">
-              Pengaturan ini sedang ditinjau pusat. Anda tidak dapat melakukan
+              Pengaturan ini sedang ditinjau. Anda tidak dapat melakukan
               perubahan hingga proses selesai.
             </p>
           </div>
@@ -265,7 +265,7 @@ export default function IntroManager() {
             onClick={() => {
               if (shouldLockUI) {
                 return toast.error("Akses Dibatasi", {
-                  description: "Data ini sedang dalam proses peninjauan pusat.",
+                  description: "Data ini sedang dalam proses peninjauan.",
                 });
               }
               setIsEditing(!isEditing);

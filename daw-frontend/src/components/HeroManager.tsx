@@ -215,7 +215,7 @@ export default function HeroManager() {
     if (shouldLockGlobalActions) {
       return toast.error("Urutan terkunci", {
         description:
-          "Terdapat slide yang sedang dalam proses peninjauan pusat.",
+          "Terdapat slide yang sedang dalam proses peninjauan.",
       });
     }
 
@@ -411,7 +411,7 @@ export default function HeroManager() {
               Mode Override Aktif
             </h4>
             <p className="text-[11px] md:text-xs text-amber-700 leading-relaxed mt-0.5 max-w-2xl">
-              Beberapa slide sedang dalam antrean peninjauan pusat.{" "}
+              Beberapa slide sedang dalam antrean peninjauan.{" "}
               <span className="font-bold underline">
                 Direct Commit akan membatalkan draf Editor secara sepihak.
               </span>
@@ -431,7 +431,7 @@ export default function HeroManager() {
               🔒 Interaksi Dibatasi
             </h4>
             <p className="text-[11px] md:text-xs text-blue-700 leading-relaxed mt-0.5 max-w-2xl">
-              Urutan slide dan data tertentu sedang ditinjau pusat. Anda tidak
+              Urutan slide dan data tertentu sedang ditinjau. Anda tidak
               dapat melakukan perubahan kolektif hingga proses selesai.
             </p>
           </div>
@@ -460,7 +460,7 @@ export default function HeroManager() {
             onClick={() => {
               if (shouldLockGlobalActions) {
                 return toast.error("Akses Dibatasi", {
-                  description: "Data sedang dalam proses peninjauan pusat.",
+                  description: "Data sedang dalam proses peninjauan.",
                 });
               }
               setIsEditing(!isEditing);
@@ -583,7 +583,7 @@ export default function HeroManager() {
 
               {shouldLockRowUI && (
                 <div className="absolute top-0 left-0 right-0 bg-blue-50 border-b border-blue-100 text-blue-600 text-[10px] font-black px-3 py-1 flex items-center justify-center gap-1.5 z-10 uppercase tracking-widest">
-                  <Lock className="w-3 h-3" /> Sedang Ditinjau Pusat
+                  <Lock className="w-3 h-3" /> Sedang Ditinjau
                 </div>
               )}
 

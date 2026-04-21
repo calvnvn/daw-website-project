@@ -139,7 +139,7 @@ export default function StatsManager() {
   const handleDragStart = (index: number) => {
     if (shouldLockGlobalActions)
       return toast.error("Interaksi dibatasi", {
-        description: "Data sedang dalam antrean pusat.",
+        description: "Data sedang dalam antrean.",
       });
     setDraggedIndex(index);
   };
@@ -181,14 +181,14 @@ export default function StatsManager() {
   const removeStat = async (id: string | number) => {
     if (shouldLockGlobalActions) {
       return toast.error("Akses Terbatas", {
-        description: "Terdapat data yang sedang ditinjau pusat.",
+        description: "Terdapat data yang sedang ditinjau.",
       });
     }
 
     toast("Hapus data statistik ini?", {
       description: isSuperadmin
         ? "Data akan dihapus secara permanen."
-        : "Pengajuan hapus akan dikirim ke pusat.",
+        : "Pengajuan hapus akan dikirim.",
       action: {
         label: "Hapus",
         onClick: () => {
@@ -263,7 +263,7 @@ export default function StatsManager() {
     const loadingToast = toast.loading(
       isSuperadmin
         ? "Menerapkan perubahan live..."
-        : "Mengajukan revisi ke pusat...",
+        : "Mengajukan revisi...",
     );
 
     try {
@@ -337,7 +337,7 @@ export default function StatsManager() {
             onClick={() => {
               if (shouldLockGlobalActions) {
                 return toast.error("Akses Dibatasi", {
-                  description: "Terdapat data yang sedang ditinjau pusat.",
+                  description: "Terdapat data yang sedang ditinjau.",
                 });
               }
               setIsEditing(!isEditing);
@@ -462,7 +462,7 @@ export default function StatsManager() {
 
               {shouldLockThisRowUI && (
                 <div className="absolute top-0 left-0 right-0 bg-blue-50 border-b border-blue-100 text-blue-600 text-[10px] font-black px-3 py-1 flex items-center justify-center gap-1.5 z-10 uppercase tracking-widest">
-                  <Lock className="w-3 h-3" /> Sedang Ditinjau Pusat
+                  <Lock className="w-3 h-3" /> Sedang Ditinjau
                 </div>
               )}
 
