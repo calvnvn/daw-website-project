@@ -142,19 +142,41 @@ export const BusinessProvider = ({ children }: { children: ReactNode }) => {
         api.get("/projects/public"),
       ]);
 
-      console.log("📦 [DEBUG] Data Bisnis dari API:", results[0]);
+      const categoryResult = results[1];
+      if (categoryResult.status === "fulfilled") {
+        const rawData = categoryResult.value.data;
 
-      if (results[0].status === "fulfilled") setSections(results[0].value.data);
-      if (results[1].status === "fulfilled")
-        setCategories(results[1].value.data);
-      if (results[2].status === "fulfilled")
-        setPublicProjects(results[2].value.data);
+        // Jaring pengaman: Pastikan kita dapet array
+        const finalArray = Array.isArray(rawData)
+          ? rawData
+          : rawData?.data || [];
+
+        if (Array.isArray(finalArray)) {
+          setCategories(finalArray);
+        } else {
+          setCategories([]);
+        }
+      }
+
+      if (results[0].status === "fulfilled") {
+        const sectionData = results[0].value.data;
+        setSections(
+          Array.isArray(sectionData) ? sectionData : sectionData?.data || [],
+        );
+      }
+
+      if (results[2].status === "fulfilled") {
+        const projectData = results[2].value.data;
+        setPublicProjects(
+          Array.isArray(projectData) ? projectData : projectData?.data || [],
+        );
+      }
     } catch (error) {
       console.error("❌ [DEBUG] refreshData Error:", error);
     } finally {
       setIsLoading(false);
     }
-  }, []); // 💡 WAJIB KOSONG! Agar fungsi ini tidak dibuat ulang terus menerus.
+  }, []);
 
   // Fungsi untuk menyimpan data ke Backend
   const updateSection = useCallback(

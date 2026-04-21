@@ -71,6 +71,8 @@ export default function ManageBusinesses() {
 
   // --- 3. MEMOIZED UTILITIES (Performance Guard) ---
   const categoryMap = useMemo(() => {
+    if (!Array.isArray(categories)) return {};
+
     return Object.fromEntries(categories.map((cat) => [cat.id, cat.color]));
   }, [categories]);
 
@@ -126,18 +128,26 @@ export default function ManageBusinesses() {
         [];
 
       const normalizedData = {
-        category: currentSection.category || "",
+        category: currentSection.category ?? "",
         title: currentSection.title || "",
         htmlContent: currentSection.htmlContent || "",
         hasMap: normalizeBool(currentSection.hasMap),
         orderIndex: currentSection.orderIndex || 0,
-        mapMarkers: Array.isArray(rawMarkers) ? [...rawMarkers] : [],
+        mapMarkers: Array.isArray(rawMarkers)
+          ? rawMarkers.map((m: any) => ({
+              ...m,
+              title: m.title ?? "",
+              desc: m.desc ?? "",
+              mapUrl: m.mapUrl ?? "",
+              categoryId: m.categoryId ?? "",
+            }))
+          : [],
         is_locked: currentSection.is_locked || false,
         lock_ticket: (currentSection as any).lock_ticket || "",
       };
 
       setFormData(normalizedData);
-      setOriginalData(normalizedData); // ⚓ The Diff Anchor
+      setOriginalData(normalizedData);
     }
   }, [activeTab, sections, currentSection, isEditing]);
 

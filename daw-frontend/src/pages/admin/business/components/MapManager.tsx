@@ -36,6 +36,11 @@ export default function MapManager({
   updateMarker,
   removeMarker,
 }: MapManagerProps) {
+  console.log(">>> [MAP DEBUG] Categories Received:", categories);
+  console.log(
+    ">>> [MAP DEBUG] First Marker CategoryID:",
+    formData.mapMarkers[0]?.categoryId,
+  );
   // Helper untuk menyalin koordinat dengan proteksi SSL
   const handleCopyCoords = (coords: string) => {
     if (!navigator.clipboard) {
@@ -182,16 +187,23 @@ export default function MapManager({
                         </span>
                         <select
                           className="w-full text-[10px] bg-white border border-slate-200 rounded-lg px-2 py-1.5 outline-none appearance-none cursor-pointer focus:ring-2 focus:ring-daw-green/10 disabled:bg-slate-50 disabled:cursor-not-allowed"
-                          value={marker.categoryId}
+                          value={
+                            marker.categoryId ? String(marker.categoryId) : ""
+                          }
                           onChange={(e) =>
                             updateMarker(index, "categoryId", e.target.value)
                           }
                           disabled={!isEditing}>
-                          {categories.map((c) => (
-                            <option key={c.id} value={c.id}>
-                              {c.name}
-                            </option>
-                          ))}
+                          <option value="">Pilih Kategori</option>
+                          {categories && categories.length > 0 ? (
+                            categories.map((c) => (
+                              <option key={c.id} value={String(c.id)}>
+                                {c.name}
+                              </option>
+                            ))
+                          ) : (
+                            <option disabled>Memuat kategori...</option>
+                          )}
                         </select>
                       </div>
                       <div className="space-y-1">

@@ -16,6 +16,14 @@ const MapCategory = sequelize.define(
       type: DataTypes.STRING(7), // Hex: '#004B23'
       defaultValue: "#004B23",
     },
+    is_locked: {
+      type: DataTypes.BOOLEAN,
+      defaultValue: false,
+    },
+    lock_ticket: {
+      type: DataTypes.STRING,
+      allowNull: true,
+    },
   },
   {
     tableName: "MapCategories",
