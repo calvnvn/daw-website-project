@@ -34,6 +34,7 @@ export interface Affiliate {
 interface InvestmentContextType {
   settings: InvestmentSettings | null;
   companies: Affiliate[];
+  rejectedSettings: any | null;
   isLoading: boolean;
   refreshData: () => Promise<void>;
 }
@@ -41,6 +42,7 @@ interface InvestmentContextType {
 export const InvestmentContext = createContext<InvestmentContextType>({
   settings: null,
   companies: [],
+  rejectedSettings: null,
   isLoading: true,
   refreshData: async () => {},
 });
@@ -48,39 +50,51 @@ export const InvestmentContext = createContext<InvestmentContextType>({
 export function InvestmentProvider({ children }: { children: ReactNode }) {
   const [settings, setSettings] = useState<InvestmentSettings | null>(null);
   const [companies, setCompanies] = useState<Affiliate[]>([]);
+  const [rejectedSettings, setRejectedSettings] = useState<any | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   const fetchData = useCallback(async (signal?: AbortSignal) => {
-    try {
-      const res = await api.get("/investment", { signal });
-      setSettings(res.data.settings);
-      setCompanies(res.data.companies);
-    } catch (err: any) {
-      if (err.name !== "CanceledError") {
-        console.error("🚨 Investment Sync Error:", err.message);
-      }
-    } finally {
-      setIsLoading(false);
+    const results = await Promise.allSettled([
+      api.get("/investment", { signal }),
+      api.get("/approval/rejected/1?module=InvestmentSettings", { signal }),
+    ]);
+
+    // Handle Data Live
+    if (results[0].status === "fulfilled") {
+      setSettings(results[0].value.data.settings);
+      setCompanies(results[0].value.data.companies);
+    } else {
+      console.error("🚨 Live Data Fetch Failed:", results[0].reason);
     }
+
+    // Handle Rejected Draft (Singleton Settings)
+    if (
+      results[1].status === "fulfilled" &&
+      results[1].value.data.hasRejected
+    ) {
+      setRejectedSettings(results[1].value.data.data);
+    } else {
+      setRejectedSettings(null);
+    }
+
+    setIsLoading(false);
   }, []);
 
   useEffect(() => {
     const controller = new AbortController();
     fetchData(controller.signal);
-
-    // 🛡️ BLUEPRINT: Memory Leak Cleanup
     return () => controller.abort();
   }, [fetchData]);
 
-  // 🛡️ PERFORMA: Memoize value agar provider tidak re-render anak secara brutal
   const contextValue = useMemo(
     () => ({
       settings,
       companies,
+      rejectedSettings,
       isLoading,
       refreshData: () => fetchData(),
     }),
-    [settings, companies, isLoading, fetchData],
+    [settings, companies, rejectedSettings, isLoading, fetchData],
   );
 
   return (
@@ -89,7 +103,6 @@ export function InvestmentProvider({ children }: { children: ReactNode }) {
     </InvestmentContext.Provider>
   );
 }
-
 export function useInvestments() {
   const context = useContext(InvestmentContext);
   if (context === undefined) {

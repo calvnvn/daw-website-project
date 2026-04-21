@@ -202,7 +202,7 @@ export default function IntroManager() {
               // Pencegahan klik untuk Editor jika terkunci
               if ((isServerLocked || isOptimisticallyLocked) && !isSuperadmin) {
                 return toast.error("Akses Terbatas", {
-                  description: "Data ini sedang dalam proses peninjauan pusat.",
+                  description: "Data ini sedang dalam proses peninjauan.",
                 });
               }
               setIsEditing(!isEditing);

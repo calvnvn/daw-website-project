@@ -156,8 +156,7 @@ exports.updateBusinessSection = async (req, res) => {
     if (section.is_locked && userRole === "editor") {
       return res.status(423).json({
         success: false,
-        message:
-          "Akses Dibatasi. Sektor ini sedang dalam proses peninjauan pusat.",
+        message: "Akses Dibatasi. Sektor ini sedang dalam proses peninjauan.",
         ticket: section.lock_ticket,
       });
     }

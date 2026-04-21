@@ -2,6 +2,7 @@ const InvestmentSettings = require("../models/InvestmentSettings");
 const Affiliate = require("../models/Affiliate");
 const ApprovalDraft = require("../models/ApprovalDraft");
 const { deleteSingleFile } = require("../utils/fileRemover");
+const { invalidateOldDrafts } = require("../utils/draftCleanup");
 const sequelize = require("../config/database");
 
 const ErpApprovalService = require("../services/erpApprovalService");
@@ -11,14 +12,29 @@ const JENIS_APP_CMS = process.env.CMS_APPROVAL_CODE;
 exports.getInvestmentData = async (req, res) => {
   try {
     let settings = await InvestmentSettings.findOne();
-    if (!settings)
+    if (!settings) {
       settings = await InvestmentSettings.create({
         teaserHeadline: "Other Investments.",
         teaserBody: "Beyond our core operations...",
         sectionIntro: "We continuously look for opportunities...",
+        is_locked: false,
       });
+    }
 
-    const companies = await Affiliate.findAll({ order: [["id", "ASC"]] });
+    const companies = await Affiliate.findAll({
+      order: [["id", "ASC"]],
+      attributes: [
+        "id",
+        "name",
+        "desc",
+        "category",
+        "logoUrl",
+        "websiteUrl",
+        "is_locked",
+        "lock_ticket",
+      ],
+    });
+
     res.status(200).json({ settings, companies });
   } catch (error) {
     res.status(500).json({ message: error.message });
@@ -35,18 +51,22 @@ exports.updateSettings = async (req, res) => {
       status,
       previous_notrans,
     } = req.body;
+
     let settings = await InvestmentSettings.findOne();
     if (!settings) settings = await InvestmentSettings.create({});
 
     if (settings.is_locked && req.userRole?.toLowerCase() === "editor") {
       return res.status(423).json({
-        message: "Pengaturan Investasi sedang dikunci oleh proses approval.",
+        success: false,
+        message:
+          "Akses Dibatasi. Pengaturan Investasi sedang dikunci oleh proses approval pusat.",
         ticket: settings.lock_ticket,
       });
     }
 
-    // Editor
+    // --- JALUR EDITOR (Two-Phase) ---
     if (req.userRole?.toLowerCase() === "editor" && status === "Published") {
+      // Cleanup previous draft if resubmitting
       if (previous_notrans) {
         await ApprovalDraft.update(
           { status: "Replaced" },
@@ -56,7 +76,7 @@ exports.updateSettings = async (req, res) => {
 
       const result = await ErpApprovalService.initiateApproval({
         model: InvestmentSettings,
-        targetId: 1,
+        targetId: 1, // Singleton ID constraint
         action: "UPDATE",
         payload: { teaserHeadline, teaserBody, sectionIntro },
         userId: req.userId,
@@ -67,31 +87,52 @@ exports.updateSettings = async (req, res) => {
       await settings.update({ is_locked: true, lock_ticket: result.notrans });
 
       return res.status(202).json({
-        message: "Revisi teks investasi dikirim .",
+        success: true,
+        message: "Revisi teks investasi berhasil diajukan.",
         ticket: result.notrans,
       });
     }
 
-    // Superadmin Flow
-    await settings.update({
-      teaserHeadline,
-      teaserBody,
-      sectionIntro,
-      is_locked: false,
-      lock_ticket: null,
-    });
-    res.status(200).json(settings);
+    // --- JALUR SUPERADMIN (SOVEREIGN BYPASS) ---
+    const t = await sequelize.transaction();
+    try {
+      // 1. The Atomic Draft Killer: Bunuh draf editor jika Superadmin intervensi
+      await invalidateOldDrafts("InvestmentSettings", 1, t);
+
+      // 2. Override Live Data & Force Unlock
+      await settings.update(
+        {
+          teaserHeadline,
+          teaserBody,
+          sectionIntro,
+          is_locked: false,
+          lock_ticket: null,
+        },
+        { transaction: t },
+      );
+
+      await t.commit();
+      res.status(200).json({ success: true, data: settings });
+    } catch (dbError) {
+      await t.rollback();
+      throw dbError;
+    }
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    res.status(500).json({ success: false, message: error.message });
   }
 };
 
 // 3. POST: Create Affiliate (Approval Aware)
 exports.createAffiliate = async (req, res) => {
   let newCompany = null;
+  const userRole = req.userRole?.toLowerCase();
+
   try {
     const { name, desc, category, websiteUrl, status, previous_notrans } =
       req.body;
+
+    // ⚠️ Catatan: Jika multer tidak diset untuk menambah prefix TEMP_ untuk role editor,
+    // pastikan Orchestrator (approvalController) siap menerima format file ini.
     const logoUrl = req.file ? req.file.filename : null;
 
     const affiliateData = {
@@ -103,8 +144,10 @@ exports.createAffiliate = async (req, res) => {
       is_locked: false,
     };
 
+    // Phase 1: Local Transaction
     const t = await sequelize.transaction();
     try {
+      if (userRole === "editor") affiliateData.is_locked = true; // Langsung lock jika editor
       newCompany = await Affiliate.create(affiliateData, { transaction: t });
       await t.commit();
     } catch (dbError) {
@@ -112,8 +155,8 @@ exports.createAffiliate = async (req, res) => {
       throw dbError;
     }
 
-    // Editor
-    if (req.userRole?.toLowerCase() === "editor" && status === "Published") {
+    // --- JALUR EDITOR (Phase 2) ---
+    if (userRole === "editor" && status === "Published") {
       try {
         if (previous_notrans) {
           await ApprovalDraft.update(
@@ -132,16 +175,14 @@ exports.createAffiliate = async (req, res) => {
           token: req.owl_token,
         });
 
-        await newCompany.update({
-          is_locked: true,
-          lock_ticket: result.notrans,
-        });
+        await newCompany.update({ lock_ticket: result.notrans });
+
         return res.status(202).json({
-          message: "Permintaan tambah afiliasi baru dikirim.",
+          success: true,
+          message: "Permintaan tambah afiliasi baru diajukan.",
           ticket: result.notrans,
         });
       } catch (owlError) {
-        // 🛡️ BLUEPRINT: Orphan Guard
         console.error(
           `🚨 [CLEANUP] Menghapus orphan Affiliate ID: ${newCompany.id}`,
         );
@@ -149,10 +190,15 @@ exports.createAffiliate = async (req, res) => {
         throw owlError;
       }
     }
-    // Superadmin
-    res.status(201).json({ message: "Affiliate created", data: newCompany });
+
+    // --- JALUR SUPERADMIN ---
+    res.status(201).json({
+      success: true,
+      message: "Affiliate created live",
+      data: newCompany,
+    });
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    res.status(500).json({ success: false, message: error.message });
   }
 };
 
@@ -171,12 +217,17 @@ exports.updateAffiliate = async (req, res) => {
     } = req.body;
 
     const company = await Affiliate.findByPk(id);
-    if (!company) return res.status(404).json({ message: "Company not found" });
+    if (!company)
+      return res
+        .status(404)
+        .json({ success: false, message: "Company not found" });
 
-    // Cek Gembok
+    // 🔒 THE GATEKEEPER
     if (company.is_locked && req.userRole?.toLowerCase() === "editor") {
       return res.status(423).json({
-        message: "Data sedang dikunci oleh proses approval.",
+        success: false,
+        message:
+          "Akses Dibatasi. Data afiliasi ini sedang dikunci oleh proses approval.",
         ticket: company.lock_ticket,
       });
     }
@@ -200,7 +251,7 @@ exports.updateAffiliate = async (req, res) => {
       logoUrl: finalLogoUrl,
     };
 
-    // Editor
+    // --- JALUR EDITOR ---
     if (req.userRole?.toLowerCase() === "editor" && status === "Published") {
       if (previous_notrans) {
         await ApprovalDraft.update(
@@ -219,25 +270,43 @@ exports.updateAffiliate = async (req, res) => {
         token: req.owl_token,
       });
 
-      // 🛡️ BLUEPRINT: Lock Data!
       await company.update({ is_locked: true, lock_ticket: result.notrans });
 
       return res.status(202).json({
-        message: "Revisi afiliasi dikirim .",
+        success: true,
+        message: "Revisi afiliasi berhasil diajukan.",
         ticket: result.notrans,
       });
     }
 
-    // Superadmin
-    if (oldLogoToDelete) deleteSingleFile(oldLogoToDelete);
-    await company.update({
-      ...updatedData,
-      is_locked: false,
-      lock_ticket: null,
-    });
-    res.status(200).json({ message: "Affiliate updated!", data: company });
+    // --- JALUR SUPERADMIN (SOVEREIGN BYPASS) ---
+    const t = await sequelize.transaction();
+    try {
+      // 1. The Atomic Draft Killer
+      await invalidateOldDrafts("Affiliate", id, t);
+
+      // 2. Lock & Update
+      await company.update(
+        { ...updatedData, is_locked: false, lock_ticket: null },
+        { transaction: t },
+      );
+
+      await t.commit();
+
+      // 3. Final Physical Asset Management (Hapus file lama SETELAH transaksi DB sukses)
+      if (oldLogoToDelete) deleteSingleFile(oldLogoToDelete);
+
+      res.status(200).json({
+        success: true,
+        message: "Affiliate updated live!",
+        data: company,
+      });
+    } catch (dbError) {
+      await t.rollback();
+      throw dbError;
+    }
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    res.status(500).json({ success: false, message: error.message });
   }
 };
 
@@ -246,12 +315,17 @@ exports.deleteAffiliate = async (req, res) => {
   try {
     const { id } = req.params;
     const company = await Affiliate.findByPk(id);
-    if (!company) return res.status(404).json({ message: "Data not found" });
+    if (!company)
+      return res
+        .status(404)
+        .json({ success: false, message: "Data not found" });
 
-    // 🛡️ BLUEPRINT: Check Lock
+    // 🔒 THE GATEKEEPER
     if (company.is_locked && req.userRole?.toLowerCase() === "editor") {
       return res.status(423).json({
-        message: "Data sedang dikunci oleh proses approval.",
+        success: false,
+        message:
+          "Akses Dibatasi. Data ini sedang dikunci oleh proses approval.",
         ticket: company.lock_ticket,
       });
     }
@@ -268,20 +342,41 @@ exports.deleteAffiliate = async (req, res) => {
         token: req.owl_token,
       });
 
-      // 🛡️ BLUEPRINT: Wajib Lock lokal!
       await company.update({ is_locked: true, lock_ticket: result.notrans });
 
       return res.status(202).json({
-        message: "Permintaan hapus afiliasi dikirim . Data dikunci.",
+        success: true,
+        message: "Permintaan hapus afiliasi diajukan. Data dikunci.",
         ticket: result.notrans,
       });
     }
 
-    // --- JALUR SUPERADMIN ---
-    if (company.logoUrl) deleteSingleFile(company.logoUrl);
-    await company.destroy();
-    res.status(200).json({ message: "Affiliate deleted successfully!" });
+    // --- JALUR SUPERADMIN (SOVEREIGN BYPASS) ---
+    const t = await sequelize.transaction();
+    try {
+      // 1. The Atomic Draft Killer
+      await invalidateOldDrafts("Affiliate", id, t);
+
+      // 2. Lock & Destroy
+      await company.reload({ transaction: t, lock: t.LOCK.UPDATE });
+      await company.destroy({ transaction: t });
+
+      await t.commit();
+
+      // 3. Final Physical Asset Management
+      if (company.logoUrl) deleteSingleFile(company.logoUrl);
+
+      res
+        .status(200)
+        .json({
+          success: true,
+          message: "Affiliate deleted successfully live!",
+        });
+    } catch (dbError) {
+      await t.rollback();
+      throw dbError;
+    }
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    res.status(500).json({ success: false, message: error.message });
   }
 };

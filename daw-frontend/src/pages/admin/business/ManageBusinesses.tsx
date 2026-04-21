@@ -145,9 +145,7 @@ export default function ManageBusinesses() {
   useEffect(() => {
     if (shouldLockUI && isEditing) {
       setIsEditing(false);
-      toast.info(
-        "Akses ditutup. Sektor ini sedang dalam proses peninjauan pusat.",
-      );
+      toast.info("Akses ditutup. Sektor ini sedang dalam proses peninjauan.");
     }
   }, [shouldLockUI, isEditing]);
 
@@ -235,7 +233,7 @@ export default function ManageBusinesses() {
     // 1. Sovereign Guard: Cegah submit dari Inspect Element
     if (shouldLockUI) {
       return toast.error("Akses Dibatasi.", {
-        description: "Data ini sedang dalam peninjauan pusat.",
+        description: "Data ini sedang dalam peninjauan.",
       });
     }
 
