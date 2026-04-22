@@ -45,11 +45,8 @@ class ErpApprovalService {
   static async _cekSetup(notrans, token) {
     try {
       const payload = {
-        trans: notrans,
-        notransaksi: notrans,
         notrans: notrans,
         jenisApp: CMS_CODE,
-        jenispersetujuan: CMS_CODE,
       };
 
       const response = await dawApi.post(
@@ -65,7 +62,7 @@ class ErpApprovalService {
     }
   }
 
-  // REFACTORED: Initiate Approval (Saga Pattern / 2-Phase Commit)
+  // Submit For Approval /trans/add
   static async initiateApproval({
     moduleName,
     model,
@@ -136,11 +133,18 @@ class ErpApprovalService {
         );
       }
       console.log(`>>> [ERP SERVICE] 3. Injection: Registering to OWL...`);
+      const cleanApproverRows = approverRows.map((row) => ({
+        kodeapp: row.kodeapp,
+        level: Number(row.level),
+        karyawanid: String(row.karyawanid),
+        jenispersetujuan: row.jenispersetujuan || CMS_CODE,
+      }));
+
       const payloadTransAdd = {
         notrans,
         jenisApp: CMS_CODE,
-        inputby: actorId,
-        data: approverRows,
+        inputby: String(req.karyawanId || actorId),
+        data: cleanApproverRows,
       };
 
       console.log(">>> [STRICT DEBUG] Menyiapkan Injeksi ke OWL");
@@ -181,18 +185,19 @@ class ErpApprovalService {
     }
   }
 
-  // GET Queue List
-  static async getPendingList(karyawanid, token) {
+  // GET Queue List alias /trans/getData
+  static async getPendingList({ karyawanid, token, limit = 100 }) {
     try {
       const payload = {
         approver: String(karyawanid),
         karyawanid: String(karyawanid),
         jenisApp: CMS_CODE,
-        jenispersetujuan: CMS_CODE,
+        limit: Number(limit),
       };
 
+      console.log(">>> [DEBUG OWL] Membuka Keran Data (getData)...");
       console.log(
-        ">>> [DEBUG OWL] Nembak ke URL:",
+        ">>> [DEBUG OWL] URL:",
         process.env.DAW_NODE_URL + "/node/approval/trans/getData",
       );
       console.log(">>> [DEBUG OWL] Payload:", JSON.stringify(payload));
@@ -204,25 +209,17 @@ class ErpApprovalService {
       );
 
       if (response.data) {
+        const rowCount = response.data.data?.rows?.length || 0;
         console.log(
-          ">>> [DEBUG OWL] Response Error Status:",
-          response.data.error,
-        );
-        console.log(">>> [DEBUG OWL] Response Message:", response.data.message);
-        console.log(
-          ">>> [DEBUG OWL] Count Rows:",
-          response.data.data?.rows?.length || 0,
+          `>>> [DEBUG OWL] Response: ${response.data.message} | Rows Received: ${rowCount}`,
         );
 
-        // Jika rows 0, tapi ada data lain, kita harus tau
-        // if (response.data.data?.rows?.length === 0) {
-        //   console.log(
-        //     ">>> [DEBUG OWL] Kenapa 0? Cek seluruh isi data:",
-        //     JSON.stringify(response.data.data, null, 2),
-        //   );
-        // }
+        if (rowCount === 0 && response.data.error === false) {
+          console.log(
+            ">>> [DEBUG OWL] Info: OWL merespon sukses tapi tidak ada antrean aktif.",
+          );
+        }
       }
-
       return response.data;
     } catch (error) {
       console.error(
@@ -233,40 +230,29 @@ class ErpApprovalService {
     }
   }
 
-  // Execute Decision
+  // Execute Decision /trans/submitApp
   static async submitDecision({
     kodeapp,
+    nourut,
     notrans,
     level,
     status,
     komentar,
     nextApp,
-    jenisApp,
-    nourut,
     token,
     karyawanid,
   }) {
     try {
       const payload = {
         status: String(status),
-        kodeapp: kodeapp || nourut,
+        kodeapp: kodeapp,
         notrans: notrans,
         level: Number(level),
-        komentar:
-          komentar ||
-          (status === "1" ? "Disetujui via CMS" : "Ditolak via CMS"),
-        nextApp: nextApp || "",
-        jenisApp: jenisApp || CMS_CODE,
-
-        notransaksi: notrans,
-        jenispersetujuan: jenisApp || CMS_CODE,
+        komentar: komentar || (status === "1" ? "Disetujui" : "Ditolak"),
+        nextApp: String(nextApp),
+        jenisApp: CMS_CODE,
         karyawanid: String(karyawanid),
-        nourut: nourut,
       };
-
-      console.log(">>> [DEBUG OWL] Payload:", JSON.stringify(payload, null, 2));
-      console.log(JSON.stringify(payload, null, 2));
-
       const response = await dawApi.post(
         "/node/approval/trans/submitApp",
         payload,
@@ -275,6 +261,10 @@ class ErpApprovalService {
         },
       );
 
+      console.log(
+        ">>> [ERP RESPONSE RAW]:",
+        JSON.stringify(response.data, null, 2),
+      );
       return response.data;
     } catch (error) {
       this._handleError(error, "submitDecision");

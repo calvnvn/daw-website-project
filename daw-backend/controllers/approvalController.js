@@ -1,5 +1,8 @@
 const sequelize = require("../config/database");
-const { ErpApprovalService } = require("../services/erpApprovalService");
+const {
+  ErpApprovalService,
+  MODULE_REGISTRY,
+} = require("../services/erpApprovalService");
 const { commitTempFile } = require("../utils/fileManager"); // Helper yang baru kita buat
 
 // Import semua model yang terlibat dalam draf
@@ -29,16 +32,24 @@ exports.getPendingApprovals = async (req, res) => {
     const tokenOWL = req.owl_token;
     const isAdmin = ["superadmin", "admin", "administrator"].includes(userRole);
 
-    const owlResponse = await ErpApprovalService.getPendingList(
-      karyawanIdForOwl,
-      tokenOWL,
-    );
-    let myOwlTasks = owlResponse?.data?.rows || [];
+    const owlResponse = await ErpApprovalService.getPendingList({
+      karyawanid: karyawanIdForOwl,
+      token: tokenOWL,
+      limit: 100,
+    });
 
-    // Normalisasi Nomor Tiket dari Server
-    const taskTicketsNormalized = myOwlTasks
-      .map((item) => (item.notransaksi || item.notrans || "").trim())
-      .filter((t) => t !== "");
+    const myOwlTasks = owlResponse?.data?.rows || [];
+
+    const owlMap = new Map();
+    const taskTicketsNormalized = [];
+
+    myOwlTasks.forEach((item) => {
+      const ticketNo = (item.notransaksi || item.notrans || "").trim();
+      if (ticketNo) {
+        owlMap.set(ticketNo.toLowerCase(), item);
+        taskTicketsNormalized.push(ticketNo);
+      }
+    });
 
     let detailedDrafts = [];
     if (isAdmin) {
@@ -53,11 +64,8 @@ exports.getPendingApprovals = async (req, res) => {
       });
     } else {
       if (taskTicketsNormalized.length === 0) return res.status(200).json([]);
-
       detailedDrafts = await ApprovalDraft.findAll({
-        where: {
-          notrans: { [Op.in]: taskTicketsNormalized },
-        },
+        where: { notrans: { [Op.in]: taskTicketsNormalized } },
         order: [["createdAt", "DESC"]],
       });
     }
@@ -66,28 +74,47 @@ exports.getPendingApprovals = async (req, res) => {
       const draftJson = draft.toJSON();
       const cleanDraftNo = (draft.notrans || "").trim().toLowerCase();
 
-      const myRow = myOwlTasks.find((t) => {
-        const owlNo = (t.notransaksi || t.notrans || "").trim().toLowerCase();
-        return owlNo === cleanDraftNo;
-      });
+      const myRow = owlMap.get(cleanDraftNo);
 
-      // Muncul ke Queue saat ada barisnya dan status harus "0" (Active Turn)
       const owlStatusAsal = myRow ? String(myRow.status) : null;
       const isActuallyMyTurn = owlStatusAsal === "0";
 
       return {
         ...draftJson,
-        nourut: myRow ? myRow.nourut : null,
+        nourut: myRow ? myRow.nourut || myRow.kodeapp : null,
         level: myRow ? myRow.level : null,
-        kodeapp: myRow ? myRow.nourut : null,
+        kodeapp: myRow ? myRow.kodeapp || myRow.nourut : null,
         nextApp: "",
         isMyQueue: isActuallyMyTurn,
         owlStatus: owlStatusAsal,
       };
     });
+
+    if (isAdmin) {
+      const existingNotrans = new Set(
+        draftsWithExtraData.map((d) => d.notrans.toLowerCase()),
+      );
+
+      myOwlTasks.forEach((owlItem) => {
+        const owlNo = (owlItem.notransaksi || owlItem.notrans || "").trim();
+        if (owlNo && !existingNotrans.has(owlNo.toLowerCase())) {
+          draftsWithExtraData.push({
+            notrans: owlNo,
+            module_name: "UNKNOWN (Deleted Draft)",
+            action: "N/A",
+            status: "Orphaned",
+            isMyQueue: String(owlItem.status) === "0",
+            owlStatus: String(owlItem.status),
+            _isGhost: true,
+          });
+        }
+      });
+    }
+
     console.log(
       `>>> [STITCHING SUCCESS] User: ${req.owl_username} | Total: ${draftsWithExtraData.length} Tiket`,
     );
+
     return res.status(200).json(draftsWithExtraData);
   } catch (error) {
     console.error("🚨 [FETCH ERROR]:", error.message);
@@ -96,119 +123,145 @@ exports.getPendingApprovals = async (req, res) => {
 };
 
 // POST: Approve/Reject
+// POST: Approve/Reject
 exports.executeDecision = async (req, res) => {
-  const t = await sequelize.transaction();
+  // 1. Ambil Kunci Live dari Frontend (Tanpa Alias, Tanpa Replace)
+  const {
+    status,
+    kodeapp,
+    nourut,
+    notrans: bodyNotrans,
+    notransaksi,
+    level,
+    komentar,
+    module: moduleName,
+    targetId,
+    payload,
+    action,
+  } = req.body;
+
+  const notrans = bodyNotrans || notransaksi;
+  const tokenOWL = req.owl_token;
+  const nikApprover = String(req.karyawanId);
+  const currentLevel = Number(level);
+
   try {
-    const {
-      status,
-      kodeapp,
-      notrans: bodyNotrans,
-      notransaksi,
-      level,
-      komentar,
-      keteranganRejek,
-      nextApp,
-      jenisApp,
-      nourut,
-      module,
-      targetId,
-      payload,
-      action,
-    } = req.body;
+    if (!kodeapp) {
+      throw new Error("Gagal memproses: kodeapp tidak diterima dari Frontend.");
+    }
 
-    const notrans = bodyNotrans || notransaksi;
-    if (!notrans)
-      throw new Error("Nomor transaksi (notrans) wajib disertakan.");
+    // --- 🚀 FASE 1: DINAMISASI NEXTAPP (Baton Pass Logic) ---
+    let pureNextApp = "";
 
-    const tokenOWL = req.owl_token;
-    const nikApprover = String(req.karyawanId);
+    if (status === "1") {
+      console.log(
+        `>>> [BATON PASS] Mencari pelari estafet setelah Lvl ${currentLevel}...`,
+      );
+      const approverRows = await ErpApprovalService._cekSetup(
+        notrans,
+        tokenOWL,
+      );
 
+      if (approverRows && approverRows.length > 0) {
+        const nextLevel = currentLevel + 1;
+        const nextData = approverRows.find(
+          (row) => Number(row.level) === nextLevel,
+        );
+
+        if (nextData && nextData.karyawanid) {
+          pureNextApp = String(nextData.karyawanid);
+          console.log(
+            `>>> [BATON PASS] Target Estafet Ditemukan: ${pureNextApp} (${nextData.namakaryawan})`,
+          );
+        } else {
+          console.log(
+            `>>> [BATON PASS] Tidak ada level ${nextLevel}. Ini adalah Final Approval.`,
+          );
+        }
+      }
+    }
+
+    console.log(
+      `>>> [ERP CALL] Eksekusi -> KodeApp: ${kodeapp} | NoUrut: ${nourut} | NextApp: ${pureNextApp}`,
+    );
+
+    // --- 🚀 FASE 2: TEMBAK ERP ---
     const erpResult = await ErpApprovalService.submitDecision({
-      kodeapp: kodeapp,
-      notrans: notrans,
-      level: level,
-      status: status,
-      komentar: komentar || keteranganRejek,
-      nextApp: nextApp,
-      jenisApp: jenisApp,
-      nourut: nourut,
+      status,
+      kodeapp: kodeapp, // Blueprint ID
+      nourut: nourut, // Live Ticket ID (Instruksi: "kodeapp diisi nourut")
+      notrans,
+      level: currentLevel,
+      komentar,
+      nextApp: pureNextApp,
+      jenisApp: "CMS",
       token: tokenOWL,
       karyawanid: nikApprover,
     });
 
-    const isFinalApproval = erpResult?.data?.is_final === true;
-    console.log(
-      `>>> [DECISION DEBUG] Ticket: ${notrans} | Is Final: ${isFinalApproval}`,
-    );
+    // --- 🚀 FASE 3: UPDATE DATABASE LOKAL ---
+    const t = await sequelize.transaction();
 
-    // --- LOGIKA REJECT ---
-    if (status === "2") {
-      if (action !== "CREATE") {
-        const Model = getModelByModuleName(module);
-        if (Model && targetId) {
-          const queryWhere = targetId === "ALL_TREE" ? {} : { id: targetId };
+    try {
+      const isFinalApproval = erpResult?.data?.is_final === true;
+
+      // JALUR REJECT
+      if (status === "2") {
+        const Model = getModelByModuleName(moduleName);
+        if (Model && targetId && action !== "CREATE") {
           await Model.update(
             { is_locked: false, lock_ticket: null },
-            { where: queryWhere, transaction: t },
+            { where: { id: targetId }, transaction: t },
           );
         }
-      }
-      await ApprovalDraft.update(
-        { status: "Rejected", rejection_reason: komentar || keteranganRejek },
-        { where: { notrans }, transaction: t },
-      );
-
-      await t.commit();
-      return res
-        .status(200)
-        .json({ message: "Draf ditolak dan gembok data telah dibuka." });
-    }
-
-    // --- LOGIKA APPROVE ---
-    if (status === "1") {
-      if (isFinalApproval) {
-        const cleanPayload = { ...payload };
-        const forbiddenFields = [
-          "id",
-          "createdAt",
-          "updatedAt",
-          "is_locked",
-          "lock_ticket",
-        ];
-        forbiddenFields.forEach((field) => delete cleanPayload[field]);
-
-        handleFileCommit(module, cleanPayload);
-
-        cleanPayload.is_locked = false;
-        cleanPayload.lock_ticket = null;
-
-        await executeModelUpdate(module, targetId, cleanPayload, action, t);
-
         await ApprovalDraft.update(
-          { status: "Approved" },
+          { status: "Rejected", rejection_reason: komentar },
           { where: { notrans }, transaction: t },
         );
-
         await t.commit();
-        return res.status(200).json({
-          message: `Draf ${module} telah Final dan berhasil dipublish ke Production!`,
-          targetId,
-        });
-      } else {
-        console.log(
-          `>>> [INFO] Berhasil Approve Lvl ${level}. Menunggu next level.`,
-        );
-        await t.commit();
-        return res.status(200).json({
-          message: `Approval berhasil dicatat oleh ERP. Menunggu persetujuan layer berikutnya.`,
-          targetId,
-        });
+        return res.status(200).json({ message: "Rejected & Unlocked." });
       }
+
+      // JALUR APPROVE
+      if (status === "1") {
+        if (isFinalApproval) {
+          const Model = getModelByModuleName(moduleName);
+          if (!Model) throw new Error(`Model ${moduleName} tidak ditemukan.`);
+
+          const cleanPayload = { ...payload };
+          ["id", "createdAt", "updatedAt", "is_locked", "lock_ticket"].forEach(
+            (f) => delete cleanPayload[f],
+          );
+
+          await Model.update(
+            { ...cleanPayload, is_locked: false, lock_ticket: null },
+            { where: { id: targetId }, transaction: t },
+          );
+          await ApprovalDraft.update(
+            { status: "Approved" },
+            { where: { notrans }, transaction: t },
+          );
+          await t.commit();
+          return res
+            .status(200)
+            .json({ message: "Final Approval Success. Published!" });
+        } else {
+          // INTERMEDIATE APPROVAL
+          await t.commit();
+          return res.status(200).json({
+            message: `Level ${currentLevel} Approved. Menunggu Level Berikutnya.`,
+          });
+        }
+      }
+    } catch (dbError) {
+      await t.rollback();
+      throw dbError;
     }
   } catch (error) {
-    if (t) await t.rollback();
     console.error("🚨 [EXECUTE DECISION ERROR]:", error.message);
-    res.status(500).json({ message: "Gagal eksekusi.", error: error.message });
+    res
+      .status(500)
+      .json({ message: "Gagal memproses keputusan.", error: error.message });
   }
 };
 
@@ -534,4 +587,32 @@ async function fetchOriginalDataByModule(module, targetId) {
     );
     throw error;
   }
+}
+
+function getModelByModuleName(module) {
+  // 1. Normalisasi nama string (Project -> Projects, dst) menggunakan Registry Fase 1
+  const standardKey =
+    Object.keys(MODULE_REGISTRY).find(
+      (k) => k.toLowerCase() === module.toLowerCase(),
+    ) || module;
+
+  // 2. Map ke objek model yang sudah lo require di atas
+  const mapping = {
+    Project,
+    Management,
+    Affiliate,
+    Page,
+    Menu,
+    MapCategory,
+    BusinessSection,
+    HeroSlides,
+    History,
+    HomeSettings,
+    ImpactStats,
+    InvestmentSettings,
+    Settings,
+    AboutInfo,
+  };
+
+  return mapping[standardKey] || null;
 }
