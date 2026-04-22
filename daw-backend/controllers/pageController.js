@@ -10,7 +10,7 @@ const sequelize = require("../config/database");
 const Page = require("../models/Page");
 const ApprovalDraft = require("../models/ApprovalDraft");
 const { deleteSingleFile } = require("../utils/fileRemover");
-const ErpApprovalService = require("../services/erpApprovalService");
+const { ErpApprovalService } = require("../services/erpApprovalService");
 
 const JENIS_APP_CMS = process.env.CMS_APPROVAL_CODE || "040101";
 

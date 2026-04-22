@@ -5,7 +5,7 @@ const { deleteSingleFile } = require("../utils/fileRemover");
 const { invalidateOldDrafts } = require("../utils/draftCleanup");
 const sequelize = require("../config/database");
 
-const ErpApprovalService = require("../services/erpApprovalService");
+const { ErpApprovalService } = require("../services/erpApprovalService");
 const JENIS_APP_CMS = process.env.CMS_APPROVAL_CODE;
 
 // 1. GET Data Investasi

@@ -1,7 +1,7 @@
 const sequelize = require("../config/database");
 const AboutInfo = require("../models/AboutInfo");
 const ApprovalDraft = require("../models/ApprovalDraft");
-const ErpApprovalService = require("../services/erpApprovalService");
+const { ErpApprovalService } = require("../services/erpApprovalService");
 
 // Helper untuk Role
 const getRole = (req) =>

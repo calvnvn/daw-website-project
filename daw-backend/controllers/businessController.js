@@ -7,7 +7,7 @@ const sanitizeHtml = require("sanitize-html");
 const { invalidateOldDrafts } = require("../utils/draftCleanup");
 const { deleteSingleFile } = require("../utils/fileRemover");
 
-const ErpApprovalService = require("../services/erpApprovalService");
+const { ErpApprovalService } = require("../services/erpApprovalService");
 const JENIS_APP_CMS = process.env.CMS_APPROVAL_CODE;
 
 /**

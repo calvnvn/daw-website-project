@@ -1,5 +1,5 @@
 const sequelize = require("../config/database");
-const ErpApprovalService = require("../services/erpApprovalService");
+const { ErpApprovalService } = require("../services/erpApprovalService");
 const History = require("../models/History");
 const ApprovalDraft = require("../models/ApprovalDraft");
 

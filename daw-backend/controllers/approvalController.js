@@ -1,5 +1,5 @@
 const sequelize = require("../config/database");
-const ErpApprovalService = require("../services/erpApprovalService");
+const { ErpApprovalService } = require("../services/erpApprovalService");
 const { commitTempFile } = require("../utils/fileManager"); // Helper yang baru kita buat
 
 // Import semua model yang terlibat dalam draf
@@ -20,101 +20,78 @@ const ImpactStats = require("../models/ImpactStats");
 const InvestmentSettings = require("../models/InvestmentSettings");
 const Settings = require("../models/Settings");
 const AboutInfo = require("../models/AboutInfo");
+const { Op } = require("sequelize");
 
-// GET: List Queue dengan Data Lengkap dari Lokal
 exports.getPendingApprovals = async (req, res) => {
   try {
     const userRole = req.userRole ? req.userRole.toLowerCase().trim() : "";
-    console.log(`>>> [APPROVAL CENTER] Role Check: '${userRole}'`);
-    if (
-      userRole === "superadmin" ||
-      userRole === "admin" ||
-      userRole === "administrator"
-    ) {
-      console.log(
-        ">>> [APPROVAL CENTER] Authorized as Admin/superadmin (Fetching All Pending Drafts)",
-      );
-
-      const allPendingDrafts = await ApprovalDraft.findAll({
-        where: { status: "Pending" },
-        order: [["createdAt", "DESC"]],
-      });
-
-      return res.status(200).json(allPendingDrafts);
-    }
-
-    // APPROVER: melihat list yang ditugaskan melalui NIK mereka dari OWL
-    console.log(
-      ">>> [APPROVAL CENTER] Mengakses sebagai Approver (Syncing with OWL...)",
-    );
-
+    const karyawanIdForOwl = String(req.karyawanId);
     const tokenOWL = req.owl_token;
-    const karyawanId = req.owl_username || req.userId;
-    const karyawanIdForOwl = req.karyawanId;
-    console.log(
-      `>>> [DEBUG PIPELINE] NIK untuk getPendingList:`,
-      karyawanIdForOwl,
-    );
+    const isAdmin = ["superadmin", "admin", "administrator"].includes(userRole);
 
     const owlResponse = await ErpApprovalService.getPendingList(
       karyawanIdForOwl,
       tokenOWL,
     );
+    let myOwlTasks = owlResponse?.data?.rows || [];
 
-    // console.log(">>> [DEBUG OWL DATA] KaryawanID:", karyawanId);
-    // console.log(
-    //   ">>> [DEBUG OWL DATA] Raw Response:",
-    //   JSON.stringify(owlResponse, null, 2),
-    // );
+    // Normalisasi Nomor Tiket dari Server
+    const taskTicketsNormalized = myOwlTasks
+      .map((item) => (item.notransaksi || item.notrans || "").trim())
+      .filter((t) => t !== "");
 
-    let pendingTickets = [];
+    let detailedDrafts = [];
+    if (isAdmin) {
+      detailedDrafts = await ApprovalDraft.findAll({
+        where: {
+          [Op.or]: [
+            { status: "Pending" },
+            { notrans: { [Op.in]: taskTicketsNormalized } },
+          ],
+        },
+        order: [["createdAt", "DESC"]],
+      });
+    } else {
+      if (taskTicketsNormalized.length === 0) return res.status(200).json([]);
 
-    if (
-      owlResponse &&
-      owlResponse.data &&
-      Array.isArray(owlResponse.data.rows)
-    ) {
-      // Sesuai dengan JSON: { data: { rows: [...] } }
-      pendingTickets = owlResponse.data.rows;
+      detailedDrafts = await ApprovalDraft.findAll({
+        where: {
+          notrans: { [Op.in]: taskTicketsNormalized },
+        },
+        order: [["createdAt", "DESC"]],
+      });
     }
-
-    // Kalau tetep kosong
-    if (pendingTickets.length === 0) {
-      console.log(
-        ">>> [INFO] Antrean kosong atau Karyawan ID tidak punya akses approval di OWL.",
-      );
-      return res.status(200).json([]);
-    }
-
-    // Merge OWL dengan LOKAL
-    const ticketNumbers = pendingTickets.map((item) => item.notransaksi);
-    console.log(">>> [DEBUG] Mencari Tiket di DB Lokal:", ticketNumbers);
-
-    const detailedDrafts = await ApprovalDraft.findAll({
-      where: {
-        notrans: ticketNumbers,
-        status: "Pending", // Pastikan status di lokal juga masih pending
-      },
-      order: [["createdAt", "DESC"]],
-    });
 
     const draftsWithExtraData = detailedDrafts.map((draft) => {
-      const owlMatch = pendingTickets.find(
-        (t) => t.notransaksi === draft.notrans,
-      );
+      const draftJson = draft.toJSON();
+      const cleanDraftNo = (draft.notrans || "").trim().toLowerCase();
+
+      const myRow = myOwlTasks.find((t) => {
+        const owlNo = (t.notransaksi || t.notrans || "").trim().toLowerCase();
+        return owlNo === cleanDraftNo;
+      });
+
+      // Muncul ke Queue saat ada barisnya dan status harus "0" (Active Turn)
+      const owlStatusAsal = myRow ? String(myRow.status) : null;
+      const isActuallyMyTurn = owlStatusAsal === "0";
 
       return {
-        ...draft.toJSON(),
-        nourut: owlMatch ? owlMatch.nourut : null,
-        level: owlMatch ? owlMatch.level : null,
-        jenispersetujuan: owlMatch ? owlMatch.jenispersetujuan : "CMS",
+        ...draftJson,
+        nourut: myRow ? myRow.nourut : null,
+        level: myRow ? myRow.level : null,
+        kodeapp: myRow ? myRow.nourut : null,
+        nextApp: "",
+        isMyQueue: isActuallyMyTurn,
+        owlStatus: owlStatusAsal,
       };
     });
-
+    console.log(
+      `>>> [STITCHING SUCCESS] User: ${req.owl_username} | Total: ${draftsWithExtraData.length} Tiket`,
+    );
     return res.status(200).json(draftsWithExtraData);
   } catch (error) {
-    console.error("🚨 [FETCH PENDING ERROR]:", error.message);
-    res.status(error.statusCode || 500).json({ message: error.message });
+    console.error("🚨 [FETCH ERROR]:", error.message);
+    res.status(500).json({ message: "Gagal memuat antrean." });
   }
 };
 
@@ -123,11 +100,16 @@ exports.executeDecision = async (req, res) => {
   const t = await sequelize.transaction();
   try {
     const {
+      status,
+      kodeapp,
       notrans: bodyNotrans,
       notransaksi,
-      nourut,
-      status,
+      level,
+      komentar,
       keteranganRejek,
+      nextApp,
+      jenisApp,
+      nourut,
       module,
       targetId,
       payload,
@@ -139,20 +121,25 @@ exports.executeDecision = async (req, res) => {
       throw new Error("Nomor transaksi (notrans) wajib disertakan.");
 
     const tokenOWL = req.owl_token;
-    const nikApprover = String(req.karyawanId); // Pastikan selalu String
+    const nikApprover = String(req.karyawanId);
 
-    const erpResult = await ErpApprovalService.submitDecision(
-      notrans,
-      status,
-      keteranganRejek ||
-        (status === "1" ? "Disetujui via CMS" : "Ditolak via CMS"),
-      tokenOWL,
-      nikApprover,
-      nourut,
+    const erpResult = await ErpApprovalService.submitDecision({
+      kodeapp: kodeapp,
+      notrans: notrans,
+      level: level,
+      status: status,
+      komentar: komentar || keteranganRejek,
+      nextApp: nextApp,
+      jenisApp: jenisApp,
+      nourut: nourut,
+      token: tokenOWL,
+      karyawanid: nikApprover,
+    });
+
+    const isFinalApproval = erpResult?.data?.is_final === true;
+    console.log(
+      `>>> [DECISION DEBUG] Ticket: ${notrans} | Is Final: ${isFinalApproval}`,
     );
-
-    // Asumsi: OWL mengembalikan flag 'is_final' atau jika tidak ada sistem multi-layer, nilainya true.
-    const isFinalApproval = erpResult?.data?.is_final !== false;
 
     // --- LOGIKA REJECT ---
     if (status === "2") {
@@ -167,7 +154,7 @@ exports.executeDecision = async (req, res) => {
         }
       }
       await ApprovalDraft.update(
-        { status: "Rejected", rejection_reason: keteranganRejek },
+        { status: "Rejected", rejection_reason: komentar || keteranganRejek },
         { where: { notrans }, transaction: t },
       );
 
@@ -180,9 +167,7 @@ exports.executeDecision = async (req, res) => {
     // --- LOGIKA APPROVE ---
     if (status === "1") {
       if (isFinalApproval) {
-        // 🚀 STRICT PAYLOAD SANITIZATION
         const cleanPayload = { ...payload };
-        // Blacklist: Field ini HARAM di-override oleh payload dari frontend
         const forbiddenFields = [
           "id",
           "createdAt",
@@ -192,17 +177,13 @@ exports.executeDecision = async (req, res) => {
         ];
         forbiddenFields.forEach((field) => delete cleanPayload[field]);
 
-        // 1. Tangani File Fisik (Commit dari TEMP_)
         handleFileCommit(module, cleanPayload);
 
-        // 2. Buka Gembok secara Paksa di Payload
         cleanPayload.is_locked = false;
         cleanPayload.lock_ticket = null;
 
-        // 3. Eksekusi Update ke Tabel Asli
         await executeModelUpdate(module, targetId, cleanPayload, action, t);
 
-        // 4. Update Status Draf di Lokal menjadi "Approved"
         await ApprovalDraft.update(
           { status: "Approved" },
           { where: { notrans }, transaction: t },
@@ -214,7 +195,9 @@ exports.executeDecision = async (req, res) => {
           targetId,
         });
       } else {
-        // Jika ERP mengindikasikan ada layer berikutnya (belum final)
+        console.log(
+          `>>> [INFO] Berhasil Approve Lvl ${level}. Menunggu next level.`,
+        );
         await t.commit();
         return res.status(200).json({
           message: `Approval berhasil dicatat oleh ERP. Menunggu persetujuan layer berikutnya.`,

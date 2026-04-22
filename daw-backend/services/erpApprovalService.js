@@ -3,53 +3,71 @@ const ApprovalDraft = require("../models/ApprovalDraft");
 const sequelize = require("../config/database");
 const { generateNotrans } = require("../utils/notransGenerator");
 
-const CMS_CODE = process.env.CMS_APPROVAL_CODE
-  ? process.env.CMS_APPROVAL_CODE.trim()
-  : "CMS";
-
-if (!process.env.DAW_NODE_URL) {
-  console.warn("⚠️ WARNING: DAW_NODE_URL environment variable is not set!");
-}
+const CMS_CODE = process.env.CMS_APPROVAL_CODE;
 
 const dawApi = axios.create({
   baseURL: process.env.DAW_NODE_URL,
   timeout: 10000,
 });
 
+const MODULE_REGISTRY = {
+  AboutInfo: "AboutInfo",
+  Affiliate: "Affiliates",
+  BusinessSection: "BusinessSections",
+  HeroSlide: "HeroSlides",
+  History: "Histories",
+  ImpactStat: "ImpactStats",
+  InvestmentSetting: "InvestmentSettings",
+  Management: "Managements",
+  Menu: "Menus",
+  Page: "Pages",
+  Project: "Projects",
+  Settings: "Settings",
+};
+
 class ErpApprovalService {
   static _handleError(error, context) {
     const status = error.response?.status || "NETWORK_ERROR";
     const erpMessage = error.response?.data?.message || error.message;
 
-    // Log lengkap untuk keperluan debugging (jangan tampilkan ke user)
     console.error(
       `🚨 [ERP ERROR - ${context}] Status: ${status}`,
       error.response?.data || error.message,
     );
 
-    // Custom error object yang mempertahankan stack trace (opsional tapi disarankan)
     const newError = new Error(`ERP DAW Error (${context}): ${erpMessage}`);
     newError.statusCode = status;
-    newError.originalError = error; // Simpan error asli
+    newError.originalError = error;
     throw newError;
   }
 
   // Handshake: Cek Setup
   static async _cekSetup(notrans, token) {
     try {
+      const payload = {
+        trans: notrans,
+        notransaksi: notrans,
+        notrans: notrans,
+        jenisApp: CMS_CODE,
+        jenispersetujuan: CMS_CODE,
+      };
+
       const response = await dawApi.post(
         "/node/approval/setup/cekSetup",
-        { notrans, jenisApp: CMS_CODE },
+        payload,
         { headers: { Authorization: `Bearer ${token}` } },
       );
+
       return response.data?.data?.rows || [];
     } catch (error) {
-      this._handleError(error, "cekSetup");
+      console.error(`🚨 ERP cekSetup API Error [${notrans}]:`, error.message);
+      return [];
     }
   }
 
-  // 🚀 REFACTORED: Initiate Approval (Saga Pattern / 2-Phase Commit)
+  // REFACTORED: Initiate Approval (Saga Pattern / 2-Phase Commit)
   static async initiateApproval({
+    moduleName,
     model,
     targetId,
     action,
@@ -57,97 +75,95 @@ class ErpApprovalService {
     userId,
     owlUsername,
     token,
+    transaction,
   }) {
-    const notrans = generateNotrans(model.name);
-    const actorId = String(owlUsername || userId);
-
-    // 1. PRE-FLIGHT CHECK (Network Call di LUAR DB Transaction)
-    console.log(`>>> [HANDSHAKE] Discovery: Checking setup for ${notrans}...`);
-    const approverRows = await this._cekSetup(notrans, token);
-
-    // Asumsi: Jika approver tidak ada, kita harus tolak sejak awal agar tidak jadi draf hantu
-    if (!approverRows || approverRows.length === 0) {
+    if (!transaction) {
       throw new Error(
-        "Setup approval tidak ditemukan di ERP. Hubungi Administrator.",
+        "Sistem Error: initiateApproval membutuhkan context transaction.",
       );
     }
 
-    // 2. FAST DB TRANSACTION (Operasi database super cepat, tanpa tunggu network)
-    console.log(`>>> [LOCAL VAULT] Storing draft: ${notrans}`);
-    const t = await sequelize.transaction();
+    const rawModuleName = moduleName || (model && model.name);
+
+    const standardizedKey =
+      Object.keys(MODULE_REGISTRY).find(
+        (key) => key.toLowerCase() === rawModuleName.toLowerCase(),
+      ) || rawModuleName;
+
+    const notrans = await generateNotrans(rawModuleName);
+    const actorId = String(owlUsername || userId);
+    console.log(
+      `>>> [STRICT DEBUG] actorId (inputby) dikirim sebagai: ${actorId}`,
+    );
+
+    console.log(
+      `>>> [ERP SERVICE] 1. Discovery: Checking setup for ${notrans}...`,
+    );
+    const approverRows = await this._cekSetup(notrans, token);
+    console.log(">>> [DEBUG INJECTION] Tiket:", notrans);
+    console.log(
+      ">>> [DEBUG INJECTION] Hierarki dari ERP:",
+      JSON.stringify(approverRows, null, 2),
+    );
+
+    if (!approverRows || approverRows.length === 0) {
+      throw new Error(
+        `Setup approval untuk ${standardizedKey} tidak ditemukan di ERP.`,
+      );
+    }
+
     try {
+      console.log(
+        `>>> [ERP SERVICE] 2. Local Vault: Storing draft for ${standardizedKey}...`,
+      );
       await ApprovalDraft.create(
         {
           notrans,
-          module_name: model.name,
+          module_name: standardizedKey,
           target_id: String(targetId),
           action,
           payload,
           created_by: actorId,
-          status: "Pending", // Status awal
+          status: "Pending",
         },
-        { transaction: t },
+        { transaction },
       );
 
       if (targetId && action !== "CREATE") {
         await model.update(
           { is_locked: true, lock_ticket: notrans },
-          { where: { id: targetId }, transaction: t },
+          { where: { id: targetId }, transaction },
         );
       }
-      await t.commit(); // DB TERTUTUP CEPAT! Performa aman.
-    } catch (dbError) {
-      await t.rollback();
-      throw new Error(
-        `Database Error: Gagal menyimpan draf lokal - ${dbError.message}`,
-      );
-    }
-
-    // 3. POST-COMMIT SYNC (Lapor ERP)
-    console.log(`>>> [HANDSHAKE] Injection: Registering transaction to OWL...`);
-    try {
+      console.log(`>>> [ERP SERVICE] 3. Injection: Registering to OWL...`);
       const payloadTransAdd = {
         notrans,
-        jenisApp: CMS_CODE, // 🚀 FIX: Ini WAJIB ada sesuai spec ERP DAW
+        jenisApp: CMS_CODE,
         inputby: actorId,
         data: approverRows,
       };
+
+      console.log(">>> [STRICT DEBUG] Menyiapkan Injeksi ke OWL");
+      console.log(">>> Notrans:", notrans);
+      console.log(
+        ">>> Payload Data (Hierarki):",
+        JSON.stringify(payloadTransAdd.data, null, 2),
+      );
 
       await dawApi.post("/node/approval/trans/add", payloadTransAdd, {
         headers: { Authorization: `Bearer ${token}` },
       });
 
       console.log(
-        `>>> [SUCCESS] Ticket ${notrans} is now live in OWL hierarchy.`,
+        `>>> [ERP SERVICE] 4. Success: Ticket ${notrans} is registered.`,
       );
       return { success: true, notrans };
-    } catch (erpError) {
-      // 🚀 COMPENSATING ACTION (Rollback Manual DB jika ERP gagal merespon)
+    } catch (error) {
       console.error(
-        `🚨 ERP Sync Failed! Melakukan rollback data lokal untuk ${notrans}...`,
+        `>>> [ERP SERVICE] ❌ FAILED at Ticket ${notrans}:`,
+        error.message,
       );
-      try {
-        await ApprovalDraft.update(
-          {
-            status: "Rejected",
-            rejection_reason: "Gagal sinkronisasi dengan server ERP.",
-          },
-          { where: { notrans } },
-        );
-        if (targetId && action !== "CREATE") {
-          await model.update(
-            { is_locked: false, lock_ticket: null },
-            { where: { id: targetId } },
-          );
-        }
-      } catch (rollbackErr) {
-        console.error(
-          "🚨 FATAL: Gagal melakukan compensating rollback!",
-          rollbackErr,
-        );
-      }
-
-      this._handleError(erpError, "initiateApproval (Injection Phase)");
+      throw error;
     }
   }
 
@@ -156,7 +172,7 @@ class ErpApprovalService {
     try {
       const response = await dawApi.post(
         "/node/tools/noapproval",
-        { jenisApp: CMS_CODE }, // 🚀 FIX: Samakan key dengan yang lain
+        { jenisApp: CMS_CODE },
         { headers: { Authorization: `Bearer ${token}` } },
       );
       return response.data.data;
@@ -187,7 +203,6 @@ class ErpApprovalService {
         { headers: { Authorization: `Bearer ${token}` } },
       );
 
-      // 🚩 CEK DISINI JAP!
       if (response.data) {
         console.log(
           ">>> [DEBUG OWL] Response Error Status:",
@@ -219,25 +234,38 @@ class ErpApprovalService {
   }
 
   // Execute Decision
-  static async submitDecision(
-    notransaksi,
+  static async submitDecision({
+    kodeapp,
+    notrans,
+    level,
     status,
-    keterangan,
+    komentar,
+    nextApp,
+    jenisApp,
+    nourut,
     token,
     karyawanid,
-    nourut,
-  ) {
+  }) {
     try {
       const payload = {
-        notransaksi: notransaksi,
-        nourut: nourut,
         status: String(status),
-        keterangan: keterangan || "Processed via CMS",
-        jenispersetujuan: "CMS",
+        kodeapp: kodeapp || nourut,
+        notrans: notrans,
+        level: Number(level),
+        komentar:
+          komentar ||
+          (status === "1" ? "Disetujui via CMS" : "Ditolak via CMS"),
+        nextApp: nextApp || "",
+        jenisApp: jenisApp || CMS_CODE,
+
+        notransaksi: notrans,
+        jenispersetujuan: jenisApp || CMS_CODE,
         karyawanid: String(karyawanid),
+        nourut: nourut,
       };
 
       console.log(">>> [DEBUG OWL] Payload:", JSON.stringify(payload, null, 2));
+      console.log(JSON.stringify(payload, null, 2));
 
       const response = await dawApi.post(
         "/node/approval/trans/submitApp",
@@ -254,4 +282,4 @@ class ErpApprovalService {
   }
 }
 
-module.exports = ErpApprovalService;
+module.exports = { ErpApprovalService, MODULE_REGISTRY };

@@ -6,7 +6,7 @@ const ImpactStats = require("../models/ImpactStats");
 const ApprovalDraft = require("../models/ApprovalDraft");
 const { deleteSingleFile } = require("../utils/fileRemover");
 const { invalidateOldDrafts } = require("../utils/draftCleanup");
-const ErpApprovalService = require("../services/erpApprovalService");
+const { ErpApprovalService } = require("../services/erpApprovalService");
 const sequelize = require("../config/database");
 
 const getRole = (req) =>
@@ -103,8 +103,7 @@ exports.updateSettings = async (req, res) => {
     if (userRole === "editor" && settings.is_locked) {
       return res.status(423).json({
         success: false,
-        message:
-          "Akses Dibatasi. Intro sedang dikunci oleh proses approval.",
+        message: "Akses Dibatasi. Intro sedang dikunci oleh proses approval.",
         ticket: settings.lock_ticket,
       });
     }

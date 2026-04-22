@@ -1,6 +1,6 @@
 const Management = require("../models/Management");
 const { deleteSingleFile } = require("../utils/fileRemover");
-const ErpApprovalService = require("../services/erpApprovalService");
+const { ErpApprovalService } = require("../services/erpApprovalService");
 const ApprovalDraft = require("../models/ApprovalDraft");
 const sequelize = require("../config/database");
 
