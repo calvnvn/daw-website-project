@@ -21,6 +21,7 @@ import { useInvestments } from "@/contexts/InvestmentContext";
 import { useAuth } from "@/contexts/AuthContext";
 import api from "@/lib/api";
 import { getCleanImageUrl } from "@/lib/utils";
+import { isDirty } from "zod/v3";
 interface LocalAffiliate {
   id: number | string;
   name: string;
@@ -34,6 +35,7 @@ interface LocalAffiliate {
   lock_ticket?: string | null;
   has_rejected?: boolean;
   previous_notrans?: string | null;
+  isDirty?: boolean;
 }
 
 const LogoPreviewer = React.memo(
@@ -161,6 +163,7 @@ export default function InvestmentsManager() {
           is_locked: c.is_locked || false,
           lock_ticket: c.lock_ticket || null,
           has_rejected: c.has_rejected || false,
+          isDirty: false,
         }));
         setLocalCompanies(comps);
         setOriginalCompanies(comps);
@@ -168,7 +171,6 @@ export default function InvestmentsManager() {
     }
   }, [settings, companies, isEditing]);
 
-  // --- 🚀 DIFF ENGINE (Pencegah Spam) ---
   const hasSettingsChanged = useCallback(() => {
     return JSON.stringify(pageContent) !== JSON.stringify(originalContent);
   }, [pageContent, originalContent]);
@@ -220,10 +222,13 @@ export default function InvestmentsManager() {
   };
 
   const handleSaveCompanies = async () => {
-    const validCompanies = localCompanies.filter((comp) => comp.name.trim());
-    if (validCompanies.length === 0) return;
+    const dirtyCompanies = localCompanies.filter(
+      (comp) => comp.name.trim() && (comp.isNew || comp.isDirty),
+    );
 
-    const saveTasks = validCompanies.map((comp) => {
+    if (dirtyCompanies.length === 0) return;
+
+    const saveTasks = dirtyCompanies.map((comp) => {
       if (comp.is_locked && !comp.isNew) return Promise.resolve(comp);
 
       const formData = new FormData();
@@ -238,6 +243,7 @@ export default function InvestmentsManager() {
       if (comp.newLogoFile) formData.append("logo", comp.newLogoFile);
 
       const config = { timeout: 60000 };
+
       if (comp.isNew) {
         return api
           .post("/investment/affiliate", formData, config)
@@ -245,6 +251,7 @@ export default function InvestmentsManager() {
             ...comp,
             id: res.data.data?.id || res.data.id,
             isNew: false,
+            isDirty: false,
             newLogoFile: null,
             is_locked: !isSuperadmin,
           }));
@@ -253,6 +260,7 @@ export default function InvestmentsManager() {
           .put(`/investment/affiliate/${comp.id}`, formData, config)
           .then(() => ({
             ...comp,
+            isDirty: false,
             newLogoFile: null,
             is_locked: !isSuperadmin,
           }));
@@ -260,30 +268,26 @@ export default function InvestmentsManager() {
     });
 
     const results = await Promise.allSettled(saveTasks);
-    const successfulComps: LocalAffiliate[] = [];
-    let failedCount = 0;
 
-    results.forEach((result, index) => {
-      if (result.status === "fulfilled") {
-        successfulComps.push(result.value);
-      } else {
-        failedCount++;
-        successfulComps.push(validCompanies[index]);
-        console.error(
-          `Failed to save company: ${validCompanies[index].name}`,
-          result.reason,
-        );
-      }
+    setLocalCompanies((prev) => {
+      return prev.map((existing) => {
+        const taskIndex = dirtyCompanies.findIndex((d) => d.id === existing.id);
+
+        if (taskIndex !== -1) {
+          const result = results[taskIndex];
+          if (result.status === "fulfilled") {
+            return result.value;
+          }
+        }
+        return existing;
+      });
     });
 
-    setLocalCompanies(successfulComps);
-
-    if (failedCount > 0) {
-      throw new Error("Partial sync failure");
-    }
+    const hasError = results.some((r) => r.status === "rejected");
+    if (hasError) throw new Error("Partial sync failure");
   };
 
-  // 🚀 THE GATEKEEPER SAVE EXECUTION
+  // THE GATEKEEPER SAVE EXECUTION
   const handleSave = async () => {
     if (currentLockState) {
       return toast.error("Akses Dibatasi.", {
@@ -291,26 +295,26 @@ export default function InvestmentsManager() {
       });
     }
 
+    const anyCompanyChanged = localCompanies.some((c) => c.isNew || c.isDirty);
+
     if (activeTab === "content" && !hasSettingsChanged()) {
       setIsEditing(false);
       return toast.info("Tidak ada perubahan terdeteksi.", {
-        description: "Data Anda masih sama dengan versi live.",
-        duration: 3000,
+        description: "Data Content masih sama dengan versi live.",
       });
     }
 
-    if (activeTab === "companies" && !hasCompaniesChanged()) {
+    if (activeTab === "companies" && !anyCompanyChanged) {
       setIsEditing(false);
       return toast.info("Tidak ada perubahan terdeteksi.", {
         description: "Data perusahaan masih sama dengan versi live.",
-        duration: 3000,
       });
     }
 
     setIsSaving(true);
     const loadingToast = toast.loading(
       isSuperadmin
-        ? "Menyimpan pembaruan secara live..."
+        ? "Menyimpan secara live..."
         : "Mengirim revisi ke sistem...",
     );
 
@@ -327,12 +331,13 @@ export default function InvestmentsManager() {
           : "Perubahan berhasil diajukan!",
         { id: loadingToast },
       );
+
       await refreshData();
       setIsEditing(false);
     } catch (err: any) {
       toast.error(
         err.message === "Partial sync failure"
-          ? "Sebagian data gagal disimpan."
+          ? "Sebagian data gagal disimpan. Yang lain berhasil."
           : err.response?.data?.message || "Gagal memproses data.",
         { id: loadingToast },
       );
@@ -353,6 +358,7 @@ export default function InvestmentsManager() {
         websiteUrl: "",
         logoUrl: null,
         isNew: true,
+        isDirty: true,
         is_locked: false,
       },
     ]);
@@ -360,10 +366,12 @@ export default function InvestmentsManager() {
 
   const removeCompany = (id: number | string) => {
     const target = localCompanies.find((c) => c.id === id);
-    if (!target) return;
+    if (!target || target.is_locked) return;
 
     toast.warning(`Remove ${target.name || "Company"}?`, {
-      description: "This action will remove the affiliate from the grid.",
+      description: isSuperadmin
+        ? "Data akan dihapus permanen dari server."
+        : "Permintaan hapus akan dikirim ke sistem approval.",
       action: {
         label: "Remove",
         onClick: async () => {
@@ -375,15 +383,20 @@ export default function InvestmentsManager() {
 
           toast.promise(
             async () => {
-              await api.delete(`/investment/affiliate/${id}`);
-              setLocalCompanies((prev) => prev.filter((c) => c.id !== id));
-              refreshData();
+              const response = await api.delete(`/investment/affiliate/${id}`);
+
+              if (response.status === 202) {
+                await refreshData();
+              } else {
+                setLocalCompanies((prev) => prev.filter((c) => c.id !== id));
+              }
             },
             {
-              loading: `Deleting ${target.name}...`,
-              success: "Company permanently deleted.",
-              error: (err) =>
-                err.response?.data?.message || "Failed to delete from server",
+              loading: `Processing ${target.name}...`,
+              success: isSuperadmin
+                ? "Deleted permanently."
+                : "Delete request submitted.",
+              error: (err) => err.response?.data?.message || "Failed to delete",
             },
           );
         },
@@ -397,12 +410,15 @@ export default function InvestmentsManager() {
     field: keyof LocalAffiliate,
     value: any,
   ) => {
-    setLocalCompanies(
-      localCompanies.map((c) => (c.id === id ? { ...c, [field]: value } : c)),
+    setLocalCompanies((prev) =>
+      prev.map((c) =>
+        c.id === id ? { ...c, [field]: value, isDirty: true } : c,
+      ),
     );
   };
 
   const handleLogoChange = (id: number | string, file: File) => {
+    if (!file) return;
     updateCompany(id, "newLogoFile", file);
   };
 
@@ -486,7 +502,7 @@ export default function InvestmentsManager() {
       )}
 
       {/* --- HEADER (MATRIX BUTTONS) --- */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white p-6 rounded-2xl border border-slate-200 shadow-sm sticky top-0 z-30">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white p-6 rounded-2xl border border-slate-200 shadow-sm top-0 z-30">
         <div>
           <div className="flex items-center gap-3">
             <h1 className="text-2xl font-serif font-black text-slate-900 tracking-tight">
@@ -542,10 +558,17 @@ export default function InvestmentsManager() {
             </span>
           </button>
 
-          {/* Matrix Action Button (Publish/Request) */}
+          {/* Matrix Action Button */}
           <button
             onClick={handleSave}
-            disabled={isSaving || !isEditing || currentLockState}
+            disabled={
+              isSaving ||
+              !isEditing ||
+              currentLockState ||
+              (activeTab === "companies" &&
+                !localCompanies.some((c) => c.isDirty || c.isNew)) ||
+              (activeTab === "content" && !hasSettingsChanged())
+            }
             className={`flex-1 sm:flex-none flex items-center justify-center gap-2 px-6 py-2.5 rounded-xl font-black text-[11px] uppercase tracking-widest transition-all shadow-lg active:scale-95 disabled:cursor-not-allowed disabled:shadow-none ${
               isSaving
                 ? "bg-slate-300 text-slate-700"
@@ -793,6 +816,18 @@ export default function InvestmentsManager() {
                             <Lock className="w-3 h-3" />
                           </span>
                         )}
+                        {(company.isDirty || company.isNew) &&
+                          !company.is_locked && (
+                            <span
+                              title={
+                                company.isNew
+                                  ? "Data Baru"
+                                  : "Perubahan Belum Disimpan"
+                              }
+                              className="flex h-5 w-5 items-center justify-center bg-daw-green text-white rounded-full shadow-sm ring-2 ring-white z-10 animate-in zoom-in duration-300">
+                              <Save className="w-2.5 h-2.5" />
+                            </span>
+                          )}
                       </div>
 
                       <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-2 text-center">

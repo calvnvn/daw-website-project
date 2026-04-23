@@ -8,6 +8,17 @@ const { invalidateOldDrafts } = require("../utils/draftCleanup");
 
 const JENIS_APP_CMS = process.env.CMS_APPROVAL_CODE;
 
+//Mencari URL gambar di dalam string HTML untuk kebutuhan cleanup fisik
+const extractImagesFromHtml = (html) => {
+  if (!html) return [];
+  const images = [];
+  const imgRegex = /src="[^"]*\/uploads\/([^"'\s>]+)"/g;
+  let match;
+  while ((match = imgRegex.exec(html)) !== null) {
+    images.push(match[1]);
+  }
+  return images;
+};
 // HELPER FUNCTIONS (Clean Code Architecture)
 const generateUniqueProjectSlug = async (title, id = null) => {
   let baseSlug = title
@@ -42,12 +53,21 @@ const processProjectPayload = async (req, project) => {
     seo_title,
     meta_description,
   } = req.body;
-
+  const authorIdentity = req.owl_username || req.karyawanId || "System Admin";
   let finalGallery = [];
   let filesToDelete = [];
   let coverImageName = project.cover_image;
   let oldCoverToDelete = null;
 
+  const cleanContent = content || project.content || "";
+  if (project.content) {
+    const oldHtmlImages = extractImagesFromHtml(project.content);
+    const newHtmlImages = extractImagesFromHtml(cleanContent);
+    const deletedHtmlImages = oldHtmlImages.filter(
+      (img) => !newHtmlImages.includes(img),
+    );
+    filesToDelete = [...filesToDelete, ...deletedHtmlImages];
+  }
   // 1. Process Gallery
   if (existing_gallery) {
     try {
@@ -99,6 +119,7 @@ const processProjectPayload = async (req, project) => {
       gallery: finalGallery,
       seo_title: seo_title || project.seo_title,
       meta_description: meta_description || project.meta_description,
+      author: project.author || authorIdentity,
     },
     filesToDelete,
     oldCoverToDelete,
@@ -218,13 +239,16 @@ exports.updateProject = async (req, res) => {
     const userRole = req.userRole?.toLowerCase();
     const { status, previous_notrans } = req.body;
 
-    const project = await Project.findByPk(id, { transaction: t });
+    const project = await Project.findByPk(id, {
+      transaction: t,
+      lock: t.LOCK.UPDATE,
+    });
+
     if (!project) {
       await t.rollback();
       return res.status(404).json({ message: "Project not found" });
     }
 
-    // 🛡️ THE GATEKEEPER
     if (project.is_locked) {
       if (userRole === "editor") {
         await t.rollback();
@@ -275,14 +299,6 @@ exports.updateProject = async (req, res) => {
     if (userRole === "superadmin" || userRole === "admin") {
       await invalidateOldDrafts("Project", id, t);
     }
-
-    await project.update(
-      { ...payload, is_locked: false, lock_ticket: null },
-      { transaction: t },
-    );
-    await t.commit();
-
-    // 🗑️ Hapus file fisik HANYA jika DB sudah berhasil di-commit
     if (
       userRole === "superadmin" ||
       (userRole === "editor" && status === "Draft")
@@ -291,8 +307,16 @@ exports.updateProject = async (req, res) => {
       if (oldCoverToDelete) deleteSingleFile(oldCoverToDelete);
     }
 
+    await project.update(
+      { ...payload, is_locked: false, lock_ticket: null },
+      { transaction: t },
+    );
+    await t.commit();
+    filesToDelete.forEach((file) => deleteSingleFile(file));
+    if (oldCoverToDelete) deleteSingleFile(oldCoverToDelete);
+
     res.status(200).json({
-      message: status === "Draft" ? "Draf disimpan." : "Override sukses.",
+      message: status === "Draft" ? "Draf disimpan." : "Override sukses.",  
     });
   } catch (error) {
     if (t && !t.finished) await t.rollback();

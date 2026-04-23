@@ -1,21 +1,6 @@
-# 1. Dependency raksasa (Tersangka Utama)
-node_modules/
-**/node_modules/
-
-# 2. Build Outputs
-dist/
-build/
-.vite/
-.next/
-
-# 5. Lock files & Logs
+node_modules
+dist
+build
+.next
 package-lock.json
-yarn.lock
-pnpm-lock.yaml
 *.log
-
-# 6. Config & Cache
-.env
-.env.*
-.cache/
-.eslintcache

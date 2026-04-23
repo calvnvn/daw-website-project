@@ -259,6 +259,22 @@ exports.updateAffiliate = async (req, res) => {
       company,
     );
 
+    const isDataChanged =
+      payload.name !== company.name ||
+      payload.desc !== company.desc ||
+      payload.category !== company.category ||
+      payload.websiteUrl !== company.websiteUrl ||
+      filesToDelete.length > 0 ||
+      req.file;
+
+    if (!isDataChanged && userRole === "editor") {
+      await t.rollback();
+      return res.status(200).json({
+        success: true,
+        message: "Tidak ada perubahan data. Permintaan diabaikan.",
+      });
+    }
+
     // JALUR EDITOR (Approval Flow)
     if (userRole === "editor" && status === "Published") {
       if (previous_notrans) {

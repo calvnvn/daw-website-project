@@ -7,10 +7,10 @@ const path = require("path");
 const swaggerUi = require("swagger-ui-express");
 const swaggerJsDoc = require("swagger-jsdoc");
 
-// --- 1. CONFIG & DATABASE IMPORT ---
+// 1. CONFIG & DATABASE IMPORT
 const sequelize = require("./config/database");
 
-// --- 2. ROUTES IMPORT ---
+// 2. ROUTES IMPORT
 const authRoutes = require("./routes/authRoutes");
 const settingsRoutes = require("./routes/settingsRoutes");
 const projectRoutes = require("./routes/projectRoutes");
@@ -30,7 +30,7 @@ const sitemapRoutes = require("./routes/sitemapRoutes");
 const mapCategoryRoutes = require("./routes/mapCategoryRoutes");
 const approvalRoutes = require("./routes/approvalRoutes");
 
-// --- 3. MODELS IMPORT ---
+// 3. MODELS IMPORT
 const User = require("./models/User");
 const Role = require("./models/Role");
 // const Permission = require("./models/Permission");
@@ -225,7 +225,7 @@ sequelize
   .then(async () => {
     console.log("[DATABASE] MySQL/MariaDB Connected & Tables Synced.");
 
-    // // // --- AUTO-SEED INQUIRY SUBJECTS ---
+    // // // AUTO-SEED INQUIRY SUBJECTS
     // // const InquirySubject = require("./models/InquirySubject");
     // // try {
     // //   const count = await InquirySubject.count();
@@ -243,7 +243,7 @@ sequelize
     // //   console.error("❌ Gagal auto-seed subjects:", err.message);
     // // }
 
-    // // --- AUTO-SEED ROLES & PERMISSIONS ---
+    // // AUTO-SEED ROLES & PERMISSIONS
     // try {
     //   // 1. SEED PERMISSIONS
     //   const permissionCount = await Permission.count();

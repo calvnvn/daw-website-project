@@ -113,7 +113,7 @@ const PhotoPreviewer = React.memo(
 
         {/* LOADING SPINNER */}
         {isDecoding && !hasError && (
-          <div className="absolute inset-0 flex items-center justify-center bg-white/50 backdrop-blur-[1px]">
+          <div className="absolute inset-0 flex items-center justify-center bg-white/50 ">
             <div className="w-5 h-5 border-2 border-daw-green border-t-transparent rounded-full animate-spin" />
           </div>
         )}
@@ -1408,7 +1408,7 @@ export default function AboutUsManager() {
                       : null;
 
                     return (
-                      <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4">
+                      <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60  p-4">
                         <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200">
                           {/* --- MODAL HEADER --- */}
                           <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50">

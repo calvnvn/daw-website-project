@@ -2,10 +2,42 @@ const Management = require("../models/Management");
 const { deleteSingleFile } = require("../utils/fileRemover");
 const { ErpApprovalService } = require("../services/erpApprovalService");
 const ApprovalDraft = require("../models/ApprovalDraft");
+const { invalidateOldDrafts } = require("../utils/draftCleanup");
 const sequelize = require("../config/database");
 
 const getRole = (req) =>
   req.userRole ? req.userRole.toLowerCase().trim() : "";
+
+// Helper
+const processManagementPayload = async (req, existingData = {}) => {
+  const { name, role, description, level, order, removePhoto } = req.body;
+  let filesToDelete = [];
+
+  let finalPhotoUrl = existingData.photoUrl || null;
+  if (req.file) {
+    if (existingData.photoUrl) filesToDelete.push(existingData.photoUrl);
+    finalPhotoUrl = req.file.filename;
+  } else if (removePhoto === "true" || removePhoto === true) {
+    if (existingData.photoUrl) filesToDelete.push(existingData.photoUrl);
+    finalPhotoUrl = null;
+  }
+
+  const finalLevel = level || existingData.level || "division";
+  const finalOrder = order ? parseInt(order, 10) : existingData.order || 1;
+
+  return {
+    payload: {
+      name: name || existingData.name,
+      role: role || existingData.role,
+      description:
+        description !== undefined ? description : existingData.description,
+      level: finalLevel,
+      order: finalOrder,
+      photoUrl: finalPhotoUrl,
+    },
+    filesToDelete,
+  };
+};
 // 1. GET ALL: Tampilkan semua data (Termasuk yang is_locked)
 exports.getAllManagements = async (req, res) => {
   try {
@@ -31,69 +63,67 @@ exports.getAllManagements = async (req, res) => {
     res.status(500).json({ message: "Gagal mengambil data management." });
   }
 };
+
+// 2. POST: Create Management (Atomic Creation)
 exports.createManagement = async (req, res) => {
   const t = await sequelize.transaction();
-  const userRole = getRole(req);
-  const photoUrl = req.file ? req.file.filename : null; // Multer sudah beri prefix TEMP_ jika Editor
-
   try {
-    const { name, role, description, level, order, status } = req.body;
-    const managementData = {
-      name,
-      role,
-      description,
-      level: level || "division",
-      order: parseInt(order) || 1,
-      photoUrl,
-    };
+    const userRole = getRole(req);
+    const { status } = req.body;
 
-    // --- JALUR EDITOR: TWO-PHASE (LOCAL FIRST, THEN NETWORK) ---
+    const { payload } = await processManagementPayload(req, {});
+
+    // JALUR EDITOR: TWO-PHASE (LOCAL FIRST, THEN NETWORK)
     if (userRole === "editor" && status === "Published") {
-      // Phase 1: Buat record lokal dalam keadaan terkunci
       const newDraftRecord = await Management.create(
-        { ...managementData, is_locked: true },
+        { ...payload, is_locked: true },
         { transaction: t },
       );
 
-      // Phase 2: Hubungi OWL
-      try {
-        const result = await ErpApprovalService.initiateApproval({
-          model: Management,
-          targetId: newDraftRecord.id, // Sekarang kita punya ID
-          action: "CREATE",
-          payload: managementData,
-          userId: req.userId,
-          owlUsername: req.owl_username,
-          token: req.headers["authorization"]?.split(" ")[1],
-        });
+      const result = await ErpApprovalService.initiateApproval({
+        moduleName: "Management",
+        model: Management,
+        targetId: newDraftRecord.id,
+        action: "CREATE",
+        payload: { ...payload, status: "Published" },
+        userId: req.userId,
+        owlUsername: req.owl_username,
+        karyawanId: req.karyawanId,
+        token: req.owl_token,
+        transaction: t,
+      });
 
-        await newDraftRecord.update(
-          { lock_ticket: result.notrans },
-          { transaction: t },
-        );
-        await t.commit();
+      await newDraftRecord.update(
+        { lock_ticket: result.notrans },
+        { transaction: t },
+      );
 
-        return res.status(202).json({
-          message: "Permintaan tambah anggota dikirim.",
-          ticket: result.notrans,
-        });
-      } catch (owlError) {
-        await t.rollback();
-        if (photoUrl) deleteSingleFile(photoUrl); // Hapus file TEMP_ karena draf gagal
-        throw owlError;
-      }
+      await t.commit();
+      return res.status(202).json({
+        message: "Permintaan tambah anggota direksi/manajemen dikirim.",
+        ticket: result.notrans,
+      });
     }
 
-    // --- JALUR SUPERADMIN: DIRECT CREATE ---
-    const newPerson = await Management.create(managementData, {
-      transaction: t,
-    });
+    // JALUR SUPERADMIN ATAU DRAFT: DIRECT CREATE
+    const newPerson = await Management.create(
+      { ...payload, is_locked: false, lock_ticket: null },
+      { transaction: t },
+    );
+
     await t.commit();
-    res
-      .status(201)
-      .json({ message: "Anggota berhasil ditambahkan!", data: newPerson });
+    return res.status(201).json({
+      message: "Anggota berhasil ditambahkan!",
+      data: newPerson,
+    });
   } catch (error) {
-    if (t) await t.rollback();
+    if (t && !t.finished) await t.rollback();
+
+    if (req.file && req.file.filename) {
+      deleteSingleFile(req.file.filename);
+    }
+
+    console.error("🚨 [CREATE MANAGEMENT ERROR]:", error.message);
     res.status(500).json({ message: error.message });
   }
 };
@@ -101,112 +131,16 @@ exports.createManagement = async (req, res) => {
 // 3. PUT: Update Management (Resubmission & Asset Cleanup)
 exports.updateManagement = async (req, res) => {
   const t = await sequelize.transaction();
-  const userRole = getRole(req);
-  const { id } = req.params;
-
   try {
-    const {
-      name,
-      role,
-      description,
-      level,
-      order,
-      removePhoto,
-      status,
-      previous_notrans,
-    } = req.body;
-    const person = await Management.findByPk(id, { transaction: t });
+    const userRole = getRole(req);
+    const { id } = req.params;
+    const { status, previous_notrans } = req.body;
 
-    if (!person) {
-      await t.rollback();
-      return res.status(404).json({ message: "Data tidak ditemukan." });
-    }
+    const person = await Management.findByPk(id, {
+      transaction: t,
+      lock: t.LOCK.UPDATE,
+    });
 
-    // Safety Check: Lock Guard
-    if (person.is_locked && userRole === "editor") {
-      await t.rollback();
-      return res
-        .status(423)
-        .json({ message: "Data terkunci.", ticket: person.lock_ticket });
-    }
-
-    let finalPhotoUrl = person.photoUrl;
-    let oldPhotoToDelete = null;
-
-    if (req.file) {
-      oldPhotoToDelete = person.photoUrl;
-      finalPhotoUrl = req.file.filename;
-    } else if (removePhoto === "true") {
-      oldPhotoToDelete = person.photoUrl;
-      finalPhotoUrl = null;
-    }
-
-    const updatedData = {
-      name: name || person.name,
-      role: role || person.role,
-      description: description || person.description,
-      level: level || person.level,
-      order: parseInt(order) || person.order,
-      photoUrl: finalPhotoUrl,
-    };
-
-    // --- JALUR EDITOR: REQUEST UPDATE ---
-    if (userRole === "editor" && status === "Published") {
-      // A. Cleanup Draf Lama
-      if (previous_notrans) {
-        await ApprovalDraft.update(
-          { status: "Replaced" },
-          { where: { notrans: previous_notrans }, transaction: t },
-        );
-      }
-
-      // B. Network Call
-      const result = await ErpApprovalService.initiateApproval({
-        model: Management,
-        targetId: id,
-        action: "UPDATE",
-        payload: updatedData,
-        userId: req.userId,
-        owlUsername: req.owl_username,
-        token: req.headers["authorization"]?.split(" ")[1],
-      });
-
-      // C. Set Lock
-      await person.update(
-        { is_locked: true, lock_ticket: result.notrans },
-        { transaction: t },
-      );
-      await t.commit();
-
-      return res
-        .status(202)
-        .json({ message: "Draf revisi dikirim.", ticket: result.notrans });
-    }
-
-    // --- JALUR SUPERADMIN: DIRECT UPDATE ---
-    // Cleanup physical file jika superadmin ganti/hapus foto
-    if (oldPhotoToDelete) deleteSingleFile(oldPhotoToDelete);
-
-    await person.update(
-      { ...updatedData, is_locked: false, lock_ticket: null },
-      { transaction: t },
-    );
-    await t.commit();
-
-    res.status(200).json({ message: "Data berhasil diperbarui langsung!" });
-  } catch (error) {
-    if (t) await t.rollback();
-    res.status(500).json({ message: error.message });
-  }
-};
-
-// 4. DELETE: Management (Row-Level Locking)
-exports.deleteManagement = async (req, res) => {
-  const t = await sequelize.transaction();
-  const userRole = getRole(req);
-
-  try {
-    const person = await Management.findByPk(req.params.id, { transaction: t });
     if (!person) {
       await t.rollback();
       return res.status(404).json({ message: "Data tidak ditemukan." });
@@ -215,39 +149,154 @@ exports.deleteManagement = async (req, res) => {
     if (person.is_locked && userRole === "editor") {
       await t.rollback();
       return res.status(423).json({
-        message: "Gagal menghapus. Data terkunci.",
+        message: "Akses ditolak. Data sedang dikunci oleh proses approval OWL.",
         ticket: person.lock_ticket,
       });
     }
 
-    if (userRole === "editor") {
+    const { payload, filesToDelete } = await processManagementPayload(
+      req,
+      person,
+    );
+
+    // JALUR EDITOR: REQUEST UPDATE
+    if (userRole === "editor" && status === "Published") {
+      if (previous_notrans) {
+        await ApprovalDraft.update(
+          { status: "Replaced" },
+          { where: { notrans: previous_notrans }, transaction: t },
+        );
+      }
+
       const result = await ErpApprovalService.initiateApproval({
+        moduleName: "Management",
         model: Management,
-        targetId: person.id,
-        action: "DELETE",
-        payload: { name: person.name },
+        targetId: id,
+        action: "UPDATE",
+        payload: { ...payload, status: "Published" },
         userId: req.userId,
         owlUsername: req.owl_username,
-        token: req.headers["authorization"]?.split(" ")[1],
+        karyawanId: req.karyawanId,
+        token: req.owl_token,
+        transaction: t,
       });
 
       await person.update(
         { is_locked: true, lock_ticket: result.notrans },
         { transaction: t },
       );
+
       await t.commit();
-      return res
-        .status(202)
-        .json({ message: "Permintaan hapus dikirim.", ticket: result.notrans });
+      return res.status(202).json({
+        message: "Draf revisi manajemen dikirim ke ERP.",
+        ticket: result.notrans,
+      });
     }
 
-    // superadmin: Langsung musnahkan
-    if (person.photoUrl) deleteSingleFile(person.photoUrl);
-    await person.destroy({ transaction: t });
+    // JALUR SUPERADMIN ATAU DRAFT: DIRECT UPDATE
+    if (userRole === "superadmin" || userRole === "admin") {
+      await invalidateOldDrafts("Management", id, t);
+    }
+
+    await person.update(
+      { ...payload, is_locked: false, lock_ticket: null },
+      { transaction: t },
+    );
+
     await t.commit();
-    res.status(200).json({ message: "Data berhasil dihapus." });
+
+    if (filesToDelete.length > 0) {
+      filesToDelete.forEach((file) => deleteSingleFile(file));
+    }
+
+    return res
+      .status(200)
+      .json({ message: "Data manajemen berhasil diperbarui!" });
   } catch (error) {
-    if (t) await t.rollback();
+    if (t && !t.finished) await t.rollback();
+    if (req.file && req.file.filename) {
+      deleteSingleFile(req.file.filename);
+    }
+
+    console.error("🚨 [UPDATE MANAGEMENT ERROR]:", error.message);
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// 4. DELETE: Management (Standardized Shared Transaction)
+exports.deleteManagement = async (req, res) => {
+  const t = await sequelize.transaction();
+  const userRole = getRole(req);
+
+  try {
+    const { id } = req.params;
+
+    const person = await Management.findByPk(id, {
+      transaction: t,
+      lock: t.LOCK.UPDATE,
+    });
+
+    if (!person) {
+      await t.rollback();
+      return res.status(404).json({ message: "Data tidak ditemukan." });
+    }
+
+    if (person.is_locked && userRole === "editor") {
+      await t.rollback();
+      return res.status(423).json({
+        message: "Gagal menghapus. Data sedang dalam proses approval OWL.",
+        ticket: person.lock_ticket,
+      });
+    }
+
+    const photoToDelete = person.photoUrl;
+
+    // JALUR EDITOR: REQUEST DELETE (APPROVAL)
+    if (userRole === "editor") {
+      const result = await ErpApprovalService.initiateApproval({
+        moduleName: "Management",
+        model: Management,
+        targetId: id,
+        action: "DELETE",
+        payload: {
+          name: person.name,
+          role: person.role,
+          reason: "Request for permanent deletion",
+        },
+        userId: req.userId,
+        owlUsername: req.owl_username,
+        karyawanId: req.karyawanId,
+        token: req.owl_token,
+        transaction: t,
+      });
+
+      await person.update(
+        { is_locked: true, lock_ticket: result.notrans },
+        { transaction: t },
+      );
+
+      await t.commit();
+      return res.status(202).json({
+        message: "Permintaan hapus dikirim ke ERP. Data dikunci.",
+        ticket: result.notrans,
+      });
+    }
+
+    // JALUR SUPERADMIN: DIRECT DELETE
+    await invalidateOldDrafts("Management", id, t);
+    await person.destroy({ transaction: t });
+
+    await t.commit();
+
+    if (photoToDelete) {
+      deleteSingleFile(photoToDelete);
+    }
+
+    res.status(200).json({ message: "Data berhasil dihapus secara permanen." });
+  } catch (error) {
+    if (t && !t.finished) await t.rollback();
+
+    console.error("🚨 [DELETE MANAGEMENT ERROR]:", error.message);
     res.status(500).json({ message: error.message });
   }
 };

@@ -28,8 +28,10 @@ exports.getPendingApprovals = async (req, res) => {
     const userRole = req.userRole ? req.userRole.toLowerCase().trim() : "";
     const karyawanIdForOwl = String(req.karyawanId);
     const tokenOWL = req.owl_token;
-    const isAdmin = ["superadmin", "admin", "administrator"].includes(userRole);
 
+    const isApproverRole = ["superadmin", "approver"].includes(userRole);
+
+    // 1. Tarik Data dari ERP OWL (Bisa kosong jika sedang re-index pasca Reject)
     const owlResponse = await ErpApprovalService.getPendingList({
       karyawanid: karyawanIdForOwl,
       token: tokenOWL,
@@ -37,20 +39,23 @@ exports.getPendingApprovals = async (req, res) => {
     });
 
     const myOwlTasks = owlResponse?.data?.rows || [];
-
     const owlMap = new Map();
     const taskTicketsNormalized = [];
 
     myOwlTasks.forEach((item) => {
-      const ticketNo = (item.notransaksi || item.notrans || "").trim();
+      const ticketNo = (item.notransaksi || item.notrans || "")
+        .trim()
+        .toLowerCase();
       if (ticketNo) {
-        owlMap.set(ticketNo.toLowerCase(), item);
+        owlMap.set(ticketNo, item);
         taskTicketsNormalized.push(ticketNo);
       }
     });
 
+    // 2. THE SOURCE OF TRUTH (MySQL Query)
     let detailedDrafts = [];
-    if (isAdmin) {
+
+    if (isApproverRole) {
       detailedDrafts = await ApprovalDraft.findAll({
         where: {
           [Op.or]: [
@@ -68,15 +73,17 @@ exports.getPendingApprovals = async (req, res) => {
       });
     }
 
+    // 3. STITCHING DATA (Menjahit MySQL + ERP)
     const draftsWithExtraData = detailedDrafts.map((draft) => {
       const draftJson = draft.toJSON();
       const cleanDraftNo = (draft.notrans || "").trim().toLowerCase();
 
       const myRow = owlMap.get(cleanDraftNo);
 
-      const owlStatusAsal = myRow ? String(myRow.status) : null;
-      const isActuallyMyTurn = owlStatusAsal === "0";
-
+      const owlStatusFinal = myRow ? String(myRow.status) : "9";
+      const isActuallyMyTurn =
+        owlStatusFinal === "0" ||
+        (owlStatusFinal === "2" && draft.status === "Pending");
       return {
         ...draftJson,
         nourut: myRow ? myRow.nourut || myRow.kodeapp : null,
@@ -84,11 +91,13 @@ exports.getPendingApprovals = async (req, res) => {
         kodeapp: myRow ? myRow.kodeapp || myRow.nourut : null,
         nextApp: "",
         isMyQueue: isActuallyMyTurn,
-        owlStatus: owlStatusAsal,
+        owlStatus: owlStatusFinal,
+        _isSyncing: !myRow && draft.status === "Pending",
       };
     });
 
-    if (isAdmin) {
+    // 4. ORPHAN GHOST HANDLING (Tiket di ERP tapi tidak ada di CMS Lokal)
+    if (isApproverRole) {
       const existingNotrans = new Set(
         draftsWithExtraData.map((d) => d.notrans.toLowerCase()),
       );
@@ -98,7 +107,7 @@ exports.getPendingApprovals = async (req, res) => {
         if (owlNo && !existingNotrans.has(owlNo.toLowerCase())) {
           draftsWithExtraData.push({
             notrans: owlNo,
-            module_name: "UNKNOWN (Deleted Draft)",
+            module_name: "UNKNOWN (Deleted/Legacy Draft)",
             action: "N/A",
             status: "Orphaned",
             isMyQueue: String(owlItem.status) === "0",
@@ -110,23 +119,22 @@ exports.getPendingApprovals = async (req, res) => {
     }
 
     console.log(
-      `>>> [STITCHING SUCCESS] User: ${req.owl_username} | Total: ${draftsWithExtraData.length} Tiket`,
+      `>>> [STITCHING SUCCESS] Total Tiket Final: ${draftsWithExtraData.length} | ERP Rows: ${myOwlTasks.length}`,
     );
 
     return res.status(200).json(draftsWithExtraData);
   } catch (error) {
     console.error("🚨 [FETCH ERROR]:", error.message);
-    res.status(500).json({ message: "Gagal memuat antrean." });
+    res.status(500).json({ message: "Gagal memuat antrean persetujuan." });
   }
 };
 
 // POST: Approve/Reject
 exports.executeDecision = async (req, res) => {
-  // 1. Ambil Kunci Live dari Frontend (Tanpa Alias, Tanpa Replace)
   const {
     status,
-    kodeapp,
-    nourut,
+    kodeapp, // dari frontend
+    nourut, // key instance
     notrans: bodyNotrans,
     notransaksi,
     level,
@@ -147,8 +155,9 @@ exports.executeDecision = async (req, res) => {
       throw new Error("Gagal memproses: kodeapp tidak diterima dari Frontend.");
     }
 
-    // --- 🚀 FASE 1: DINAMISASI NEXTAPP (Baton Pass Logic) ---
+    //  FASE 1: DINAMISASI NEXTAPP (Baton Pass Logic)
     let pureNextApp = "";
+    let isFinalLocal = false;
 
     if (status === "1") {
       console.log(
@@ -171,22 +180,26 @@ exports.executeDecision = async (req, res) => {
             `>>> [BATON PASS] Target Estafet Ditemukan: ${pureNextApp} (${nextData.namakaryawan})`,
           );
         } else {
+          isFinalLocal = true; // Jika tidak ada level selanjutnya, MAKA INI FINAL!
           console.log(
             `>>> [BATON PASS] Tidak ada level ${nextLevel}. Ini adalah Final Approval.`,
           );
         }
+      } else {
+        // Fallback: Jika gagal tarik setup tapi status 1, kita asumsikan final agar tidak gantung
+        isFinalLocal = true;
       }
     }
 
     console.log(
-      `>>> [ERP CALL] Eksekusi -> KodeApp: ${kodeapp} | NoUrut: ${nourut} | NextApp: ${pureNextApp}`,
+      `>>> [ERP CALL] Eksekusi -> NoUrut: ${nourut} | NextApp: ${pureNextApp}`,
     );
 
-    // --- 🚀 FASE 2: TEMBAK ERP ---
-    const erpResult = await ErpApprovalService.submitDecision({
+    //  FASE 2: TEMBAK ERP (MAPPING REMAP)
+    await ErpApprovalService.submitDecision({
       status,
-      kodeapp: kodeapp, // Blueprint ID
-      nourut: nourut, // Live Ticket ID (Instruksi: "kodeapp diisi nourut")
+      kodeapp: nourut, // WAJIB: API ERP meminta nourut dikirim ke field kodeapp
+      nourut: nourut,
       notrans,
       level: currentLevel,
       komentar,
@@ -196,21 +209,21 @@ exports.executeDecision = async (req, res) => {
       karyawanid: nikApprover,
     });
 
-    // --- 🚀 FASE 3: UPDATE DATABASE LOKAL ---
+    // FASE 3: UPDATE DATABASE LOKAL (ORCHESTRATION)
     const t = await sequelize.transaction();
 
     try {
-      const isFinalApproval = erpResult?.data?.is_final === true;
-
       // JALUR REJECT
       if (status === "2") {
         const Model = getModelByModuleName(moduleName);
         if (Model && targetId && action !== "CREATE") {
+          // Buka gembok data asli agar bisa diedit ulang oleh Editor
           await Model.update(
             { is_locked: false, lock_ticket: null },
             { where: { id: targetId }, transaction: t },
           );
         }
+        // Tandai Draf sebagai Ditolak
         await ApprovalDraft.update(
           { status: "Rejected", rejection_reason: komentar },
           { where: { notrans }, transaction: t },
@@ -221,32 +234,46 @@ exports.executeDecision = async (req, res) => {
 
       // JALUR APPROVE
       if (status === "1") {
-        if (isFinalApproval) {
-          const Model = getModelByModuleName(moduleName);
-          if (!Model) throw new Error(`Model ${moduleName} tidak ditemukan.`);
+        if (isFinalLocal) {
+          console.log(
+            `>>> [LOCAL EXECUTION] Memulai injeksi data ke MySQL untuk modul ${moduleName}...`,
+          );
 
-          const cleanPayload = { ...payload };
+          let cleanPayload = { ...payload };
+          // Bersihkan field kotor dari Draf
           ["id", "createdAt", "updatedAt", "is_locked", "lock_ticket"].forEach(
             (f) => delete cleanPayload[f],
           );
 
-          await Model.update(
-            { ...cleanPayload, is_locked: false, lock_ticket: null },
-            { where: { id: targetId }, transaction: t },
+          // Suntikkan perintah Buka Gembok untuk di-update
+          cleanPayload.is_locked = false;
+          cleanPayload.lock_ticket = null;
+
+          // FILE COMMIT ENGINE: Ubah file TEMP_ jadi permanen!
+          cleanPayload = handleFileCommit(moduleName, cleanPayload);
+
+          // EXECUTION ENGINE: Jalankan update relasional (Induk & Anak)
+          await executeModelUpdate(
+            moduleName,
+            targetId,
+            cleanPayload,
+            action,
+            t,
           );
+
           await ApprovalDraft.update(
             { status: "Approved" },
             { where: { notrans }, transaction: t },
           );
+
           await t.commit();
           return res
             .status(200)
             .json({ message: "Final Approval Success. Published!" });
         } else {
-          // INTERMEDIATE APPROVAL
           await t.commit();
           return res.status(200).json({
-            message: `Level ${currentLevel} Approved. Menunggu Level Berikutnya.`,
+            message: `Level ${currentLevel} Approved. Estafet dilanjutkan ke Approver berikutnya.`,
           });
         }
       }
@@ -334,12 +361,14 @@ exports.getRejectedDraftByTarget = async (req, res) => {
   }
 };
 
-// --- PRIVATE HELPERS (MAINTAINABILITY) ---
-/**
- * 1. MAPPING MODEL
- * Menghubungkan nama modul dari OWL ke Model Sequelize kita
- */
+//  PRIVATE HELPERS (MAINTAINABILITY)
+// Mapping Model
 function getModelByModuleName(module) {
+  const standardKey =
+    Object.keys(MODULE_REGISTRY).find(
+      (k) => k.toLowerCase() === module.toLowerCase(),
+    ) || module;
+
   const mapping = {
     Project,
     Management,
@@ -353,17 +382,14 @@ function getModelByModuleName(module) {
     HomeSettings,
     ImpactStats,
     InvestmentSettings,
-    InvestmentSetting: InvestmentSettings,
     Settings,
     AboutInfo,
   };
-  return mapping[module] || null;
+
+  return mapping[standardKey] || null;
 }
 
-/**
- * 2. FILE COMMIT ENGINE
- * Mencari semua field yang kemungkinan berisi file TEMP_ dan meresmikannya
- */
+// File Commit
 function handleFileCommit(module, payload) {
   const fileFields = {
     Project: ["cover_image"],
@@ -373,12 +399,11 @@ function handleFileCommit(module, payload) {
     HeroSlides: ["imageUrl"],
     ImpactStats: ["icon"],
     Settings: ["logoUrl", "faviconUrl"],
-    // AboutInfo, History, dll biasanya teks murni
   };
 
   const fields = fileFields[module] || [];
+
   fields.forEach((field) => {
-    // Jika field ada isinya dan mengandung prefix TEMP_, kita commit
     if (
       payload[field] &&
       typeof payload[field] === "string" &&
@@ -388,7 +413,6 @@ function handleFileCommit(module, payload) {
     }
   });
 
-  // Special Case: Gallery Project (Array of Strings)
   if (module === "Project" && Array.isArray(payload.gallery)) {
     payload.gallery = payload.gallery.map((img) =>
       typeof img === "string" && img.startsWith("TEMP_")
@@ -396,12 +420,11 @@ function handleFileCommit(module, payload) {
         : img,
     );
   }
+
+  return payload;
 }
 
-/**
- * 3. EXECUTION ENGINE
- * Tempat eksekusi logika update ke MySQL berdasarkan modul
- */
+// 3. EXECUTION ENGINE
 async function executeModelUpdate(
   module,
   targetId,
@@ -410,37 +433,44 @@ async function executeModelUpdate(
   transaction,
 ) {
   const Model = getModelByModuleName(module);
-  if (!Model)
-    throw new Error(`Mapping Model untuk modul '${module}' tidak ditemukan.`);
 
+  if (!Model) {
+    throw new Error(`Mapping Model untuk modul '${module}' tidak ditemukan.`);
+  }
+
+  // PENANGANAN DELETE
   if (action === "DELETE") {
+    if (module === "BusinessSection") {
+      await BusinessMapMarker.destroy({
+        where: { sectionId: targetId },
+        transaction,
+      });
+    }
     return await Model.destroy({ where: { id: targetId }, transaction });
   }
 
+  // PENANGANAN CREATE
   if (action === "CREATE") {
     return await Model.create(payload, { transaction });
   }
 
-  // Semua modul yang cuma punya 1 row otomatis dialihkan ke ID 1
   const singletonModules = [
     "AboutInfo",
     "HomeSettings",
     "InvestmentSettings",
     "Settings",
   ];
-
   if (singletonModules.includes(module)) {
     return await Model.update(payload, { where: { id: 1 }, transaction });
   }
 
   switch (module) {
     case "History":
-      // Pola Replace-All untuk tabel anak (child table)
       await History.destroy({ where: {}, transaction });
       if (payload.histories && Array.isArray(payload.histories)) {
         const historyData = payload.histories.map((h) => ({
           year: h.year,
-          description: h.text, // Pastikan ini match dengan nama kolom MySQL lo
+          description: h.text,
           is_locked: false,
           lock_ticket: null,
         }));
@@ -449,12 +479,14 @@ async function executeModelUpdate(
       break;
 
     case "BusinessSection":
-      // 1. Update Induk
-      await BusinessSection.update(payload, {
+      const parentPayload = { ...payload };
+      delete parentPayload.mapMarkers;
+
+      await BusinessSection.update(parentPayload, {
         where: { id: targetId },
         transaction,
       });
-      // 2. Update Anak (Markers) dengan pola Replace-All
+
       if (payload.mapMarkers && Array.isArray(payload.mapMarkers)) {
         await BusinessMapMarker.destroy({
           where: { sectionId: targetId },
@@ -462,7 +494,7 @@ async function executeModelUpdate(
         });
         const newMarkers = payload.mapMarkers.map((m) => ({
           ...m,
-          id: undefined, // Paksa MySQL bikin ID auto-increment baru
+          id: undefined,
           sectionId: targetId,
           is_locked: false,
           lock_ticket: null,
@@ -489,7 +521,6 @@ async function executeModelUpdate(
       break;
 
     default:
-      // Modul Standar (Project, Affiliate, Management, Page, HeroSlides, ImpactStats)
       return await Model.update(payload, {
         where: { id: targetId },
         transaction,
@@ -497,10 +528,7 @@ async function executeModelUpdate(
   }
 }
 
-/**
- * 4. DIFF VIEWER DATA FETCHER
- * Mengambil data "Live" untuk dibandingkan dengan "Draf" di Frontend
- */
+// Diff Viewer Data Fetcher
 async function fetchOriginalDataByModule(module, targetId) {
   const Model = getModelByModuleName(module);
 
@@ -511,27 +539,14 @@ async function fetchOriginalDataByModule(module, targetId) {
     return null;
   }
 
-  // 2. SANITASI SUPER KETAT (Membunuh White Space dan Stringified Null)
-  let cleanTargetId = null;
-  if (targetId && typeof targetId === "string") {
-    cleanTargetId = targetId.trim();
-    if (
-      cleanTargetId === "null" ||
-      cleanTargetId === "undefined" ||
-      cleanTargetId === ""
-    ) {
-      cleanTargetId = null;
-    }
-  } else {
-    cleanTargetId = targetId;
+  // Sanitasi super ketat ID
+  let cleanTargetId =
+    targetId && typeof targetId === "string" ? targetId.trim() : targetId;
+  if (["null", "undefined", ""].includes(cleanTargetId)) {
+    cleanTargetId = null;
   }
 
-  console.log(
-    `>>> [DIFF VIEWER] Mencari versi Live | Modul: ${module} | Clean ID: '${cleanTargetId}'`,
-  );
-
   try {
-    // Custom fetch untuk data yang punya relasi atau singleton
     if (module === "BusinessSection") {
       return await BusinessSection.findByPk(cleanTargetId, {
         include: [{ model: BusinessMapMarker, as: "mapMarkers" }],
@@ -543,7 +558,6 @@ async function fetchOriginalDataByModule(module, targetId) {
         module,
       )
     ) {
-      // Modul Singleton selalu pakai ID 1
       return await Model.findByPk(1);
     }
 
@@ -557,59 +571,14 @@ async function fetchOriginalDataByModule(module, targetId) {
       };
     }
 
-    // 3. PENCEGAHAN QUERY KOSONG
-    if (!cleanTargetId) {
-      console.warn(
-        `⚠️ [DIFF VIEWER] Target ID kosong setelah sanitasi. Batal query ke database.`,
-      );
-      return null;
-    }
+    if (!cleanTargetId) return null; // Cegah query melayang
 
-    // Default Fetch (Project, Affiliate, Management, Page, dll)
-    const data = await Model.findByPk(cleanTargetId);
-
-    if (!data) {
-      console.warn(
-        `⚠️ [DIFF VIEWER] Data GHOST! Record '${cleanTargetId}' tidak ada di tabel '${Model.tableName}'`,
-      );
-    } else {
-      console.log(`>>> [DIFF VIEWER] Data Live Ditemukan! Sukses.`);
-    }
-
-    return data;
+    return await Model.findByPk(cleanTargetId);
   } catch (error) {
     console.error(
-      `🚨 [DIFF VIEWER] Sequelize Error saat query tabel '${Model.tableName}':`,
+      `🚨 [DIFF VIEWER] Sequelize Error query '${Model.tableName}':`,
       error,
     );
     throw error;
   }
-}
-
-function getModelByModuleName(module) {
-  // 1. Normalisasi nama string (Project -> Projects, dst) menggunakan Registry Fase 1
-  const standardKey =
-    Object.keys(MODULE_REGISTRY).find(
-      (k) => k.toLowerCase() === module.toLowerCase(),
-    ) || module;
-
-  // 2. Map ke objek model yang sudah lo require di atas
-  const mapping = {
-    Project,
-    Management,
-    Affiliate,
-    Page,
-    Menu,
-    MapCategory,
-    BusinessSection,
-    HeroSlides,
-    History,
-    HomeSettings,
-    ImpactStats,
-    InvestmentSettings,
-    Settings,
-    AboutInfo,
-  };
-
-  return mapping[standardKey] || null;
 }

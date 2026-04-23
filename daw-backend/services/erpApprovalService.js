@@ -233,8 +233,8 @@ class ErpApprovalService {
 
   // Execute Decision /trans/submitApp
   static async submitDecision({
-    kodeapp,
-    nourut,
+    kodeapp, // e.g., "20260415/CMS/001"
+    nourut, // e.g., "20260422/APPCMS/001"
     notrans,
     level,
     status,
@@ -246,25 +246,24 @@ class ErpApprovalService {
     try {
       const payload = {
         status: String(status),
-        kodeapp: kodeapp,
-        notrans: notrans,
+        kodeapp: String(nourut),
+        notrans: String(notrans),
         level: Number(level),
         komentar: komentar || (status === "1" ? "Disetujui" : "Ditolak"),
-        nextApp: String(nextApp),
+        nextApp: String(nextApp || ""),
         jenisApp: CMS_CODE,
         karyawanid: String(karyawanid),
       };
+      console.log(
+        ">>> [ERP PRE-FLIGHT] Payload Remapped:",
+        JSON.stringify(payload, null, 2),
+      );
       const response = await dawApi.post(
         "/node/approval/trans/submitApp",
         payload,
         {
           headers: { Authorization: `Bearer ${token}` },
         },
-      );
-
-      console.log(
-        ">>> [ERP RESPONSE RAW]:",
-        JSON.stringify(response.data, null, 2),
       );
       return response.data;
     } catch (error) {

@@ -4,12 +4,12 @@ const Settings = require("../models/Settings");
 const ApprovalDraft = require("../models/ApprovalDraft");
 const { ErpApprovalService } = require("../services/erpApprovalService");
 const { deleteSingleFile } = require("../utils/fileRemover");
-const { invalidateOldDrafts } = require("../utils/draftCleanup"); // 🚀 IMPOR DRAFT KILLER
+const { invalidateOldDrafts } = require("../utils/draftCleanup");
 const sequelize = require("../config/database");
 
 const JENIS_APP_CMS = process.env.CMS_APPROVAL_CODE;
 
-// --- HELPER: Safely Rename File for Editor Drafts ---
+// HELPER: Safely Rename File for Editor Drafts
 const applyTempPrefix = (fileObj) => {
   if (!fileObj) return null;
   const newFilename = `TEMP_${fileObj.filename}`;
@@ -74,7 +74,7 @@ exports.updateSettings = async (req, res) => {
     const userRole = req.userRole ? req.userRole.toLowerCase().trim() : "";
     const { status, previous_notrans, ...textContent } = req.body;
 
-    // 🔒 THE GATEKEEPER
+    // THE GATEKEEPER
     if (userRole === "editor" && settings.is_locked) {
       return res.status(423).json({
         success: false,
