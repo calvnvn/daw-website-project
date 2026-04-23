@@ -174,6 +174,7 @@ exports.createProject = async (req, res) => {
         payload: { ...projectData, status: "Published" },
         userId: req.userId,
         owlUsername: req.owl_username,
+        karyawanId: req.karyawanId,
         token: req.owl_token,
         transaction: t, // 👈 WAJIB ADA AGAR TIDAK DEADLOCK
       });
@@ -365,10 +366,7 @@ exports.deleteProject = async (req, res) => {
   }
 };
 
-// ============================================================================
 // PUBLIC CONTROLLERS (Tidak pakai transaksi karena cuma READ)
-// ============================================================================
-
 exports.uploadInlineImage = async (req, res) => {
   try {
     if (!req.file)

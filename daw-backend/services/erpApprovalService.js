@@ -71,6 +71,7 @@ class ErpApprovalService {
     payload,
     userId,
     owlUsername,
+    karyawanId,
     token,
     transaction,
   }) {
@@ -143,7 +144,7 @@ class ErpApprovalService {
       const payloadTransAdd = {
         notrans,
         jenisApp: CMS_CODE,
-        inputby: String(req.karyawanId || actorId),
+        inputby: String(karyawanId || actorId),
         data: cleanApproverRows,
       };
 
