@@ -108,10 +108,7 @@ const processProjectPayload = async (req, project) => {
   };
 };
 
-// ============================================================================
-// 🚀 MAIN CONTROLLERS
-// ============================================================================
-
+// MAIN CONTROLLERS
 exports.getAllProjects = async (req, res) => {
   try {
     const projects = await Project.findAll({
@@ -136,28 +133,28 @@ exports.getProjectById = async (req, res) => {
   }
 };
 
-// 🔥 REFACTORED: Atomic Create
 exports.createProject = async (req, res) => {
-  const t = await sequelize.transaction(); // Tambahkan transaksi di Create
+  const t = await sequelize.transaction();
   try {
-    // Asumsi: prepareProjectData sudah ada di file ini atau didefinisikan sebelumnya
-    // Jika fungsi ini ada di middleware/helper lain, pastikan sudah di-import.
-    // Jika tidak ada, lo bisa ganti dengan req.body sementara (sesuai kodingan lama lo).
-    const projectData =
-      typeof prepareProjectData === "function"
-        ? await prepareProjectData(req)
-        : req.body;
-    const { previous_notrans, status } = req.body;
+    const { previous_notrans, status: requestStatus } = req.body;
     const userRole = req.userRole?.toLowerCase();
 
-    // 1. Buat record di lokal (Status default Draft)
+    // 1. Gunakan helper processProjectPayload.
+    const { payload } = await processProjectPayload(req, {
+      title: "",
+      slug: "",
+      gallery: [],
+      cover_image: null,
+    });
+
+    // 2. Buat record di lokal (Status dipaksa Draft dulu demi keamanan)
     const newProject = await Project.create(
-      { ...projectData, status: "Draft" },
+      { ...payload, status: "Draft" },
       { transaction: t },
     );
 
-    // 2. Editor Jalur Publish (Approval)
-    if (userRole === "editor" && status === "Published") {
+    // 3. JALUR EDITOR: Ajukan Publish (Approval OWL)
+    if (userRole === "editor" && requestStatus === "Published") {
       if (previous_notrans) {
         await ApprovalDraft.update(
           { status: "Replaced" },
@@ -165,18 +162,18 @@ exports.createProject = async (req, res) => {
         );
       }
 
-      // Handshake OWL
+      // Handshake ke ERP
       const result = await ErpApprovalService.initiateApproval({
         moduleName: "Project",
         model: Project,
         targetId: newProject.id,
         action: "CREATE",
-        payload: { ...projectData, status: "Published" },
+        payload: { ...payload, status: "Published" },
         userId: req.userId,
         owlUsername: req.owl_username,
         karyawanId: req.karyawanId,
         token: req.owl_token,
-        transaction: t, // 👈 WAJIB ADA AGAR TIDAK DEADLOCK
+        transaction: t,
       });
 
       await newProject.update(
@@ -186,30 +183,37 @@ exports.createProject = async (req, res) => {
 
       await t.commit();
       return res.status(202).json({
-        message: "Diajukan. Data dikunci menunggu persetujuan.",
+        message: "Proyek baru diajukan. Data dikunci menunggu persetujuan.",
         ticket: result.notrans,
       });
     }
 
-    // 3. Admin atau Editor Save Draft
-    if (status === "Published") {
+    // JALUR ADMIN ATAU SIMPAN DRAF
+    if (
+      requestStatus === "Published" &&
+      (userRole === "superadmin" || userRole === "admin")
+    ) {
       await newProject.update({ status: "Published" }, { transaction: t });
     }
 
     await t.commit();
-    return res
-      .status(201)
-      .json({ message: "Proyek berhasil disimpan.", data: newProject });
+    return res.status(201).json({
+      message:
+        requestStatus === "Draft"
+          ? "Draf proyek berhasil disimpan."
+          : "Proyek berhasil dipublikasikan.",
+      data: newProject,
+    });
   } catch (error) {
     if (t && !t.finished) await t.rollback();
     console.error("🚨 Error CREATE Project:", error);
-    res
-      .status(500)
-      .json({ message: "Gagal memproses permintaan.", error: error.message });
+    res.status(500).json({
+      message: "Gagal membuat proyek baru.",
+      error: error.message,
+    });
   }
 };
 
-// 🔥 REFACTORED: Atomic Update
 exports.updateProject = async (req, res) => {
   const t = await sequelize.transaction();
   try {
@@ -235,7 +239,6 @@ exports.updateProject = async (req, res) => {
       console.log(`>>> [OVERRIDE] Admin bypass lock pada Proyek ID: ${id}`);
     }
 
-    // 📦 Ekstrak logika berantakan ke helper
     const { payload, filesToDelete, oldCoverToDelete } =
       await processProjectPayload(req, project);
 
@@ -301,7 +304,6 @@ exports.updateProject = async (req, res) => {
   }
 };
 
-// 🔥 REFACTORED: Atomic Delete
 exports.deleteProject = async (req, res) => {
   const t = await sequelize.transaction();
   try {

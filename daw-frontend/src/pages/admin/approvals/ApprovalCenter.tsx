@@ -444,7 +444,7 @@ export default function ApprovalCenter() {
 
   // 2. ENGINE STATES (Search, Filter, Pagination)
   const [activeTab, setActiveTab] = useState<"my_queue" | "history" | "all">(
-    "my_queue",
+    "all",
   );
   const [searchQuery, setSearchQuery] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
