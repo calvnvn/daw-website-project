@@ -2,31 +2,37 @@ const sequelize = require("../config/database");
 const AboutInfo = require("../models/AboutInfo");
 const ApprovalDraft = require("../models/ApprovalDraft");
 const { ErpApprovalService } = require("../services/erpApprovalService");
+const { invalidateOldDrafts } = require("../utils/draftCleanup");
 
-// Helper untuk Role
-const getRole = (req) =>
-  req.userRole ? req.userRole.toLowerCase().trim() : "";
+// Helper Pemrosesan Payload
+const processAboutPayload = async (req, existingData = {}) => {
+  const {
+    spiritText,
+    missionText,
+    visionText,
+    philosophyTitle,
+    philosophyPillars,
+  } = req.body;
+
+  return {
+    payload: {
+      spiritText: spiritText || existingData.spiritText,
+      missionText: missionText || existingData.missionText,
+      visionText: visionText || existingData.visionText,
+      philosophyTitle: philosophyTitle || existingData.philosophyTitle,
+      philosophyPillars: philosophyPillars || existingData.philosophyPillars,
+    },
+    filesToDelete: [],
+  };
+};
 
 // GET: Data Info & Philosophy
 exports.getAboutInfo = async (req, res) => {
   try {
-    const info = await AboutInfo.findByPk(1, {
-      attributes: [
-        "spiritText",
-        "missionText",
-        "visionText",
-        "philosophyTitle",
-        "philosophyPillars",
-        "is_locked",
-        "lock_ticket",
-      ],
-    });
-
+    const info = await AboutInfo.findByPk(1);
     if (!info) return res.status(404).json({ message: "About info not found" });
-
     res.status(200).json(info);
   } catch (error) {
-    console.error("Error GET About Info:", error);
     res.status(500).json({ message: "Failed to fetch about info" });
   }
 };
@@ -35,42 +41,31 @@ exports.getAboutInfo = async (req, res) => {
 exports.updateAboutInfo = async (req, res) => {
   const t = await sequelize.transaction();
   try {
-    const userRole = getRole(req);
-    const {
-      spiritText,
-      missionText,
-      visionText,
-      philosophyTitle,
-      philosophyPillars,
-      status,
-      previous_notrans,
-    } = req.body;
+    const userRole = req.userRole?.toLowerCase().trim();
+    const { status, previous_notrans } = req.body;
 
+    // Singleton: Selalu gunakan ID 1
     const info = await AboutInfo.findByPk(1, { transaction: t });
     if (!info) {
       await t.rollback();
-      return res.status(404).json({ message: "About info not found" });
+      return res
+        .status(404)
+        .json({ message: "About info record ID 1 not found" });
     }
 
-    // 1. Pre-Flight Check: Lock Guard
+    // A. GATEKEEPER: Lock Guard
     if (info.is_locked && userRole === "editor") {
       await t.rollback();
       return res.status(423).json({
-        message:
-          "Data sedang ditinjau Admin. Perubahan saat ini tidak diizinkan.",
+        message: "Data sedang dikunci oleh proses approval OWL.",
         ticket: info.lock_ticket,
       });
     }
 
-    const packageContent = {
-      spiritText: spiritText || info.spiritText,
-      missionText: missionText || info.missionText,
-      visionText: visionText || info.visionText,
-      philosophyTitle: philosophyTitle || info.philosophyTitle,
-      philosophyPillars: philosophyPillars || info.philosophyPillars,
-    };
+    // B. PROCESSING: Jalankan Helper
+    const { payload } = await processAboutPayload(req, info);
 
-    // --- JALUR EDITOR: TWO-PHASE EXECUTION ---
+    // JALUR 1: EDITOR (Approval Flow)
     if (userRole === "editor" && status === "Published") {
       if (previous_notrans) {
         await ApprovalDraft.update(
@@ -80,16 +75,18 @@ exports.updateAboutInfo = async (req, res) => {
       }
 
       const result = await ErpApprovalService.initiateApproval({
+        moduleName: "AboutInfo",
         model: AboutInfo,
-        targetId: 1, // Singleton ID
+        targetId: 1,
         action: "UPDATE",
-        payload: packageContent,
+        payload: { ...payload, status: "Published" },
         userId: req.userId,
         owlUsername: req.owl_username,
-        token: req.headers["authorization"]?.split(" ")[1],
+        karyawanId: req.karyawanId,
+        token: req.owl_token,
+        transaction: t,
       });
 
-      // C. Set Local Lock
       await info.update(
         { is_locked: true, lock_ticket: result.notrans },
         { transaction: t },
@@ -97,15 +94,19 @@ exports.updateAboutInfo = async (req, res) => {
 
       await t.commit();
       return res.status(202).json({
-        message: "Revisi About Company terkirim.",
+        message: "Revisi About Company diajukan ke ERP OWL.",
         ticket: result.notrans,
       });
     }
 
-    // --- JALUR SUPERADMIN: DIRECT EXECUTION ---
+    // JALUR 2: ADMIN / DIRECT COMMIT
+    if (userRole === "superadmin" || userRole === "admin") {
+      await invalidateOldDrafts("AboutInfo", 1, t);
+    }
+
     await info.update(
       {
-        ...packageContent,
+        ...payload,
         is_locked: false,
         lock_ticket: null,
       },
@@ -113,9 +114,11 @@ exports.updateAboutInfo = async (req, res) => {
     );
 
     await t.commit();
-    res.status(200).json({ message: "About Info updated successfully!" });
+    return res
+      .status(200)
+      .json({ message: "About Info berhasil diperbarui secara langsung." });
   } catch (error) {
-    if (t) await t.rollback();
+    if (t && !t.finished) await t.rollback();
     console.error("🚨 [UPDATE ABOUT ERROR]:", error.message);
     res.status(500).json({ message: error.message });
   }

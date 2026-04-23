@@ -8,10 +8,7 @@ const { invalidateOldDrafts } = require("../utils/draftCleanup");
 
 const JENIS_APP_CMS = process.env.CMS_APPROVAL_CODE;
 
-// ============================================================================
-// 🛠️ HELPER FUNCTIONS (Clean Code Architecture)
-// ============================================================================
-
+// HELPER FUNCTIONS (Clean Code Architecture)
 const generateUniqueProjectSlug = async (title, id = null) => {
   let baseSlug = title
     .toLowerCase()
