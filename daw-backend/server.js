@@ -53,6 +53,7 @@ require("./models/Inquiry");
 require("./models/InquirySubject");
 require("./models/InvestmentSettings");
 require("./models/ApprovalDraft");
+const { startCleanupTask } = require("./utils/cleanupWorker");
 
 const app = express();
 
@@ -128,6 +129,10 @@ app.get("/", (req, res) => {
     docs: "/api-docs",
   });
 });
+
+// Cronjob
+startCleanupTask();
+console.log("🚀 [SYSTEM] Weekly Cleanup Worker has been initialized.");
 
 // SWAGGER API DOCS SETUP
 try {

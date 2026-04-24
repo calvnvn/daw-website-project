@@ -1,14 +1,16 @@
 const Project = require("../models/Project");
 const BusinessSection = require("../models/BusinessSection");
+const ApprovalDraft = require("../models/ApprovalDraft");
 const { deleteSingleFile } = require("../utils/fileRemover");
 const { Op } = require("sequelize");
 const sequelize = require("../config/database");
-const { ErpApprovalService } = require("../services/erpApprovalService");
+const ErpApprovalService = require("../services/erpApprovalService");
 const { invalidateOldDrafts } = require("../utils/draftCleanup");
+const { generateNotrans } = require("../utils/notransGenerator");
 
 const JENIS_APP_CMS = process.env.CMS_APPROVAL_CODE;
 
-//Mencari URL gambar di dalam string HTML untuk kebutuhan cleanup fisik
+//Mencari URL gambar di dalam string HTML untuk kebutuhan cleanup
 const extractImagesFromHtml = (html) => {
   if (!html) return [];
   const images = [];
@@ -19,6 +21,7 @@ const extractImagesFromHtml = (html) => {
   }
   return images;
 };
+
 // HELPER FUNCTIONS (Clean Code Architecture)
 const generateUniqueProjectSlug = async (title, id = null) => {
   let baseSlug = title
@@ -29,11 +32,26 @@ const generateUniqueProjectSlug = async (title, id = null) => {
   let counter = 1;
 
   while (true) {
+    // Check live table
     const whereClause = id
       ? { slug: finalSlug, id: { [Op.ne]: id } }
       : { slug: finalSlug };
-    const existing = await Project.findOne({ where: whereClause });
-    if (!existing) break;
+    const existingLive = await Project.findOne({ where: whereClause });
+
+    // Cek di dalam Brankas ApprovalDraft supaya tidak collision
+    const existingDraft = await ApprovalDraft.findOne({
+      where: {
+        module_name: "Project",
+        status: "Pending",
+        [Op.and]: sequelize.where(
+          sequelize.fn("JSON_EXTRACT", sequelize.col("payload"), "$.slug"),
+          `"${finalSlug}"`,
+        ),
+      },
+    });
+
+    if (!existingLive && !existingDraft) break;
+
     finalSlug = `${baseSlug}-${counter}`;
     counter++;
   }
@@ -53,6 +71,7 @@ const processProjectPayload = async (req, project) => {
     seo_title,
     meta_description,
   } = req.body;
+
   const authorIdentity = req.owl_username || req.karyawanId || "System Admin";
   let finalGallery = [];
   let filesToDelete = [];
@@ -60,6 +79,7 @@ const processProjectPayload = async (req, project) => {
   let oldCoverToDelete = null;
 
   const cleanContent = content || project.content || "";
+
   if (project.content) {
     const oldHtmlImages = extractImagesFromHtml(project.content);
     const newHtmlImages = extractImagesFromHtml(cleanContent);
@@ -68,6 +88,7 @@ const processProjectPayload = async (req, project) => {
     );
     filesToDelete = [...filesToDelete, ...deletedHtmlImages];
   }
+
   // 1. Process Gallery
   if (existing_gallery) {
     try {
@@ -79,9 +100,11 @@ const processProjectPayload = async (req, project) => {
         typeof project.gallery === "string"
           ? JSON.parse(project.gallery || "[]")
           : project.gallery;
-      filesToDelete = oldGallery.filter(
+
+      const removedFromGallery = oldGallery.filter(
         (file) => !remainingGallery.includes(file),
       );
+      filesToDelete = [...filesToDelete, ...removedFromGallery];
       finalGallery = remainingGallery;
     } catch (e) {
       console.error("Gagal parse gallery lama:", e);
@@ -107,6 +130,9 @@ const processProjectPayload = async (req, project) => {
     finalSlug = await generateUniqueProjectSlug(title, project.id);
   }
 
+  const allFilesToTrash = [...filesToDelete];
+  if (oldCoverToDelete) allFilesToTrash.push(oldCoverToDelete);
+
   return {
     payload: {
       title: title || project.title,
@@ -120,13 +146,13 @@ const processProjectPayload = async (req, project) => {
       seo_title: seo_title || project.seo_title,
       meta_description: meta_description || project.meta_description,
       author: project.author || authorIdentity,
+      _filesToDelete: allFilesToTrash,
     },
     filesToDelete,
     oldCoverToDelete,
   };
 };
 
-// MAIN CONTROLLERS
 exports.getAllProjects = async (req, res) => {
   try {
     const projects = await Project.findAll({
@@ -156,8 +182,9 @@ exports.createProject = async (req, res) => {
   try {
     const { previous_notrans, status: requestStatus } = req.body;
     const userRole = req.userRole?.toLowerCase();
+    const actorId = String(req.owl_username || req.karyawanId);
 
-    // 1. Gunakan helper processProjectPayload.
+    // 1. Bersihkan Payload
     const { payload } = await processProjectPayload(req, {
       title: "",
       slug: "",
@@ -165,14 +192,12 @@ exports.createProject = async (req, res) => {
       cover_image: null,
     });
 
-    // 2. Buat record di lokal (Status dipaksa Draft dulu demi keamanan)
-    const newProject = await Project.create(
-      { ...payload, status: "Draft" },
-      { transaction: t },
-    );
-
-    // 3. JALUR EDITOR: Ajukan Publish (Approval OWL)
+    // EDITOR: Ajukan Publish (Approval ERP)
     if (userRole === "editor" && requestStatus === "Published") {
+      // Dapatkan Kunci Antrean
+      const notrans = await generateNotrans("Projects");
+
+      // Invalidate Draf Lama (Jika ada resubmission)
       if (previous_notrans) {
         await ApprovalDraft.update(
           { status: "Replaced" },
@@ -180,55 +205,60 @@ exports.createProject = async (req, res) => {
         );
       }
 
-      // Handshake ke ERP
-      const result = await ErpApprovalService.initiateApproval({
-        moduleName: "Project",
-        model: Project,
-        targetId: newProject.id,
-        action: "CREATE",
-        payload: { ...payload, status: "Published" },
-        userId: req.userId,
-        owlUsername: req.owl_username,
-        karyawanId: req.karyawanId,
-        token: req.owl_token,
-        transaction: t,
-      });
-
-      await newProject.update(
-        { is_locked: true, lock_ticket: result.notrans },
+      // Buat Data Asli (Langsung Digembok)
+      const newProject = await Project.create(
+        { ...payload, status: "Draft", is_locked: true, lock_ticket: notrans },
         { transaction: t },
       );
+
+      await ApprovalDraft.create(
+        {
+          notrans,
+          module_name: "Project",
+          action: "CREATE",
+          target_id: String(newProject.id),
+          payload: { ...payload, status: "Published" },
+          created_by: actorId,
+          status: "Pending",
+        },
+        { transaction: t },
+      );
+
+      // e. THE HANDSHAKE: Lapor ke ERP
+      await ErpApprovalService.initiateApproval({
+        notrans,
+        karyawanId: actorId,
+        token: req.owl_token,
+      });
 
       await t.commit();
       return res.status(202).json({
         message: "Proyek baru diajukan. Data dikunci menunggu persetujuan.",
-        ticket: result.notrans,
+        ticket: notrans,
       });
     }
 
-    // JALUR ADMIN ATAU SIMPAN DRAF
-    if (
-      requestStatus === "Published" &&
-      (userRole === "superadmin" || userRole === "admin")
-    ) {
-      await newProject.update({ status: "Published" }, { transaction: t });
-    }
+    // ADMIN: LIVE OR LOCAL DRAFT (Editor Save as Draft)
+    const finalStatus = requestStatus === "Published" ? "Published" : "Draft";
+    const newProject = await Project.create(
+      { ...payload, status: finalStatus, is_locked: false },
+      { transaction: t },
+    );
 
     await t.commit();
     return res.status(201).json({
       message:
-        requestStatus === "Draft"
-          ? "Draf proyek berhasil disimpan."
+        finalStatus === "Draft"
+          ? "Draf proyek berhasil disimpan lokal."
           : "Proyek berhasil dipublikasikan.",
       data: newProject,
     });
   } catch (error) {
     if (t && !t.finished) await t.rollback();
     console.error("🚨 Error CREATE Project:", error);
-    res.status(500).json({
-      message: "Gagal membuat proyek baru.",
-      error: error.message,
-    });
+    res
+      .status(500)
+      .json({ message: "Gagal membuat proyek baru.", error: error.message });
   }
 };
 
@@ -238,12 +268,12 @@ exports.updateProject = async (req, res) => {
     const { id } = req.params;
     const userRole = req.userRole?.toLowerCase();
     const { status, previous_notrans } = req.body;
+    const actorId = String(req.owl_username || req.karyawanId);
 
     const project = await Project.findByPk(id, {
       transaction: t,
       lock: t.LOCK.UPDATE,
     });
-
     if (!project) {
       await t.rollback();
       return res.status(404).json({ message: "Project not found" });
@@ -253,7 +283,7 @@ exports.updateProject = async (req, res) => {
       if (userRole === "editor") {
         await t.rollback();
         return res.status(423).json({
-          message: "Data sedang dikunci oleh proses approval OWL.",
+          message: "Data sedang dikunci oleh proses approval ERP.",
           ticket: project.lock_ticket,
         });
       }
@@ -263,8 +293,10 @@ exports.updateProject = async (req, res) => {
     const { payload, filesToDelete, oldCoverToDelete } =
       await processProjectPayload(req, project);
 
-    // --- JALUR EDITOR (Approval) ---
+    // EDITOR: Ajukan Revisi
     if (userRole === "editor" && status === "Published") {
+      const notrans = await generateNotrans("Projects");
+
       if (previous_notrans) {
         await ApprovalDraft.update(
           { status: "Replaced" },
@@ -272,33 +304,50 @@ exports.updateProject = async (req, res) => {
         );
       }
 
-      await project.update({ is_locked: true }, { transaction: t });
+      await ApprovalDraft.create(
+        {
+          notrans,
+          module_name: "Project",
+          action: "UPDATE",
+          target_id: String(id),
+          payload: { ...payload, status: "Published" },
+          created_by: actorId,
+          status: "Pending",
+        },
+        { transaction: t },
+      );
 
-      const result = await ErpApprovalService.initiateApproval({
-        moduleName: "Project",
-        model: Project,
-        targetId: id,
-        action: "UPDATE",
-        payload: { ...payload, status: "Published" },
-        userId: req.userId,
-        owlUsername: req.owl_username,
+      // Pasang Gembok di Live Data
+      await project.update(
+        { is_locked: true, lock_ticket: notrans },
+        { transaction: t },
+      );
+
+      // Handshake
+      await ErpApprovalService.initiateApproval({
+        notrans,
+        karyawanId: actorId,
         token: req.owl_token,
-        transaction: t,
       });
-
-      await project.update({ lock_ticket: result.notrans }, { transaction: t });
 
       await t.commit();
       return res.status(202).json({
-        message: "Revisi diajukan. Data asli dikunci.",
-        ticket: result.notrans,
+        message: "Revisi diajukan ke ERP. Data asli dikunci.",
+        ticket: notrans,
       });
     }
 
-    // --- JALUR ADMIN / DRAFT ---
+    // ADMIN / DRAFT LOKAL
     if (userRole === "superadmin" || userRole === "admin") {
       await invalidateOldDrafts("Project", id, t);
     }
+
+    await project.update(
+      { ...payload, is_locked: false, lock_ticket: null },
+      { transaction: t },
+    );
+    await t.commit();
+
     if (
       userRole === "superadmin" ||
       (userRole === "editor" && status === "Draft")
@@ -307,16 +356,8 @@ exports.updateProject = async (req, res) => {
       if (oldCoverToDelete) deleteSingleFile(oldCoverToDelete);
     }
 
-    await project.update(
-      { ...payload, is_locked: false, lock_ticket: null },
-      { transaction: t },
-    );
-    await t.commit();
-    filesToDelete.forEach((file) => deleteSingleFile(file));
-    if (oldCoverToDelete) deleteSingleFile(oldCoverToDelete);
-
     res.status(200).json({
-      message: status === "Draft" ? "Draf disimpan." : "Override sukses.",  
+      message: status === "Draft" ? "Draf disimpan." : "Override sukses.",
     });
   } catch (error) {
     if (t && !t.finished) await t.rollback();
@@ -330,6 +371,8 @@ exports.deleteProject = async (req, res) => {
   try {
     const { id } = req.params;
     const userRole = req.userRole?.toLowerCase();
+    const actorId = String(req.owl_username || req.karyawanId);
+
     const project = await Project.findByPk(id, { transaction: t });
 
     if (!project) {
@@ -345,35 +388,47 @@ exports.deleteProject = async (req, res) => {
       });
     }
 
+    // EDITOR: Ajukan Penghapusan
     if (userRole === "editor") {
-      await project.update({ is_locked: true }, { transaction: t });
+      const notrans = await generateNotrans("Projects");
 
-      const result = await ErpApprovalService.initiateApproval({
-        moduleName: "Project",
-        model: Project,
-        targetId: id,
-        action: "DELETE",
-        payload: { title: project.title, reason: "Request Delete" },
-        userId: req.userId,
-        owlUsername: req.owl_username,
+      // Bikin draf "Minta Hapus"
+      await ApprovalDraft.create(
+        {
+          notrans,
+          module_name: "Project",
+          action: "DELETE",
+          target_id: String(id),
+          payload: { title: project.title, reason: "Request Delete" },
+          created_by: actorId,
+          status: "Pending",
+        },
+        { transaction: t },
+      );
+
+      // Gembok doang, JANGAN DI-DESTROY!
+      await project.update(
+        { is_locked: true, lock_ticket: notrans },
+        { transaction: t },
+      );
+
+      await ErpApprovalService.initiateApproval({
+        notrans,
+        karyawanId: actorId,
         token: req.owl_token,
-        transaction: t, // 👈 WAJIB ADA
       });
-
-      await project.update({ lock_ticket: result.notrans }, { transaction: t });
 
       await t.commit();
       return res
         .status(202)
-        .json({ message: "Permintaan hapus dikirim.", ticket: result.notrans });
+        .json({ message: "Permintaan hapus dikirim ke ERP.", ticket: notrans });
     }
 
-    // --- JALUR ADMIN ---
+    // ADMIN
     await invalidateOldDrafts("Project", id, t);
     await project.destroy({ transaction: t });
     await t.commit();
 
-    // Cleanup File Fisik
     if (project.cover_image) deleteSingleFile(project.cover_image);
     const gallery =
       typeof project.gallery === "string"
@@ -427,7 +482,9 @@ exports.getPublicProjectById = async (req, res) => {
       return res
         .status(404)
         .json({ message: "Project not found or not published" });
-    await project.increment("views", { by: 1 });
+
+    await project.increment("views", { by: 1, silent: true });
+
     res.status(200).json(project);
   } catch (error) {
     res.status(500).json({ message: error.message });
@@ -443,7 +500,9 @@ exports.getPublicProjectBySlug = async (req, res) => {
       return res
         .status(404)
         .json({ message: "Project not found or not published" });
-    await project.increment("views", { by: 1 });
+
+    await project.increment("views", { by: 1, silent: true });
+
     res.status(200).json(project);
   } catch (error) {
     res.status(500).json({ message: error.message });
@@ -453,7 +512,9 @@ exports.getPublicProjectBySlug = async (req, res) => {
 exports.incrementProjectView = async (req, res) => {
   try {
     const project = await Project.findByPk(req.params.id);
-    if (project) await project.increment("views", { by: 1 });
+    if (project) {
+      await project.increment("views", { by: 1, silent: true });
+    }
     res.status(200).json({ message: "View incremented" });
   } catch (error) {
     res.status(500).json({ message: error.message });
