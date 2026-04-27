@@ -15,13 +15,15 @@ import {
   Loader2,
   Send,
   Clock,
+  X,
+  FileText,
 } from "lucide-react";
 import { toast } from "sonner";
 import { useInvestments } from "@/contexts/InvestmentContext";
 import { useAuth } from "@/contexts/AuthContext";
 import api from "@/lib/api";
 import { getCleanImageUrl } from "@/lib/utils";
-import { isDirty } from "zod/v3";
+
 interface LocalAffiliate {
   id: number | string;
   name: string;
@@ -30,6 +32,7 @@ interface LocalAffiliate {
   websiteUrl?: string | null;
   logoUrl: string | null;
   newLogoFile?: File | null;
+  removePhoto?: boolean;
   isNew?: boolean;
   is_locked?: boolean;
   lock_ticket?: string | null;
@@ -43,26 +46,21 @@ const LogoPreviewer = React.memo(
     file,
     savedUrl,
     isEditing,
+    onRemove,
   }: {
     file?: File | null;
     savedUrl: string | null;
     isEditing: boolean;
+    onRemove: () => void;
   }) => {
-    // 1. Generate preview secara sinkron (Anti-flicker fixed)
     const previewUrl = useMemo(() => {
-      if (file) {
-        return URL.createObjectURL(file);
-      }
-      // utility getCleanImageUrl memastikan balikan string kosong "" jika savedUrl null
+      if (file) return URL.createObjectURL(file);
       return getCleanImageUrl(savedUrl);
     }, [file, savedUrl]);
 
-    // 2. CLEANUP: Revoke ObjectURL (Memory leak fixed)
     useEffect(() => {
       return () => {
-        if (previewUrl.startsWith("blob:")) {
-          URL.revokeObjectURL(previewUrl);
-        }
+        if (previewUrl?.startsWith("blob:")) URL.revokeObjectURL(previewUrl);
       };
     }, [previewUrl]);
 
@@ -70,19 +68,30 @@ const LogoPreviewer = React.memo(
       <div
         className={`relative aspect-square rounded-lg border-2 border-dashed flex flex-col items-center justify-center p-2 overflow-hidden transition-colors ${
           isEditing
-            ? "border-slate-300 bg-white hover:border-daw-green cursor-pointer"
+            ? "border-slate-300 bg-white hover:border-daw-green cursor-pointer group/preview"
             : "border-slate-200 bg-slate-100/50 cursor-not-allowed"
         }`}>
         {previewUrl ? (
-          <img
-            src={previewUrl}
-            alt="Logo Preview" // Alt text tetap ada untuk aksesibilitas
-            className="w-full h-full object-contain p-1"
-            key={previewUrl}
-            // Hapus onLoad & onError manual dari sini, sudah dihandle useMemo + utility
-          />
+          <>
+            <img
+              src={previewUrl}
+              alt="Logo"
+              className="w-full h-full object-contain p-1"
+            />
+            {isEditing && (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onRemove();
+                }}
+                className="absolute top-1 right-1 p-1.5 bg-red-500/90 hover:bg-red-600 text-white rounded-md opacity-0 group-hover/preview:opacity-100 transition-opacity"
+                title="Hapus Logo">
+                <X className="w-3 h-3" />
+              </button>
+            )}
+          </>
         ) : (
-          <div className="flex flex-col items-center justify-center text-center space-y-1.5 animate-in fade-in duration-300">
+          <div className="flex flex-col items-center justify-center text-center space-y-1.5 animate-in fade-in">
             <ImageIcon
               className={`w-6 h-6 ${isEditing ? "text-daw-green" : "text-slate-400"}`}
             />
@@ -108,7 +117,8 @@ export default function InvestmentsManager() {
   const [isEditing, setIsEditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
 
-  // 🚀 TAHAP 1: THE CONTEXT INJECTION
+  const [hideDraftBanner, setHideDraftBanner] = useState(false);
+
   const { settings, companies, rejectedSettings, refreshData } =
     useInvestments();
 
@@ -125,24 +135,17 @@ export default function InvestmentsManager() {
     [],
   );
 
-  // 🚀 SOVEREIGN LOGIC (Kasta & Gembok)
-  const isSettingsLocked = settings?.is_locked === true;
-  const shouldLockSettings = isSettingsLocked && !isSuperadmin;
-
-  const hasLockedCompanies = localCompanies.some((c) => c.is_locked === true);
-  const shouldLockCompaniesAgg = hasLockedCompanies && !isSuperadmin;
+  const isSettingsLockedForEditor =
+    settings?.is_locked === true && !isSuperadmin;
+  const isSettingsOverrideMode = settings?.is_locked === true && isSuperadmin;
 
   const currentLockState =
-    activeTab === "content" ? shouldLockSettings : shouldLockCompaniesAgg;
-  const isOverrideMode =
-    (activeTab === "content" ? isSettingsLocked : hasLockedCompanies) &&
-    isSuperadmin;
+    activeTab === "content" ? isSettingsLockedForEditor : false;
 
   const lockStyles = currentLockState
     ? "opacity-60 grayscale-[30%] pointer-events-none cursor-not-allowed select-none"
     : "";
 
-  // --- 🚀 SYNC & SNAPSHOT ENGINE ---
   useEffect(() => {
     if (!isEditing) {
       if (settings) {
@@ -164,39 +167,29 @@ export default function InvestmentsManager() {
           lock_ticket: c.lock_ticket || null,
           has_rejected: c.has_rejected || false,
           isDirty: false,
+          removePhoto: false,
         }));
         setLocalCompanies(comps);
         setOriginalCompanies(comps);
       }
+
+      setHideDraftBanner(false);
     }
   }, [settings, companies, isEditing]);
 
   const hasSettingsChanged = useCallback(() => {
     return JSON.stringify(pageContent) !== JSON.stringify(originalContent);
   }, [pageContent, originalContent]);
-
-  const hasCompaniesChanged = useCallback(() => {
-    const sanitizeForDiff = (arr: LocalAffiliate[]) =>
-      arr.map(
-        ({
-          newLogoFile,
-          is_locked,
-          lock_ticket,
-          has_rejected,
-          previous_notrans,
-          ...rest
-        }) => rest,
-      );
-
-    return (
-      JSON.stringify(sanitizeForDiff(localCompanies)) !==
-      JSON.stringify(sanitizeForDiff(originalCompanies))
-    );
-  }, [localCompanies, originalCompanies]);
-
-  // --- RESTORATION HANDLER ---
+  // --- 🔵 3. RESTORATION ENGINE (Blueprint Part 3) ---
   const handleRestoreSettingsDraft = useCallback(() => {
     if (!rejectedSettings?.payload) return;
+
+    // 🚨 Anti-Corruption Guard: Tolak restorasi jika aksinya DELETE
+    if (rejectedSettings.action === "DELETE") {
+      return toast.error("Tidak dapat memulihkan.", {
+        description: "Draf ini adalah permintaan penghapusan data.",
+      });
+    }
 
     const payload = rejectedSettings.payload;
     setPageContent((prev) => ({
@@ -206,10 +199,18 @@ export default function InvestmentsManager() {
     }));
 
     setIsEditing(true);
-    toast.info("Draf berhasil dipulihkan.", {
-      description: "Silakan perbaiki dan simpan kembali.",
+    setHideDraftBanner(true); // Sembunyikan banner setelah dipulihkan
+    toast.info("Draf berhasil disuntikkan ke formulir.", {
+      description: "Silakan perbaiki dan klik Request Approval.",
     });
   }, [rejectedSettings]);
+
+  // 🔵 UX Cleanup: Fungsi abaikan draf
+  const handleDiscardDraft = () => {
+    setHideDraftBanner(true);
+    // Idealnya: panggil API endpoint DELETE ke /approval/drafts dengan encodeURIComponent(tiket) di sini
+    toast.success("Notifikasi penolakan diabaikan sementara.");
+  };
 
   // --- SAVE HANDLERS ---
   const handleSaveSettings = async () => {
@@ -218,19 +219,21 @@ export default function InvestmentsManager() {
       status: "Published",
       previous_notrans: rejectedSettings?.notrans || null,
     };
-    await api.put("/investment/settings", payload, { timeout: 60000 });
+    await api.put("/investments/settings", payload, { timeout: 60000 });
   };
 
   const handleSaveCompanies = async () => {
+    // 🔵 Hanya ambil perusahaan yang kotor DAN tidak sedang dikunci (Isolasi Item)
     const dirtyCompanies = localCompanies.filter(
-      (comp) => comp.name.trim() && (comp.isNew || comp.isDirty),
+      (comp) =>
+        comp.name.trim() &&
+        (comp.isNew || comp.isDirty) &&
+        !(comp.is_locked && !isSuperadmin),
     );
 
     if (dirtyCompanies.length === 0) return;
 
     const saveTasks = dirtyCompanies.map((comp) => {
-      if (comp.is_locked && !comp.isNew) return Promise.resolve(comp);
-
       const formData = new FormData();
       formData.append("name", comp.name);
       formData.append("desc", comp.desc || "");
@@ -241,74 +244,43 @@ export default function InvestmentsManager() {
       if (comp.previous_notrans)
         formData.append("previous_notrans", comp.previous_notrans);
       if (comp.newLogoFile) formData.append("logo", comp.newLogoFile);
+      if (comp.removePhoto) formData.append("removePhoto", "true");
 
       const config = { timeout: 60000 };
 
       if (comp.isNew) {
-        return api
-          .post("/investment/affiliate", formData, config)
-          .then((res) => ({
-            ...comp,
-            id: res.data.data?.id || res.data.id,
-            isNew: false,
-            isDirty: false,
-            newLogoFile: null,
-            is_locked: !isSuperadmin,
-          }));
+        return api.post("/investments/affiliates", formData, config);
       } else {
-        return api
-          .put(`/investment/affiliate/${comp.id}`, formData, config)
-          .then(() => ({
-            ...comp,
-            isDirty: false,
-            newLogoFile: null,
-            is_locked: !isSuperadmin,
-          }));
+        return api.put(`/investments/affiliates/${comp.id}`, formData, config);
       }
     });
 
     const results = await Promise.allSettled(saveTasks);
-
-    setLocalCompanies((prev) => {
-      return prev.map((existing) => {
-        const taskIndex = dirtyCompanies.findIndex((d) => d.id === existing.id);
-
-        if (taskIndex !== -1) {
-          const result = results[taskIndex];
-          if (result.status === "fulfilled") {
-            return result.value;
-          }
-        }
-        return existing;
-      });
-    });
-
     const hasError = results.some((r) => r.status === "rejected");
     if (hasError) throw new Error("Partial sync failure");
   };
 
   // THE GATEKEEPER SAVE EXECUTION
   const handleSave = async () => {
-    if (currentLockState) {
+    // 🔵 Validasi Gatekeeper diperbarui (Hanya block jika tab content yang locked)
+    if (activeTab === "content" && currentLockState) {
       return toast.error("Akses Dibatasi.", {
-        description: "Data ini sedang dalam peninjauan.",
+        description: "Data teks sedang dalam peninjauan.",
       });
     }
 
-    const anyCompanyChanged = localCompanies.some((c) => c.isNew || c.isDirty);
+    const anyCompanyChanged = localCompanies.some(
+      (c) => (c.isNew || c.isDirty) && !(c.is_locked && !isSuperadmin),
+    );
 
     if (activeTab === "content" && !hasSettingsChanged()) {
       setIsEditing(false);
-      return toast.info("Tidak ada perubahan terdeteksi.", {
-        description: "Data Content masih sama dengan versi live.",
-      });
+      return toast.info("Tidak ada perubahan terdeteksi.");
     }
 
     if (activeTab === "companies" && !anyCompanyChanged) {
       setIsEditing(false);
-      return toast.info("Tidak ada perubahan terdeteksi.", {
-        description: "Data perusahaan masih sama dengan versi live.",
-      });
+      return toast.info("Tidak ada perubahan valid yang bisa disimpan.");
     }
 
     setIsSaving(true);
@@ -349,7 +321,6 @@ export default function InvestmentsManager() {
   // --- ARRAY MUTATION HANDLERS ---
   const addCompany = () => {
     setLocalCompanies([
-      ...localCompanies,
       {
         id: `temp-${Date.now()}`,
         name: "",
@@ -361,47 +332,54 @@ export default function InvestmentsManager() {
         isDirty: true,
         is_locked: false,
       },
+      ...localCompanies,
     ]);
   };
 
   const removeCompany = (id: number | string) => {
     const target = localCompanies.find((c) => c.id === id);
-    if (!target || target.is_locked) return;
+    if (!target || (target.is_locked && !isSuperadmin)) return;
 
-    toast.warning(`Remove ${target.name || "Company"}?`, {
+    toast.warning(`Hapus ${target.name || "Perusahaan"}?`, {
       description: isSuperadmin
         ? "Data akan dihapus permanen dari server."
         : "Permintaan hapus akan dikirim ke sistem approval.",
       action: {
-        label: "Remove",
+        label: "Eksekusi Hapus",
         onClick: async () => {
           if (target.isNew) {
             setLocalCompanies((prev) => prev.filter((c) => c.id !== id));
-            toast.success("Removed from list");
-            return;
+            return toast.success("Draf dibatalkan.");
           }
 
-          toast.promise(
-            async () => {
-              const response = await api.delete(`/investment/affiliate/${id}`);
-
+          toast.promise(api.delete(`/investments/affiliates/${id}`), {
+            loading: `Memproses ${target.name}...`,
+            success: (response) => {
               if (response.status === 202) {
-                await refreshData();
+                setLocalCompanies((prev) =>
+                  prev.map((c) =>
+                    c.id === id
+                      ? {
+                          ...c,
+                          is_locked: true,
+                          lock_ticket: response.data.ticket,
+                        }
+                      : c,
+                  ),
+                );
+                refreshData(); // Sinkronisasi background
+                return "Pengajuan hapus dikirim. Data dikunci.";
               } else {
+                // Admin path (200)
                 setLocalCompanies((prev) => prev.filter((c) => c.id !== id));
+                return "Berhasil dihapus permanen.";
               }
             },
-            {
-              loading: `Processing ${target.name}...`,
-              success: isSuperadmin
-                ? "Deleted permanently."
-                : "Delete request submitted.",
-              error: (err) => err.response?.data?.message || "Failed to delete",
-            },
-          );
+            error: (err) => err.response?.data?.message || "Gagal menghapus",
+          });
         },
       },
-      cancel: { label: "Cancel", onClick: () => {} },
+      cancel: { label: "Batal", onClick: () => {} },
     });
   };
 
@@ -420,14 +398,15 @@ export default function InvestmentsManager() {
   const handleLogoChange = (id: number | string, file: File) => {
     if (!file) return;
     updateCompany(id, "newLogoFile", file);
+    updateCompany(id, "removePhoto", false);
   };
 
   return (
     <div className="max-w-6xl mx-auto space-y-6 animate-in fade-in duration-500 pb-12">
-      {/* --- SOVEREIGN BANNERS (Contextual Awareness) --- */}
-      {/* 1. Amber Banner (superadmin Override Warning) */}
-      {isOverrideMode && (
-        <div className="bg-amber-50 border border-amber-200 p-4 rounded-xl flex items-center gap-4 animate-in slide-in-from-top-4 shadow-sm">
+      {/* SOVEREIGN BANNERS (Contextual Awareness) */}
+      {/* AMBER BANNER: Sovereign Bypass (Khusus Admin) */}
+      {isSettingsOverrideMode && activeTab === "content" && (
+        <div className="bg-amber-50 border-l-4 border-l-amber-500 border-y border-r border-amber-200 p-4 rounded-xl flex items-center gap-4 animate-in slide-in-from-top-4 shadow-sm">
           <div className="bg-amber-100 p-2 rounded-full text-amber-600 shrink-0">
             <ShieldAlert className="w-5 h-5" />
           </div>
@@ -436,7 +415,7 @@ export default function InvestmentsManager() {
               Mode Override Aktif
             </h4>
             <p className="text-xs text-amber-700 leading-relaxed mt-0.5">
-              Anda sedang mengedit data yang sedang dalam antrean peninjauan.{" "}
+              Anda sedang mengedit data yang sedang dalam antrean peninjauan.
               <span className="font-bold underline">
                 Direct Commit akan membatalkan draf Editor secara sepihak.
               </span>
@@ -445,9 +424,9 @@ export default function InvestmentsManager() {
         </div>
       )}
 
-      {/* 2. Blue Banner (Editor Locked Warning) */}
+      {/* BLUE BANNER: Locked UI (Khusus Editor) */}
       {currentLockState && (
-        <div className="bg-blue-50 border border-blue-200 p-4 rounded-xl flex items-center gap-4 animate-pulse shadow-sm">
+        <div className="bg-blue-50 border-l-4 border-l-blue-500 border-y border-r border-blue-200 p-4 rounded-xl flex items-center gap-4 animate-pulse shadow-sm">
           <div className="bg-blue-100 p-2 rounded-full text-blue-600 shrink-0">
             <Lock className="w-5 h-5" />
           </div>
@@ -456,28 +435,33 @@ export default function InvestmentsManager() {
               Akses Dibatasi
             </h4>
             <p className="text-xs text-blue-700 leading-relaxed mt-0.5">
-              Data pada halaman ini sedang ditinjau. Anda tidak dapat melakukan
-              perubahan hingga proses selesai.
+              Data pada halaman ini sedang ditinjau oleh Manajer. Anda tidak
+              dapat melakukan perubahan hingga proses selesai.
             </p>
           </div>
         </div>
       )}
 
-      {/* 3. Rejection Ribbon (Draft Needs Fixing) */}
-      {/* 🚀 FIXED: Menggunakan rejectedSettings dari Context */}
-      {rejectedSettings && activeTab === "content" && (
-        <div className="bg-amber-50 border border-amber-200 rounded-xl overflow-hidden shadow-sm animate-in slide-in-from-top-4 duration-300">
+      {/* C. RED/AMBER BANNER: Recovery Banner (Rejection Feedback) UX CLEANUP FIXED: Menambahkan handleDiscardDraft dan state hideDraftBanner */}
+      {rejectedSettings && activeTab === "content" && !hideDraftBanner && (
+        <div className="bg-red-50 border-l-4 border-l-red-500 border-y border-r border-red-200 rounded-xl overflow-hidden shadow-sm animate-in slide-in-from-top-4 duration-300">
           <div className="p-4 flex gap-4 items-start">
-            <div className="bg-amber-100 p-2 rounded-lg h-fit shrink-0">
-              <AlertTriangle className="w-5 h-5 text-amber-600" />
+            <div className="bg-red-100 p-2 rounded-lg h-fit shrink-0">
+              <AlertTriangle className="w-5 h-5 text-red-600" />
             </div>
             <div className="flex-1 space-y-2">
               <div className="flex justify-between items-center">
-                <h4 className="text-xs font-black text-amber-900 uppercase tracking-tighter">
-                  ⚠️ Catatan Peninjau
+                <h4 className="text-xs font-black text-red-900 uppercase tracking-tighter">
+                  ⚠️ Revisi Ditolak: Catatan Peninjau
                 </h4>
+                <button
+                  onClick={handleDiscardDraft}
+                  className="p-1 hover:bg-red-200/50 rounded-md text-red-700 transition-colors"
+                  title="Abaikan Notifikasi">
+                  <X className="w-4 h-4" />
+                </button>
               </div>
-              <p className="text-xs text-amber-800 leading-relaxed font-bold italic bg-white/60 p-2.5 rounded border border-amber-200/50">
+              <p className="text-xs text-red-800 leading-relaxed font-bold italic bg-white/60 p-2.5 rounded border border-red-200/50">
                 "
                 {rejectedSettings.rejection_reason ||
                   "Silakan perbaiki data sesuai arahan."}
@@ -487,11 +471,11 @@ export default function InvestmentsManager() {
                 <button
                   onClick={handleRestoreSettingsDraft}
                   disabled={!isEditing}
-                  className="flex items-center justify-center gap-2 bg-amber-600 hover:bg-amber-700 disabled:bg-amber-300 disabled:cursor-not-allowed text-white px-5 py-2.5 rounded-lg text-xs font-bold transition-all shadow-sm active:scale-95">
+                  className="flex items-center justify-center gap-2 bg-red-600 hover:bg-red-700 disabled:bg-red-300 disabled:cursor-not-allowed text-white px-5 py-2.5 rounded-lg text-xs font-bold transition-all shadow-sm active:scale-95">
                   <RotateCcw className="w-3.5 h-3.5" /> PULIHKAN DRAF
                 </button>
                 {!isEditing && (
-                  <p className="text-[10px] text-amber-600 font-medium italic animate-pulse">
+                  <p className="text-[10px] text-red-600 font-medium italic animate-pulse">
                     * Aktifkan "Editing Mode" untuk memulihkan draf.
                   </p>
                 )}
@@ -501,17 +485,17 @@ export default function InvestmentsManager() {
         </div>
       )}
 
-      {/* --- HEADER (MATRIX BUTTONS) --- */}
+      {/* HEADER AREA & ACTION MATRIX*/}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white p-6 rounded-2xl border border-slate-200 shadow-sm top-0 z-30">
         <div>
           <div className="flex items-center gap-3">
             <h1 className="text-2xl font-serif font-black text-slate-900 tracking-tight">
               Investments Manager
             </h1>
-            {/* Indikator gembok level halaman (Agregat) */}
-            {(settings?.is_locked || hasLockedCompanies) && (
+            {(settings?.is_locked ||
+              localCompanies.some((c) => c.is_locked)) && (
               <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-blue-50 text-blue-600 rounded-full text-[10px] font-black uppercase tracking-tighter border border-blue-100 animate-pulse">
-                <Clock className="w-3 h-3" /> Pending Approval
+                <Clock className="w-3 h-3" /> PENDING
               </span>
             )}
           </div>
@@ -522,14 +506,13 @@ export default function InvestmentsManager() {
         </div>
 
         <div className="flex items-center gap-3 w-full sm:w-auto">
-          {/* Edit Toggle Button */}
+          {/* THE "VIEW-ONLY" / EDIT TOGGLE LINK */}
           <button
             onClick={() => {
-              if (currentLockState) {
+              if (currentLockState)
                 return toast.error("Akses Dibatasi", {
-                  description: "Data sedang dalam antrean approval.",
+                  description: "Data teks sedang dalam antrean approval.",
                 });
-              }
               setIsEditing(!isEditing);
             }}
             disabled={isSaving || currentLockState}
@@ -550,7 +533,7 @@ export default function InvestmentsManager() {
             <span>
               {currentLockState
                 ? "System Locked"
-                : isOverrideMode && isEditing
+                : isSettingsOverrideMode && isEditing && activeTab === "content"
                   ? "Override Mode"
                   : isEditing
                     ? "Editing Mode"
@@ -558,7 +541,7 @@ export default function InvestmentsManager() {
             </span>
           </button>
 
-          {/* Matrix Action Button */}
+          {/* THE SOVEREIGN / CONTEXTUAL SAVE BUTTON */}
           <button
             onClick={handleSave}
             disabled={
@@ -580,8 +563,6 @@ export default function InvestmentsManager() {
             }`}>
             {isSaving ? (
               <Loader2 className="w-4 h-4 animate-spin" />
-            ) : currentLockState ? (
-              <Lock className="w-4 h-4" />
             ) : isSuperadmin ? (
               <Save className="w-4 h-4" />
             ) : (
@@ -590,37 +571,32 @@ export default function InvestmentsManager() {
             <span>
               {isSaving
                 ? "Memproses..."
-                : currentLockState
-                  ? "Akses Terbatas"
-                  : isSuperadmin
-                    ? "Publish Live"
-                    : "Request Approval"}
+                : isSuperadmin
+                  ? "Publish Live"
+                  : "Request Approval"}
             </span>
           </button>
         </div>
       </div>
 
-      {/* --- TABS NAVIGATION --- */}
+      {/* TABS NAVIGATION & MICRO-INDICATORS */}
       <div className="flex items-end overflow-x-auto border border-slate-200 border-b-0 shadow-sm bg-white rounded-t-xl px-2 pt-2 hide-scrollbar">
         {/* TAB 1: PAGE CONTENT */}
         <button
           onClick={() => !isSaving && setActiveTab("content")}
           className={`flex items-center gap-2 px-6 py-3 font-bold text-sm uppercase tracking-wider border-b-2 transition-colors whitespace-nowrap ${
             isSaving ? "cursor-wait opacity-80" : ""
-          } ${
-            activeTab === "content"
-              ? "border-daw-green text-daw-green"
-              : "border-transparent text-slate-400 hover:text-slate-700"
-          }`}>
+          } ${activeTab === "content" ? "border-daw-green text-daw-green bg-green-50/30" : "border-transparent text-slate-400 hover:text-slate-700 hover:bg-slate-50"}`}>
           <Type className="w-4 h-4" />
           <span>Page Content</span>
           <div className="flex items-center gap-1 ml-1">
+            {/* VISUAL TOKEN FIXED: Red Pulse untuk Rejected */}
             {rejectedSettings && (
-              <span title="Revision Required">
-                <div className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
+              <span title="Revisi Diperlukan">
+                <div className="w-2 h-2 rounded-full bg-red-500 animate-pulse ring-2 ring-white" />
               </span>
             )}
-            {settings?.is_locked && (
+            {settings?.is_locked && !rejectedSettings && (
               <span title="Pending Approval">
                 <Lock className="w-3 h-3 text-blue-500" />
               </span>
@@ -633,20 +609,16 @@ export default function InvestmentsManager() {
           onClick={() => !isSaving && setActiveTab("companies")}
           className={`flex items-center gap-2 px-6 py-3 font-bold text-sm uppercase tracking-wider border-b-2 transition-colors whitespace-nowrap ${
             isSaving ? "cursor-wait opacity-80" : ""
-          } ${
-            activeTab === "companies"
-              ? "border-daw-green text-daw-green"
-              : "border-transparent text-slate-400 hover:text-slate-700"
-          }`}>
+          } ${activeTab === "companies" ? "border-daw-green text-daw-green bg-green-50/30" : "border-transparent text-slate-400 hover:text-slate-700 hover:bg-slate-50"}`}>
           <Building className="w-4 h-4" />
           <span>Affiliated Companies</span>
           <div className="flex items-center gap-1 ml-1">
             {localCompanies.some((c) => c.has_rejected) && (
-              <span title="Revision Required">
-                <div className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
+              <span title="Revisi Diperlukan">
+                <div className="w-2 h-2 rounded-full bg-red-500 animate-pulse ring-2 ring-white" />
               </span>
             )}
-            {hasLockedCompanies && (
+            {localCompanies.some((c) => c.is_locked && !c.has_rejected) && (
               <span title="Pending Approval">
                 <Lock className="w-3 h-3 text-blue-500" />
               </span>
@@ -655,18 +627,21 @@ export default function InvestmentsManager() {
         </button>
       </div>
 
-      {/* --- TAB CONTENT AREA --- */}
-      <div
-        className={`bg-white rounded-b-xl border border-t-0 border-slate-200 shadow-sm p-6 lg:p-8 min-h-[500px] transition-all duration-500`}>
-        {/* TAB 1: PAGE CONTENT (SINGLETON)           */}
+      {/* TAB CONTENT AREA */}
+      <div className="bg-white rounded-b-xl border border-t-0 border-slate-200 shadow-sm p-6 lg:p-8 min-h-[500px] transition-all duration-500">
+        {/* TAB 1: PAGE CONTENT (SINGLETON) */}
         {activeTab === "content" && (
           <div className="space-y-8 animate-in fade-in duration-300">
             <div
               className={`bg-slate-50 p-6 rounded-xl border border-slate-200 relative overflow-hidden transition-all duration-500 ${lockStyles}`}>
-              {/* Badge Lock Internal Form */}
-              {settings?.is_locked && (
-                <div className="absolute top-0 right-0 bg-blue-100 text-blue-700 px-3 py-1 rounded-bl-lg text-[10px] font-black uppercase tracking-wider flex items-center gap-1 shadow-sm z-10">
+              {settings?.is_locked && !isSuperadmin && (
+                <div className="absolute top-0 right-0 bg-blue-100 text-blue-700 px-3 py-1.5 rounded-bl-lg text-[10px] font-black uppercase tracking-wider flex items-center gap-1.5 shadow-sm z-10">
                   <Lock className="w-3 h-3" /> Locked
+                </div>
+              )}
+              {settings?.is_locked && isSuperadmin && isEditing && (
+                <div className="absolute top-0 right-0 bg-amber-500 text-white px-3 py-1.5 rounded-bl-lg text-[10px] font-black uppercase tracking-wider flex items-center gap-1.5 shadow-sm z-10">
+                  <ShieldAlert className="w-3 h-3" /> Override Active
                 </div>
               )}
 
@@ -721,11 +696,6 @@ export default function InvestmentsManager() {
 
             <div
               className={`bg-slate-50 p-6 rounded-xl border border-slate-200 relative overflow-hidden transition-all duration-500 ${lockStyles}`}>
-              {settings?.is_locked && (
-                <div className="absolute top-0 right-0 bg-blue-100 text-blue-700 px-3 py-1 rounded-bl-lg text-[10px] font-black uppercase tracking-wider flex items-center gap-1 shadow-sm z-10">
-                  <Lock className="w-3 h-3" /> Locked
-                </div>
-              )}
               <h3 className="text-base font-bold text-slate-900 mb-4 border-b border-slate-200 pb-2">
                 Main Investments Page
               </h3>
@@ -754,7 +724,7 @@ export default function InvestmentsManager() {
           </div>
         )}
 
-        {/* TAB 2: AFFILIATED COMPANIES (COLLECTION)  */}
+        {/* TAB 2: AFFILIATED COMPANIES (COLLECTION) */}
         {activeTab === "companies" && (
           <div className="space-y-6 animate-in fade-in duration-300">
             <div className="flex items-center justify-between mb-4 border-b border-slate-100 pb-4">
@@ -767,7 +737,7 @@ export default function InvestmentsManager() {
                   Add or edit logos and details for the Constellation Grid.
                 </p>
               </div>
-              {isEditing && !currentLockState && (
+              {isEditing && (
                 <button
                   onClick={addCompany}
                   disabled={isSaving}
@@ -779,204 +749,196 @@ export default function InvestmentsManager() {
 
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               {localCompanies.map((company) => {
-                const isThisCardLockedByEditor =
-                  company.is_locked && !isSuperadmin;
-                const isThisCardLockedByAdmin =
-                  company.is_locked && isSuperadmin;
+                const isNeedsRevision = company.has_rejected === true;
+                const isPending = company.is_locked && !isNeedsRevision;
+                const isDeleting =
+                  isPending && company.lock_ticket?.includes("DEL");
+                const isLockedForEditor = isPending && !isSuperadmin;
+                const isOverrideModeItem = isPending && isSuperadmin;
+
+                // 🔵 2. VISUAL TOKENS (The Looks) - Blueprint Part 2
+                // Menggunakan border-l-4 (kiri tebal) sebagai indikator kuat
+                const cardStyle = isDeleting
+                  ? "bg-rose-50/40 border-l-4 border-l-rose-500 border-rose-200 grayscale opacity-80"
+                  : isNeedsRevision
+                    ? "bg-red-50/30 border-l-4 border-l-red-500 border-red-200 shadow-sm ring-1 ring-red-500/20"
+                    : isOverrideModeItem
+                      ? "bg-amber-50/30 border-l-4 border-l-amber-500 border-amber-200 ring-1 ring-amber-500/20"
+                      : isLockedForEditor
+                        ? "bg-slate-50 border-l-4 border-l-blue-500 border-slate-200 grayscale opacity-70 pointer-events-none"
+                        : "bg-slate-50 border-slate-200 hover:border-slate-300 hover:shadow-sm";
 
                 return (
                   <div
                     key={company.id}
-                    className={`flex gap-4 items-start p-5 rounded-xl border group transition-all relative ${
-                      isThisCardLockedByEditor
-                        ? "opacity-60 grayscale-[30%] pointer-events-none bg-slate-50 border-slate-200"
-                        : isThisCardLockedByAdmin
-                          ? "bg-amber-50/50 border-amber-200 ring-2 ring-amber-500/20"
-                          : company.has_rejected
-                            ? "bg-amber-50/30 border-amber-200 ring-2 ring-amber-500/40"
-                            : "bg-slate-50 border-slate-200 hover:border-slate-300"
-                    }`}>
-                    {/* LOGO UPLOAD COMPONENT */}
+                    className={`flex gap-4 items-start p-5 rounded-xl border transition-all relative ${cardStyle}`}>
+                    {/* --- LOGO UPLOAD & INDICATOR BADGES --- */}
                     <div className="w-24 shrink-0 relative">
+                      {/* Dynamic Badges Container */}
                       <div className="absolute -top-3 -right-3 z-20 flex flex-col gap-1.5">
-                        {company.has_rejected && (
+                        {isDeleting && (
                           <span
-                            title="Revisi Ditolak: Butuh Perbaikan"
-                            className="flex h-5 w-5 relative">
-                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
-                            <span className="relative inline-flex rounded-full h-5 w-5 bg-amber-500 items-center justify-center text-[10px] text-white font-bold shadow-sm ring-2 ring-white">
+                            className="flex h-5 w-5 items-center justify-center text-white rounded-full bg-rose-500 shadow-sm ring-2 ring-white"
+                            title="Menunggu Penghapusan">
+                            <Trash2 className="w-3 h-3" />
+                          </span>
+                        )}
+                        {isPending && !isDeleting && (
+                          <span
+                            className={`flex h-5 w-5 items-center justify-center text-white rounded-full shadow-sm ring-2 ring-white ${isSuperadmin ? "bg-amber-500" : "bg-blue-500"}`}
+                            title={`Terkunci: ${company.lock_ticket}`}>
+                            <Lock className="w-3 h-3" />
+                          </span>
+                        )}
+                        {isNeedsRevision && (
+                          <span
+                            className="flex h-5 w-5 relative"
+                            title="Revisi Ditolak: Butuh Perbaikan">
+                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+                            <span className="relative inline-flex rounded-full h-5 w-5 bg-red-500 items-center justify-center text-[10px] text-white font-bold ring-2 ring-white">
                               !
                             </span>
                           </span>
                         )}
-                        {company.is_locked && (
-                          <span
-                            title={`Dikunci (${company.lock_ticket})`}
-                            className={`flex h-5 w-5 items-center justify-center text-white rounded-full shadow-sm ring-2 ring-white z-10 ${isSuperadmin ? "bg-amber-500" : "bg-blue-500"}`}>
-                            <Lock className="w-3 h-3" />
-                          </span>
-                        )}
                         {(company.isDirty || company.isNew) &&
-                          !company.is_locked && (
+                          !isPending &&
+                          !isNeedsRevision && (
                             <span
-                              title={
-                                company.isNew
-                                  ? "Data Baru"
-                                  : "Perubahan Belum Disimpan"
-                              }
-                              className="flex h-5 w-5 items-center justify-center bg-daw-green text-white rounded-full shadow-sm ring-2 ring-white z-10 animate-in zoom-in duration-300">
+                              className="flex h-5 w-5 items-center justify-center bg-daw-green text-white rounded-full shadow-sm ring-2 ring-white animate-in zoom-in"
+                              title="Perubahan Belum Disimpan">
                               <Save className="w-2.5 h-2.5" />
                             </span>
                           )}
                       </div>
 
-                      <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-2 text-center">
-                        Logo
-                      </label>
-                      <div
-                        className={`relative group ${isThisCardLockedByEditor ? "pointer-events-none" : ""}`}>
-                        <LogoPreviewer
-                          file={company.newLogoFile}
-                          savedUrl={company.logoUrl}
-                          isEditing={isEditing && !isThisCardLockedByEditor}
+                      <LogoPreviewer
+                        file={company.newLogoFile}
+                        savedUrl={company.removePhoto ? null : company.logoUrl}
+                        // 🔵 Proteksi aksesibilitas editor
+                        isEditing={
+                          isEditing && !isLockedForEditor && !isDeleting
+                        }
+                        onRemove={() => {
+                          updateCompany(company.id, "removePhoto", true);
+                          updateCompany(company.id, "newLogoFile", null);
+                        }}
+                      />
+                      {/* Invisible Input File Cover */}
+                      {isEditing && !isLockedForEditor && !isDeleting && (
+                        <input
+                          type="file"
+                          accept="image/*"
+                          onChange={(e) =>
+                            e.target.files?.[0] &&
+                            updateCompany(
+                              company.id,
+                              "newLogoFile",
+                              e.target.files[0],
+                            )
+                          }
+                          className="absolute inset-0 opacity-0 cursor-pointer z-10"
                         />
-
-                        {isEditing && !isThisCardLockedByEditor && (
-                          <input
-                            type="file"
-                            accept="image/*"
-                            onChange={(e) =>
-                              e.target.files?.[0] &&
-                              handleLogoChange(company.id, e.target.files[0])
-                            }
-                            className="absolute inset-0 opacity-0 cursor-pointer z-10"
-                          />
-                        )}
-                      </div>
+                      )}
                     </div>
 
-                    {/* COMPANY DETAILS */}
+                    {/* --- COMPANY DETAILS FORM --- */}
                     <fieldset
-                      disabled={!isEditing || isThisCardLockedByEditor}
+                      disabled={!isEditing || isLockedForEditor || isDeleting}
                       className="flex-1 space-y-3">
                       <div>
-                        <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">
-                          Company Name
-                        </label>
                         <input
                           type="text"
                           value={company.name}
+                          placeholder="Company Name"
                           onChange={(e) =>
                             updateCompany(company.id, "name", e.target.value)
                           }
-                          className={`w-full px-3 py-1.5 text-sm rounded-md font-bold transition-all duration-300 ${
-                            isEditing && !isThisCardLockedByEditor
-                              ? "bg-white border border-slate-300 text-slate-900 focus:ring-2 focus:ring-daw-green/20 shadow-inner"
-                              : "bg-slate-100/50 border-transparent text-slate-500"
-                          }`}
+                          // 🔵 TYPOGRAPHY FEEDBACK: Coret judul jika mau dihapus
+                          className={`w-full px-3 py-1.5 text-sm rounded-md font-bold transition-all duration-300 outline-none
+                            ${isDeleting ? "line-through text-rose-800" : "text-slate-900"} 
+                            ${isEditing && !isLockedForEditor && !isDeleting ? "bg-white border border-slate-300 focus:ring-2 focus:ring-daw-green/20" : "bg-transparent border-transparent"}`}
                         />
                       </div>
-
                       <div className="grid grid-cols-2 gap-3">
-                        <div>
-                          <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">
-                            Sub-text (Optional)
-                          </label>
-                          <input
-                            type="text"
-                            placeholder="e.g. PT. BPR..."
-                            value={company.desc}
-                            onChange={(e) =>
-                              updateCompany(company.id, "desc", e.target.value)
-                            }
-                            className={`w-full px-3 py-1.5 text-xs rounded-md transition-all duration-300 ${
-                              isEditing && !isThisCardLockedByEditor
-                                ? "bg-white border border-slate-300 text-slate-900 focus:ring-2 focus:ring-daw-green/20 shadow-inner"
-                                : "bg-slate-100/50 border-transparent text-slate-500"
-                            }`}
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">
-                            Industry
-                          </label>
-                          <select
-                            value={company.category}
-                            onChange={(e) =>
-                              updateCompany(
-                                company.id,
-                                "category",
-                                e.target.value,
-                              )
-                            }
-                            className={`w-full px-3 py-1.5 text-xs rounded-md transition-all duration-300 ${
-                              isEditing && !isThisCardLockedByEditor
-                                ? "bg-white border border-slate-300 text-slate-900 focus:ring-2 focus:ring-daw-green/20 shadow-inner"
-                                : "bg-slate-100/50 border-transparent text-slate-500 appearance-none"
-                            }`}>
-                            <option value="fnb">Food & Beverage</option>
-                            <option value="steel">Steel</option>
-                            <option value="finance">
-                              Finance / Microfinance
-                            </option>
-                            <option value="edu">Education</option>
-                            {!["fnb", "steel", "finance", "edu"].includes(
-                              company.category,
-                            ) && (
-                              <option
-                                value={company.category}
-                                className="text-red-500">
-                                ⚠ Unknown Category ({company.category})
-                              </option>
-                            )}
-                          </select>
-                        </div>
-                      </div>
-                      <div>
-                        <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">
-                          Website Link (Optional)
-                        </label>
                         <input
-                          type="url"
-                          placeholder="e.g. https://www.example.com"
-                          value={company.websiteUrl || ""}
+                          type="text"
+                          placeholder="Sub-text (Optional)"
+                          value={company.desc}
+                          onChange={(e) =>
+                            updateCompany(company.id, "desc", e.target.value)
+                          }
+                          className={`w-full px-3 py-1.5 text-xs rounded-md outline-none ${isEditing && !isLockedForEditor && !isDeleting ? "bg-white border border-slate-300 focus:border-daw-green" : "bg-transparent border-transparent text-slate-500"}`}
+                        />
+                        <select
+                          value={company.category}
                           onChange={(e) =>
                             updateCompany(
                               company.id,
-                              "websiteUrl",
+                              "category",
                               e.target.value,
                             )
                           }
-                          className={`w-full px-3 py-1.5 text-xs rounded-md transition-all duration-300 ${
-                            isEditing && !isThisCardLockedByEditor
-                              ? "bg-white border border-slate-300 text-slate-900 focus:ring-2 focus:ring-daw-green/20 shadow-inner"
-                              : "bg-slate-100/50 border-transparent text-slate-500"
-                          }`}
-                        />
+                          className={`w-full px-3 py-1.5 text-xs rounded-md outline-none ${isEditing && !isLockedForEditor && !isDeleting ? "bg-white border border-slate-300 focus:border-daw-green" : "bg-transparent border-transparent text-slate-500 appearance-none"}`}>
+                          <option value="fnb">Food & Beverage</option>
+                          <option value="steel">Steel</option>
+                          <option value="finance">Finance</option>
+                          <option value="edu">Education</option>
+                          {/* 🔵 Fallback untuk dirty data dari DB lama */}
+                          {!["fnb", "steel", "finance", "edu"].includes(
+                            company.category,
+                          ) && (
+                            <option
+                              value={company.category}
+                              className="text-red-500">
+                              ⚠ Unknown ({company.category})
+                            </option>
+                          )}
+                        </select>
                       </div>
+                      <input
+                        type="url"
+                        placeholder="Website URL (https://)"
+                        value={company.websiteUrl || ""}
+                        onChange={(e) =>
+                          updateCompany(
+                            company.id,
+                            "websiteUrl",
+                            e.target.value,
+                          )
+                        }
+                        className={`w-full px-3 py-1.5 text-xs rounded-md outline-none ${isEditing && !isLockedForEditor && !isDeleting ? "bg-white border border-slate-300 focus:border-daw-green" : "bg-transparent border-transparent text-slate-500"}`}
+                      />
                     </fieldset>
 
-                    {/* DELETE ACTION */}
-                    {isEditing && !isThisCardLockedByEditor && (
+                    {/* --- ACTION BUTTONS --- */}
+                    {isEditing && !isLockedForEditor && !isDeleting && (
                       <button
                         onClick={() => removeCompany(company.id)}
-                        className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-md transition-colors mt-5 shrink-0"
-                        title="Remove Company">
+                        className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-md shrink-0 transition-colors"
+                        title="Ajukan Penghapusan">
                         <Trash2 className="w-4 h-4" />
                       </button>
                     )}
                   </div>
                 );
               })}
-
-              {localCompanies.length === 0 && (
-                <div className="col-span-full py-10 text-center text-slate-500 italic flex flex-col items-center gap-2">
-                  <Building className="w-8 h-8 text-slate-300 mb-2" />
-                  Belum ada perusahaan afiliasi. Klik "Add Company" untuk
-                  memulai.
-                </div>
-              )}
             </div>
+
+            {/* --- EMPTY STATE (Blueprint Part 5) --- */}
+            {localCompanies.length === 0 && (
+              <div className="col-span-full py-16 text-center text-slate-500 flex flex-col items-center gap-3 bg-slate-50 rounded-xl border border-slate-200 border-dashed">
+                <Building className="w-10 h-10 text-slate-300" />
+                <div>
+                  <h4 className="font-bold text-slate-700">
+                    Portofolio Kosong
+                  </h4>
+                  <p className="text-xs mt-1">
+                    Belum ada perusahaan afiliasi. Klik "Add Company" untuk
+                    memulai.
+                  </p>
+                </div>
+              </div>
+            )}
           </div>
         )}
       </div>

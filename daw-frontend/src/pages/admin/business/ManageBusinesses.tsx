@@ -185,8 +185,7 @@ export default function ManageBusinesses() {
     return () => window.removeEventListener("beforeunload", handleBeforeUnload);
   }, [isEditing]);
 
-  // --- 6. DECISION HANDLERS & API (Blueprint Form: 3B & 4) ---
-
+  // 6. DECISION HANDLERS & API
   // Discard Backend Notification
   const handleDiscardDraft = async () => {
     if (!rejectedDraft?.notrans) return;

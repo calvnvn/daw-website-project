@@ -2,9 +2,10 @@ const sequelize = require("../config/database");
 const InvestmentSettings = require("../models/InvestmentSettings");
 const Affiliate = require("../models/Affiliate");
 const ApprovalDraft = require("../models/ApprovalDraft");
-const { ErpApprovalService } = require("../services/erpApprovalService");
 const { invalidateOldDrafts } = require("../utils/draftCleanup");
 const { deleteSingleFile } = require("../utils/fileRemover");
+const { generateNotrans } = require("../utils/notransGenerator");
+const ErpApprovalService = require("../services/erpApprovalService");
 
 const JENIS_APP_CMS = process.env.CMS_APPROVAL_CODE;
 
@@ -53,6 +54,99 @@ const processAffiliatePayload = async (req, existingData = {}) => {
   };
 };
 
+exports.getPublicInvestmentData = async (req, res) => {
+  try {
+    let settings = await InvestmentSettings.findByPk(1);
+    if (!settings) {
+      try {
+        settings = await InvestmentSettings.create({
+          id: 1,
+          teaserHeadline: "Other Investments.",
+          teaserBody: "Beyond our core operations...",
+          sectionIntro: "We continuously look for opportunities...",
+          is_locked: false,
+        });
+      } catch (err) {
+        settings = await InvestmentSettings.findByPk(1);
+      }
+    }
+
+    const companies = await Affiliate.findAll({
+      where: { is_locked: false },
+      order: [["id", "ASC"]],
+      attributes: ["id", "name", "desc", "category", "logoUrl", "websiteUrl"],
+    });
+
+    res.status(200).json({ settings, companies });
+  } catch (error) {
+    console.error("🚨 [GET_PUBLIC_INVESTMENT_ERROR]:", error.message);
+    res.status(500).json({ message: "Gagal mengambil data publik investasi." });
+  }
+};
+
+exports.getAdminInvestmentData = async (req, res) => {
+  try {
+    let settings = await InvestmentSettings.findByPk(1);
+    if (!settings) {
+      try {
+        settings = await InvestmentSettings.create({
+          id: 1,
+          teaserHeadline: "Other Investments.",
+          teaserBody: "Beyond our core operations...",
+          sectionIntro: "We continuously look for opportunities...",
+          is_locked: false,
+        });
+      } catch (err) {
+        settings = await InvestmentSettings.findByPk(1);
+      }
+    }
+
+    const companies = await Affiliate.findAll({
+      attributes: {
+        include: [
+          [
+            // 🔵 SENIOR FIX: Menambahkan COLLATE utf8mb4_unicode_ci
+            // Memaksa hasil CAST memiliki "bahasa" yang sama dengan tabel ApprovalDrafts
+            sequelize.literal(`(
+              SELECT COUNT(*)
+              FROM ApprovalDrafts AS ad
+              WHERE ad.target_id COLLATE utf8mb4_unicode_ci = CAST(Affiliate.id AS CHAR) COLLATE utf8mb4_unicode_ci
+                AND ad.status COLLATE utf8mb4_unicode_ci = 'Rejected'
+                AND ad.module_name COLLATE utf8mb4_unicode_ci = 'Affiliate'
+            )`),
+            "has_rejected_count",
+          ],
+        ],
+      },
+      order: [["id", "ASC"]],
+    });
+
+    const settingsDraft = await ApprovalDraft.count({
+      where: {
+        target_id: "1",
+        module_name: "InvestmentSettings",
+        status: "Rejected",
+      },
+    });
+
+    const resultCompanies = companies.map((c) => {
+      const data = c.get({ plain: true });
+      data.has_rejected = data.has_rejected_count > 0;
+      return data;
+    });
+
+    const resultSettings = settings.get({ plain: true });
+    resultSettings.has_rejected = settingsDraft > 0;
+
+    res
+      .status(200)
+      .json({ settings: resultSettings, companies: resultCompanies });
+  } catch (error) {
+    console.error("🚨 [GET_ADMIN_INVESTMENT_ERROR]:", error.message);
+    res.status(500).json({ message: "Gagal mengambil data admin investasi." });
+  }
+};
+
 // 1. GET Data Investasi
 exports.getInvestmentData = async (req, res) => {
   try {
@@ -92,11 +186,14 @@ exports.updateSettings = async (req, res) => {
   try {
     const userRole = req.userRole?.toLowerCase();
     const { status, previous_notrans } = req.body;
+    const actorId = String(req.owl_username || req.karyawanId);
 
-    // Baca/Buat data di dalam transaksi
-    let settings = await InvestmentSettings.findOne({ transaction: t });
+    let settings = await InvestmentSettings.findByPk(1, {
+      transaction: t,
+      lock: t.LOCK.UPDATE,
+    });
     if (!settings) {
-      settings = await InvestmentSettings.create({}, { transaction: t });
+      settings = await InvestmentSettings.create({ id: 1 }, { transaction: t });
     }
 
     if (settings.is_locked && userRole === "editor") {
@@ -111,8 +208,10 @@ exports.updateSettings = async (req, res) => {
 
     const { payload } = await processInvestmentPayload(req, settings);
 
-    // JALUR EDITOR (Approval Flow)
+    // EDITOR (Approval Flow)
     if (userRole === "editor" && status === "Published") {
+      const notrans = await generateNotrans("INV_SET");
+
       if (previous_notrans) {
         await ApprovalDraft.update(
           { status: "Replaced" },
@@ -120,36 +219,49 @@ exports.updateSettings = async (req, res) => {
         );
       }
 
-      // Shared Transaction ke ERP OWL
-      const result = await ErpApprovalService.initiateApproval({
-        moduleName: "InvestmentSettings",
-        model: InvestmentSettings,
-        targetId: 1, // Singleton ID constraint
-        action: "UPDATE",
-        payload: { ...payload, status: "Published" },
-        userId: req.userId,
-        owlUsername: req.owl_username,
-        karyawanId: req.karyawanId,
-        token: req.owl_token,
-        transaction: t,
-      });
+      await ApprovalDraft.create(
+        {
+          notrans,
+          module_name: "InvestmentSettings",
+          action: "UPDATE",
+          target_id: "1",
+          payload: { ...payload, status: "Published" },
+          created_by: actorId,
+          status: "Pending",
+        },
+        { transaction: t },
+      );
 
-      // Kunci data lokal
       await settings.update(
-        { is_locked: true, lock_ticket: result.notrans },
+        { is_locked: true, lock_ticket: notrans },
         { transaction: t },
       );
 
       await t.commit();
+
+      try {
+        await ErpApprovalService.initiateApproval({
+          notrans,
+          karyawanId: req.karyawanId,
+          token: req.owl_token,
+          moduleName: "InvestmentSettings",
+        });
+      } catch (erpError) {
+        console.error(
+          "⚠️ [ERP_SYNC_WARNING]: Gagal sinkronisasi ke ERP, namun draf lokal aman.",
+          erpError.message,
+        );
+      }
+
       return res.status(202).json({
         success: true,
         message: "Revisi teks investasi berhasil diajukan.",
-        ticket: result.notrans,
+        ticket: notrans,
       });
     }
 
-    //JALUR SUPERADMIN (Direct Override)
-    await invalidateOldDrafts("InvestmentSettings", 1, t);
+    // SUPERADMIN (Direct Override)
+    await invalidateOldDrafts("InvestmentSettings", "1", t);
 
     await settings.update(
       { ...payload, is_locked: false, lock_ticket: null },
@@ -159,7 +271,7 @@ exports.updateSettings = async (req, res) => {
     await t.commit();
     res.status(200).json({
       success: true,
-      message: "Pengaturan berhasil diperbarui.",
+      message: "Pengaturan berhasil diperbarui secara langsung.",
       data: settings,
     });
   } catch (error) {
@@ -168,57 +280,71 @@ exports.updateSettings = async (req, res) => {
     res.status(500).json({ success: false, message: error.message });
   }
 };
-
-// 3. POST: Create Affiliate (Shared Transaction Standard)
+// POST: Create Affiliate (Shared Transaction Standard)
 exports.createAffiliate = async (req, res) => {
   const t = await sequelize.transaction();
   try {
     const userRole = req.userRole?.toLowerCase();
     const { status } = req.body;
+    const actorId = String(req.owl_username || req.karyawanId);
 
     const { payload } = await processAffiliatePayload(req, {});
 
-    // 1. Buat data base line di DB Lokal
+    // Buat data baseline di DB Lokal
     const isEditor = userRole === "editor";
     const newCompany = await Affiliate.create(
       { ...payload, is_locked: isEditor },
       { transaction: t },
     );
 
-    // JALUR EDITOR (Approval Flow)
+    // EDITOR (Approval Flow)
     if (isEditor && status === "Published") {
-      const result = await ErpApprovalService.initiateApproval({
-        moduleName: "Affiliate",
-        model: Affiliate,
-        targetId: newCompany.id,
-        action: "CREATE",
-        payload: { ...payload, status: "Published" },
-        userId: req.userId,
-        owlUsername: req.owl_username,
-        karyawanId: req.karyawanId,
-        token: req.owl_token,
-        transaction: t,
-      });
+      const notrans = await generateNotrans("AFF");
 
-      // Update tiket gembok lokal
-      await newCompany.update(
-        { lock_ticket: result.notrans },
+      await ApprovalDraft.create(
+        {
+          notrans,
+          module_name: "Affiliate",
+          action: "CREATE",
+          target_id: String(newCompany.id),
+          payload: { ...payload, status: "Published" },
+          created_by: actorId,
+          status: "Pending",
+        },
         { transaction: t },
       );
 
+      await newCompany.update({ lock_ticket: notrans }, { transaction: t });
+
       await t.commit();
+
+      try {
+        await ErpApprovalService.initiateApproval({
+          notrans,
+          moduleName: "Affiliate",
+          karyawanId: req.karyawanId,
+          token: req.owl_token,
+          // HAPUS transaction: t dari parameter ini!
+        });
+      } catch (erpError) {
+        console.error(
+          "⚠️ [ERP_SYNC_WARNING]: Gagal sinkronisasi ERP saat Create Affiliate.",
+          erpError.message,
+        );
+      }
+
       return res.status(202).json({
         success: true,
         message: "Permintaan tambah afiliasi baru diajukan.",
-        ticket: result.notrans,
+        ticket: notrans,
       });
     }
 
-    // JALUR SUPERADMIN ATAU SAVE DRAFT
+    // SUPERADMIN (Direct Execution)
     await t.commit();
     return res.status(201).json({
       success: true,
-      message: "Affiliate berhasil dibuat secara langsung.",
+      message: "Affiliate berhasil dibuat secara permanen.",
       data: newCompany,
     });
   } catch (error) {
@@ -228,20 +354,25 @@ exports.createAffiliate = async (req, res) => {
   }
 };
 
-// 4. PUT: Update Affiliate (Shared Transaction Standard)
+// PUT: Update Affiliate (Shared Transaction Standard)
 exports.updateAffiliate = async (req, res) => {
   const t = await sequelize.transaction();
   try {
     const { id } = req.params;
     const userRole = req.userRole?.toLowerCase();
     const { status, previous_notrans } = req.body;
+    const actorId = String(req.owl_username || req.karyawanId);
 
-    const company = await Affiliate.findByPk(id, { transaction: t });
+    const company = await Affiliate.findByPk(id, {
+      transaction: t,
+      lock: t.LOCK.UPDATE,
+    });
     if (!company) {
       await t.rollback();
-      return res
-        .status(404)
-        .json({ success: false, message: "Company not found" });
+      return res.status(404).json({
+        success: false,
+        message: "Perusahaan afiliasi tidak ditemukan",
+      });
     }
 
     if (company.is_locked && userRole === "editor") {
@@ -275,8 +406,10 @@ exports.updateAffiliate = async (req, res) => {
       });
     }
 
-    // JALUR EDITOR (Approval Flow)
+    // EDITOR (Approval Flow)
     if (userRole === "editor" && status === "Published") {
+      const notrans = await generateNotrans("AFF");
+
       if (previous_notrans) {
         await ApprovalDraft.update(
           { status: "Replaced" },
@@ -284,35 +417,49 @@ exports.updateAffiliate = async (req, res) => {
         );
       }
 
-      // Shared Transaction ke ERP OWL
-      const result = await ErpApprovalService.initiateApproval({
-        moduleName: "Affiliate",
-        model: Affiliate,
-        targetId: id,
-        action: "UPDATE",
-        payload: { ...payload, status: "Published" },
-        userId: req.userId,
-        owlUsername: req.owl_username,
-        karyawanId: req.karyawanId,
-        token: req.owl_token,
-        transaction: t,
-      });
+      await ApprovalDraft.create(
+        {
+          notrans,
+          module_name: "Affiliate",
+          action: "UPDATE",
+          target_id: String(id),
+          payload: { ...payload, status: "Published" },
+          created_by: actorId,
+          status: "Pending",
+        },
+        { transaction: t },
+      );
 
       await company.update(
-        { is_locked: true, lock_ticket: result.notrans },
+        { is_locked: true, lock_ticket: notrans },
         { transaction: t },
       );
 
       await t.commit();
+
+      try {
+        await ErpApprovalService.initiateApproval({
+          notrans,
+          moduleName: "Affiliate",
+          karyawanId: req.karyawanId,
+          token: req.owl_token,
+        });
+      } catch (erpError) {
+        console.error(
+          "⚠️ [ERP_SYNC_WARNING]: Gagal sinkronisasi ERP saat Update Affiliate.",
+          erpError.message,
+        );
+      }
+
       return res.status(202).json({
         success: true,
         message: "Revisi afiliasi berhasil diajukan.",
-        ticket: result.notrans,
+        ticket: notrans,
       });
     }
 
-    // JALUR SUPERADMIN (Direct Override)
-    await invalidateOldDrafts("Affiliate", id, t);
+    // SUPERADMIN (Direct Override)
+    await invalidateOldDrafts("Affiliate", String(id), t);
 
     await company.update(
       { ...payload, is_locked: false, lock_ticket: null },
@@ -321,13 +468,14 @@ exports.updateAffiliate = async (req, res) => {
 
     await t.commit();
 
+    // Hapus file LAMA setelah transaksi sukses 100%
     if (filesToDelete.length > 0) {
       filesToDelete.forEach((file) => deleteSingleFile(file));
     }
 
     res.status(200).json({
       success: true,
-      message: "Affiliate updated live!",
+      message: "Affiliate berhasil diperbarui secara permanen!",
       data: company,
     });
   } catch (error) {
@@ -337,14 +485,14 @@ exports.updateAffiliate = async (req, res) => {
   }
 };
 
-// 5. DELETE: Delete Affiliate (Shared Transaction Standard)
+// DELETE: Delete Affiliate (Shared Transaction Standard)
 exports.deleteAffiliate = async (req, res) => {
   const t = await sequelize.transaction();
   try {
     const { id } = req.params;
     const userRole = req.userRole?.toLowerCase();
+    const actorId = String(req.owl_username || req.karyawanId);
 
-    // 1. Ambil data dengan EXCLUSIVE LOCK (Mencegah Deadlock & Race Condition)
     const company = await Affiliate.findByPk(id, {
       transaction: t,
       lock: t.LOCK.UPDATE,
@@ -354,9 +502,10 @@ exports.deleteAffiliate = async (req, res) => {
       await t.rollback();
       return res
         .status(404)
-        .json({ success: false, message: "Data not found" });
+        .json({ success: false, message: "Data tidak ditemukan" });
     }
 
+    // 🚨 Lock Guard
     if (company.is_locked && userRole === "editor") {
       await t.rollback();
       return res.status(423).json({
@@ -367,48 +516,66 @@ exports.deleteAffiliate = async (req, res) => {
       });
     }
 
-    // Siapkan nama file untuk dihapus JIKA transaksi sukses
     const logoToDelete = company.logoUrl;
 
-    // JALUR EDITOR (Approval Flow)
+    // EDITOR (Approval Flow)
     if (userRole === "editor") {
-      const result = await ErpApprovalService.initiateApproval({
-        moduleName: "Affiliate",
-        model: Affiliate,
-        targetId: id,
-        action: "DELETE",
-        payload: { name: company.name, reason: "Request Delete" },
-        userId: req.userId,
-        owlUsername: req.owl_username,
-        karyawanId: req.karyawanId,
-        token: req.owl_token,
-        transaction: t,
-      });
+      const notrans = await generateNotrans("AFF_DEL");
+
+      const fullSnapshot = company.get({ plain: true });
+
+      await ApprovalDraft.create(
+        {
+          notrans,
+          module_name: "Affiliate",
+          action: "DELETE",
+          target_id: String(id),
+          payload: { ...fullSnapshot, reason: "Request Delete" },
+          created_by: actorId,
+          status: "Pending",
+        },
+        { transaction: t },
+      );
 
       await company.update(
-        { is_locked: true, lock_ticket: result.notrans },
+        { is_locked: true, lock_ticket: notrans },
         { transaction: t },
       );
 
       await t.commit();
+
+      try {
+        await ErpApprovalService.initiateApproval({
+          notrans,
+          moduleName: "Affiliate",
+          karyawanId: req.karyawanId,
+          token: req.owl_token,
+        });
+      } catch (erpError) {
+        console.error(
+          "⚠️ [ERP_SYNC_WARNING]: Gagal sinkronisasi ERP saat Delete Affiliate.",
+          erpError.message,
+        );
+      }
+
       return res.status(202).json({
         success: true,
-        message: "Permintaan hapus afiliasi diajukan. Data dikunci.",
-        ticket: result.notrans,
+        message: "Permintaan hapus afiliasi diajukan. Data dikunci sementara.",
+        ticket: notrans,
       });
     }
 
-    // JALUR SUPERADMIN (Direct Execution)
-    await invalidateOldDrafts("Affiliate", id, t);
+    // SUPERADMIN (Direct Execution)
+    await invalidateOldDrafts("Affiliate", String(id), t);
     await company.destroy({ transaction: t });
+
     await t.commit();
 
-    // 4. Final Physical Asset Management
-    if (logoToDelete) deleteSingleFile(logoToDelete);
+    if (logoToDelete) deleteSingleFile(logoToDelete.replace("/uploads/", ""));
 
     return res.status(200).json({
       success: true,
-      message: "Affiliate berhasil dihapus secara permanen!",
+      message: "Affiliate beserta gambarnya berhasil dihapus secara permanen!",
     });
   } catch (error) {
     if (t && !t.finished) await t.rollback();

@@ -109,7 +109,7 @@ app.use("/api/settings", settingsRoutes);
 app.use("/api/about", aboutRoutes);
 app.use("/api/history", historyRoutes);
 app.use("/api/management", managementRoutes);
-app.use("/api/investment", investmentRoutes);
+app.use("/api/investments", investmentRoutes);
 app.use("/api/homepage", homeRoutes);
 app.use("/api/inquiries", inquiryRoutes);
 app.use("/api/dashboard", dashboardRoutes);

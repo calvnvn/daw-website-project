@@ -21,8 +21,6 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
       <HelmetProvider>
         <BrowserRouter>
           <AuthProvider>
-            {" "}
-            {/* 🔵 1. Pindahkan ke paling atas (setelah Router) */}
             <SettingsProvider>
               <AboutProvider>
                 <InvestmentProvider>
