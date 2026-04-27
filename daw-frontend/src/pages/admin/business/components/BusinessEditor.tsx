@@ -195,7 +195,7 @@ export default function BusinessEditor({
       {/* MAIN CONTENT CARD */}
       <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm relative ">
         <div className="absolute top-0 right-0 p-2 opacity-[0.03] pointer-events-none select-none uppercase font-black text-4xl">
-          {activeTab}
+          {formData.category}
         </div>
 
         <div className="p-2">
