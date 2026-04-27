@@ -1,10 +1,10 @@
 import { useState, useMemo } from "react";
-import { Plus, X, Save, Loader2 } from "lucide-react";
+import { Plus, X, Save, Loader2, Send } from "lucide-react";
 import { toast } from "sonner";
+import { useAuth } from "@/contexts/AuthContext";
 
 interface AddSectionModalProps {
   onClose: () => void;
-  // 🚀 MENGHAPUS PARAMETER 'STATUS' (Backend The Gatekeeper yang akan menentukan ini)
   addSection: (category: string, title: string) => Promise<void>;
 }
 
@@ -12,10 +12,11 @@ export default function AddSectionModal({
   onClose,
   addSection,
 }: AddSectionModalProps) {
+  const { user } = useAuth();
+  const isSuperadmin = user?.role === "superadmin" || user?.role === "admin";
   const [newSectionName, setNewSectionName] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // 1. IMPROVED SLUG GENERATOR (Memoized for Performance)
   const previewSlug = useMemo(() => {
     return newSectionName
       .toLowerCase()
@@ -28,19 +29,13 @@ export default function AddSectionModal({
 
   const handleSubmit = async () => {
     const trimmedName = newSectionName.trim();
-
-    // 2. BASIC CLIENT VALIDATION
     if (trimmedName.length < 3) {
       return toast.error("Nama sektor minimal 3 karakter");
     }
 
     setIsSubmitting(true);
     try {
-      await addSection(
-        trimmedName,
-        `Explore Our ${trimmedName} Operations`, // Title default
-      );
-
+      await addSection(trimmedName, `Explore Our ${trimmedName} Operations`);
       onClose();
     } catch (error: any) {
       const errMsg =
@@ -54,7 +49,6 @@ export default function AddSectionModal({
 
   return (
     <div className="fixed inset-0 z-[150] flex items-center justify-center p-4 outline-none">
-      {/* Backdrop */}
       <div
         className="absolute inset-0 bg-slate-900/60 animate-in fade-in duration-200"
         onClick={() => !isSubmitting && onClose()}
@@ -104,8 +98,6 @@ export default function AddSectionModal({
               disabled={isSubmitting}
               className="w-full px-4 py-3 rounded-xl border border-slate-200 text-slate-900 focus:outline-none focus:border-daw-green focus:ring-4 focus:ring-daw-green/10 transition-all font-medium placeholder:text-slate-300"
             />
-
-            {/* Real-time ID Preview (Visual UX) */}
             <div className="flex items-center gap-2 px-3 py-2 bg-slate-50 rounded-lg border border-slate-100">
               <div className="flex items-center gap-1.5">
                 <span className="text-[9px] font-black text-slate-400 uppercase">
@@ -116,7 +108,6 @@ export default function AddSectionModal({
                 </code>
               </div>
             </div>
-
             <p className="text-[10px] text-slate-400 italic">
               * ID ini akan digunakan untuk routing URL (e.g. /business/
               {previewSlug || "..."}).
@@ -139,13 +130,19 @@ export default function AddSectionModal({
               newSectionName.trim().length < 3
             }
             onClick={handleSubmit}
-            className="flex items-center gap-2 bg-slate-900 hover:bg-daw-green disabled:bg-slate-200 disabled:text-slate-400 text-white px-7 py-2.5 rounded-xl font-bold text-sm transition-all shadow-md active:scale-95">
+            className={`flex items-center gap-2 px-7 py-2.5 rounded-xl font-bold text-sm transition-all shadow-md active:scale-95 text-white disabled:bg-slate-200 disabled:text-slate-400 ${
+              isSuperadmin
+                ? "bg-daw-green hover:bg-[#003b1c]"
+                : "bg-blue-600 hover:bg-blue-700"
+            }`}>
             {isSubmitting ? (
               <Loader2 className="w-4 h-4 animate-spin" />
-            ) : (
+            ) : isSuperadmin ? (
               <Save className="w-4 h-4" />
+            ) : (
+              <Send className="w-4 h-4" />
             )}
-            CREATE SECTOR
+            {isSuperadmin ? "CREATE SECTOR" : "REQUEST CREATION"}
           </button>
         </div>
       </div>

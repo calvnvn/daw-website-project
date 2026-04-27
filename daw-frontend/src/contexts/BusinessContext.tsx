@@ -30,10 +30,6 @@ export interface MapMarker {
   categoryData?: MapCategory;
 }
 
-/**
- * @interface SectionData
- * Represents a major business division (e.g., Resources, Energy).
- */
 export interface SectionData {
   id: string;
   category: string;
@@ -48,10 +44,6 @@ export interface SectionData {
   rejection_reason?: string;
 }
 
-/**
- * @interface BusinessContextType
- * Defines the global state and methods accessible throughout the business management module.
- */
 interface BusinessContextType {
   sections: SectionData[];
   categories: MapCategory[];
@@ -93,13 +85,12 @@ export const BusinessProvider = ({ children }: { children: ReactNode }) => {
   const [isProcessing, setIsProcessing] = useState(false);
   const [rejectedDraft, setRejectedDraft] = useState<any | null>(null);
 
-  // Menarik data draf yang ditolak dari backend untuk fitur Recovery Editor
   const fetchRejectedDraft = useCallback(
     async (id: string, moduleName: string, signal?: AbortSignal) => {
       try {
         const response = await api.get(`/approval/rejected/${id}`, {
           params: { module: moduleName },
-          signal, // 💡 FIX: Teruskan signal pembatalan ke Axios
+          signal,
         });
         if (response.data.hasRejected) {
           setRejectedDraft(response.data.data);
@@ -122,22 +113,17 @@ export const BusinessProvider = ({ children }: { children: ReactNode }) => {
     [],
   );
 
-  // Cleaning Draf's State (saat save atau pindah tab)
   const clearRejectedDraft = useCallback(() => {
     setRejectedDraft(null);
   }, []);
-  /**
-   * @desc Synchronizes local memory with the remote database.
-   * Fetches both business sections and map categories concurrently for performance.
-   */
-  // BusinessContext.tsx
+
   const refreshData = useCallback(async () => {
     console.log("🚀 [DEBUG] refreshData dipicu!");
     if (sections.length === 0) setIsLoading(true);
 
     try {
       const results = await Promise.allSettled([
-        api.get("/businesses/public"),
+        api.get("/businesses/admin"),
         api.get("/map-categories"),
         api.get("/projects/public"),
       ]);
@@ -145,24 +131,16 @@ export const BusinessProvider = ({ children }: { children: ReactNode }) => {
       const categoryResult = results[1];
       if (categoryResult.status === "fulfilled") {
         const rawData = categoryResult.value.data;
-
-        // Jaring pengaman: Pastikan kita dapet array
         const finalArray = Array.isArray(rawData)
           ? rawData
           : rawData?.data || [];
-
-        if (Array.isArray(finalArray)) {
-          setCategories(finalArray);
-        } else {
-          setCategories([]);
-        }
+        setCategories(Array.isArray(finalArray) ? finalArray : []);
       }
 
       if (results[0].status === "fulfilled") {
-        const sectionData = results[0].value.data;
-        setSections(
-          Array.isArray(sectionData) ? sectionData : sectionData?.data || [],
-        );
+        const sectionData =
+          results[0].value.data?.data || results[0].value.data;
+        setSections(Array.isArray(sectionData) ? sectionData : []);
       }
 
       if (results[2].status === "fulfilled") {
@@ -178,7 +156,6 @@ export const BusinessProvider = ({ children }: { children: ReactNode }) => {
     }
   }, []);
 
-  // Fungsi untuk menyimpan data ke Backend
   const updateSection = useCallback(
     async (
       id: string,
@@ -228,7 +205,7 @@ export const BusinessProvider = ({ children }: { children: ReactNode }) => {
         });
         throw error;
       } finally {
-        setIsProcessing(false); // Mematikan isProcessing global
+        setIsProcessing(false);
       }
     },
     [refreshData, clearRejectedDraft],
@@ -251,7 +228,6 @@ export const BusinessProvider = ({ children }: { children: ReactNode }) => {
     [refreshData],
   );
 
-  // 2. Update Kategori (Warna/Nama)
   const updateCategory = useCallback(
     async (id: string, data: Partial<MapCategory>) => {
       setIsProcessing(true);
@@ -269,7 +245,6 @@ export const BusinessProvider = ({ children }: { children: ReactNode }) => {
     [refreshData],
   );
 
-  // 3. Hapus Kategori
   const deleteCategory = useCallback(
     async (id: string) => {
       setIsProcessing(true);
@@ -289,15 +264,11 @@ export const BusinessProvider = ({ children }: { children: ReactNode }) => {
     [refreshData],
   );
 
-  /**
-   * @desc Dispatches a POST request to initialize a new business unit.
-   */
   const addSection = useCallback(
     async (category: string, title: string) => {
       setIsProcessing(true);
       const toastId = toast.loading("Membuat sektor bisnis baru...");
       try {
-        // 1. FIX: Tambahkan deklarasi 'res'
         const res = await api.post("/businesses/admin", { category, title });
 
         if (res.status === 202) {
@@ -309,11 +280,9 @@ export const BusinessProvider = ({ children }: { children: ReactNode }) => {
           toast.success(`Sektor ${category} berhasil dibuat!`, { id: toastId });
         }
 
-        // 2. Refresh data setelah feedback muncul
         await refreshData();
       } catch (error: any) {
         console.error("[ADD_SECTION_ERROR]:", error);
-        // 3. FIX: Gunakan toastId agar loading-nya hilang saat error
         toast.error("Gagal Membuat Sektor", {
           id: toastId,
           description: error.response?.data?.message || error.message,
@@ -334,7 +303,6 @@ export const BusinessProvider = ({ children }: { children: ReactNode }) => {
       setIsProcessing(true);
       const toastId = toast.loading("Memproses penghapusan...");
       try {
-        // 1. FIX: Tambahkan deklarasi 'res'
         const res = await api.delete(`/businesses/admin/${id}`);
 
         if (res.status === 202) {

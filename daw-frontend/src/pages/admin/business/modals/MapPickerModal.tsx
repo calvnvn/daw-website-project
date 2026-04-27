@@ -33,8 +33,10 @@ export default function MapPickerModal({
   const crosshairRef = useRef<HTMLDivElement>(null);
   const loupeRef = useRef<HTMLDivElement>(null);
   const radarRef = useRef<HTMLDivElement>(null);
-  const lastCoords = useRef({ x: "0%", y: "0%" });
-
+  const lastCoords = useRef({ x: "50%", y: "50%" });
+  useEffect(() => {
+    if (isOpen) lastCoords.current = { x: "50%", y: "50%" };
+  }, [isOpen]);
   /**
    * Method: updatePointerPos
    * Optimasi: Penanganan rasio aspek dan pencegahan clipping.
@@ -60,8 +62,6 @@ export default function MapPickerModal({
         }
         if (loupeRef.current) {
           const { zoom, radius, offset } = CONFIG.DESKTOP;
-
-          // Dynamic positioning: jika kursor di atas, pindahkan loupe ke bawah kursor
           const shouldFlip = yPx < offset;
           loupeRef.current.style.transform = `translate(-50%, ${shouldFlip ? "20%" : "-130%"})`;
 
@@ -117,7 +117,10 @@ export default function MapPickerModal({
             className={`relative w-full max-w-4xl aspect-video bg-white shadow-xl rounded-2xl overflow-hidden border-4 border-white transition-all ${
               isMobile ? "touch-none" : "cursor-none"
             }`}
-            onClick={() => onSelectLocation(lastCoords.current)}
+            onClick={(e) => {
+              if (!isMobile) updatePointerPos(e.clientX, e.clientY);
+              onSelectLocation(lastCoords.current);
+            }}
             onMouseMove={(e) =>
               !isMobile && updatePointerPos(e.clientX, e.clientY)
             }

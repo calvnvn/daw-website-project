@@ -6,6 +6,7 @@ import {
   Info,
   CheckCircle2,
   Clock,
+  X, // Tambahan icon X untuk tombol Abaikan
 } from "lucide-react";
 import { useBusiness, type SectionData } from "@/contexts/BusinessContext";
 import "react-quill-new/dist/quill.snow.css";
@@ -18,6 +19,7 @@ interface BusinessEditorProps {
   formData: BusinessFormState;
   setFormData: React.Dispatch<React.SetStateAction<BusinessFormState>>;
   isEditing: boolean;
+  handleDiscardDraft: () => Promise<void>;
 }
 
 export default function BusinessEditor({
@@ -25,15 +27,24 @@ export default function BusinessEditor({
   formData,
   setFormData,
   isEditing,
+  handleDiscardDraft,
 }: BusinessEditorProps) {
   const { rejectedDraft } = useBusiness();
 
   const handleRestoreDraft = useCallback(() => {
     if (!rejectedDraft?.payload) return;
 
+    if (rejectedDraft.action === "DELETE") {
+      toast.error("Tindakan Ditolak", {
+        description: "Tidak dapat memulihkan data dari draf penghapusan.",
+      });
+      return;
+    }
+
     try {
       const payload = rejectedDraft.payload;
 
+      // DEEP MERGE
       setFormData((prev) => ({
         ...prev,
         title: payload.title ?? prev.title,
@@ -68,7 +79,7 @@ export default function BusinessEditor({
 
   return (
     <div className="lg:col-span-7 space-y-6">
-      {/* 🚀 THE REJECTION RIBBON (Blueprint IV.B) */}
+      {/* THE REJECTION RIBBON (Blueprint 3B: Recovery Banner) */}
       {rejectedDraft && (
         <div className="bg-amber-50 border border-amber-200 rounded-xl overflow-hidden shadow-sm animate-in slide-in-from-top-4 duration-300">
           <div className="p-4 flex gap-4 items-start">
@@ -91,7 +102,9 @@ export default function BusinessEditor({
                   "Silakan hubungi peninjau terkait alasan penolakan."}
                 "
               </p>
+
               <div className="pt-2 flex flex-col sm:flex-row sm:items-center gap-3">
+                {/* ACTION 1: PULIHKAN DATA */}
                 <button
                   onClick={handleRestoreDraft}
                   disabled={!isEditing}
@@ -106,6 +119,15 @@ export default function BusinessEditor({
                   />
                   PULIHKAN DATA
                 </button>
+
+                {/* ACTION 2: ABAIKAN NOTIFIKASI (Blueprint 3B: Clean Discard) */}
+                <button
+                  onClick={handleDiscardDraft}
+                  className="flex items-center justify-center gap-2 bg-white border border-amber-200 text-amber-600 hover:bg-amber-100 px-4 py-2.5 rounded-lg text-xs font-bold transition-all shadow-sm active:scale-95">
+                  <X className="w-3.5 h-3.5" />
+                  ABAIKAN NOTIFIKASI
+                </button>
+
                 {!isEditing && (
                   <p className="text-[10px] text-amber-600 font-medium italic animate-pulse">
                     * Aktifkan "Editing Mode" untuk memulihkan draf.
@@ -163,7 +185,8 @@ export default function BusinessEditor({
               <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-2">
                 Narasi Konten (Rich Text)
               </label>
-              {/* 🚀 Aggressive visual lockdown logic (already correct) */}
+
+              {/* Aggressive visual lockdown logic (Sesuai Blueprint 5) */}
               <div
                 className={`rounded-xl overflow-hidden border transition-all duration-300 ${
                   isEditing

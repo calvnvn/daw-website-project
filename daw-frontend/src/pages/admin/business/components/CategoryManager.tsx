@@ -8,6 +8,7 @@ import {
   Map as MapIcon,
   Lock,
   Clock,
+  ShieldAlert,
 } from "lucide-react";
 import { useBusiness } from "@/contexts/BusinessContext";
 import { useAuth } from "@/contexts/AuthContext";
@@ -25,12 +26,12 @@ export default function CategoryManager() {
     isProcessing,
   } = useBusiness();
 
-  // --- LOCAL STATE ---
+  // LOCAL STATE
   const [newCat, setNewCat] = useState({ id: "", name: "", color: "#004B23" });
   const [editingCatId, setEditingCatId] = useState<string | null>(null);
   const [editCatData, setEditCatData] = useState({ name: "", color: "" });
 
-  // --- HELPERS ---
+  // HELPERS
   const validateHex = (hex: string) => /^#[0-9A-Fa-f]{6}$/.test(hex);
 
   const slugify = (text: string) =>
@@ -40,7 +41,7 @@ export default function CategoryManager() {
       .replace(/[^\w-]/g, "") // Hapus karakter ilegal
       .replace(/--+/g, "-"); // Hapus multiple dashes
 
-  // --- HANDLERS ---
+  // HANDLERS
   const handleAdd = async () => {
     if (!validateHex(newCat.color)) {
       return toast.error("Warna Hex harus lengkap (contoh: #004B23)");
@@ -63,7 +64,7 @@ export default function CategoryManager() {
 
   return (
     <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
-      {/* 1. Info Banner & Restriction Warning */}
+      {/* Info Banner & Restriction Warning */}
       <div className="bg-daw-green/5 border border-daw-green/20 p-4 rounded-xl flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
         <div className="flex items-start gap-3">
           <MapIcon className="w-5 h-5 text-daw-green shrink-0 mt-0.5" />
@@ -89,7 +90,7 @@ export default function CategoryManager() {
         )}
       </div>
 
-      {/* 2. Category Creation Form ( DISEMBUNYIKAN UNTUK EDITOR) */}
+      {/* Category Creation Form ( DISEMBUNYIKAN UNTUK EDITOR) */}
       {isSuperadmin && (
         <div className="bg-slate-50 p-6 rounded-xl border border-slate-200">
           <h3 className="font-bold text-slate-900 flex items-center gap-2 text-xs uppercase tracking-widest mb-4">
@@ -171,7 +172,7 @@ export default function CategoryManager() {
         </div>
       )}
 
-      {/* 3. Table List */}
+      {/*Table List */}
       <div className="overflow-hidden border border-slate-200 rounded-xl shadow-sm bg-white">
         <table className="w-full text-left text-sm">
           <thead className="bg-slate-50 border-b border-slate-200 text-slate-500 uppercase text-[10px] font-black">
@@ -187,23 +188,34 @@ export default function CategoryManager() {
           <tbody className="divide-y divide-slate-100">
             {categories.map((cat) => {
               const isEditingThis = editingCatId === cat.id;
-              const isLocked = cat.is_locked;
+              const isPending = cat.is_locked;
+              const isLockedForEditor = !isSuperadmin;
 
               return (
                 <tr
                   key={cat.id}
-                  className={`transition-colors ${isLocked ? "bg-slate-50/50" : "hover:bg-slate-50/30"}`}>
+                  className={`transition-all duration-300 group ${
+                    isPending
+                      ? "bg-slate-50/50 opacity-70 grayscale-[20%]"
+                      : isLockedForEditor
+                        ? "hover:bg-slate-50/20 cursor-default"
+                        : "hover:bg-slate-50/80"
+                  }`}>
+                  {/* KOLOM STATUS (Visual Radar) */}
                   <td className="px-6 py-4">
-                    {isLocked ? (
-                      <div className="flex items-center gap-1.5 text-blue-600 font-bold text-[10px] bg-blue-50 px-2 py-1 rounded-full w-fit border border-blue-100">
+                    {isPending ? (
+                      <div className="flex items-center gap-1.5 text-blue-600 font-bold text-[10px] bg-blue-50 px-2 py-1 rounded-full w-fit border border-blue-100 shadow-sm">
                         <Clock className="w-3 h-3 animate-pulse" /> PENDING
                       </div>
                     ) : (
-                      <div className="text-daw-green font-bold text-[10px] bg-green-50 px-2 py-1 rounded-full w-fit border border-green-100">
+                      <div className="flex items-center gap-1.5 text-daw-green font-bold text-[10px] bg-green-50 px-2 py-1 rounded-full w-fit border border-green-100">
+                        <div className="w-1 h-1 bg-daw-green rounded-full" />{" "}
                         LIVE
                       </div>
                     )}
                   </td>
+
+                  {/* KOLOM IDENTITAS */}
                   <td className="px-6 py-4">
                     <div className="flex flex-col">
                       <span className="font-mono text-[10px] text-slate-400">
@@ -223,12 +235,18 @@ export default function CategoryManager() {
                         />
                       ) : (
                         <span
-                          className={`font-bold ${isLocked ? "text-slate-400" : "text-slate-700"}`}>
+                          className={`font-bold ${
+                            isPending || isLockedForEditor
+                              ? "text-slate-400"
+                              : "text-slate-700"
+                          }`}>
                           {cat.name}
                         </span>
                       )}
                     </div>
                   </td>
+
+                  {/* KOLOM VISUAL WARNA */}
                   <td className="px-6 py-4">
                     <div className="flex items-center gap-3">
                       {isEditingThis ? (
@@ -259,7 +277,7 @@ export default function CategoryManager() {
                       ) : (
                         <>
                           <div
-                            className="w-4 h-4 rounded-full border border-black/10 shadow-sm"
+                            className={`w-4 h-4 rounded-full border border-black/10 shadow-sm ${isPending ? "opacity-50" : ""}`}
                             style={{ backgroundColor: cat.color }}
                           />
                           <span className="text-xs font-mono text-slate-400">
@@ -270,7 +288,7 @@ export default function CategoryManager() {
                     </div>
                   </td>
 
-                  {/* 🚀 Kolom Action hanya di-render untuk superadmin */}
+                  {/* KOLOM ACTION (Role Guard & Lockdown Guard) */}
                   {isSuperadmin && (
                     <td className="px-6 py-4 text-right">
                       <div className="flex justify-end gap-2">
@@ -290,7 +308,7 @@ export default function CategoryManager() {
                         ) : (
                           <>
                             <button
-                              disabled={isLocked}
+                              disabled={isPending}
                               onClick={() => {
                                 setEditingCatId(cat.id);
                                 setEditCatData({
@@ -299,14 +317,14 @@ export default function CategoryManager() {
                                 });
                               }}
                               className="p-1.5 text-slate-400 hover:text-daw-green disabled:opacity-30 transition-colors">
-                              {isLocked ? (
+                              {isPending ? (
                                 <Lock className="w-4 h-4" />
                               ) : (
                                 <Edit className="w-4 h-4" />
                               )}
                             </button>
                             <button
-                              disabled={isLocked}
+                              disabled={isPending}
                               onClick={() =>
                                 confirm(`Hapus kategori "${cat.name}"?`) &&
                                 deleteCategory(cat.id)

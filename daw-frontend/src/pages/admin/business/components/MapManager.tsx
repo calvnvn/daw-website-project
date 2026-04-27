@@ -14,10 +14,10 @@ import {
   type SectionData,
 } from "@/contexts/BusinessContext";
 
-// Definisi Interface yang ketat
+type BusinessFormState = Omit<SectionData, "id">;
 interface MapManagerProps {
   formData: Omit<SectionData, "id">;
-  setFormData: React.Dispatch<React.SetStateAction<any>>;
+  setFormData: React.Dispatch<React.SetStateAction<BusinessFormState>>;
   isEditing: boolean;
   categories: MapCategory[];
   categoryMap: Record<string, string>;
@@ -29,7 +29,7 @@ interface MapManagerProps {
 export default function MapManager({
   formData,
   setFormData,
-  isEditing, // 🚀 SEKARANG 100% TUNDUK PADA PARENT (Sovereign Gatekeeper)
+  isEditing,
   categories,
   categoryMap,
   onOpenMapPicker,
@@ -41,6 +41,11 @@ export default function MapManager({
     ">>> [MAP DEBUG] First Marker CategoryID:",
     formData.mapMarkers[0]?.categoryId,
   );
+  const isLocked = !isEditing;
+  const itemLockStyles = isLocked
+    ? "opacity-75 grayscale-[0.3] select-none"
+    : "";
+
   // Helper untuk menyalin koordinat dengan proteksi SSL
   const handleCopyCoords = (coords: string) => {
     if (!navigator.clipboard) {
@@ -51,10 +56,6 @@ export default function MapManager({
     navigator.clipboard.writeText(coords);
     toast.success("Koordinat berhasil disalin ke clipboard!");
   };
-
-  // 🚀 DIHAPUS: const isLocked = formData.is_locked;
-  // 🚀 DIHAPUS: const canInteract = isEditing && !isLocked;
-  // Kita langsung menggunakan prop `isEditing` di seluruh interaksi.
 
   return (
     <div className="lg:col-span-5 space-y-6">
@@ -100,8 +101,13 @@ export default function MapManager({
               className={`relative group rounded-xl border-2 transition-all overflow-hidden ${
                 isEditing
                   ? "cursor-crosshair border-daw-green/20 hover:border-daw-green/50"
-                  : "cursor-default border-slate-100 grayscale-[0.5]"
+                  : "cursor-default border-slate-100 grayscale-[0.8] opacity-80"
               }`}
+              title={
+                isLocked
+                  ? "Data sedang dikunci oleh sistem"
+                  : "Klik untuk atur lokasi"
+              }
               onClick={() => isEditing && onOpenMapPicker()}>
               <div className="w-full aspect-video bg-slate-50 relative shadow-inner flex items-center justify-center">
                 <img
@@ -139,7 +145,9 @@ export default function MapManager({
               {formData.mapMarkers.map((marker: MapMarker, index: number) => (
                 <div
                   key={marker.id || `list-${index}`}
-                  className="p-4 bg-slate-50/50 border border-slate-200 rounded-xl relative group hover:border-daw-green/40 hover:bg-white transition-all duration-300">
+                  className={`p-4 bg-slate-50/50 border border-slate-200 rounded-xl relative group transition-all duration-300 ${
+                    !isLocked ? "hover:border-daw-green/40 hover:bg-white" : ""
+                  } ${itemLockStyles}`}>
                   {/* Action Buttons Floating */}
                   <div className="absolute top-3 right-3 flex gap-1.5 opacity-0 group-hover:opacity-100 transition-all transform translate-y-[-2px] group-hover:translate-y-0">
                     <button
