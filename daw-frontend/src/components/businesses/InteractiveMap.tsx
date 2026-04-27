@@ -137,8 +137,7 @@ const InteractiveMap = memo(function InteractiveMap({
                   : "opacity-100"
               }`}
               onMouseEnter={() => !isMobile && setHoveredCategory(cat.id)}
-              onMouseLeave={() => !isMobile && setHoveredCategory(null)}
-            >
+              onMouseLeave={() => !isMobile && setHoveredCategory(null)}>
               <span
                 className="w-3 h-3 rounded-full shadow-sm"
                 style={{ backgroundColor: cat.color }}
@@ -205,18 +204,15 @@ const InteractiveMap = memo(function InteractiveMap({
                 style={{ left: `${m.dX}%`, top: `${m.dY}%` }}
                 onClick={() => setActiveId(isActive ? null : m.id)}
                 onMouseEnter={() => !isMobile && setActiveId(m.id)}
-                onMouseLeave={() => !isMobile && setActiveId(null)}
-              >
+                onMouseLeave={() => !isMobile && setActiveId(null)}>
                 {!isFaded && (
                   <span
                     className="animate-ping absolute inline-flex h-4 w-4 rounded-full opacity-40"
-                    style={{ backgroundColor: markerColor }}
-                  ></span>
+                    style={{ backgroundColor: markerColor }}></span>
                 )}
                 <span
                   className={`relative inline-flex rounded-full h-3 w-3 border-[1.5px] border-white shadow-md transition-all duration-300 ${isActive ? "scale-150" : "hover:scale-125"}`}
-                  style={{ backgroundColor: markerColor }}
-                ></span>
+                  style={{ backgroundColor: markerColor }}></span>
               </div>
 
               {/* FLOATING DATA BOX (Desktop Only) - TIER S DESIGN */}
@@ -246,8 +242,7 @@ const InteractiveMap = memo(function InteractiveMap({
                     borderColor: isActive ? "transparent" : `${markerColor}30`,
                   }}
                   onMouseEnter={() => setActiveId(m.id)}
-                  onMouseLeave={() => setActiveId(null)}
-                >
+                  onMouseLeave={() => setActiveId(null)}>
                   {/* AESTHETIC: Dynamic Top Accent Line */}
                   <div
                     className={`absolute top-0 left-0 w-full transition-all duration-500 ease-out ${
@@ -271,8 +266,7 @@ const InteractiveMap = memo(function InteractiveMap({
                     <div>
                       <h4
                         className="font-serif font-bold text-[14px] leading-tight mb-1 transition-colors duration-300"
-                        style={{ color: isActive ? "#0f172a" : markerColor }}
-                      >
+                        style={{ color: isActive ? "#0f172a" : markerColor }}>
                         {m.title}
                       </h4>
                       <p className="font-sans text-[11px] font-medium text-slate-600 leading-relaxed">
@@ -287,8 +281,7 @@ const InteractiveMap = memo(function InteractiveMap({
                         isActive && m.mapUrl
                           ? "grid-rows-[1fr] opacity-100 mt-2"
                           : "grid-rows-[0fr] opacity-0 mt-0"
-                      }`}
-                    >
+                      }`}>
                       <div className="overflow-hidden">
                         {m.mapUrl && (
                           <a
@@ -297,8 +290,7 @@ const InteractiveMap = memo(function InteractiveMap({
                             rel="noopener noreferrer"
                             className="inline-flex items-center gap-1.5 text-[10px] font-black uppercase tracking-[0.15em] hover:opacity-70 transition-opacity bg-slate-50 py-2 px-3 rounded-lg border border-slate-100 w-full"
                             style={{ color: markerColor }}
-                            onClick={(e) => e.stopPropagation()}
-                          >
+                            onClick={(e) => e.stopPropagation()}>
                             <ExternalLink className="w-3 h-3" />
                             <span>View on Maps</span>
                           </a>
@@ -314,64 +306,61 @@ const InteractiveMap = memo(function InteractiveMap({
       </div>
 
       {/* --- MOBILE: BOTTOM SHEET & BACKDROP --- */}
-      {isMobile && activeId && (
-        <div
-          className="fixed inset-0 bg-slate-900/40 backdrop-blur-[2px] z-[90] animate-in fade-in duration-300"
-          onClick={() => setActiveId(null)}
-        />
-      )}
+      {isMobile && activeId && activeMarker && (
+        <>
+          <div
+            className="fixed inset-0 bg-slate-900/40 backdrop-blur-[2px] z-[90] animate-in fade-in duration-300"
+            onClick={() => setActiveId(null)}
+          />
 
-      <div
-        className={`fixed md:hidden bottom-0 left-0 right-0 z-[100] bg-white border-t border-slate-100 rounded-t-[2.5rem] shadow-2xl transition-transform duration-500 ease-out p-8 pb-12 ${activeMarker ? "translate-y-0" : "translate-y-full"}`}
-      >
-        <div
-          className="w-12 h-1.5 bg-slate-100 rounded-full mx-auto mb-8"
-          onClick={() => setActiveId(null)}
-        />
+          <div className="fixed md:hidden bottom-0 left-0 right-0 z-[100] bg-white border-t border-slate-100 rounded-t-[2.5rem] shadow-[0_-15px_40px_rgba(0,0,0,0.15)] transition-transform duration-500 ease-out p-8 pb-12 translate-y-0 animate-in slide-in-from-bottom-full">
+            <div
+              className="w-12 h-1.5 bg-slate-200 rounded-full mx-auto mb-8 cursor-pointer active:scale-95 transition-transform"
+              onClick={() => setActiveId(null)}
+            />
 
-        {activeMarker && (
-          <div className="space-y-6">
-            <div className="flex justify-between items-start">
-              <div>
-                <div className="flex items-center gap-2 mb-2">
-                  <span
-                    className="w-2 h-2 rounded-full"
-                    style={{ backgroundColor: activeMarker.color }}
-                  />
-                  <span className="text-[10px] font-extrabold uppercase tracking-widest text-slate-400">
-                    {activeMarker.categoryName}
-                  </span>
+            {/* Isi Konten Data Lokasi */}
+            <div className="space-y-6">
+              <div className="flex justify-between items-start">
+                <div>
+                  <div className="flex items-center gap-2 mb-2">
+                    <span
+                      className="w-2 h-2 rounded-full"
+                      style={{ backgroundColor: activeMarker.color }}
+                    />
+                    <span className="text-[10px] font-extrabold uppercase tracking-widest text-slate-400">
+                      {activeMarker.categoryName}
+                    </span>
+                  </div>
+                  <h3 className="text-2xl font-serif font-bold text-slate-900 leading-tight">
+                    {activeMarker.title}
+                  </h3>
                 </div>
-                <h3 className="text-2xl font-serif font-bold text-slate-900 leading-tight">
-                  {activeMarker.title}
-                </h3>
+                <button
+                  onClick={() => setActiveId(null)}
+                  className="p-3 bg-slate-50 rounded-full text-slate-400 hover:text-slate-600 active:scale-90 transition-all">
+                  <X className="w-6 h-6" />
+                </button>
               </div>
-              <button
-                onClick={() => setActiveId(null)}
-                className="p-3 bg-slate-50 rounded-full text-slate-400 active:scale-90 transition-transform"
-              >
-                <X className="w-6 h-6" />
-              </button>
+
+              <p className="text-slate-600 leading-relaxed font-medium">
+                {activeMarker.desc}
+              </p>
+
+              {activeMarker.mapUrl && (
+                <a
+                  href={activeMarker.mapUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center justify-center gap-3 w-full py-4 rounded-2xl text-sm font-bold text-white shadow-lg transition-transform active:scale-95 hover:opacity-90"
+                  style={{ backgroundColor: activeMarker.color }}>
+                  <ExternalLink className="w-4 h-4" /> VIEW ON GOOGLE MAPS
+                </a>
+              )}
             </div>
-
-            <p className="text-slate-600 leading-relaxed font-medium">
-              {activeMarker.desc}
-            </p>
-
-            {activeMarker.mapUrl && (
-              <a
-                href={activeMarker.mapUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-center justify-center gap-3 w-full py-4 rounded-2xl text-sm font-bold text-white shadow-lg transition-transform active:scale-95"
-                style={{ backgroundColor: activeMarker.color }}
-              >
-                <ExternalLink className="w-4 h-4" /> VIEW ON GOOGLE MAPS
-              </a>
-            )}
           </div>
-        )}
-      </div>
+        </>
+      )}
     </div>
   );
 });
