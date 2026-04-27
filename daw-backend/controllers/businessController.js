@@ -6,8 +6,11 @@ const MapCategory = require("../models/MapCategory");
 const ApprovalDraft = require("../models/ApprovalDraft");
 const { invalidateOldDrafts } = require("../utils/draftCleanup");
 const { deleteSingleFile } = require("../utils/fileRemover");
-const { ErpApprovalService } = require("../services/erpApprovalService");
+const ErpApprovalService = require("../services/erpApprovalService");
+const { generateNotrans } = require("../utils/notransGenerator");
 const sanitizeHtml = require("sanitize-html");
+const { Op } = require("sequelize");
+
 const JENIS_APP_CMS = process.env.CMS_APPROVAL_CODE;
 
 const sanitizeOptions = {
@@ -130,6 +133,54 @@ const processBusinessPayload = async (req, existingData = {}) => {
   };
 };
 
+// Admin Getter with Rejection Radar
+exports.getAdminBusinessSections = async (req, res) => {
+  try {
+    const sections = await BusinessSection.findAll({
+      attributes: {
+        include: [
+          [
+            sequelize.literal(`(
+              SELECT COUNT(*)
+              FROM ApprovalDrafts AS ad
+              WHERE ad.target_id = BusinessSection.id
+                AND ad.status = 'Rejected'
+                AND ad.module_name = 'BusinessSection'
+            )`),
+            "has_rejected_count",
+          ],
+        ],
+      },
+      include: [
+        {
+          model: BusinessMapMarker,
+          as: "mapMarkers",
+          required: false,
+          include: [
+            {
+              model: MapCategory,
+              as: "categoryData",
+              attributes: ["id", "name", "color"],
+            },
+          ],
+        },
+      ],
+      order: [["orderIndex", "ASC"]],
+    });
+
+    const result = sections.map((s) => {
+      const data = s.get({ plain: true });
+      data.has_rejected = data.has_rejected_count > 0;
+      return data;
+    });
+
+    res.status(200).json({ success: true, data: result });
+  } catch (error) {
+    console.error("[GET_ADMIN_BUSINESS_ERROR]:", error);
+    res.status(500).json({ message: "Failed to fetch admin business data" });
+  }
+};
+
 exports.getPublicBusinessData = async (req, res) => {
   try {
     const sections = await BusinessSection.findAll({
@@ -173,8 +224,13 @@ exports.updateBusinessSection = async (req, res) => {
     const { id } = req.params;
     const userRole = req.userRole?.toLowerCase();
     const { status, previous_notrans } = req.body;
+    const actorId = String(req.owl_username || req.karyawanId);
 
-    const section = await BusinessSection.findByPk(id, { transaction: t });
+    const section = await BusinessSection.findByPk(id, {
+      transaction: t,
+      lock: t.LOCK.UPDATE,
+    });
+
     if (!section) {
       await t.rollback();
       return res
@@ -182,7 +238,7 @@ exports.updateBusinessSection = async (req, res) => {
         .json({ message: "Sektor Bisnis tidak ditemukan!" });
     }
 
-    // 1. GATEKEEPER: Lock Guard
+    // Lock Guard
     if (section.is_locked && userRole === "editor") {
       await t.rollback();
       return res.status(423).json({
@@ -191,14 +247,15 @@ exports.updateBusinessSection = async (req, res) => {
       });
     }
 
-    // 2. PEMROSESAN PAYLOAD (HTML Sanitization & Image Extraction)
     const { payload, filesToDelete } = await processBusinessPayload(
       req,
       section,
     );
 
-    // 3. JALUR EDITOR: Approval Flow
+    // EDITOR: Approval Flow
     if (userRole === "editor" && status === "Published") {
+      const notrans = await generateNotrans("BusinessSection");
+
       if (previous_notrans) {
         await ApprovalDraft.update(
           { status: "Replaced" },
@@ -206,35 +263,39 @@ exports.updateBusinessSection = async (req, res) => {
         );
       }
 
-      // Shared Transaction ke ERP
-      const result = await ErpApprovalService.initiateApproval({
-        moduleName: "BusinessSection",
-        model: BusinessSection,
-        targetId: id,
-        action: "UPDATE",
-        payload: { ...payload, status: "Published" },
-        userId: req.userId,
-        owlUsername: req.owl_username,
-        karyawanId: req.karyawanId,
-        token: req.owl_token,
-        transaction: t,
-      });
-
-      // Kunci data lokal
-      await section.update(
-        { is_locked: true, lock_ticket: result.notrans },
+      await ApprovalDraft.create(
+        {
+          notrans,
+          module_name: "BusinessSection",
+          action: "UPDATE",
+          target_id: String(id),
+          payload: { ...payload, status: "Published" },
+          created_by: actorId,
+          status: "Pending",
+        },
         { transaction: t },
       );
+
+      await section.update(
+        { is_locked: true, lock_ticket: notrans },
+        { transaction: t },
+      );
+
+      await ErpApprovalService.initiateApproval({
+        notrans,
+        karyawanId: actorId,
+        token: req.owl_token,
+      });
 
       await t.commit();
       return res.status(202).json({
         message:
           "Revisi Sektor & Peta diajukan. Data dikunci menunggu persetujuan.",
-        ticket: result.notrans,
+        ticket: notrans,
       });
     }
 
-    // 4. JALUR ADMIN: Direct Commit (Atomic Baton Pass)
+    // ADMIN: Direct Commit (Atomic Baton Pass)
     if (userRole === "superadmin" || userRole === "admin") {
       await invalidateOldDrafts("BusinessSection", id, t);
     }
@@ -285,10 +346,12 @@ exports.createBusinessSection = async (req, res) => {
   const t = await sequelize.transaction();
   try {
     const { category, title, status } = req.body;
-    const generatedId = slugify(category);
     const userRole = req.userRole?.toLowerCase();
+    const actorId = String(req.owl_username || req.karyawanId);
 
-    // 1. Validasi Unik di Dalam Transaksi
+    const timestampId = Date.now().toString(36);
+    const generatedId = `${slugify(category).substring(0, 20)}-${timestampId}`;
+
     const existing = await BusinessSection.findByPk(generatedId, {
       transaction: t,
     });
@@ -297,7 +360,6 @@ exports.createBusinessSection = async (req, res) => {
       return res.status(400).json({ message: "Sektor bisnis sudah ada!" });
     }
 
-    // 2. Hitung Max Order secara Dinamis
     const maxOrder =
       (await BusinessSection.max("orderIndex", { transaction: t })) || 0;
 
@@ -312,39 +374,48 @@ exports.createBusinessSection = async (req, res) => {
       lock_ticket: null,
     };
 
-    const newSection = await BusinessSection.create(sectionPayload, {
-      transaction: t,
-    });
-
-    // 3. JALUR EDITOR: Approval Flow
+    // EDITOR: Approval Flow
     if (userRole === "editor" && status === "Published") {
-      const result = await ErpApprovalService.initiateApproval({
-        moduleName: "BusinessSection",
-        model: BusinessSection,
-        targetId: generatedId,
-        action: "CREATE",
-        payload: { category, title, status: "Published" },
-        userId: req.userId,
-        owlUsername: req.owl_username,
-        karyawanId: req.karyawanId,
-        token: req.owl_token,
-        transaction: t,
-      });
+      const notrans = await generateNotrans("BusinessSection");
 
-      await newSection.update(
-        { is_locked: true, lock_ticket: result.notrans },
+      // Buat baris baru di Live Database TAPI LANGSUNG DIGEMBOK
+      await BusinessSection.create(
+        { ...sectionPayload, is_locked: true, lock_ticket: notrans },
         { transaction: t },
       );
+
+      // Simpan konten aslinya ke dalam Vault
+      await ApprovalDraft.create(
+        {
+          notrans,
+          module_name: "BusinessSection",
+          action: "CREATE",
+          target_id: String(generatedId),
+          payload: { category, title, status: "Published" },
+          created_by: actorId,
+          status: "Pending",
+        },
+        { transaction: t },
+      );
+
+      await ErpApprovalService.initiateApproval({
+        notrans,
+        karyawanId: actorId,
+        token: req.owl_token,
+      });
 
       await t.commit();
       return res.status(202).json({
         message:
           "Pembuatan sektor diajukan. Sektor terkunci menunggu persetujuan.",
-        ticket: result.notrans,
+        ticket: notrans,
       });
     }
 
-    // 4. JALUR ADMIN: Direct Commit
+    // ADMIN: Direct Commit
+    const newSection = await BusinessSection.create(sectionPayload, {
+      transaction: t,
+    });
     await t.commit();
     return res.status(201).json({
       message: "Sektor bisnis baru berhasil dibuat secara langsung.",
@@ -358,13 +429,12 @@ exports.createBusinessSection = async (req, res) => {
 };
 
 exports.deleteSection = async (req, res) => {
-  // 1. BUKA GERBANG TRANSAKSI DI AWAL
   const t = await sequelize.transaction();
   try {
     const { id } = req.params;
     const userRole = req.userRole?.toLowerCase();
+    const actorId = String(req.owl_username || req.karyawanId);
 
-    // 2. Ambil data dengan EXCLUSIVE LOCK (SELECT ... FOR UPDATE)
     const section = await BusinessSection.findByPk(id, {
       transaction: t,
       lock: t.LOCK.UPDATE,
@@ -375,7 +445,6 @@ exports.deleteSection = async (req, res) => {
       return res.status(404).json({ message: "Sektor tidak ditemukan" });
     }
 
-    // 3. GATEKEEPER: Lock Guard
     if (section.is_locked && userRole === "editor") {
       await t.rollback();
       return res.status(423).json({
@@ -386,20 +455,17 @@ exports.deleteSection = async (req, res) => {
       });
     }
 
-    // 4. VALIDASI RELASI (Di dalam Transaksi)
     const attachedProjectsCount = await Project.count({
       where: { category: id },
       transaction: t,
     });
-
     if (attachedProjectsCount > 0) {
       await t.rollback();
       return res.status(400).json({
-        message: `Hapus ditolak! Sektor ini masih memiliki ${attachedProjectsCount} proyek aktif.`,
+        message: `Hapus ditolak! Sektor ini masih memiliki ${attachedProjectsCount} proyek aktif. Pindahkan proyek terlebih dahulu.`,
       });
     }
 
-    // 5. SIAPKAN DAFTAR SAMPAH FILE (Kumpulkan sekarang, hapus nanti)
     let filesToDelete = [];
     if (section.htmlContent) {
       const imgRegex = /src="[^"]*\/uploads\/([^"'\s>]+)"/g;
@@ -409,43 +475,51 @@ exports.deleteSection = async (req, res) => {
       }
     }
 
-    // JALUR 1: EDITOR (Approval Flow)
+    // EDITOR
     if (userRole === "editor") {
-      const result = await ErpApprovalService.initiateApproval({
-        moduleName: "BusinessSection",
-        model: BusinessSection,
-        targetId: id,
-        action: "DELETE",
-        payload: { title: section.title, reason: "Request Delete" },
-        userId: req.userId,
-        owlUsername: req.owl_username,
-        karyawanId: req.karyawanId,
-        token: req.owl_token,
-        transaction: t,
-      });
+      const notrans = await generateNotrans("BusinessSection");
 
-      await section.update(
-        { is_locked: true, lock_ticket: result.notrans },
+      await ApprovalDraft.create(
+        {
+          notrans,
+          module_name: "BusinessSection",
+          action: "DELETE",
+          target_id: String(id),
+          payload: { title: section.title, reason: "Request Delete" }, // Payload minimal
+          created_by: actorId,
+          status: "Pending",
+        },
         { transaction: t },
       );
+
+      await section.update(
+        { is_locked: true, lock_ticket: notrans },
+        { transaction: t },
+      );
+
+      await ErpApprovalService.initiateApproval({
+        notrans,
+        karyawanId: actorId,
+        token: req.owl_token,
+      });
 
       await t.commit();
       return res.status(202).json({
         message: "Permintaan hapus sektor dikirim ke Server. Data dikunci.",
-        ticket: result.notrans,
+        ticket: notrans,
       });
     }
 
-    // JALUR 2: SUPERADMIN / ADMIN (Direct Cascade Commit)
+    // ADMIN (Direct Cascade Commit)
     await invalidateOldDrafts("BusinessSection", id, t);
     await BusinessMapMarker.destroy({
       where: { sectionId: id },
       transaction: t,
     });
     await section.destroy({ transaction: t });
+
     await t.commit();
 
-    // 6. PHYSICAL FILE CLEANUP (Sangat Aman)
     if (filesToDelete.length > 0) {
       filesToDelete.forEach((file) => deleteSingleFile(file));
     }
@@ -456,9 +530,8 @@ exports.deleteSection = async (req, res) => {
   } catch (error) {
     if (t && !t.finished) await t.rollback();
     console.error("🚨 [DELETE_SECTION_ERROR]:", error.message);
-    res.status(500).json({
-      message: "Gagal memproses penghapusan",
-      error: error.message,
-    });
+    res
+      .status(500)
+      .json({ message: "Gagal memproses penghapusan", error: error.message });
   }
 };

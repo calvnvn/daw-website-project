@@ -64,7 +64,7 @@ exports.createCategory = async (req, res) => {
   }
 };
 
-// --- 2. UPDATE (ABSOLUTE ADMIN RESTRICTION) ---
+// --- 2. UPDATE (ABSOLUTE ADMIN RESTRAICTION) ---
 exports.updateCategory = async (req, res) => {
   const { id } = req.params;
   const { name, color } = req.body;
