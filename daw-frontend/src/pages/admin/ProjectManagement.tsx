@@ -9,7 +9,7 @@ import {
   FileText,
   AlertTriangle,
   Lock,
-  X, // Tambahan icon X untuk discard
+  X,
 } from "lucide-react";
 import { Link } from "react-router-dom";
 import { toast } from "sonner";
@@ -17,7 +17,6 @@ import api from "@/lib/api";
 import { useBusiness } from "@/contexts/BusinessContext";
 import { useAuth } from "@/contexts/AuthContext";
 
-// 1. Antarmuka terstandardisasi sesuai Backend V2.5
 export interface AdminProject {
   id: string;
   slug: string;
@@ -42,7 +41,6 @@ export default function ProjectManagement() {
 
   const { sections, isLoading: isSectionsLoading } = useBusiness();
 
-  // Optimasi filter sektor O(1)
   const validSectorIds = useMemo(
     () => new Set(sections.map((s) => s.id)),
     [sections],
@@ -101,7 +99,6 @@ export default function ProjectManagement() {
   }, []);
 
   // THE DECISION HANDLERS
-
   const handleDeleteRequest = (
     id: string,
     title: string,
