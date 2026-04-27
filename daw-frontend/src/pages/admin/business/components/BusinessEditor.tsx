@@ -1,4 +1,4 @@
-import { useCallback, useMemo } from "react";
+import { useCallback, useMemo, useRef } from "react";
 import ReactQuill from "react-quill-new";
 import {
   AlertTriangle,
@@ -11,6 +11,7 @@ import {
 import { useBusiness, type SectionData } from "@/contexts/BusinessContext";
 import "react-quill-new/dist/quill.snow.css";
 import { toast } from "sonner";
+import api from "@/lib/api";
 
 type BusinessFormState = Omit<SectionData, "id">;
 
@@ -30,6 +31,50 @@ export default function BusinessEditor({
   handleDiscardDraft,
 }: BusinessEditorProps) {
   const { rejectedDraft } = useBusiness();
+  const quillRef = useRef<ReactQuill>(null);
+  const imageHandler = useCallback(() => {
+    const input = document.createElement("input");
+    input.setAttribute("type", "file");
+    input.setAttribute("accept", "image/*");
+    input.click();
+
+    input.onchange = async () => {
+      const file = input.files?.[0];
+      if (!file) return;
+
+      if (file.size > 2 * 1024 * 1024) {
+        return toast.error("File terlalu besar! Maksimal 2MB.");
+      }
+
+      const formData = new FormData();
+      formData.append("image", file);
+
+      const toastId = toast.loading("Mengunggah gambar ke server...");
+      try {
+        // Ganti endpoint ini sesuai dengan route backend yang kita buat nanti
+        const res = await api.post("/businesses/admin/upload-image", formData, {
+          headers: { "Content-Type": "multipart/form-data" },
+        });
+
+        const imageUrl = res.data.url; // Contoh: "/uploads/image-123.jpg"
+
+        // Ambil instance editor
+        const quill = quillRef.current?.getEditor();
+        const range = quill?.getSelection();
+
+        if (quill && range) {
+          // Masukkan gambar sebagai URL, bukan Base64!
+          quill.insertEmbed(range.index, "image", imageUrl);
+          // Pindahkan kursor ke setelah gambar
+          quill.setSelection(range.index + 1);
+        }
+
+        toast.success("Gambar berhasil diunggah", { id: toastId });
+      } catch {
+        toast.error("Gagal mengunggah gambar", { id: toastId });
+      }
+    };
+  }, []);
 
   const handleRestoreDraft = useCallback(() => {
     if (!rejectedDraft?.payload) return;
@@ -65,16 +110,21 @@ export default function BusinessEditor({
 
   const quillModules = useMemo(
     () => ({
-      toolbar: [
-        [{ header: [1, 2, 3, false] }],
-        ["bold", "italic", "underline", "strike", "blockquote"],
-        [{ list: "ordered" }, { list: "bullet" }],
-        ["link", "image", "video"],
-        ["clean"],
-      ],
+      toolbar: {
+        container: [
+          [{ header: [1, 2, 3, false] }],
+          ["bold", "italic", "underline", "strike", "blockquote"],
+          [{ list: "ordered" }, { list: "bullet" }],
+          ["link", "image", "video"],
+          ["clean"],
+        ],
+        handlers: {
+          image: imageHandler,
+        },
+      },
       clipboard: { matchVisual: false },
     }),
-    [],
+    [imageHandler],
   );
 
   return (
@@ -194,6 +244,7 @@ export default function BusinessEditor({
                     : "opacity-60 grayscale-[0.5] pointer-events-none bg-slate-50 border-slate-200"
                 }`}>
                 <ReactQuill
+                  ref={quillRef}
                   theme="snow"
                   value={formData.htmlContent}
                   onChange={(val) =>

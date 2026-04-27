@@ -11,6 +11,7 @@ import { InvestmentProvider } from "./contexts/InvestmentContext";
 import { BusinessProvider } from "./contexts/BusinessContext";
 import { HomeProvider } from "./contexts/HomeContext";
 import { HelmetProvider } from "react-helmet-async"; //  1. Import ini
+import { AuthProvider } from "./contexts/AuthContext.tsx";
 
 const queryClient = new QueryClient();
 
@@ -23,9 +24,11 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
             <AboutProvider>
               <InvestmentProvider>
                 <HomeProvider>
-                  <BusinessProvider>
-                    <App />
-                  </BusinessProvider>
+                  <AuthProvider>
+                    <BusinessProvider>
+                      <App />
+                    </BusinessProvider>
+                  </AuthProvider>
                 </HomeProvider>
               </InvestmentProvider>
             </AboutProvider>

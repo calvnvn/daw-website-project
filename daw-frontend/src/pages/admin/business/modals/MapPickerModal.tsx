@@ -1,5 +1,5 @@
 import { useState, useRef, useCallback, useEffect } from "react";
-import { X, MousePointerClick, Crosshair } from "lucide-react";
+import { X, Crosshair } from "lucide-react";
 import mapBase from "@/assets/map-indonesia-base.svg";
 import { type MapMarker } from "@/contexts/BusinessContext";
 

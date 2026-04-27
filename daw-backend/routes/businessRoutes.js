@@ -2,6 +2,7 @@ const express = require("express");
 const router = express.Router();
 const businessController = require("../controllers/businessController");
 const { verifyToken, checkPermission } = require("../middleware/authJwt");
+const { upload, optimizeImage } = require("../middleware/upload");
 
 // 1. PUBLIC ENDPOINT
 router.get("/public", businessController.getPublicBusinessData);
@@ -27,5 +28,10 @@ router.delete(
   [verifyToken, checkPermission("manage_businesses")],
   businessController.deleteSection,
 );
-
+router.post(
+  "/admin/upload-image",
+  upload.single("image"),
+  optimizeImage,
+  businessController.uploadBusinessImage,
+);
 module.exports = router;

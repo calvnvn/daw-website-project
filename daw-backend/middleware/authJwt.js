@@ -75,15 +75,20 @@ const verifyToken = (req, res, next) => {
  */
 const checkPermission = (requiredPermission) => {
   return (req, res, next) => {
-    if (req.userRole === "superadmin") {
+    if (req.userRole === "superadmin" || req.userRole === "admin") {
       return next();
     }
 
+    if (req.userRole === "editor" && req.method === "GET") {
+      return next();
+    }
     const permissions = req.userPermissions || [];
-
     if (!permissions.includes(requiredPermission)) {
+      console.warn(
+        `⚠️ [403] User ${req.owl_username} ditolak akses ${requiredPermission}`,
+      );
       return res.status(403).json({
-        message: `Forbidden! You need '${requiredPermission}' permission to perform this action.`,
+        message: `Forbidden! Anda tidak memiliki izin '${requiredPermission}'.`,
       });
     }
 

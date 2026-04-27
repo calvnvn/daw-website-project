@@ -8,6 +8,7 @@ import {
 } from "react";
 import api from "@/lib/api";
 import { toast } from "sonner";
+import { useAuth } from "./AuthContext";
 
 export interface MapCategory {
   id: string;
@@ -78,6 +79,7 @@ const BusinessContext = createContext<BusinessContextType | undefined>(
 );
 
 export const BusinessProvider = ({ children }: { children: ReactNode }) => {
+  const { user } = useAuth();
   const [sections, setSections] = useState<SectionData[]>([]);
   const [categories, setCategories] = useState<MapCategory[]>([]);
   const [publicProjects, setPublicProjects] = useState<any[]>([]);
@@ -118,43 +120,53 @@ export const BusinessProvider = ({ children }: { children: ReactNode }) => {
   }, []);
 
   const refreshData = useCallback(async () => {
-    console.log("🚀 [DEBUG] refreshData dipicu!");
+    const isAdminOrEditor =
+      user?.role === "superadmin" ||
+      user?.role === "admin" ||
+      user?.role === "editor";
+
+    console.log(`🚀 [DEBUG] refreshData dipicu untuk role: ${user?.role}`);
+
     if (sections.length === 0) setIsLoading(true);
 
     try {
-      const results = await Promise.allSettled([
-        api.get("/businesses/admin"),
+      const promises: Promise<any>[] = [
         api.get("/map-categories"),
         api.get("/projects/public"),
-      ]);
+      ];
 
-      const categoryResult = results[1];
-      if (categoryResult.status === "fulfilled") {
-        const rawData = categoryResult.value.data;
-        const finalArray = Array.isArray(rawData)
-          ? rawData
-          : rawData?.data || [];
-        setCategories(Array.isArray(finalArray) ? finalArray : []);
+      if (isAdminOrEditor) {
+        promises.push(api.get("/businesses/admin"));
       }
 
-      if (results[0].status === "fulfilled") {
-        const sectionData =
-          results[0].value.data?.data || results[0].value.data;
-        setSections(Array.isArray(sectionData) ? sectionData : []);
-      }
+      const results = await Promise.allSettled(promises);
 
-      if (results[2].status === "fulfilled") {
-        const projectData = results[2].value.data;
-        setPublicProjects(
-          Array.isArray(projectData) ? projectData : projectData?.data || [],
-        );
-      }
+      results.forEach((result) => {
+        if (result.status === "fulfilled") {
+          const url = result.value.config.url;
+          const data = result.value.data;
+
+          if (url?.includes("/map-categories")) {
+            const finalArray = Array.isArray(data) ? data : data?.data || [];
+            setCategories(finalArray);
+          }
+
+          if (url?.includes("/projects/public")) {
+            setPublicProjects(Array.isArray(data) ? data : data?.data || []);
+          }
+
+          if (url?.includes("/businesses/admin")) {
+            const sectionData = data?.data || data;
+            setSections(Array.isArray(sectionData) ? sectionData : []);
+          }
+        }
+      });
     } catch (error) {
       console.error("❌ [DEBUG] refreshData Error:", error);
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [user, sections.length]);
 
   const updateSection = useCallback(
     async (

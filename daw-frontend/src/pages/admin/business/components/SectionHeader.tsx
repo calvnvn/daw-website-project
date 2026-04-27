@@ -26,7 +26,7 @@ export default function SectionHeader({
   const isCategoryTab = activeTab === "categories";
 
   return (
-    <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white p-6 rounded-xl border border-slate-200 shadow-sm top-0 z-20 sticky">
+    <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white p-6 rounded-xl border border-slate-200 shadow-sm top-0 z-20">
       {/* IDENTITAS & STATUS RADAR */}
       <div className="space-y-1">
         <div className="flex items-center gap-3">

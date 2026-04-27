@@ -229,6 +229,13 @@ export default function ManageBusinesses() {
       return toast.error("Narasi konten artikel wajib diisi.");
     }
 
+    if (formData.htmlContent.includes("data:image/")) {
+      return toast.error("Terdeteksi Gambar Ilegal!", {
+        description:
+          "Dilarang copy-paste gambar langsung. Gunakan tombol 'image' di toolbar editor.",
+      });
+    }
+
     // Spam Prevention
     if (!hasDataChanged()) {
       setIsEditing(false);
@@ -469,18 +476,22 @@ export default function ManageBusinesses() {
       </main>
 
       {/* MODAL OVERLAYS */}
-      <AddSectionModal
-        onClose={() => setIsAddModalOpen(false)}
-        addSection={addSection}
-      />
+      {isAddModalOpen && (
+        <AddSectionModal
+          onClose={() => setIsAddModalOpen(false)}
+          addSection={addSection}
+        />
+      )}
 
-      <DeleteSectionModal
-        activeTab={activeTab}
-        sections={sections}
-        onClose={() => setIsDeleteModalOpen(false)}
-        deleteSection={deleteSection}
-        setActiveTab={setActiveTab}
-      />
+      {isDeleteModalOpen && (
+        <DeleteSectionModal
+          activeTab={activeTab}
+          sections={sections}
+          onClose={() => setIsDeleteModalOpen(false)}
+          deleteSection={deleteSection}
+          setActiveTab={setActiveTab}
+        />
+      )}
 
       <MapPickerModal
         isOpen={isMapModalOpen}

@@ -99,7 +99,7 @@ const extractImagesFromHtml = (html) => {
 };
 
 const processBusinessPayload = async (req, existingData = {}) => {
-  const { title, htmlContent, hasMap, mapMarkers } = req.body;
+  const { title, category, htmlContent, hasMap, mapMarkers } = req.body;
   let filesToDelete = [];
 
   const cleanHtmlContent = htmlContent
@@ -110,7 +110,8 @@ const processBusinessPayload = async (req, existingData = {}) => {
     const oldImages = extractImagesFromHtml(existingData.htmlContent);
     const newImages = extractImagesFromHtml(cleanHtmlContent);
 
-    filesToDelete = oldImages.filter((img) => !newImages.includes(img));
+    const deletedImages = oldImages.filter((img) => !newImages.includes(img));
+    filesToDelete = [...filesToDelete, ...deletedImages];
   }
 
   const isMapActive = [true, "true", 1, "1"].includes(hasMap) ? 1 : 0;
@@ -124,6 +125,7 @@ const processBusinessPayload = async (req, existingData = {}) => {
 
   return {
     payload: {
+      category: category || existingData.category,
       title: title || existingData.title,
       htmlContent: cleanHtmlContent,
       hasMap: isMapActive,
@@ -138,6 +140,7 @@ exports.getAdminBusinessSections = async (req, res) => {
   try {
     const sections = await BusinessSection.findAll({
       attributes: {
+        exclude: ["htmlContent"],
         include: [
           [
             sequelize.literal(`(
@@ -218,6 +221,23 @@ exports.getPublicBusinessData = async (req, res) => {
   }
 };
 
+exports.uploadBusinessImage = async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ message: "Tidak ada file yang diunggah" });
+    }
+
+    const imageUrl = `/uploads/${req.file.filename}`;
+
+    res.status(200).json({
+      success: true,
+      url: imageUrl,
+    });
+  } catch (error) {
+    res.status(500).json({ message: "Gagal memproses gambar" });
+  }
+};
+
 exports.updateBusinessSection = async (req, res) => {
   const t = await sequelize.transaction();
   try {
@@ -238,6 +258,14 @@ exports.updateBusinessSection = async (req, res) => {
         .json({ message: "Sektor Bisnis tidak ditemukan!" });
     }
 
+    if (req.body.htmlContent && req.body.htmlContent.includes("data:image/")) {
+      await t.rollback();
+      return res.status(400).json({
+        message:
+          "Format gambar tidak diizinkan. Gunakan fitur upload gambar di toolbar editor.",
+      });
+    }
+
     // Lock Guard
     if (section.is_locked && userRole === "editor") {
       await t.rollback();
@@ -253,7 +281,7 @@ exports.updateBusinessSection = async (req, res) => {
     );
 
     // EDITOR: Approval Flow
-    if (userRole === "editor" && status === "Published") {
+    if (userRole === "editor") {
       const notrans = await generateNotrans("BusinessSection");
 
       if (previous_notrans) {
@@ -289,8 +317,7 @@ exports.updateBusinessSection = async (req, res) => {
 
       await t.commit();
       return res.status(202).json({
-        message:
-          "Revisi Sektor & Peta diajukan. Data dikunci menunggu persetujuan.",
+        message: "Revisi diajukan. Menunggu persetujuan.",
         ticket: notrans,
       });
     }
