@@ -43,10 +43,7 @@ const generateUniqueProjectSlug = async (title, id = null) => {
       where: {
         module_name: "Project",
         status: "Pending",
-        [Op.and]: sequelize.where(
-          sequelize.fn("JSON_EXTRACT", sequelize.col("payload"), "$.slug"),
-          `"${finalSlug}"`,
-        ),
+        "payload.slug": finalSlug,
       },
     });
 
@@ -75,7 +72,7 @@ const processProjectPayload = async (req, project) => {
   const authorIdentity = req.owl_username || req.karyawanId || "System Admin";
   let finalGallery = [];
   let filesToDelete = [];
-  let coverImageName = project.cover_image;
+  let coverImageName = project?.cover_image || null;
   let oldCoverToDelete = null;
 
   const cleanContent = content || project.content || "";
@@ -156,12 +153,35 @@ const processProjectPayload = async (req, project) => {
 exports.getAllProjects = async (req, res) => {
   try {
     const projects = await Project.findAll({
+      attributes: {
+        include: [
+          // Subquery untuk cek status rejected di Vault
+          [
+            sequelize.literal(`(
+              SELECT COUNT(*)
+              FROM ApprovalDrafts AS ad
+              WHERE ad.target_id = Project.id
+                AND ad.status = 'Rejected'
+                AND ad.module_name = 'Project'
+            )`),
+            "has_rejected_count",
+          ],
+        ],
+      },
       include: [
         { model: BusinessSection, as: "sectorData", attributes: ["category"] },
       ],
       order: [["createdAt", "DESC"]],
     });
-    res.status(200).json(projects);
+
+    // Map agar has_rejected jadi boolean yang mudah dibaca Frontend
+    const result = projects.map((p) => {
+      const data = p.get({ plain: true });
+      data.has_rejected = data.has_rejected_count > 0;
+      return data;
+    });
+
+    res.status(200).json(result);
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
@@ -169,7 +189,12 @@ exports.getAllProjects = async (req, res) => {
 
 exports.getProjectById = async (req, res) => {
   try {
-    const project = await Project.findByPk(req.params.id);
+    const project = await Project.findByPk(req.params.id, {
+      include: [
+        { model: BusinessSection, as: "sectorData", attributes: ["category"] },
+      ],
+    });
+
     if (!project) return res.status(404).json({ message: "Project not found" });
     res.status(200).json(project);
   } catch (error) {
@@ -283,7 +308,7 @@ exports.updateProject = async (req, res) => {
       if (userRole === "editor") {
         await t.rollback();
         return res.status(423).json({
-          message: "Data sedang dikunci oleh proses approval ERP.",
+          message: "Data sedang dikunci oleh proses approval.",
           ticket: project.lock_ticket,
         });
       }
@@ -332,7 +357,7 @@ exports.updateProject = async (req, res) => {
 
       await t.commit();
       return res.status(202).json({
-        message: "Revisi diajukan ke ERP. Data asli dikunci.",
+        message: "Revisi diajukan. Data asli dikunci.",
         ticket: notrans,
       });
     }
@@ -421,7 +446,7 @@ exports.deleteProject = async (req, res) => {
       await t.commit();
       return res
         .status(202)
-        .json({ message: "Permintaan hapus dikirim ke ERP.", ticket: notrans });
+        .json({ message: "Permintaan hapus dikirim.", ticket: notrans });
     }
 
     // ADMIN

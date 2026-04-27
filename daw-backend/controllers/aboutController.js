@@ -94,7 +94,7 @@ exports.updateAboutInfo = async (req, res) => {
 
       await t.commit();
       return res.status(202).json({
-        message: "Revisi About Company diajukan ke ERP OWL.",
+        message: "Revisi About Company diajukan.",
         ticket: result.notrans,
       });
     }

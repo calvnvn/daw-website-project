@@ -41,7 +41,7 @@ const checkLock = (Model) => {
       if (record.is_locked) {
         return res.status(423).json({
           message: "Data sedang dikunci (Locked).",
-          error: `Perubahan ditolak karena data ini sedang dalam proses review di ERP OWL (Tiket: ${record.lock_ticket || "N/A"}).`,
+          error: `Perubahan ditolak karena data ini sedang dalam proses review (Tiket: ${record.lock_ticket || "N/A"}).`,
           lockTicket: record.lock_ticket,
         });
       }

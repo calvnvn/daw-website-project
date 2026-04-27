@@ -90,7 +90,7 @@ exports.updateHistories = async (req, res) => {
 
       await t.commit();
       return res.status(202).json({
-        message: "Draf revisi timeline berhasil diajukan ke ERP OWL.",
+        message: "Draf revisi timeline berhasil diajukan.",
         ticket: result.notrans,
       });
     }

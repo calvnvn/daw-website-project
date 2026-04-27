@@ -196,7 +196,7 @@ exports.executeDecision = async (req, res) => {
       kodeapp: nourut, // Mapping nourut to ERP's kodeapp field
       nourut: nourut,
       notrans,
-      level: currentLevel + 1,
+      level: status === "1" ? currentLevel + 1 : currentLevel,
       komentar,
       nextApp: pureNextApp,
       token: tokenOWL,
@@ -208,12 +208,13 @@ exports.executeDecision = async (req, res) => {
     // CASE A: REJECTION
     if (status === "2") {
       const Model = getModelByModuleName(moduleName);
-      if (Model && targetId && action !== "CREATE") {
+      if (Model && targetId) {
         // Safe Unlock: Back to Editor's hands
-        await Model.update(
+        const result = await Model.update(
           { is_locked: false, lock_ticket: null },
           { where: { id: targetId }, transaction: t },
         );
+        console.log("DEBUG UNLOCK RESULT:", result);
       }
       await draftData.update(
         { status: "Rejected", rejection_reason: komentar },
@@ -325,19 +326,36 @@ exports.getRejectedDraftByTarget = async (req, res) => {
         .json({ message: "Target ID dan Module Name wajib disertakan." });
     }
 
+    const username = req.owl_username;
+    const karyawanId = req.karyawanId;
+    const userId = req.userId;
+
+    const actorId = String(req.owl_username || req.karyawanId || req.userId);
+
     const draft = await ApprovalDraft.findOne({
       where: {
-        target_id: id,
-        module_name: module,
-        status: "Rejected",
-        created_by: String(req.owl_username || req.userId),
+        target_id: String(id),
+        [Op.and]: [
+          { module_name: module },
+          { status: "Rejected" },
+          {
+            [Op.or]: [
+              { created_by: String(username) },
+              { created_by: String(karyawanId) },
+              { created_by: String(userId) },
+            ],
+          },
+        ],
       },
       order: [["createdAt", "DESC"]],
     });
 
     if (!draft) {
+      console.log(
+        `🔍 [RECOVERY] Not found for ID: ${id}. Checked identities: ${username}, ${karyawanId}`,
+      );
       return res.status(200).json({
-        message: "Tidak ada draf tertunda yang ditolak untuk entitas ini.",
+        message: "Tidak ada draf tertunda.",
         hasRejected: false,
       });
     }
@@ -354,14 +372,16 @@ exports.getRejectedDraftByTarget = async (req, res) => {
 
 // PATCH: Discard Rejected Draft
 exports.discardDraft = async (req, res) => {
+  const t = await sequelize.transaction();
   try {
     const { notrans } = req.params;
     const actorId = String(req.owl_username || req.userId);
 
     // 1. Cari drafnya
-    const draft = await ApprovalDraft.findByPk(notrans);
+    const draft = await ApprovalDraft.findByPk(notrans, { transaction: t });
 
     if (!draft) {
+      await t.rollback();
       return res.status(404).json({ message: "Draf tidak ditemukan." });
     }
 
@@ -380,17 +400,30 @@ exports.discardDraft = async (req, res) => {
     }
 
     // 4. Eksekusi Perubahan Status
-    await draft.update({ status: "Discarded" });
+    await draft.update({ status: "Discarded" }, { transaction: t });
+    const Model = getModelByModuleName(draft.module_name);
+    if (Model && draft.target_id) {
+      const cleanId = String(draft.target_id).trim(); // Cegah spasi siluman
 
-    console.log(
-      `>>> [UX CLEANUP] Tiket ${notrans} telah diabaikan oleh Editor.`,
-    );
+      await Model.update(
+        { is_locked: false, lock_ticket: null },
+        {
+          where: { id: cleanId },
+          transaction: t,
+        },
+      );
+      console.log(
+        `>>> [DISCARD UNLOCK] Gembok ${draft.module_name} ID ${cleanId} dibuka.`,
+      );
+    }
+    await t.commit();
 
     res.status(200).json({
       success: true,
       message: "Notifikasi draf telah diabaikan.",
     });
   } catch (error) {
+    if (t) await t.rollback();
     console.error("🚨 [DISCARD ERROR]:", error.message);
     res.status(500).json({ message: "Gagal mengabaikan draf." });
   }

@@ -180,7 +180,7 @@ exports.updateSettings = async (req, res) => {
           deleteSingleFile(updatePayload.faviconUrl);
 
         console.error(
-          "🚨 [SETTINGS] ERP Approval Gagal. Membersihkan file TEMP_ yatim piatu.",
+          "🚨 [SETTINGS] ERP Approval Gagal. Membersihkan file TEMP_ orphaned.",
         );
         throw owlError;
       }

@@ -1,14 +1,4 @@
 /* eslint-disable @typescript-eslint/ban-ts-comment */
-/**
- * MODULE: Universal Project Form (Create & Edit)
- * PATH: /src/pages/admin/ProjectForm.tsx
- * * TECHNICAL DOCUMENTATION:
- * 1. Unified Logic: Handles both POST (Create) and PUT (Edit) seamlessly via isEditMode flag.
- * 2. Memory Leak Guard: Sub-component handles individual gallery object URLs safely.
- * 3. SEO Intelligence: Optimized fallback and slug preview.
- * 4. Progress Tracking: Real-time upload percentage for large assets.
- */
-
 import { useState, useRef, useMemo, useCallback, useEffect } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import ReactQuill from "react-quill-new";
@@ -37,12 +27,12 @@ import { compressImage } from "@/utils/imageHelper";
 import { useAuth } from "@/contexts/AuthContext";
 import { useBusiness } from "@/contexts/BusinessContext";
 
-// Tambahkan di bagian atas file jika Anda menggunakan TypeScript yang ketat
 interface RejectedDraft {
   notrans: string;
   module_name: string;
   payload: any;
-  rejection_reason: string | null; // Kolom baru dari backend
+  action: string;
+  rejection_reason: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -51,9 +41,11 @@ interface RejectedDraft {
 const GalleryPreviewItem = ({
   file,
   onRemove,
+  disabled = false,
 }: {
   file: File;
   onRemove: () => void;
+  disabled?: boolean;
 }) => {
   const [preview, setPreview] = useState<string>("");
 
@@ -61,6 +53,8 @@ const GalleryPreviewItem = ({
     let isMounted = true;
     const objectUrl = URL.createObjectURL(file);
     if (isMounted) setPreview(objectUrl);
+
+    // Mencegah memory leak saat komponen di-unmount
     return () => {
       isMounted = false;
       URL.revokeObjectURL(objectUrl);
@@ -76,12 +70,14 @@ const GalleryPreviewItem = ({
           alt="Preview"
         />
       )}
-      <button
-        type="button"
-        onClick={onRemove}
-        className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity z-10 hover:bg-red-600 shadow-md">
-        <X className="w-3 h-3" />
-      </button>
+      {!disabled && (
+        <button
+          type="button"
+          onClick={onRemove}
+          className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity z-10 hover:bg-red-600 shadow-md">
+          <X className="w-3 h-3" />
+        </button>
+      )}
     </div>
   );
 };
@@ -90,8 +86,11 @@ const GalleryPreviewItem = ({
 export default function ProjectForm() {
   const navigate = useNavigate();
   const { id } = useParams();
+  console.log("Current ID from URL:", id);
+
   const isEditMode = !!id;
   const quillRef = useRef<ReactQuill>(null);
+
   const { user, can } = useAuth();
   const isSuperadmin = user?.role === "superadmin" || user?.role === "admin";
   const isEditor = !isSuperadmin;
@@ -117,8 +116,6 @@ export default function ProjectForm() {
   };
 
   const [formData, setFormData] = useState(initialFormState);
-
-  // Diff Engine
   const [originalData, setOriginalData] = useState(initialFormState);
 
   const [rejectedDraft, setRejectedDraft] = useState<RejectedDraft | null>(
@@ -137,11 +134,6 @@ export default function ProjectForm() {
     ? "opacity-60 grayscale-[30%] pointer-events-none cursor-not-allowed select-none"
     : "";
 
-  /**
-   * @memo validSectorIds
-   * Optimization: Converts sections array into a Set for O(1) validation.
-   * Essential for detecting if a project's existing category has been deleted.
-   */
   const validSectorIds = useMemo(
     () => new Set(sections.map((s) => s.id)),
     [sections],
@@ -161,7 +153,7 @@ export default function ProjectForm() {
   const [galleryFiles, setGalleryFiles] = useState<File[]>([]);
   const [coverPreview, setCoverPreview] = useState<string | null>(null);
 
-  // Auto-generate Slug untuk SEO Preview
+  // Pratinjau Slug Otomatis (Hanya untuk UI, validasi akhir di Backend)
   const generatedSlug = useMemo(() => {
     return formData.title
       .toLowerCase()
@@ -207,6 +199,7 @@ export default function ProjectForm() {
       setIsFetching(true);
 
       try {
+        console.log("Hitting API with ID:", id);
         const [projectRes, draftRes] = await Promise.allSettled([
           api.get(`/projects/${id}`, { signal: controller.signal }),
           api.get(`/approval/rejected/${id}?module=Project`, {
@@ -278,44 +271,88 @@ export default function ProjectForm() {
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id, isEditMode, navigate]);
+  const handleDiscardDraft = async () => {
+    if (!rejectedDraft?.notrans) return;
 
-  // Restoration Function
+    const toastId = toast.loading("Mengabaikan notifikasi penolakan...");
+    try {
+      // FIX: Gunakan encodeURIComponent karena notrans mengandung karakter '/'
+      const safeTicket = encodeURIComponent(rejectedDraft.notrans);
+      await api.patch(`/approval/discard/${safeTicket}`);
+
+      toast.success("Notifikasi revisi berhasil diabaikan.", { id: toastId });
+
+      setRejectedDraft(null);
+      setShowDraftBanner(false);
+    } catch (error: any) {
+      toast.error("Gagal mengabaikan draf", {
+        id: toastId,
+        description:
+          error.response?.data?.message ||
+          "Kesalahan komunikasi dengan server.",
+      });
+    }
+  };
+
+  // 2. RESTORATION FUNCTION (FIXED PARSING & SAFETY)
   const handleRestoreDraft = () => {
-    if (!rejectedDraft?.payload) return;
+    // Pastikan draf ada
+    if (!rejectedDraft?.payload) {
+      toast.error("Data pemulihan tidak ditemukan.");
+      return;
+    }
+
+    if (rejectedDraft?.action === "DELETE") {
+      toast.error(
+        "Permintaan penghapusan yang ditolak tidak dapat dipulihkan ke dalam form.",
+      );
+      return;
+    }
+
     setIsRestoring(true);
 
-    const payload = rejectedDraft.payload;
+    try {
+      const rawPayload = rejectedDraft.payload;
+      const payload =
+        typeof rawPayload === "string" ? JSON.parse(rawPayload) : rawPayload;
 
-    setFormData((prev) => ({
-      ...prev,
-      title: payload.title ?? prev.title,
-      excerpt: payload.excerpt ?? prev.excerpt,
-      content: payload.content ?? prev.content,
-      category: payload.category ?? prev.category,
-      status: "Draft",
-      cover_image: payload.cover_image ?? prev.cover_image,
-      gallery:
-        typeof payload.gallery === "string"
-          ? payload.gallery
-          : JSON.stringify(payload.gallery || []),
-      seo_title: payload.seo_title ?? prev.seo_title,
-      meta_description: payload.meta_description ?? prev.meta_description,
-    }));
+      setFormData((prev) => ({
+        ...prev,
+        title: payload.title ?? prev.title,
+        excerpt: payload.excerpt ?? prev.excerpt,
+        content: payload.content ?? prev.content,
+        category: payload.category ?? prev.category,
+        status: "Draft", // Paksa ke Draft agar user bisa review dulu
+        cover_image: payload.cover_image ?? prev.cover_image,
+        // Pastikan gallery terformat string JSON untuk input hidden
+        gallery: Array.isArray(payload.gallery)
+          ? JSON.stringify(payload.gallery)
+          : (payload.gallery ?? "[]"),
+        seo_title: payload.seo_title ?? prev.seo_title,
+        meta_description: payload.meta_description ?? prev.meta_description,
+      }));
 
-    setCoverFile(null);
-    setGalleryFiles([]);
-    setCoverPreview(null);
+      // Bersihkan file picker (karena kita memulihkan path file draf lama)
+      setCoverFile(null);
+      setGalleryFiles([]);
+      setCoverPreview(null);
 
-    toast.success("Konten berhasil dipulihkan!", {
-      description: "Silakan periksa kembali sebelum mengirim ulang.",
-    });
+      toast.success("Konten draf berhasil dipulihkan!", {
+        description: "Silakan periksa kembali sebelum mengirim ulang.",
+      });
 
-    setShowDraftBanner(false);
-    setIsRestoring(false);
+      setShowDraftBanner(false);
+    } catch (err) {
+      console.error("Restore Error:", err);
+      toast.error("Gagal memproses data pemulihan.");
+    } finally {
+      setIsRestoring(false);
+    }
   };
 
   // Remove existing gallery image (Edit Mode)
   const removeOldGalleryImage = (indexToRemove: number) => {
+    if (shouldLockUI) return;
     const updatedGallery = parsedGallery.filter(
       (_: any, idx: number) => idx !== indexToRemove,
     );
@@ -361,7 +398,8 @@ export default function ProjectForm() {
         } catch (err: any) {
           toast.error("Upload gagal", {
             id: toastId,
-            description: err.response?.data?.message || "Error",
+            description:
+              err.response?.data?.message || "Kesalahan pada server.",
           });
         }
       }
@@ -412,6 +450,7 @@ export default function ProjectForm() {
 
   // Unified Save Logic
   const handleSave = async (targetStatus: string) => {
+    // 1. SECURITY & AUTHORITY CHECK
     if (shouldLockUI) {
       return toast.error("Akses Dibatasi.", {
         description:
@@ -419,14 +458,18 @@ export default function ProjectForm() {
       });
     }
 
-    if (!formData.title.trim())
+    // 2. DATA INTEGRITY VALIDATION
+    if (!formData.title.trim()) {
       return toast.error("Judul proyek tidak boleh kosong.");
+    }
 
+    // Mendeteksi konten kosong (regex menghapus tag HTML untuk validasi panjang teks asli)
     const plainTextContent = formData.content.replace(/<[^>]*>?/gm, "").trim();
     if (!formData.content || plainTextContent.length === 0) {
       return toast.error("Isi artikel wajib diisi.");
     }
 
+    // Validasi integritas referensi kategori
     const isCategoryValid = sections.some(
       (sec) => sec.id === formData.category,
     );
@@ -434,13 +477,16 @@ export default function ProjectForm() {
       return toast.error("Kategori proyek tidak valid atau telah terhapus.");
     }
 
+    // Validasi aset wajib untuk publikasi
     if (targetStatus === "Published" && !coverFile && !formData.cover_image) {
       return toast.error("Gambar sampul wajib ada untuk publikasi.");
     }
 
+    // SPAM PREVENTION
     if (targetStatus === "Published" && !hasDataChanged()) {
       return toast.info("Tidak ada perubahan terdeteksi.", {
-        description: "Data masih sama dengan versi live.",
+        description:
+          "Data saat ini masih identik dengan versi yang sudah tayang.",
         duration: 4000,
       });
     }
@@ -453,24 +499,23 @@ export default function ProjectForm() {
     try {
       const payload = new FormData();
 
+      // 3. ASSET PROCESSING (Cover & Gallery)
       if (coverFile) {
+        // Kasus: User mengunggah file baru
         payload.append("cover_image", await compressImage(coverFile));
       } else if (formData.cover_image) {
+        // Kasus: Menggunakan referensi file lama atau file dari draf restorasi
         payload.append("cover_image", formData.cover_image);
       }
 
-      if (rejectedDraft?.notrans) {
-        payload.append("previous_notrans", rejectedDraft.notrans);
+      if (galleryFiles.length > 0) {
+        for (const file of galleryFiles) {
+          payload.append("gallery", await compressImage(file));
+        }
       }
 
-      for (const file of galleryFiles) {
-        payload.append("gallery", await compressImage(file));
-      }
-
+      // 4. PAYLOAD CONSTRUCTION
       payload.append("title", formData.title.trim());
-      if (generatedSlug) {
-        payload.append("slug", generatedSlug);
-      }
       payload.append("excerpt", formData.excerpt.trim());
       payload.append("content", formData.content);
       payload.append("category", formData.category);
@@ -489,8 +534,15 @@ export default function ProjectForm() {
         payload.append("existing_gallery", formData.gallery);
       }
 
-      payload.append("author", user?.name || "Admin DAW");
+      // Metadata Identitas
+      payload.append("author", user?.name || "System Admin");
 
+      // Menautkan ID tiket lama jika ini adalah pengajuan ulang (re-submission)
+      if (rejectedDraft?.notrans) {
+        payload.append("previous_notrans", rejectedDraft.notrans);
+      }
+
+      // 5. API EXECUTION
       const endpoint = isEditMode ? `/projects/${id}` : "/projects";
       const method = isEditMode ? api.put : api.post;
 
@@ -498,42 +550,48 @@ export default function ProjectForm() {
         timeout: 60000,
         onUploadProgress: (p) => {
           const percent = Math.round((p.loaded * 100) / (p.total || 1));
-          toast.loading(`Mengunggah: ${percent}%...`, { id: loadingToast });
+          toast.loading(`Sinkronisasi Aset: ${percent}%...`, {
+            id: loadingToast,
+          });
         },
       });
 
+      // 6. RESPONSE ORCHESTRATION (Handling Baton Pass vs Direct)
       if ([200, 201, 202].includes(response.status)) {
+        // Bersihkan state draf karena sudah berhasil diproses/diajukan
         setRejectedDraft(null);
         setShowDraftBanner(false);
 
         if (response.status === 202) {
+          // Jalur Editor: Menunggu persetujuan (Locked State)
           setFormData((prev) => ({
             ...prev,
             is_locked: true,
             lock_ticket: response.data.ticket,
           }));
-          toast.success("Revisi berhasil diajukan! Menunggu persetujuan.", {
+          toast.success("Revisi Berhasil Diajukan!", {
             id: loadingToast,
+            description: "Tiket approval telah diterbitkan ke sistem.",
             duration: 5000,
           });
         } else {
+          // Jalur Admin: Eksekusi Langsung
           toast.success(
             isSuperadmin
-              ? "Perubahan berhasil di-publish secara live!"
-              : "Draf berhasil disimpan.",
+              ? "Perubahan Berhasil Dipublikasikan!"
+              : "Draf Lokal Tersimpan.",
             { id: loadingToast },
           );
         }
 
+        // Delay sedikit agar user sempat membaca toast sebelum redirect
         setTimeout(() => navigate("/admin/projects"), 800);
       }
     } catch (err: any) {
-      console.error("Save Error:", err);
-      toast.error("Gagal menyimpan", {
+      console.error("🚨 [FORM_SAVE_ERROR]:", err);
+      toast.error("Gagal melakukan penyimpanan", {
         id: loadingToast,
-        description:
-          err.response?.data?.message ||
-          "Koneksi server mungkin lambat atau terputus.",
+        description: err.response?.data?.message || "Koneksi server terganggu.",
       });
     } finally {
       setIsSaving(false);
@@ -565,7 +623,7 @@ export default function ProjectForm() {
     getInputProps: getInputGalleryProps,
     isDragActive: isGalleryDragActive,
   } = useDropzone({
-    disabled: shouldLockUI, // 👈 Guard Dropzone
+    disabled: shouldLockUI,
     onDrop: (files) => {
       if (files.length === 0) return;
 
@@ -601,48 +659,61 @@ export default function ProjectForm() {
 
   return (
     <div className="max-w-7xl mx-auto animate-in fade-in duration-500">
-      {/* Warning Banner (superadmin Only) */}
+      {/* ⚠️ 1. SOVEREIGN BYPASS BANNER (Khusus Superadmin) */}
+      {/* Menandakan bahwa Admin sedang melihat data yang sedang dikunci oleh antrean Editor, dan memberikan otoritas untuk membatalkannya. */}
       {isOverrideMode && (
         <div className="mb-6 bg-amber-50 border border-amber-200 p-4 rounded-xl flex items-center gap-4 animate-in slide-in-from-top-4 shadow-sm">
           <div className="bg-amber-100 p-2 rounded-full text-amber-600 shrink-0">
-            <ShieldAlert className="w-5 h-5" />
+            <AlertTriangle className="w-5 h-5" />
           </div>
           <div>
             <h4 className="text-xs font-black text-amber-900 uppercase tracking-tight">
-              Mode Override superadmin
+              Mode Override Admin
             </h4>
             <p className="text-xs text-amber-700 leading-relaxed mt-0.5">
-              Data ini sedang dikunci oleh tiket peninjauan{" "}
-              <strong>{formData.lock_ticket}</strong>. Anda dapat melakukan
-              perubahan langsung.
+              Data ini sedang dikunci oleh antrean{" "}
+              <strong>{formData.lock_ticket}</strong>.
               <span className="font-bold underline ml-1">
-                Menyimpan akan otomatis membatalkan draf tersebut.
+                Menyimpan akan otomatis membatalkan antrean tersebut.
               </span>
             </p>
           </div>
         </div>
       )}
 
-      {/* Locked Banner (Editor Only) */}
+      {/* 2. LOCKED BANNER (Khusus Editor) */}
+      {/* Jika data terkunci, Editor akan melihat peringatan dan seluruh input di bawahnya akan dinonaktifkan. */}
       {shouldLockUI && (
-        <div className="mb-6 bg-blue-50 border border-blue-200 p-4 rounded-xl flex items-center gap-4 animate-pulse shadow-sm">
-          <div className="bg-blue-100 p-2 rounded-full text-blue-600 shrink-0">
+        <div
+          className={`mb-6 p-4 rounded-xl flex items-center gap-4 shadow-sm ${
+            formData.lock_ticket?.includes("DEL")
+              ? "bg-rose-50 border border-rose-200 animate-pulse" // Merah redup kalau mau dihapus
+              : "bg-blue-50 border border-blue-200" // Biru kalau update biasa
+          }`}>
+          <div
+            className={`p-2 rounded-full shrink-0 ${formData.lock_ticket?.includes("DEL") ? "bg-rose-100 text-rose-600" : "bg-blue-100 text-blue-600"}`}>
             <LockIcon className="w-5 h-5" />
           </div>
           <div>
-            <h4 className="text-xs font-black text-blue-900 uppercase tracking-tight">
-              Akses Dibatasi
+            <h4
+              className={`text-xs font-black uppercase tracking-tight ${formData.lock_ticket?.includes("DEL") ? "text-rose-900" : "text-blue-900"}`}>
+              {formData.lock_ticket?.includes("DEL")
+                ? "Menunggu Penghapusan"
+                : "Akses Dibatasi"}
             </h4>
-            <p className="text-xs text-blue-700 leading-relaxed mt-0.5">
-              Anda tidak dapat mengubah data ini karena revisi sebelumnya sedang
-              menunggu persetujuan.
+            <p
+              className={`text-xs leading-relaxed mt-0.5 ${formData.lock_ticket?.includes("DEL") ? "text-rose-700" : "text-blue-700"}`}>
+              {formData.lock_ticket?.includes("DEL")
+                ? "Permintaan penghapusan data ini sedang ditinjau."
+                : "Revisi sedang ditinjau. Anda tidak dapat mengubah data ini sampai ada keputusan."}
             </p>
           </div>
         </div>
       )}
-      {/* TOOLBAR HEADER */}
+
+      {/* --- TOOLBAR HEADER --- */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white p-6 rounded-xl border border-slate-200 shadow-sm top-0 z-20 mb-6">
-        {/* Kiri: Back Button & Title */}
+        {/* Kiri: Navigasi & Judul */}
         <div className="flex items-center gap-4">
           <button
             onClick={() => navigate("/admin/projects")}
@@ -651,21 +722,21 @@ export default function ProjectForm() {
           </button>
           <div>
             <h1 className="text-xl font-serif font-bold text-slate-900">
-              {isEditMode ? "Edit Proyek" : "Create New Project"}
+              {isEditMode ? "Edit Proyek" : "Buat Proyek Baru"}
             </h1>
+            {/* Slug Intelligence: Menampilkan pratinjau URL yang ramah SEO secara real-time berdasarkan judul. */}
             {formData.title && (
               <p className="text-[10px] font-mono text-slate-400 uppercase tracking-tighter mt-1 flex items-center gap-1">
-                <LinkIcon className="w-2.5 h-2.5" /> preview: daw.co.id/page/
+                <LinkIcon className="w-2.5 h-2.5" /> daw.co.id/page/
                 {generatedSlug}
               </p>
             )}
           </div>
         </div>
 
-        {/* Kanan: STANDARDIZED ACTION BUTTONS */}
+        {/* Kanan: ACTION BUTTONS (Dynamic Labeling) */}
         <div className="flex flex-col items-end gap-1 w-full sm:w-auto">
           <div className="flex gap-3 w-full sm:w-auto">
-            {/* Tombol Simpan Draf Lokal */}
             <button
               type="button"
               onClick={() => handleSave("Draft")}
@@ -675,7 +746,7 @@ export default function ProjectForm() {
               Simpan Draf Lokal
             </button>
 
-            {/* Tombol Aksi Utama (Berdasarkan Kasta & State) */}
+            {/* Tombol Utama berubah warna dan label sesuai konteks Otoritas (Admin vs Editor) */}
             <button
               type="button"
               onClick={() => handleSave("Published")}
@@ -685,9 +756,11 @@ export default function ProjectForm() {
                   ? "bg-slate-300 text-slate-700"
                   : shouldLockUI
                     ? "bg-slate-200 text-slate-500"
-                    : isSuperadmin
-                      ? "bg-daw-green hover:bg-[#003b1c]"
-                      : "bg-blue-600 hover:bg-blue-700"
+                    : isOverrideMode
+                      ? "bg-amber-600 hover:bg-amber-700" // Warna khusus untuk peringatan Bypass Admin
+                      : isSuperadmin
+                        ? "bg-daw-green hover:bg-[#003b1c]"
+                        : "bg-blue-600 hover:bg-blue-700" // Warna khusus untuk Editor (Request Approval)
               }`}>
               {isSaving ? (
                 <>
@@ -696,6 +769,10 @@ export default function ProjectForm() {
               ) : shouldLockUI ? (
                 <>
                   <LockIcon className="w-4 h-4" /> Akses Terbatas
+                </>
+              ) : isOverrideMode ? (
+                <>
+                  <AlertCircle className="w-4 h-4" /> Override & Publish
                 </>
               ) : isSuperadmin ? (
                 <>
@@ -709,25 +786,25 @@ export default function ProjectForm() {
             </button>
           </div>
 
-          {/* Hint Khusus Editor (Hanya muncul jika tidak dilock dan bukan admin) */}
+          {/* Hint visual untuk Editor agar tahu bahwa tombol biru tidak akan mempublikasikan data secara instan */}
           {isEditor && !shouldLockUI && !isSaving && (
             <p className="text-[10px] text-blue-500 font-bold mt-1 flex items-center gap-1 animate-in slide-in-from-top-1">
               <span className="w-1.5 h-1.5 bg-blue-500 rounded-full animate-pulse"></span>
-              Pembaruan akan dikirim untuk disetujui.
+              Pembaruan harus disetujui Manajer.
             </p>
           )}
         </div>
       </div>
 
-      {/* ⚠️ 3. RECOVERY BANNER SYSTEM (DRAF DITOLAK) */}
+      {/* ⚠️ 3. RECOVERY BANNER (DRAF DITOLAK) */}
+      {/* Banner ini dipicu jika Backend mengembalikan object 'rejectedDraft' yang valid */}
       {showDraftBanner && rejectedDraft && (
         <div className="mb-8 animate-in fade-in slide-in-from-top-4 duration-500">
           <div className="bg-amber-50 border border-amber-200 rounded-2xl overflow-hidden shadow-sm">
             <div className="p-5 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
               <div className="flex items-start gap-4">
                 <div className="p-3 bg-amber-100 rounded-xl text-amber-600 shrink-0">
-                  <AlertTriangle className="w-6 h-6" />{" "}
-                  {/* Icon disesuaikan dengan status warning */}
+                  <AlertTriangle className="w-6 h-6" />
                 </div>
                 <div>
                   <h4 className="text-sm font-bold text-amber-900 mb-1">
@@ -736,7 +813,7 @@ export default function ProjectForm() {
                   <p className="text-xs text-amber-700 leading-relaxed max-w-2xl font-bold italic">
                     "
                     {rejectedDraft.rejection_reason ||
-                      "Tidak ada alasan spesifik yang diberikan."}
+                      "Revisi Anda memerlukan perbaikan lanjutan."}
                     "
                   </p>
                   <div className="mt-2 flex items-center gap-2 text-[10px] text-amber-500 font-medium">
@@ -745,7 +822,6 @@ export default function ProjectForm() {
                     {new Date(rejectedDraft.updatedAt).toLocaleString("id-ID", {
                       day: "numeric",
                       month: "long",
-                      year: "numeric",
                       hour: "2-digit",
                       minute: "2-digit",
                     })}
@@ -753,34 +829,31 @@ export default function ProjectForm() {
                 </div>
               </div>
 
+              {/* RECOVERY ACTIONS */}
               <div className="flex items-center gap-2 w-full md:w-auto shrink-0">
+                {/* Opsi 1: Restoration Logic - Memuat ulang payload JSON ke dalam form */}
+                {rejectedDraft.action !== "DELETE" && (
+                  <button
+                    type="button"
+                    onClick={handleRestoreDraft}
+                    disabled={isRestoring || shouldLockUI}
+                    className="flex items-center justify-center gap-2 bg-amber-600 hover:bg-amber-700 text-white px-5 py-2.5 rounded-xl text-xs font-bold transition-all active:scale-95 shadow-sm shadow-amber-200 disabled:opacity-50 disabled:grayscale">
+                    <RotateCcw
+                      className={`w-4 h-4 ${isRestoring ? "animate-spin" : ""}`}
+                    />
+                    Pulihkan Data
+                  </button>
+                )}
+                {/* Opsi 2: Discard Logic - Memanggil fungsi handleDiscardDraft untuk menghapus notifikasi dari ERP */}
                 <button
                   type="button"
-                  onClick={handleRestoreDraft}
-                  disabled={isRestoring || shouldLockUI}
-                  title={
-                    shouldLockUI
-                      ? "Selesaikan proses peninjauan aktif untuk memulihkan draf lama"
-                      : "Pulihkan data draf"
-                  }
-                  className="flex-1 md:flex-none flex items-center justify-center gap-2 bg-amber-600 hover:bg-amber-700 text-white px-5 py-2.5 rounded-xl text-xs font-bold transition-all active:scale-95 shadow-sm shadow-amber-200 disabled:opacity-50 disabled:grayscale disabled:cursor-not-allowed">
-                  <RotateCcw
-                    className={`w-4 h-4 ${isRestoring ? "animate-spin" : ""}`}
-                  />
-                  Pulihkan Data
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => setShowDraftBanner(false)}
-                  className="p-2.5 text-amber-400 hover:text-amber-600 hover:bg-amber-100 rounded-xl transition-colors"
-                  title="Abaikan">
-                  <X className="w-5 h-5" />
+                  onClick={handleDiscardDraft}
+                  className="flex items-center justify-center gap-2 bg-white border border-amber-200 text-amber-600 hover:bg-amber-100 px-4 py-2.5 rounded-xl text-xs font-bold transition-all shadow-sm active:scale-95">
+                  <X className="w-4 h-4" />
+                  Abaikan Notifikasi
                 </button>
               </div>
             </div>
-
-            {/* Visual Progress Bar - Memberikan kesan dinamis */}
             <div className="h-1 bg-amber-200 w-full overflow-hidden">
               <div className="h-full bg-amber-500 w-1/3 animate-pulse"></div>
             </div>
@@ -788,10 +861,11 @@ export default function ProjectForm() {
         </div>
       )}
 
-      {/* MAIN FORM GRID */}
+      {/* --- MAIN FORM GRID --- */}
+      {/* lockStyles di sini akan mematikan pointer-events dan memberikan efek grayscale pada keseluruhan form jika status is_locked bernilai true */}
       <div
         className={`mt-4 grid grid-cols-1 lg:grid-cols-3 gap-8 items-start transition-all duration-500 ${lockStyles}`}>
-        {/* KIRI: CONTENT AREA */}
+        {/* KOLOM KIRI: CONTENT AREA */}
         <div className="lg:col-span-2 space-y-6">
           <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden flex flex-col p-0 md:p-8 space-y-8">
             <input
@@ -818,7 +892,7 @@ export default function ProjectForm() {
               <textarea
                 placeholder="Tulis ringkasan singkat untuk tampilan beranda..."
                 maxLength={150}
-                disabled={shouldLockUI} // 🔒 Guard
+                disabled={shouldLockUI} // 🔒 Guard Lapisan 1
                 rows={2}
                 className="w-full p-4 bg-slate-50 border border-slate-100 rounded-xl outline-none text-slate-600 text-sm h-[80px] resize-none focus:ring-2 focus:ring-daw-green/10 disabled:bg-slate-100 disabled:text-slate-500"
                 value={formData.excerpt}
@@ -838,7 +912,7 @@ export default function ProjectForm() {
                   ref={quillRef}
                   theme="snow"
                   modules={modules}
-                  readOnly={shouldLockUI} // 🔒 Guard khusus untuk ReactQuill
+                  readOnly={shouldLockUI} // 🔒 Strict ReadOnly Integration untuk mencegah manipulasi DOM Quill
                   value={formData.content}
                   onChange={(v) => setFormData({ ...formData, content: v })}
                   className="min-h-[300px]"
@@ -847,7 +921,7 @@ export default function ProjectForm() {
             </div>
           </div>
 
-          {/* SEO ENGINE */}
+          {/* SEO ENGINE & PREVIEW */}
           <div className="bg-slate-50/50 rounded-2xl border border-slate-200 p-8 space-y-6 shadow-inner">
             <h3 className="text-xs font-black uppercase tracking-widest flex items-center gap-2 text-slate-800">
               <Search className="w-4 h-4 text-blue-500" /> Pengaturan Pencarian
@@ -858,7 +932,7 @@ export default function ProjectForm() {
                 <input
                   type="text"
                   placeholder="Judul Khusus Tampilan Google"
-                  disabled={shouldLockUI} // 🔒 Guard
+                  disabled={shouldLockUI}
                   className="w-full p-3 bg-white border border-slate-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-500/20 disabled:bg-slate-100 disabled:text-slate-500"
                   value={formData.seo_title}
                   onChange={(e) =>
@@ -879,12 +953,13 @@ export default function ProjectForm() {
                 />
               </div>
 
-              {/* Pratinjau SEO */}
+              {/* Google Search Simulation: Real-time visual feedback */}
               <div className="bg-white p-5 rounded-xl border border-slate-100 shadow-sm flex flex-col justify-center">
                 <p className="text-[10px] font-black text-slate-300 uppercase mb-3">
                   Pratinjau Tampilan Google
                 </p>
                 <p className="text-[#1a0dab] text-lg font-medium truncate">
+                  {/* Metadata Sync: Fallback ke judul utama jika SEO title kosong */}
                   {formData.seo_title || formData.title || "Untitled Project"}
                 </p>
                 <p className="text-[#006621] text-xs truncate mb-1 font-mono">
@@ -900,8 +975,7 @@ export default function ProjectForm() {
           </div>
         </div>
 
-        {/* KANAN: SIDEBAR */}
-        {/* FIX: Wrapped all sidebar elements inside a single column container to prevent grid breaking */}
+        {/* KOLOM KANAN: SIDEBAR ASSET & CATEGORY */}
         <div className="space-y-6">
           {/* 1. KATEGORI PROYEK */}
           <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm">
@@ -914,9 +988,6 @@ export default function ProjectForm() {
                 <p className="text-sm font-bold text-slate-500">
                   Belum ada sektor aktif
                 </p>
-                <p className="text-xs text-slate-400 mt-1 mb-3">
-                  Buat sektor bisnis terlebih dahulu.
-                </p>
                 <Link
                   to="/admin/businesses"
                   className="text-xs font-bold text-daw-green hover:underline">
@@ -926,7 +997,7 @@ export default function ProjectForm() {
             ) : (
               <>
                 <select
-                  disabled={shouldLockUI} // 🔒 Guard
+                  disabled={shouldLockUI} // 🔒 Guard Kategori
                   className={`w-full p-3 bg-slate-50 border rounded-xl font-bold outline-none transition-all disabled:bg-slate-100 disabled:text-slate-500 disabled:cursor-not-allowed ${
                     formData.category && !validSectorIds.has(formData.category)
                       ? "border-red-500 text-red-600 ring-2 ring-red-100"
@@ -964,41 +1035,38 @@ export default function ProjectForm() {
             )}
           </div>
 
-          {/* 2. GAMBAR SAMPUL */}
+          {/* 2. GAMBAR SAMPUL (COVER ASSET) */}
           <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm">
             <h3 className="text-xs font-black uppercase tracking-widest mb-4 flex items-center gap-2">
               <ImageIcon className="w-4 h-4 text-daw-green" /> Gambar Sampul
             </h3>
 
-            {/* Guard UI ditambahkan pada class Dropzone */}
             <div
               {...getRootCoverProps()}
               className={`aspect-video rounded-xl flex items-center justify-center transition-all relative overflow-hidden
                 ${shouldLockUI ? "border-2 border-slate-200 bg-slate-100 opacity-80 cursor-not-allowed" : "border-2 border-dashed cursor-pointer hover:bg-slate-50"}
                 ${isCoverDragActive && !shouldLockUI ? "border-daw-green bg-green-50" : "border-slate-200"}
               `}>
-              {!shouldLockUI && <input {...getInputCoverProps()} />}{" "}
-              {/* Kasus A: Ada File Baru yang baru saja di-drop */}
+              {/* 🔒 Menonaktifkan input file jika UI dikunci */}
+              {!shouldLockUI && <input {...getInputCoverProps()} />}
+
               {coverPreview ? (
                 <img
                   src={coverPreview}
                   className="w-full h-full object-cover"
                   alt="New Upload"
                 />
-              ) : /* Kasus B: Menggunakan data dari Database (Live atau Recovered Draft) */
-              formData.cover_image ? (
+              ) : formData.cover_image ? (
                 <>
                   <img
                     src={
                       formData.cover_image.startsWith("http")
-                        ? formData.cover_image // Jika sudah URL lengkap
-                        : `${BASE_UPLOAD_URL}/${formData.cover_image}` // Jika hanya nama file
+                        ? formData.cover_image
+                        : `${BASE_UPLOAD_URL}/${formData.cover_image}`
                     }
                     className="w-full h-full object-cover"
                     alt="Cover Data"
                   />
-
-                  {/* Indikator visual jika ini adalah data yang di-restore */}
                   {rejectedDraft && !coverPreview && (
                     <div className="absolute top-2 left-2 bg-amber-500 text-white text-[8px] font-black px-2 py-1 rounded uppercase tracking-widest shadow-lg animate-in slide-in-from-top-1">
                       Restored from Draft
@@ -1006,7 +1074,6 @@ export default function ProjectForm() {
                   )}
                 </>
               ) : (
-                /* Kasus C: Kosong */
                 <div className="text-center p-4">
                   <ImageIcon className="w-8 h-8 text-slate-200 mx-auto mb-2" />
                   <p className="text-[10px] font-bold text-slate-400 uppercase tracking-tighter">
@@ -1017,7 +1084,7 @@ export default function ProjectForm() {
             </div>
           </div>
 
-          {/* 3. GALERI */}
+          {/* 3. GALERI FISIK (MULTIPLE ASSETS) */}
           <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm">
             <h3 className="text-xs font-black uppercase tracking-widest mb-4 flex items-center gap-2">
               <Images className="w-4 h-4 text-daw-green" /> Galeri
@@ -1025,6 +1092,7 @@ export default function ProjectForm() {
 
             {(galleryFiles.length > 0 || parsedGallery.length > 0) && (
               <div className="grid grid-cols-3 gap-2 mb-4">
+                {/* Me-render Gambar Tersimpan (Parsed Gallery) */}
                 {isEditMode &&
                   parsedGallery.map((imgName: string, idx: number) => (
                     <div
@@ -1041,6 +1109,7 @@ export default function ProjectForm() {
                         </span>
                       </div>
 
+                      {/* 🔒 Layer 2 Guarding: Menghilangkan tombol hapus (X) jika terkunci */}
                       {!shouldLockUI && (
                         <button
                           type="button"
@@ -1055,11 +1124,12 @@ export default function ProjectForm() {
                     </div>
                   ))}
 
-                {/* File Baru yang belum disave */}
+                {/* Me-render File Baru yang belum dikirim ke server */}
                 {galleryFiles.map((file, idx) => (
                   <GalleryPreviewItem
                     key={`new-${idx}`}
                     file={file}
+                    disabled={shouldLockUI} // 🔒 Mengunci komponen anak agar tombol hapus dimatikan
                     onRemove={() =>
                       setGalleryFiles((prev) =>
                         prev.filter((_, i) => i !== idx),
@@ -1070,6 +1140,7 @@ export default function ProjectForm() {
               </div>
             )}
 
+            {/* 🔒 Layer 1 Guarding: Menyembunyikan Dropzone Tambah Galeri jika terkunci */}
             {!shouldLockUI && (
               <div
                 {...getRootGalleryProps()}

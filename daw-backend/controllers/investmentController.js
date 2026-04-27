@@ -209,7 +209,7 @@ exports.createAffiliate = async (req, res) => {
       await t.commit();
       return res.status(202).json({
         success: true,
-        message: "Permintaan tambah afiliasi baru diajukan ke ERP.",
+        message: "Permintaan tambah afiliasi baru diajukan.",
         ticket: result.notrans,
       });
     }

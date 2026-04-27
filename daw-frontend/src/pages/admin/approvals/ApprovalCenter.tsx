@@ -170,7 +170,7 @@ const DiffModal = ({
                 }`}>
                 {draft.action}
               </span>
-              Tiket: {draft.notrans} | Level ERP: {draft.level}
+              Tiket: {draft.notrans} | Level: {draft.level}
             </p>
           </div>
 

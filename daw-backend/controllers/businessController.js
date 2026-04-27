@@ -186,8 +186,7 @@ exports.updateBusinessSection = async (req, res) => {
     if (section.is_locked && userRole === "editor") {
       await t.rollback();
       return res.status(423).json({
-        message:
-          "Akses Dibatasi. Sektor ini sedang dalam proses peninjauan ERP.",
+        message: "Akses Dibatasi. Sektor ini sedang dalam proses peninjauan.",
         ticket: section.lock_ticket,
       });
     }
@@ -382,7 +381,7 @@ exports.deleteSection = async (req, res) => {
       return res.status(423).json({
         success: false,
         message:
-          "Akses Dibatasi. Sektor ini sedang dikunci oleh antrean approval ERP.",
+          "Akses Dibatasi. Sektor ini sedang dikunci oleh antrean approval.",
         ticket: section.lock_ticket,
       });
     }
@@ -432,7 +431,7 @@ exports.deleteSection = async (req, res) => {
 
       await t.commit();
       return res.status(202).json({
-        message: "Permintaan hapus sektor dikirim ke ERP. Data dikunci.",
+        message: "Permintaan hapus sektor dikirim ke Server. Data dikunci.",
         ticket: result.notrans,
       });
     }

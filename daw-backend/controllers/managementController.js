@@ -188,7 +188,7 @@ exports.updateManagement = async (req, res) => {
 
       await t.commit();
       return res.status(202).json({
-        message: "Draf revisi manajemen dikirim ke ERP.",
+        message: "Draf revisi manajemen dikirim.",
         ticket: result.notrans,
       });
     }
@@ -277,7 +277,7 @@ exports.deleteManagement = async (req, res) => {
 
       await t.commit();
       return res.status(202).json({
-        message: "Permintaan hapus dikirim ke ERP. Data dikunci.",
+        message: "Permintaan hapus dikirim. Data dikunci.",
         ticket: result.notrans,
       });
     }

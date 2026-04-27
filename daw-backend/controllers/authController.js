@@ -39,7 +39,7 @@ exports.login = async (req, res) => {
       throw new Error("DAW_NODE_URL is not defined in environment.");
     }
 
-    console.log(`>>> [AUTH] Verifying ${uname} via OWL ERP...`);
+    console.log(`>>> [AUTH] Verifying ${uname} via OWL...`);
 
     // --- FASE 1: Validasi ke API Eksternal OWL ---
     let owlResponse;
@@ -55,7 +55,7 @@ exports.login = async (req, res) => {
       );
       return res.status(401).json({
         message: "Gagal Login: Username atau Password OWL salah!",
-        detail: owlError.response?.data?.message || "Koneksi ERP gagal.",
+        detail: owlError.response?.data?.message || "Koneksi server gagal.",
       });
     }
 

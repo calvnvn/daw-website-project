@@ -562,7 +562,7 @@ export default function UserManagement() {
                   Akses (SSO)
                 </h2>
                 <p className="text-xs text-slate-500 mt-1 font-medium">
-                  Hubungkan akun ERP DAW ke sistem CMS.
+                  Hubungkan akun ke sistem CMS.
                 </p>
               </div>
               <button

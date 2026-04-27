@@ -3,13 +3,13 @@ import {
   Search,
   Plus,
   Filter,
-  MoreVertical,
   Edit,
   Trash2,
   Eye,
   FileText,
   AlertTriangle,
   Lock,
+  X, // Tambahan icon X untuk discard
 } from "lucide-react";
 import { Link } from "react-router-dom";
 import { toast } from "sonner";
@@ -17,8 +17,8 @@ import api from "@/lib/api";
 import { useBusiness } from "@/contexts/BusinessContext";
 import { useAuth } from "@/contexts/AuthContext";
 
-// 1. Sesuaikan Interface dengan kolom tabel MySQL kita
-interface AdminProject {
+// 1. Antarmuka terstandardisasi sesuai Backend V2.5
+export interface AdminProject {
   id: string;
   slug: string;
   title: string;
@@ -40,14 +40,9 @@ export default function ProjectManagement() {
   const [searchTerm, setSearchTerm] = useState("");
   const [filterCategory, setFilterCategory] = useState<string>("All");
 
-  // Get business context data
   const { sections, isLoading: isSectionsLoading } = useBusiness();
 
-  /**
-   * @memo validSectorIds
-   * Optimization: Converts sections array to a Set for O(1) lookup performance.
-   * This prevents expensive array traversal inside the filter loops.
-   */
+  // Optimasi filter sektor O(1)
   const validSectorIds = useMemo(
     () => new Set(sections.map((s) => s.id)),
     [sections],
@@ -58,6 +53,7 @@ export default function ProjectManagement() {
     return projects.some((p) => !validSectorIds.has(p.category));
   }, [projects, validSectorIds, isSectionsLoading]);
 
+  // Mesin Pencari & Filter
   const filteredProjects = useMemo(() => {
     if (isLoading) return [];
     return projects.filter((project) => {
@@ -81,26 +77,30 @@ export default function ProjectManagement() {
     });
   }, [projects, searchTerm, filterCategory, validSectorIds, isLoading]);
 
+  // Fetcher Data
+  const fetchProjects = async () => {
+    setIsLoading(true);
+    try {
+      const response = await api.get("/projects");
+      const data = response.data?.success ? response.data.data : response.data;
+      if (Array.isArray(data)) setProjects(data);
+    } catch (error: any) {
+      console.error("[FETCH_PROJECTS_ERROR]:", error);
+      toast.error("Gagal sinkronisasi data proyek", {
+        description:
+          error.response?.data?.message || "Kesalahan koneksi server.",
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   useEffect(() => {
-    const fetchProjects = async () => {
-      try {
-        const response = await api.get("/projects");
-        const data = response.data?.success
-          ? response.data.data
-          : response.data;
-        if (Array.isArray(data)) setProjects(data);
-      } catch (error: any) {
-        console.error("[FETCH_PROJECTS_ERROR]:", error);
-        toast.error("Gagal sinkronisasi data proyek", {
-          description:
-            error.response?.data?.message || "Kesalahan koneksi server.",
-        });
-      } finally {
-        setIsLoading(false);
-      }
-    };
     fetchProjects();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // THE DECISION HANDLERS
 
   const handleDeleteRequest = (
     id: string,
@@ -112,12 +112,12 @@ export default function ProjectManagement() {
       {
         description: isOverride
           ? `PERHATIAN: Proyek "${title}" sedang terkunci oleh draf. Melanjutkan akan membatalkan draf tersebut dan menghapus data secara permanen.`
-          : `Apakah Anda yakin ingin menghapus "${title}"? Tindakan ini tidak dapat dibatalkan.`,
+          : `Apakah Anda yakin ingin menghapus "${title}"?`,
         action: {
-          label: isOverride ? "Force Delete" : "Delete",
+          label: isOverride ? "Force Delete" : "Eksekusi",
           onClick: () => executeDelete(id),
         },
-        cancel: { label: "Cancel", onClick: () => {} },
+        cancel: { label: "Batal", onClick: () => {} },
       },
     );
   };
@@ -126,16 +126,67 @@ export default function ProjectManagement() {
     toast.promise(
       async () => {
         const response = await api.delete(`/projects/${id}`);
-        setProjects((prev) => prev.filter((p) => p.id !== id));
-        return response.data;
+
+        // Pengecekan Jalur
+        if (response.status === 202) {
+          // Editor Path: Update baris menjadi terkunci, jangan dihapus dari state
+          setProjects((prev) =>
+            prev.map((p) =>
+              p.id === id
+                ? { ...p, is_locked: true, lock_ticket: response.data.ticket }
+                : p,
+            ),
+          );
+          return {
+            type: "pending",
+            message: "Permintaan hapus diajukan ke sistem.",
+          };
+        } else {
+          // Admin Path: Hapus permanen dari state
+          setProjects((prev) => prev.filter((p) => p.id !== id));
+          return {
+            type: "deleted",
+            message: "Proyek berhasil dihapus permanen.",
+          };
+        }
       },
       {
-        loading: "Menghapus proyek dan membersihkan data terkait...",
-        success: "Proyek berhasil dihapus dari sistem.",
+        loading: "Memproses instruksi penghapusan...",
+        success: (data: any) => data.message,
         error: (err) => {
           console.error("Delete Error:", err);
-          return err.response?.data?.message || "Failed to delete project.";
+          return err.response?.data?.message || "Gagal memproses penghapusan.";
         },
+      },
+    );
+  };
+
+  // handleDiscard (Garbage Collection Trigger)
+  const handleDiscard = async (lockTicket: string, targetId: string) => {
+    if (!lockTicket) return;
+
+    toast.promise(
+      async () => {
+        const safeTicket = encodeURIComponent(lockTicket);
+        await api.patch(`/approval/discard/${safeTicket}`);
+        setProjects((prev) =>
+          prev.map((p) =>
+            p.id === targetId
+              ? {
+                  ...p,
+                  has_rejected: false,
+                  is_locked: false,
+                  lock_ticket: null,
+                }
+              : p,
+          ),
+        );
+      },
+      {
+        loading: "Membersihkan notifikasi draf...",
+        success: "Notifikasi draf yang ditolak berhasil diabaikan.",
+        error: (err) =>
+          err.response?.data?.message || "Gagal mengabaikan draf.",
       },
     );
   };
@@ -146,7 +197,7 @@ export default function ProjectManagement() {
     toast.promise(api.put(`/projects/${id}`, { status: newStatus }), {
       loading: "Memperbarui status...",
       success: (response) => {
-        // Cek apakah Backend merespon dengan 202 (Jalur Approval Editor)
+        // Editor Path
         if (response.status === 202) {
           setProjects((prev) =>
             prev.map((p) =>
@@ -155,10 +206,10 @@ export default function ProjectManagement() {
                 : p,
             ),
           );
-          return "Status diajukan . Data dikunci menunggu persetujuan.";
+          return "Status diajukan. Data dikunci menunggu persetujuan.";
         }
 
-        // Jalur Eksekusi Langsung (superadmin / Save Draft)
+        // Admin Path
         setProjects((prev) =>
           prev.map((p) => (p.id === id ? { ...p, status: newStatus } : p)),
         );
@@ -170,7 +221,7 @@ export default function ProjectManagement() {
 
   return (
     <div className="max-w-6xl mx-auto space-y-6 animate-in fade-in duration-500 pb-12">
-      {/* --- HEADER --- */}
+      {/* HEADER */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white p-6 rounded-xl border border-slate-200 shadow-sm top-0 z-20">
         <div>
           <h1 className="text-2xl font-serif font-bold text-slate-900">
@@ -181,15 +232,14 @@ export default function ProjectManagement() {
           </p>
         </div>
         <Link to="/admin/projects/create">
-          {" "}
-          {/* Pastikan path ini benar ada slash di depan */}
           <button className="flex items-center gap-2 bg-daw-green hover:bg-[#003b1c] text-white px-5 py-2.5 rounded-lg font-medium transition-colors shadow-sm shadow-daw-green/20">
             <Plus className="w-5 h-5" />
             <span>Tambah Proyek Baru</span>
           </button>
         </Link>
       </div>
-      {/* --- QUICK STATS --- */}
+
+      {/* QUICK STATS */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
         <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
           <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">
@@ -199,24 +249,31 @@ export default function ProjectManagement() {
             {projects.length}
           </p>
         </div>
-        <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm border-l-4 border-l-green-500">
+
+        <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm border-l-4 border-l-emerald-500">
           <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">
-            Telah Terbit
+            Telah Terbit (Live)
           </p>
-          <p className="text-2xl font-serif font-bold text-green-600">
-            {projects.filter((p) => p.status === "Published").length}
+          <p className="text-2xl font-serif font-bold text-emerald-600">
+            {/* REFACTORED: Hanya menghitung yang Published DAN tidak sedang dikunci (aman) */}
+            {
+              projects.filter((p) => p.status === "Published" && !p.is_locked)
+                .length
+            }
           </p>
         </div>
+
         <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm border-l-4 border-l-amber-500">
           <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">
-            Draf / Revisi
+            Dalam Antrean / Revisi
           </p>
           <p className="text-2xl font-serif font-bold text-amber-600">
-            {projects.filter((p) => p.status === "Draft").length}
+            {projects.filter((p) => p.is_locked || p.has_rejected).length}
           </p>
         </div>
       </div>
-      {/* --- TOOLBAR (Search & Filter) --- */}
+
+      {/* TOOLBAR (Search & Filter) */}
       <div className="flex flex-col sm:flex-row gap-4">
         {/* Search Bar */}
         <div className="relative flex-1">
@@ -238,21 +295,24 @@ export default function ProjectManagement() {
             <Filter className="w-4 h-4 text-slate-400" />
           </div>
           <select
-            className="w-full pl-10 pr-8 py-2.5 bg-white border border-slate-200 rounded-lg appearance-none focus:outline-none focus:ring-2 focus:ring-daw-green/20 focus:border-daw-green cursor-pointer text-slate-700"
+            className="w-full pl-10 pr-8 py-2.5 bg-white border border-slate-200 rounded-lg appearance-none focus:outline-none focus:ring-2 focus:ring-daw-green/20 focus:border-daw-green cursor-pointer text-slate-700 font-medium"
             value={filterCategory}
             onChange={(e) => setFilterCategory(e.target.value)}>
             <option value="All">Semua Kategori</option>
-            <option value="Rejected" className="text-red-500 font-bold">
-              Butuh Revisi
+            <option value="Rejected" className="text-red-600 font-bold">
+              ⚠️ Butuh Revisi
             </option>
             {sections.map((sec) => (
               <option key={sec.id} value={sec.id}>
                 {sec.category}
               </option>
             ))}
+            {/* Opsi khusus ini hanya muncul jika ada data "yatim piatu" yang sektornya terhapus */}
             {hasUncategorizedProjects && (
-              <option value="Uncategorized" className="text-red-500 font-bold">
-                ⚠️ Sektor Terhapus
+              <option
+                value="Uncategorized"
+                className="text-slate-500 font-bold">
+                ✖️ Sektor Terhapus
               </option>
             )}
           </select>
@@ -260,7 +320,7 @@ export default function ProjectManagement() {
       </div>
 
       {/* --- DATA TABLE SECTION --- */}
-      <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+      <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden mt-6">
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">
             <thead>
@@ -283,51 +343,100 @@ export default function ProjectManagement() {
                 </tr>
               ) : filteredProjects.length > 0 ? (
                 filteredProjects.map((project) => {
-                  const isLockedForCurrentUser =
-                    project.is_locked && !isSuperadmin;
-                  const isOverrideMode = project.is_locked && isSuperadmin;
+                  const isRejected = project.has_rejected;
+                  const isLocked = project.is_locked;
+                  // isNeedsRevision: Prioritas #1 (Urgensi Tinggi)
+                  const isNeedsRevision = project.has_rejected;
+
+                  // isPending: Prioritas #2 (Hanya aktif jika tidak sedang rejected)
+                  const isPending = project.is_locked && !isNeedsRevision;
+
+                  // HEURISTIC: Cek apakah ini permintaan hapus berdasarkan pola tiket
+                  const isDeleting =
+                    isPending && project.lock_ticket?.includes("DEL");
+
+                  // Deteksi Otoritas
+                  const isLockedForEditor = isPending && !isSuperadmin;
+                  const isOverrideMode = isPending && isSuperadmin;
+
+                  const rowStyle = isNeedsRevision
+                    ? "bg-red-50/30 hover:bg-red-50/60 border-l-4 border-l-red-500 shadow-[inset_4px_0_0_0_rgba(239,68,68,1)]"
+                    : isDeleting
+                      ? "bg-rose-50/40 opacity-80 grayscale-[20%] border-l-4 border-l-rose-500" // WARNA ROSE UNTUK HAPUS
+                      : isPending
+                        ? isOverrideMode
+                          ? "bg-amber-50/40 hover:bg-amber-50/70 border-l-4 border-amber-500"
+                          : "bg-slate-50/50 opacity-70 grayscale-[20%]"
+                        : "hover:bg-slate-50/80";
+
                   return (
                     <tr
                       key={project.id}
-                      className={`transition-colors group ${
-                        isLockedForCurrentUser
-                          ? "bg-slate-50/40 opacity-60"
-                          : isOverrideMode
-                            ? "bg-amber-50/30 hover:bg-amber-50/60"
-                            : "hover:bg-slate-50/80"
-                      }`}>
+                      className={`transition-all duration-300 group ${rowStyle}`}>
+                      {/* KOLOM 1: TITLE & IDENTIFIERS */}
                       <td className="px-6 py-4">
                         <div className="flex items-center gap-3">
+                          {/* Dynamic Icon Box */}
                           <div
-                            className={`w-10 h-10 rounded flex items-center justify-center shrink-0 border ${isOverrideMode ? "bg-amber-100 border-amber-200" : "bg-slate-100 border-slate-200"}`}>
-                            <FileText
-                              className={`w-5 h-5 ${isOverrideMode ? "text-amber-500" : "text-slate-400"}`}
-                            />
+                            className={`w-10 h-10 rounded-lg flex items-center justify-center shrink-0 border transition-transform group-hover:scale-105 ${
+                              isNeedsRevision
+                                ? "bg-red-100 border-red-200 text-red-600"
+                                : isDeleting
+                                  ? "bg-rose-100 border-rose-200 text-rose-600"
+                                  : isPending
+                                    ? "bg-blue-50 border-blue-100 text-blue-500"
+                                    : "bg-slate-100 border-slate-200 text-slate-400"
+                            }`}>
+                            {isDeleting ? (
+                              <Trash2 className="w-5 h-5" />
+                            ) : (
+                              <FileText className="w-5 h-5" />
+                            )}
                           </div>
+
                           <div>
-                            <div className="flex items-center gap-2">
+                            <div className="flex flex-wrap items-center gap-2">
                               <p className="text-sm font-bold text-slate-900 group-hover:text-daw-green transition-colors line-clamp-1">
                                 {project.title}
                               </p>
-                              {project.is_locked ? (
+
+                              {/* BADGE SYSTEM  (Konsisten dengan Row Style) */}
+                              {isDeleting ? (
+                                <span className="inline-flex items-center gap-1 text-[10px] bg-rose-600 text-white px-2 py-0.5 rounded-full font-black tracking-tighter shadow-sm animate-pulse">
+                                  <Trash2 className="w-2.5 h-2.5" /> PENDING
+                                  DELETE
+                                </span>
+                              ) : isPending ? (
                                 <span
-                                  className={`inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full font-bold border shadow-sm ${isOverrideMode ? "bg-amber-50 text-amber-600 border-amber-200" : "bg-blue-50 text-blue-600 border-blue-100"}`}>
+                                  className={`inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full font-bold border shadow-sm ${
+                                    isOverrideMode
+                                      ? "bg-amber-50 text-amber-600 border-amber-200"
+                                      : "bg-blue-50 text-blue-600 border-blue-100"
+                                  }`}>
                                   <Lock className="w-3 h-3" /> PENDING
                                 </span>
-                              ) : project.has_rejected ? (
-                                <span className="inline-flex items-center gap-1 text-[10px] bg-red-50 text-red-600 px-2 py-0.5 rounded-full font-bold border border-red-100 shadow-sm animate-pulse">
+                              ) : isNeedsRevision ? (
+                                <span className="inline-flex items-center gap-1 text-[10px] bg-red-600 text-white px-2 py-0.5 rounded-full font-black animate-pulse shadow-sm shadow-red-200">
                                   <AlertTriangle className="w-3 h-3" /> REVISION
                                 </span>
                               ) : null}
                             </div>
-                            <p className="text-xs text-slate-500 mt-0.5">
-                              Penulis: {project.author}
-                            </p>
+
+                            {/* TICKET IDENTIFIER */}
+                            {isPending && project.lock_ticket ? (
+                              <p className="text-[10px] font-mono text-slate-500 mt-1 uppercase">
+                                Ticket: {project.lock_ticket}
+                              </p>
+                            ) : (
+                              <p className="text-xs text-slate-500 mt-0.5">
+                                Penulis: {project.author}
+                              </p>
+                            )}
                           </div>
                         </div>
                       </td>
 
-                      {/* Kolom Category */}
+                      {/* KOLOM 2: CATEGORY */}
                       <td className="px-6 py-4">
                         {(() => {
                           const matchedSector = sections.find(
@@ -338,7 +447,9 @@ export default function ProjectManagement() {
                               {matchedSector.category}
                             </span>
                           ) : (
-                            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-red-50 text-red-600 text-xs font-bold border border-red-100 cursor-help">
+                            <span
+                              className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-red-50 text-red-600 text-xs font-bold border border-red-100 cursor-help"
+                              title="Sektor asal telah dihapus dari sistem">
                               <AlertTriangle className="w-3 h-3" /> Sektor
                               Terhapus
                             </span>
@@ -346,21 +457,33 @@ export default function ProjectManagement() {
                         })()}
                       </td>
 
-                      {/* Kolom Status */}
+                      {/* KOLOM 3: STATUS */}
                       <td className="px-6 py-4">
-                        <span
+                        <button
+                          onClick={() =>
+                            toggleStatus(project.id, project.status)
+                          }
+                          disabled={isPending || isNeedsRevision}
+                          title={
+                            isPending || isNeedsRevision
+                              ? "Tidak dapat diubah saat dalam proses persetujuan"
+                              : "Klik untuk ubah status"
+                          }
                           className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold tracking-wide transition-all ${
-                            project.is_locked
-                              ? "bg-slate-100 text-slate-400 border border-slate-200 cursor-not-allowed"
+                            isPending || isNeedsRevision
+                              ? "cursor-not-allowed opacity-80 " // Disable styling
+                              : "cursor-pointer hover:shadow-md active:scale-95 " // Enable styling
+                          } ${
+                            isPending
+                              ? "bg-slate-100 text-slate-400 border border-slate-200"
                               : project.status === "Published"
-                                ? "bg-green-100 text-green-700 border border-green-200 active:scale-95 hover:brightness-90"
-                                : "bg-amber-100 text-amber-700 border border-amber-200 active:scale-95 hover:brightness-90"
+                                ? "bg-green-100 text-green-700 border border-green-200 hover:bg-green-200"
+                                : "bg-amber-100 text-amber-700 border border-amber-200 hover:bg-amber-200"
                           }`}>
                           {project.status}
-                        </span>
+                        </button>
                       </td>
-
-                      {/* Kolom Date */}
+                      {/* KOLOM 4: DATE & VIEWS */}
                       <td className="px-6 py-4">
                         <p className="text-sm text-slate-600">
                           {new Date(project.createdAt).toLocaleDateString(
@@ -373,47 +496,85 @@ export default function ProjectManagement() {
                         </p>
                       </td>
 
-                      {/* Kolom Actions */}
+                      {/* KOLOM 5: ACTIONS (DYNAMIC UX) */}
                       <td className="px-6 py-4 text-right">
                         <div
-                          className={`flex items-center justify-end gap-2 transition-opacity ${isLockedForCurrentUser ? "opacity-50" : "opacity-0 group-hover:opacity-100"}`}>
+                          className={`flex items-center justify-end gap-1 transition-opacity ${isLockedForEditor ? "opacity-50" : "opacity-0 group-hover:opacity-100"}`}>
+                          {/* PUBLIC PREVIEW */}
                           <Link
                             to={`/projects/${project.slug || project.id}`}
                             target="_blank"
-                            className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors">
+                            className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                            title="Pratinjau Publik">
                             <Eye className="w-4 h-4" />
                           </Link>
 
-                          {isLockedForCurrentUser ? (
-                            <button
-                              disabled
-                              className="p-2 text-slate-300 cursor-not-allowed">
+                          {/* EDIT / VIEW ACTION */}
+                          {isLockedForEditor ? (
+                            /* SENIOR FIX: Jangan matikan tombol. Arahkan ke mode View agar Editor bisa baca data. */
+                            <Link
+                              to={`/admin/projects/edit/${project.id}?mode=view`}
+                              title="Lihat Detail (Data Terkunci)"
+                              className="p-2 text-blue-400 hover:bg-blue-50 rounded-lg cursor-pointer">
                               <Lock className="w-4 h-4" />
-                            </button>
+                            </Link>
                           ) : (
-                            <>
-                              <Link
-                                to={`/admin/projects/edit/${project.id}`}
-                                className={`p-2 rounded-lg transition-colors ${isOverrideMode ? "text-amber-500 hover:bg-amber-50" : "text-slate-400 hover:text-daw-green hover:bg-green-50"}`}>
-                                {isOverrideMode ? (
-                                  <AlertTriangle className="w-4 h-4" />
-                                ) : (
-                                  <Edit className="w-4 h-4" />
-                                )}
-                              </Link>
-                              <button
-                                onClick={() =>
-                                  handleDeleteRequest(
-                                    project.id,
-                                    project.title,
-                                    isOverrideMode,
-                                  )
-                                }
-                                className={`p-2 rounded-lg transition-all ${isOverrideMode ? "text-amber-500 hover:text-red-600 hover:bg-red-50" : "text-slate-400 hover:text-red-600 hover:bg-red-50"}`}>
-                                <Trash2 className="w-4 h-4" />
-                              </button>
-                            </>
+                            <Link
+                              to={`/admin/projects/edit/${project.id}`}
+                              className={`p-2 rounded-lg transition-colors ${
+                                isOverrideMode
+                                  ? "text-amber-500 hover:bg-amber-50"
+                                  : "text-slate-400 hover:text-daw-green hover:bg-green-50"
+                              }`}
+                              title={
+                                isOverrideMode
+                                  ? "Override Data Terkunci"
+                                  : "Edit Proyek"
+                              }>
+                              {isOverrideMode ? (
+                                <AlertTriangle className="w-4 h-4" />
+                              ) : (
+                                <Edit className="w-4 h-4" />
+                              )}
+                            </Link>
                           )}
+
+                          {/* FITUR YANG HILANG: TOMBOL DISCARD */}
+                          {isNeedsRevision && project.lock_ticket && (
+                            <button
+                              onClick={() =>
+                                handleDiscard(project.lock_ticket!)
+                              }
+                              className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all"
+                              title="Abaikan & Bersihkan Notifikasi Ini">
+                              <X className="w-4 h-4" />
+                            </button>
+                          )}
+
+                          {/* DELETE ACTION */}
+                          <button
+                            onClick={() =>
+                              handleDeleteRequest(
+                                project.id,
+                                project.title,
+                                isOverrideMode,
+                              )
+                            }
+                            disabled={isLockedForEditor}
+                            className={`p-2 rounded-lg transition-all ${
+                              isLockedForEditor
+                                ? "text-slate-200 cursor-not-allowed"
+                                : isOverrideMode
+                                  ? "text-amber-500 hover:text-red-600 hover:bg-red-50"
+                                  : "text-slate-400 hover:text-red-600 hover:bg-red-50"
+                            }`}
+                            title={
+                              isOverrideMode
+                                ? "Force Delete Data"
+                                : "Hapus Proyek"
+                            }>
+                            <Trash2 className="w-4 h-4" />
+                          </button>
                         </div>
                       </td>
                     </tr>
