@@ -11,7 +11,7 @@ import {
 import { useBusiness, type SectionData } from "@/contexts/BusinessContext";
 import "react-quill-new/dist/quill.snow.css";
 import { toast } from "sonner";
-import api from "@/lib/api";
+import api, { BASE_UPLOAD_URL } from "@/lib/api";
 
 type BusinessFormState = Omit<SectionData, "id">;
 
@@ -43,7 +43,7 @@ export default function BusinessEditor({
       if (!file) return;
 
       if (file.size > 2 * 1024 * 1024) {
-        return toast.error("File terlalu besar! Maksimal 2MB.");
+        return toast.error("Maksimal 2MB.");
       }
 
       const formData = new FormData();
@@ -51,21 +51,24 @@ export default function BusinessEditor({
 
       const toastId = toast.loading("Mengunggah gambar ke server...");
       try {
-        // Ganti endpoint ini sesuai dengan route backend yang kita buat nanti
         const res = await api.post("/businesses/admin/upload-image", formData, {
           headers: { "Content-Type": "multipart/form-data" },
         });
 
-        const imageUrl = res.data.url; // Contoh: "/uploads/image-123.jpg"
+        const imagePath = res.data.url;
 
-        // Ambil instance editor
+        const finalUrl = imagePath.startsWith("http")
+          ? imagePath
+          : `${BASE_UPLOAD_URL.replace("/uploads", "")}${imagePath}`;
+
         const quill = quillRef.current?.getEditor();
-        const range = quill?.getSelection();
+        quill?.focus();
+        const range = quill?.getSelection() || {
+          index: quill?.getLength() || 0,
+        };
 
-        if (quill && range) {
-          // Masukkan gambar sebagai URL, bukan Base64!
-          quill.insertEmbed(range.index, "image", imageUrl);
-          // Pindahkan kursor ke setelah gambar
+        if (quill) {
+          quill.insertEmbed(range.index, "image", finalUrl);
           quill.setSelection(range.index + 1);
         }
 

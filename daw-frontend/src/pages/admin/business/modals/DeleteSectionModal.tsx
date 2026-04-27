@@ -8,7 +8,7 @@ interface DeleteSectionModalProps {
   activeTab: string;
   sections: SectionData[];
   onClose: () => void;
-  deleteSection: (id: string) => Promise<void>;
+  deleteSection: (id: string) => Promise<any>;
   setActiveTab: (id: string) => void;
 }
 
@@ -44,14 +44,28 @@ export default function DeleteSectionModal({
       const fallbackTab =
         remainingSections.length > 0 ? remainingSections[0].id : "categories";
 
-      await deleteSection(activeTab);
+      const res = await deleteSection(activeTab);
 
+      if (res?.status === 202) {
+        toast.success("Permintaan Hapus Dikirim", {
+          id: toastId,
+          description: `Tiket: ${res.data.ticket}. Menunggu persetujuan direksi.`,
+        });
+      } else {
+        toast.success("Sektor berhasil dihapus.", { id: toastId });
+      }
+
+      // 4. Transisi UI
       setActiveTab(fallbackTab);
       onClose();
     } catch (error: any) {
+      // Jalur ini sudah benar di kode lo sebelumnya
       const message =
         error.response?.data?.message || "Gagal memproses penghapusan.";
-      toast.error(message, { id: toastId });
+      toast.error("Gagal Menghapus", {
+        id: toastId,
+        description: message,
+      });
       console.error("[DELETION_FAILURE]:", error);
     } finally {
       setIsDeleting(false);

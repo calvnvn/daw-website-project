@@ -19,6 +19,7 @@ const DynamicBusinessSection = memo(function DynamicBusinessSection({
   data: SectionData;
 }) {
   const { categories, publicProjects } = useBusiness();
+
   const hasProjects = useMemo(() => {
     return publicProjects.some((proj) => proj.category === data.id);
   }, [publicProjects, data.id]);
@@ -78,7 +79,10 @@ const DynamicBusinessSection = memo(function DynamicBusinessSection({
                   "prose-a:font-semibold prose-a:text-daw-green hover:prose-a:text-emerald-500",
                 ].join(" ")}
                 dangerouslySetInnerHTML={{
-                  __html: data.htmlContent.replace(/&nbsp;|\u00A0/g, " "),
+                  __html: (data?.htmlContent ?? "").replace(
+                    /&nbsp;|\u00A0/g,
+                    " ",
+                  ),
                 }}
               />
             </ScrollReveal>

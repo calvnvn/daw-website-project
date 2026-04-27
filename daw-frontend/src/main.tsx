@@ -10,7 +10,7 @@ import { AboutProvider } from "./contexts/AboutContext.tsx";
 import { InvestmentProvider } from "./contexts/InvestmentContext";
 import { BusinessProvider } from "./contexts/BusinessContext";
 import { HomeProvider } from "./contexts/HomeContext";
-import { HelmetProvider } from "react-helmet-async"; //  1. Import ini
+import { HelmetProvider } from "react-helmet-async";
 import { AuthProvider } from "./contexts/AuthContext.tsx";
 
 const queryClient = new QueryClient();
@@ -20,19 +20,21 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
     <QueryClientProvider client={queryClient}>
       <HelmetProvider>
         <BrowserRouter>
-          <SettingsProvider>
-            <AboutProvider>
-              <InvestmentProvider>
-                <HomeProvider>
-                  <AuthProvider>
+          <AuthProvider>
+            {" "}
+            {/* 🔵 1. Pindahkan ke paling atas (setelah Router) */}
+            <SettingsProvider>
+              <AboutProvider>
+                <InvestmentProvider>
+                  <HomeProvider>
                     <BusinessProvider>
                       <App />
                     </BusinessProvider>
-                  </AuthProvider>
-                </HomeProvider>
-              </InvestmentProvider>
-            </AboutProvider>
-          </SettingsProvider>
+                  </HomeProvider>
+                </InvestmentProvider>
+              </AboutProvider>
+            </SettingsProvider>
+          </AuthProvider>
         </BrowserRouter>
       </HelmetProvider>
     </QueryClientProvider>

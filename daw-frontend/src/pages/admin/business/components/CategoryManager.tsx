@@ -16,7 +16,11 @@ import { toast } from "sonner";
 
 export default function CategoryManager() {
   const { user } = useAuth();
-  const isSuperadmin = user?.role === "superadmin" || user?.role === "admin";
+
+  const canManageCategories =
+    user?.role === "superadmin" ||
+    user?.role === "admin" ||
+    user?.role === "editor";
 
   const {
     categories,
@@ -37,9 +41,9 @@ export default function CategoryManager() {
   const slugify = (text: string) =>
     text
       .toLowerCase()
-      .replace(/\s+/g, "-") // Ganti spasi dengan -
-      .replace(/[^\w-]/g, "") // Hapus karakter ilegal
-      .replace(/--+/g, "-"); // Hapus multiple dashes
+      .replace(/\s+/g, "-")
+      .replace(/[^\w-]/g, "")
+      .replace(/--+/g, "-");
 
   // HANDLERS
   const handleAdd = async () => {
@@ -79,19 +83,18 @@ export default function CategoryManager() {
           </div>
         </div>
 
-        {/* BANNER KASTA (Hanya Editor yang melihat ini) */}
-        {!isSuperadmin && (
+        {!canManageCategories && (
           <div className="flex items-center gap-2 bg-amber-50 border border-amber-200 px-3 py-2 rounded-lg text-amber-700 shrink-0 shadow-sm">
             <ShieldAlert className="w-4 h-4" />
             <span className="text-[10px] font-bold uppercase tracking-widest">
-              Akses Mutasi Terkunci (Read-Only)
+              Akses Terkunci (Read-Only)
             </span>
           </div>
         )}
       </div>
 
-      {/* Category Creation Form ( DISEMBUNYIKAN UNTUK EDITOR) */}
-      {isSuperadmin && (
+      {/* Category Creation Form */}
+      {canManageCategories && (
         <div className="bg-slate-50 p-6 rounded-xl border border-slate-200">
           <h3 className="font-bold text-slate-900 flex items-center gap-2 text-xs uppercase tracking-widest mb-4">
             <Plus className="w-4 h-4 text-daw-green" /> Tambah Kategori Baru
@@ -99,7 +102,7 @@ export default function CategoryManager() {
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
             <div>
               <label className="text-[10px] font-black text-slate-500 uppercase mb-1.5 block">
-                ID Referensi (Slug)
+                ID Referensi
               </label>
               <input
                 type="text"
@@ -180,7 +183,7 @@ export default function CategoryManager() {
               <th className="px-6 py-4">Status</th>
               <th className="px-6 py-4">ID / Label</th>
               <th className="px-6 py-4">Visual Color</th>
-              {isSuperadmin && (
+              {canManageCategories && (
                 <th className="px-6 py-4 text-right">Actions</th>
               )}{" "}
             </tr>
@@ -189,7 +192,6 @@ export default function CategoryManager() {
             {categories.map((cat) => {
               const isEditingThis = editingCatId === cat.id;
               const isPending = cat.is_locked;
-              const isLockedForEditor = !isSuperadmin;
 
               return (
                 <tr
@@ -197,11 +199,9 @@ export default function CategoryManager() {
                   className={`transition-all duration-300 group ${
                     isPending
                       ? "bg-slate-50/50 opacity-70 grayscale-[20%]"
-                      : isLockedForEditor
-                        ? "hover:bg-slate-50/20 cursor-default"
-                        : "hover:bg-slate-50/80"
+                      : "hover:bg-slate-50/80"
                   }`}>
-                  {/* KOLOM STATUS (Visual Radar) */}
+                  {/* KOLOM STATUS */}
                   <td className="px-6 py-4">
                     {isPending ? (
                       <div className="flex items-center gap-1.5 text-blue-600 font-bold text-[10px] bg-blue-50 px-2 py-1 rounded-full w-fit border border-blue-100 shadow-sm">
@@ -236,9 +236,7 @@ export default function CategoryManager() {
                       ) : (
                         <span
                           className={`font-bold ${
-                            isPending || isLockedForEditor
-                              ? "text-slate-400"
-                              : "text-slate-700"
+                            isPending ? "text-slate-400" : "text-slate-700"
                           }`}>
                           {cat.name}
                         </span>
@@ -288,8 +286,8 @@ export default function CategoryManager() {
                     </div>
                   </td>
 
-                  {/* KOLOM ACTION (Role Guard & Lockdown Guard) */}
-                  {isSuperadmin && (
+                  {/* KOLOM ACTION */}
+                  {canManageCategories && (
                     <td className="px-6 py-4 text-right">
                       <div className="flex justify-end gap-2">
                         {isEditingThis ? (

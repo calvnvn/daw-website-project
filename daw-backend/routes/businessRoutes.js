@@ -10,14 +10,16 @@ router.get("/public", businessController.getPublicBusinessData);
 // 2. ADMIN ENDPOINTS (The Ledger & Vault)
 router.get(
   "/admin",
-  [verifyToken, checkPermission("manage_businesses")],
+  [verifyToken], // Cukup verifyToken, atau tambahkan checkPermission('view_admin_data') jika ada
   businessController.getAdminBusinessSections,
 );
+
 router.post(
   "/admin",
   [verifyToken, checkPermission("manage_businesses")],
   businessController.createBusinessSection,
 );
+
 router.put(
   "/admin/:id",
   [verifyToken, checkPermission("manage_businesses")],
@@ -28,6 +30,7 @@ router.delete(
   [verifyToken, checkPermission("manage_businesses")],
   businessController.deleteSection,
 );
+
 router.post(
   "/admin/upload-image",
   upload.single("image"),

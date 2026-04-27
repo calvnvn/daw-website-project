@@ -10,7 +10,6 @@ const { invalidateOldDrafts } = require("../utils/draftCleanup");
 exports.getAllCategories = async (req, res) => {
   try {
     const categories = await MapCategory.findAll({
-      // 💡 BLUEPRINT: Query Normalization (Eksplisit memanggil atribut gembok)
       attributes: ["id", "name", "color", "is_locked", "lock_ticket"],
       order: [["name", "ASC"]],
     });
@@ -23,16 +22,6 @@ exports.getAllCategories = async (req, res) => {
 // --- 1. CREATE (ABSOLUTE ADMIN RESTRICTION) ---
 exports.createCategory = async (req, res) => {
   const { id, name, color } = req.body;
-  const userRole = req.userRole?.toLowerCase();
-
-  // 🔒 GATEKEEPER: Blokir Editor (Master Data hanya boleh disentuh Admin)
-  if (userRole === "editor") {
-    return res.status(403).json({
-      success: false,
-      message:
-        "Akses Ditolak. Hanya Admin yang dapat mengelola Master Data Kategori.",
-    });
-  }
 
   const t = await sequelize.transaction();
 
@@ -68,16 +57,6 @@ exports.createCategory = async (req, res) => {
 exports.updateCategory = async (req, res) => {
   const { id } = req.params;
   const { name, color } = req.body;
-  const userRole = req.userRole?.toLowerCase();
-
-  // 🔒 GATEKEEPER: Blokir Editor
-  if (userRole === "editor") {
-    return res.status(403).json({
-      success: false,
-      message:
-        "Akses Ditolak. Hanya Admin yang dapat mengelola Master Data Kategori.",
-    });
-  }
 
   const t = await sequelize.transaction();
 
@@ -98,7 +77,6 @@ exports.updateCategory = async (req, res) => {
         .json({ success: false, message: "Kategori tidak ditemukan" });
     }
 
-    // 3. Update Live Data & Force Unlock
     await category.update(
       { name, color, is_locked: false, lock_ticket: null },
       { transaction: t },
@@ -117,21 +95,10 @@ exports.updateCategory = async (req, res) => {
 // --- 3. DELETE (ABSOLUTE ADMIN RESTRICTION) ---
 exports.deleteCategory = async (req, res) => {
   const { id } = req.params;
-  const userRole = req.userRole?.toLowerCase();
-
-  // 🔒 GATEKEEPER: Blokir Editor
-  if (userRole === "editor") {
-    return res.status(403).json({
-      success: false,
-      message:
-        "Akses Ditolak. Hanya Admin yang dapat mengelola Master Data Kategori.",
-    });
-  }
 
   const t = await sequelize.transaction();
 
   try {
-    // 1. Bunuh draf lama (Mencegah Zombie Drafts)
     await invalidateOldDrafts("MapCategory", id, t);
 
     const category = await MapCategory.findByPk(id, {

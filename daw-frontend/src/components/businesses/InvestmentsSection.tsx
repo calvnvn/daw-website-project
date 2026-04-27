@@ -68,19 +68,16 @@ export default function InvestmentsSection() {
                     hoveredCategory === cat.id
                       ? "bg-white/10 border-white/20 shadow-[0_0_30px_rgba(16,185,129,0.15)]"
                       : "bg-white/5 border-white/10 lg:bg-transparent lg:border-transparent lg:hover:bg-white/5"
-                  }`}
-                >
+                  }`}>
                   <div
-                    className={`absolute left-0 top-0 bottom-0 w-1 bg-emerald-500 transition-transform duration-300 origin-left ${hoveredCategory === cat.id ? "scale-y-100" : "scale-y-0"}`}
-                  ></div>
+                    className={`absolute left-0 top-0 bottom-0 w-1 bg-emerald-500 transition-transform duration-300 origin-left ${hoveredCategory === cat.id ? "scale-y-100" : "scale-y-0"}`}></div>
 
                   <div
                     className={`w-12 h-12 rounded-xl flex items-center justify-center backdrop-blur-md transition-colors duration-500 ${
                       hoveredCategory === cat.id
                         ? "bg-emerald-500/20 text-emerald-400"
                         : "bg-white/5 text-slate-400"
-                    }`}
-                  >
+                    }`}>
                     {cat.icon}
                   </div>
 
@@ -90,8 +87,7 @@ export default function InvestmentsSection() {
                         hoveredCategory === cat.id
                           ? "text-white"
                           : "text-slate-300"
-                      }`}
-                    >
+                      }`}>
                       {t(`businessesPage.investments.categories.${cat.key}`)}
                     </h4>
                   </div>
@@ -131,8 +127,7 @@ export default function InvestmentsSection() {
                   <div
                     key={company.id}
                     onClick={() => setSelectedCompany(company)}
-                    className={`group/card relative flex flex-col items-center justify-center aspect-square md:aspect-[4/3] rounded-2xl p-4 cursor-pointer hover:-translate-y-1.5 transition-all duration-700 ease-[cubic-bezier(0.4,0,0.2,1)] overflow-hidden ${opacityClass} ${borderClass}`}
-                  >
+                    className={`group/card relative flex flex-col items-center justify-center aspect-square md:aspect-[4/3] rounded-2xl p-4 cursor-pointer hover:-translate-y-1.5 transition-all duration-700 ease-[cubic-bezier(0.4,0,0.2,1)] overflow-hidden ${opacityClass} ${borderClass}`}>
                     {/* --- NEW: VISUAL HINT OVERLAY (HOVER EFFECT) --- */}
                     <div className="absolute inset-0 bg-emerald-950/60 opacity-0 group-hover/card:opacity-100 transition-opacity duration-500 z-10 flex items-center justify-center backdrop-blur-[2px]">
                       <div className="bg-emerald-500 text-white p-3 rounded-full shadow-[0_0_20px_rgba(16,185,129,0.5)] transform translate-y-8 group-hover/card:translate-y-0 transition-transform duration-500 ease-[cubic-bezier(0.4,0,0.2,1)]">
@@ -141,14 +136,20 @@ export default function InvestmentsSection() {
                     </div>
 
                     <div className="w-16 h-16 mb-3 rounded-full bg-white flex items-center justify-center shadow-lg overflow-hidden border border-white/20 relative z-0">
-                      <img
-                        src={getCleanImageUrl(company.logoUrl)}
-                        alt={company.name}
-                        className="w-full h-full object-contain p-3"
-                        onError={(e) => {
-                          e.currentTarget.style.display = "none";
-                        }}
-                      />
+                      {company.logoUrl ? (
+                        <img
+                          src={getCleanImageUrl(company.logoUrl)}
+                          alt={company.name}
+                          className="w-full h-full object-contain p-3"
+                          onError={(e) => {
+                            e.currentTarget.style.display = "none";
+                          }}
+                        />
+                      ) : (
+                        <div className="text-[10px] text-slate-300 font-bold">
+                          NO LOGO
+                        </div>
+                      )}
                     </div>
 
                     <h5 className="font-sans text-[12px] md:text-[13px] font-bold text-center text-white leading-tight relative z-0">
@@ -177,13 +178,11 @@ export default function InvestmentsSection() {
       {selectedCompany && (
         <div
           className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-[#000a03]/95 animate-in fade-in duration-200"
-          onClick={() => setSelectedCompany(null)}
-        >
+          onClick={() => setSelectedCompany(null)}>
           <div
             // GANTI: Box menggunakan solid background agar tidak mentransparansi elemen di belakangnya
             className="relative bg-[#001a0a] border border-daw-green/30 p-8 md:p-14 rounded-[3rem] shadow-[0_30px_60px_-15px_rgba(0,0,0,0.5)] max-w-sm md:max-w-lg w-full flex flex-col items-center animate-in zoom-in-95 slide-in-from-bottom-4 duration-400 ease-out"
-            onClick={(e) => e.stopPropagation()}
-          >
+            onClick={(e) => e.stopPropagation()}>
             {/* Ambient Lighting - Disederhanakan: Pakai radial gradient saja (lebih ringan dari blur filter) */}
             <div className="absolute inset-0 bg-[radial-gradient(circle_at_0%_0%,rgba(0,75,35,0.15)_0%,transparent_50%)] pointer-events-none"></div>
             <div className="absolute inset-0 bg-[radial-gradient(circle_at_100%_100%,rgba(0,75,35,0.1)_0%,transparent_50%)] pointer-events-none"></div>
@@ -191,8 +190,7 @@ export default function InvestmentsSection() {
             {/* Interactive Close Button */}
             <button
               onClick={() => setSelectedCompany(null)}
-              className="absolute top-6 right-6 p-2.5 rounded-full bg-white/5 hover:bg-daw-green/20 border border-white/10 hover:border-daw-green/40 text-emerald-100/50 hover:text-white transition-all duration-200 group z-20"
-            >
+              className="absolute top-6 right-6 p-2.5 rounded-full bg-white/5 hover:bg-daw-green/20 border border-white/10 hover:border-daw-green/40 text-emerald-100/50 hover:text-white transition-all duration-200 group z-20">
               <X className="w-5 h-5 group-hover:rotate-90 transition-transform duration-200" />
             </button>
 
@@ -204,14 +202,18 @@ export default function InvestmentsSection() {
 
               {/* Core Logo Wrapper */}
               <div className="relative w-full h-full rounded-full bg-white flex items-center justify-center shadow-2xl overflow-hidden p-8 border border-white/10 transition-transform duration-300 hover:scale-105 active:scale-95">
-                <img
-                  src={getCleanImageUrl(selectedCompany?.logoUrl)}
-                  alt={selectedCompany?.name || "Company Logo"}
-                  className="w-full h-full object-contain"
-                  onError={(e) => {
-                    e.currentTarget.style.display = "none";
-                  }}
-                />
+                {selectedCompany?.logoUrl ? (
+                  <img
+                    src={getCleanImageUrl(selectedCompany.logoUrl)}
+                    alt={selectedCompany?.name || "Company Logo"}
+                    className="w-full h-full object-contain"
+                    onError={(e) => {
+                      e.currentTarget.style.display = "none";
+                    }}
+                  />
+                ) : (
+                  <div className="text-slate-200">No Image</div>
+                )}
               </div>
             </div>
 
@@ -225,8 +227,7 @@ export default function InvestmentsSection() {
                 href={selectedCompany.websiteUrl}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="z-10 mb-8 flex items-center gap-2 px-8 py-3.5 bg-emerald-500 hover:bg-emerald-600 text-white rounded-full font-bold text-sm transition-all shadow-[0_10px_25px_-5px_rgba(16,185,129,0.4)] active:scale-95 group/btn"
-              >
+                className="z-10 mb-8 flex items-center gap-2 px-8 py-3.5 bg-emerald-500 hover:bg-emerald-600 text-white rounded-full font-bold text-sm transition-all shadow-[0_10px_25px_-5px_rgba(16,185,129,0.4)] active:scale-95 group/btn">
                 <Globe2 className="w-4 h-4 group-hover/btn:rotate-12 transition-transform" />
                 VISIT WEBSITE
               </a>

@@ -170,24 +170,30 @@ export default function MapManager({
 
                   {/* Input Detail Marker */}
                   <div className="grid grid-cols-1 gap-4">
-                    <div className="flex items-center gap-3">
-                      <div
-                        className="w-2 h-2 rounded-full shrink-0 shadow-sm"
-                        style={{
-                          backgroundColor: categoryMap[marker.categoryId],
-                        }}
-                      />
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-2">
+                        <div
+                          className="w-2 h-2 rounded-full shrink-0 shadow-sm"
+                          style={{
+                            backgroundColor:
+                              categoryMap[marker.categoryId] || "#94a3b8",
+                          }}
+                        />
+                        <span className="text-[9px] font-black text-slate-400 uppercase tracking-tighter">
+                          Nama Lokasi / Site
+                        </span>
+                      </div>
                       <input
-                        className="flex-1 text-xs font-bold bg-transparent border-b border-transparent focus:border-slate-300 outline-none transition-colors disabled:opacity-70"
+                        className="w-full text-xs font-bold bg-white border border-slate-200 rounded-lg px-3 py-2 outline-none focus:ring-2 focus:ring-daw-green/10 transition-all disabled:opacity-70 disabled:bg-slate-50"
                         value={marker.title || ""}
                         onChange={(e) =>
                           updateMarker(index, "title", e.target.value)
                         }
                         disabled={!isEditing}
-                        placeholder="Nama Lokasi (e.g. Site Muara Enim)"
+                        placeholder="Contoh: Site Muara Enim"
                       />
                     </div>
-
+                    {/* KATEGORI & KETERANGAN */}
                     <div className="grid grid-cols-2 gap-3">
                       <div className="space-y-1">
                         <span className="text-[9px] font-black text-slate-400 uppercase tracking-tighter">
@@ -216,7 +222,7 @@ export default function MapManager({
                       </div>
                       <div className="space-y-1">
                         <span className="text-[9px] font-black text-slate-400 uppercase tracking-tighter">
-                          Kapasitas/Ket
+                          Keterangan
                         </span>
                         <input
                           className="w-full text-[10px] bg-white border border-slate-200 rounded-lg px-2 py-1.5 outline-none focus:ring-2 focus:ring-daw-green/10 disabled:bg-slate-50 disabled:cursor-not-allowed"
@@ -225,7 +231,7 @@ export default function MapManager({
                             updateMarker(index, "desc", e.target.value)
                           }
                           disabled={!isEditing}
-                          placeholder="Contoh: 15.4 MW"
+                          placeholder="Contoh: 15 MW"
                         />
                       </div>
                     </div>

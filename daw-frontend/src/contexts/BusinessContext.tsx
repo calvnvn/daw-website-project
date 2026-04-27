@@ -64,7 +64,7 @@ interface BusinessContextType {
     data: Partial<SectionData> & { previous_notrans?: string },
   ) => Promise<void>;
   addSection: (category: string, title: string) => Promise<void>;
-  deleteSection: (id: string) => Promise<void>;
+  deleteSection: (id: string) => Promise<any>;
   addCategory: (data: MapCategory, status?: string) => Promise<void>;
   updateCategory: (
     id: string,
@@ -120,53 +120,70 @@ export const BusinessProvider = ({ children }: { children: ReactNode }) => {
   }, []);
 
   const refreshData = useCallback(async () => {
-    const isAdminOrEditor =
-      user?.role === "superadmin" ||
-      user?.role === "admin" ||
-      user?.role === "editor";
+    const token = localStorage.getItem("daw_token");
+    if (token && user === null) return;
 
-    console.log(`🚀 [DEBUG] refreshData dipicu untuk role: ${user?.role}`);
+    const canAccessAdmin = ["superadmin", "admin", "editor"].includes(
+      user?.role || "",
+    );
 
     if (sections.length === 0) setIsLoading(true);
 
     try {
       const promises: Promise<any>[] = [
-        api.get("/map-categories"),
-        api.get("/projects/public"),
+        api.get("/map-categories"), // index 0
+        api.get("/projects/public"), // index 1
       ];
 
-      if (isAdminOrEditor) {
+      const sectionsIndex = promises.length; // index 2
+
+      if (canAccessAdmin) {
         promises.push(api.get("/businesses/admin"));
+      } else {
+        promises.push(api.get("/businesses/public"));
       }
 
       const results = await Promise.allSettled(promises);
 
-      results.forEach((result) => {
-        if (result.status === "fulfilled") {
-          const url = result.value.config.url;
-          const data = result.value.data;
+      if (results[0].status === "fulfilled")
+        setCategories(
+          results[0].value.data?.data || results[0].value.data || [],
+        );
+      if (results[1].status === "fulfilled")
+        setPublicProjects(
+          results[1].value.data?.data || results[1].value.data || [],
+        );
 
-          if (url?.includes("/map-categories")) {
-            const finalArray = Array.isArray(data) ? data : data?.data || [];
-            setCategories(finalArray);
-          }
+      const sectionRes = results[sectionsIndex];
 
-          if (url?.includes("/projects/public")) {
-            setPublicProjects(Array.isArray(data) ? data : data?.data || []);
-          }
-
-          if (url?.includes("/businesses/admin")) {
-            const sectionData = data?.data || data;
-            setSections(Array.isArray(sectionData) ? sectionData : []);
-          }
+      if (sectionRes.status === "fulfilled") {
+        const data = sectionRes.value.data;
+        setSections(
+          Array.isArray(data?.data)
+            ? data.data
+            : Array.isArray(data)
+              ? data
+              : [],
+        );
+      } else {
+        console.warn(
+          "⚠️ [RETRY] Admin fetch failed, falling back to public data...",
+        );
+        try {
+          const publicRes = await api.get("/businesses");
+          const publicData = publicRes.data?.data || publicRes.data;
+          setSections(Array.isArray(publicData) ? publicData : []);
+        } catch {
+          console.error("🚨 [FATAL] Public fallback also failed.");
+          setSections([]);
         }
-      });
+      }
     } catch (error) {
-      console.error("❌ [DEBUG] refreshData Error:", error);
+      console.error("❌ [DEBUG] refreshData Global Error:", error);
     } finally {
       setIsLoading(false);
     }
-  }, [user, sections.length]);
+  }, [user]);
 
   const updateSection = useCallback(
     async (
@@ -307,33 +324,15 @@ export const BusinessProvider = ({ children }: { children: ReactNode }) => {
     [refreshData],
   );
 
-  /**
-   * @desc Removes an entire business section.
-   */
   const deleteSection = useCallback(
     async (id: string) => {
       setIsProcessing(true);
-      const toastId = toast.loading("Memproses penghapusan...");
       try {
         const res = await api.delete(`/businesses/admin/${id}`);
-
-        if (res.status === 202) {
-          toast.success("Permintaan Hapus Dikirim", {
-            id: toastId,
-            description: `Tiket: ${res.data.ticket}. Data akan dikunci sampai disetujui.`,
-          });
-        } else {
-          toast.success("Sektor berhasil dihapus permanen.", { id: toastId });
-        }
-
         await refreshData();
+        return res;
       } catch (error: any) {
         console.error("[DELETE_SECTION_ERROR]:", error);
-        toast.error("Gagal Menghapus", {
-          id: toastId,
-          description:
-            error.response?.data?.message || "Terjadi kesalahan server.",
-        });
         throw error;
       } finally {
         setIsProcessing(false);

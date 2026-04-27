@@ -140,7 +140,6 @@ exports.getAdminBusinessSections = async (req, res) => {
   try {
     const sections = await BusinessSection.findAll({
       attributes: {
-        exclude: ["htmlContent"],
         include: [
           [
             sequelize.literal(`(
@@ -229,10 +228,7 @@ exports.uploadBusinessImage = async (req, res) => {
 
     const imageUrl = `/uploads/${req.file.filename}`;
 
-    res.status(200).json({
-      success: true,
-      url: imageUrl,
-    });
+    res.status(200).json({ success: true, url: imageUrl });
   } catch (error) {
     res.status(500).json({ message: "Gagal memproses gambar" });
   }
@@ -280,8 +276,53 @@ exports.updateBusinessSection = async (req, res) => {
       section,
     );
 
-    // EDITOR: Approval Flow
-    if (userRole === "editor") {
+    // THE DIFF DETECTOR: Identifikasi jenis perubahan
+    // Trim dan hilangkan spasi ekstra untuk perbandingan yang akurat
+    const originalHtml = (section.htmlContent || "").trim();
+    const incomingHtml = (payload.htmlContent || "").trim();
+
+    const isContentChanged =
+      payload.title !== section.title ||
+      incomingHtml !== originalHtml ||
+      payload.category !== section.category;
+
+    // EDITOR BYPASS (Khusus Peta)
+    if (userRole === "editor" && !isContentChanged) {
+      console.log(
+        `>>> [HYBRID BYPASS] Editor ${actorId} memodifikasi peta tanpa mengubah teks. Direct Commit...`,
+      );
+
+      await section.update({ hasMap: payload.hasMap }, { transaction: t });
+
+      await BusinessMapMarker.destroy({
+        where: { sectionId: id },
+        transaction: t,
+      });
+
+      if (
+        payload.hasMap &&
+        payload.mapMarkers &&
+        payload.mapMarkers.length > 0
+      ) {
+        const newMarkers = payload.mapMarkers.map((marker) => ({
+          ...marker,
+          sectionId: id,
+        }));
+        await BusinessMapMarker.bulkCreate(newMarkers, { transaction: t });
+      }
+
+      await t.commit();
+      return res.status(200).json({
+        success: true,
+        message: "Koordinat titik lokasi berhasil diperbarui secara langsung!",
+      });
+    }
+
+    // EDITOR NORMAL FLOW (Konten berubah -> Masuk Antrean)
+    if (userRole === "editor" && isContentChanged) {
+      console.log(
+        `>>> [APPROVAL REQUIRED] Editor ${actorId} mengubah konten teks. Memulai draf...`,
+      );
       const notrans = await generateNotrans("BusinessSection");
 
       if (previous_notrans) {
@@ -317,17 +358,16 @@ exports.updateBusinessSection = async (req, res) => {
 
       await t.commit();
       return res.status(202).json({
-        message: "Revisi diajukan. Menunggu persetujuan.",
+        message: "Revisi konten diajukan. Menunggu persetujuan.",
         ticket: notrans,
       });
     }
 
-    // ADMIN: Direct Commit (Atomic Baton Pass)
+    // ADMIN: Direct Commit (Atomic Baton Pass) - Mengubah Semua
     if (userRole === "superadmin" || userRole === "admin") {
       await invalidateOldDrafts("BusinessSection", id, t);
     }
 
-    // Update Tabel BusinessSection
     await section.update(
       {
         title: payload.title,
@@ -339,7 +379,6 @@ exports.updateBusinessSection = async (req, res) => {
       { transaction: t },
     );
 
-    // Update TabelBusinessMapMarker
     await BusinessMapMarker.destroy({
       where: { sectionId: id },
       transaction: t,
@@ -532,6 +571,7 @@ exports.deleteSection = async (req, res) => {
 
       await t.commit();
       return res.status(202).json({
+        success: true,
         message: "Permintaan hapus sektor dikirim ke Server. Data dikunci.",
         ticket: notrans,
       });
