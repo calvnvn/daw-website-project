@@ -16,7 +16,6 @@ import {
   Send,
   Clock,
   X,
-  FileText,
 } from "lucide-react";
 import { toast } from "sonner";
 import { useInvestments } from "@/contexts/InvestmentContext";
@@ -134,6 +133,9 @@ export default function InvestmentsManager() {
   const [originalCompanies, setOriginalCompanies] = useState<LocalAffiliate[]>(
     [],
   );
+  const [rejectedAffiliates, setRejectedAffiliates] = useState<
+    Record<string, any>
+  >({});
 
   const isSettingsLockedForEditor =
     settings?.is_locked === true && !isSuperadmin;
@@ -177,53 +179,195 @@ export default function InvestmentsManager() {
     }
   }, [settings, companies, isEditing]);
 
-  const hasSettingsChanged = useCallback(() => {
-    return JSON.stringify(pageContent) !== JSON.stringify(originalContent);
-  }, [pageContent, originalContent]);
-  // --- 🔵 3. RESTORATION ENGINE (Blueprint Part 3) ---
-  const handleRestoreSettingsDraft = useCallback(() => {
-    if (!rejectedSettings?.payload) return;
+  useEffect(() => {
+    const controller = new AbortController();
 
-    // 🚨 Anti-Corruption Guard: Tolak restorasi jika aksinya DELETE
-    if (rejectedSettings.action === "DELETE") {
+    const fetchRejectedDrafts = async () => {
+      if (!companies || companies.length === 0) return;
+
+      const rejectedComps = companies.filter((c) => c.has_rejected);
+      if (rejectedComps.length === 0) return;
+
+      try {
+        const promises = rejectedComps.map((comp) =>
+          api
+            .get(`/approval/rejected/${comp.id}?module=Affiliate`, {
+              signal: controller.signal,
+            })
+            .then((res) => ({ id: comp.id, data: res.data })),
+        );
+
+        const results = await Promise.allSettled(promises);
+
+        const newRejectedState: Record<string, any> = {};
+
+        results.forEach((result) => {
+          if (result.status === "fulfilled" && result.value.data.hasRejected) {
+            newRejectedState[result.value.id] = result.value.data.data;
+          }
+        });
+
+        setRejectedAffiliates((prev) => ({ ...prev, ...newRejectedState }));
+      } catch (error: any) {
+        if (error?.name !== "CanceledError" && error?.code !== "ERR_CANCELED") {
+          console.error("🚨 Gagal memuat kumpulan draf penolakan:", error);
+        }
+      }
+    };
+
+    fetchRejectedDrafts();
+
+    return () => controller.abort();
+  }, [companies]);
+
+  const handleRestoreAffiliateDraft = (companyId: string | number) => {
+    const draft = rejectedAffiliates[companyId];
+    if (!draft?.payload) return;
+
+    if (draft.action === "DELETE") {
       return toast.error("Tidak dapat memulihkan.", {
         description: "Draf ini adalah permintaan penghapusan data.",
       });
     }
 
-    const payload = rejectedSettings.payload;
-    setPageContent((prev) => ({
-      teaserHeadline: payload.teaserHeadline ?? prev.teaserHeadline,
-      teaserBody: payload.teaserBody ?? prev.teaserBody,
-      sectionIntro: payload.sectionIntro ?? prev.sectionIntro,
-    }));
+    try {
+      const rawPayload = draft.payload;
+      const payload =
+        typeof rawPayload === "string" ? JSON.parse(rawPayload) : rawPayload;
 
-    setIsEditing(true);
-    setHideDraftBanner(true); // Sembunyikan banner setelah dipulihkan
-    toast.info("Draf berhasil disuntikkan ke formulir.", {
-      description: "Silakan perbaiki dan klik Request Approval.",
-    });
-  }, [rejectedSettings]);
+      setLocalCompanies((prev) =>
+        prev.map((c) => {
+          if (c.id === companyId) {
+            return {
+              ...c,
+              name: payload.name ?? c.name,
+              desc: payload.desc ?? c.desc,
+              category: payload.category ?? c.category,
+              websiteUrl: payload.websiteUrl ?? c.websiteUrl,
+              removePhoto:
+                payload.removePhoto === "true" ? true : c.removePhoto,
+              previous_notrans: draft.notrans,
+              isDirty: true,
+              has_rejected: false,
+            };
+          }
+          return c;
+        }),
+      );
 
-  // 🔵 UX Cleanup: Fungsi abaikan draf
-  const handleDiscardDraft = () => {
-    setHideDraftBanner(true);
-    // Idealnya: panggil API endpoint DELETE ke /approval/drafts dengan encodeURIComponent(tiket) di sini
-    toast.success("Notifikasi penolakan diabaikan sementara.");
+      setRejectedAffiliates((prev) => {
+        const newObj = { ...prev };
+        delete newObj[companyId];
+        return newObj;
+      });
+
+      if (!isEditing) setIsEditing(true);
+      toast.success(`Draf afiliasi berhasil dipulihkan.`);
+    } catch (e) {
+      toast.error("Gagal memproses struktur data draf.");
+    }
   };
 
-  // --- SAVE HANDLERS ---
-  const handleSaveSettings = async () => {
-    const payload = {
-      ...pageContent,
-      status: "Published",
-      previous_notrans: rejectedSettings?.notrans || null,
-    };
-    await api.put("/investments/settings", payload, { timeout: 60000 });
+  // Fungsi Discard Level-Item
+  const handleDiscardAffiliateDraft = async (companyId: string | number) => {
+    const draft = rejectedAffiliates[companyId];
+    if (!draft?.notrans) return;
+
+    const toastId = toast.loading("Mengabaikan notifikasi penolakan...");
+    try {
+      const safeTicket = encodeURIComponent(draft.notrans);
+      await api.patch(`/approval/discard/${safeTicket}`);
+
+      setLocalCompanies((prev) =>
+        prev.map((c) =>
+          c.id === companyId ? { ...c, has_rejected: false } : c,
+        ),
+      );
+
+      setRejectedAffiliates((prev) => {
+        const newObj = { ...prev };
+        delete newObj[companyId];
+        return newObj;
+      });
+
+      toast.success("Notifikasi revisi afiliasi diabaikan.", { id: toastId });
+    } catch (error: any) {
+      toast.error("Gagal mengabaikan draf", {
+        id: toastId,
+        description: error.response?.data?.message,
+      });
+    }
+  };
+
+  const hasSettingsChanged = useCallback(() => {
+    return JSON.stringify(pageContent) !== JSON.stringify(originalContent);
+  }, [pageContent, originalContent]);
+  const handleRestoreSettingsDraft = useCallback(() => {
+    if (!rejectedSettings?.payload) {
+      toast.error("Data pemulihan tidak ditemukan.");
+      return;
+    }
+
+    if (rejectedSettings.action === "DELETE") {
+      toast.error("Tidak dapat memulihkan.", {
+        description:
+          "Draf ini adalah permintaan penghapusan data, tidak ada teks yang bisa dipulihkan.",
+      });
+      return;
+    }
+
+    try {
+      const rawPayload = rejectedSettings.payload;
+      const payload =
+        typeof rawPayload === "string" ? JSON.parse(rawPayload) : rawPayload;
+
+      setPageContent((prev) => ({
+        teaserHeadline: payload.teaserHeadline ?? prev.teaserHeadline,
+        teaserBody: payload.teaserBody ?? prev.teaserBody,
+        sectionIntro: payload.sectionIntro ?? prev.sectionIntro,
+      }));
+
+      setIsEditing(true);
+      setHideDraftBanner(true);
+
+      toast.success("Draf berhasil disuntikkan ke formulir.", {
+        description: "Silakan perbaiki data dan klik Request Approval.",
+      });
+    } catch (error) {
+      console.error("🚨 [RESTORE_PARSE_ERROR]:", error);
+      toast.error("Gagal memproses struktur data pemulihan.");
+    }
+  }, [rejectedSettings]);
+
+  const handleDiscardDraft = async () => {
+    if (!rejectedSettings?.notrans) {
+      toast.error("Nomor tiket tidak valid.");
+      return;
+    }
+
+    const toastId = toast.loading("Mengabaikan notifikasi penolakan...");
+
+    try {
+      const safeTicket = encodeURIComponent(rejectedSettings.notrans);
+
+      await api.patch(`/approval/discard/${safeTicket}`);
+
+      toast.success("Notifikasi revisi berhasil diabaikan.", { id: toastId });
+
+      setHideDraftBanner(true);
+
+      await refreshData();
+    } catch (error: any) {
+      toast.error("Gagal mengabaikan draf", {
+        id: toastId,
+        description:
+          error.response?.data?.message ||
+          "Kesalahan komunikasi dengan server.",
+      });
+    }
   };
 
   const handleSaveCompanies = async () => {
-    // 🔵 Hanya ambil perusahaan yang kotor DAN tidak sedang dikunci (Isolasi Item)
     const dirtyCompanies = localCompanies.filter(
       (comp) =>
         comp.name.trim() &&
@@ -248,21 +392,47 @@ export default function InvestmentsManager() {
 
       const config = { timeout: 60000 };
 
-      if (comp.isNew) {
-        return api.post("/investments/affiliates", formData, config);
-      } else {
-        return api.put(`/investments/affiliates/${comp.id}`, formData, config);
-      }
+      const request = comp.isNew
+        ? api.post("/investments/affiliates", formData, config)
+        : api.put(`/investments/affiliates/${comp.id}`, formData, config);
+
+      return request.then((res) => ({ id: comp.id, response: res }));
     });
 
     const results = await Promise.allSettled(saveTasks);
+
+    const successfulIds = new Set(
+      results
+        .filter((r) => r.status === "fulfilled")
+        .map((r: any) => r.value.id),
+    );
+
+    if (successfulIds.size > 0) {
+      setLocalCompanies((prev) =>
+        prev.map((c) =>
+          successfulIds.has(c.id)
+            ? { ...c, isDirty: false, isNew: false, previous_notrans: null }
+            : c,
+        ),
+      );
+    }
+
     const hasError = results.some((r) => r.status === "rejected");
     if (hasError) throw new Error("Partial sync failure");
   };
 
+  const handleSaveSettings = async () => {
+    const payload = {
+      ...pageContent,
+      status: "Published",
+      previous_notrans: rejectedSettings?.notrans || null,
+    };
+
+    await api.put("/investments/settings", payload, { timeout: 60000 });
+  };
+
   // THE GATEKEEPER SAVE EXECUTION
   const handleSave = async () => {
-    // 🔵 Validasi Gatekeeper diperbarui (Hanya block jika tab content yang locked)
     if (activeTab === "content" && currentLockState) {
       return toast.error("Akses Dibatasi.", {
         description: "Data teks sedang dalam peninjauan.",
@@ -445,38 +615,53 @@ export default function InvestmentsManager() {
       {/* C. RED/AMBER BANNER: Recovery Banner (Rejection Feedback) UX CLEANUP FIXED: Menambahkan handleDiscardDraft dan state hideDraftBanner */}
       {rejectedSettings && activeTab === "content" && !hideDraftBanner && (
         <div className="bg-red-50 border-l-4 border-l-red-500 border-y border-r border-red-200 rounded-xl overflow-hidden shadow-sm animate-in slide-in-from-top-4 duration-300">
-          <div className="p-4 flex gap-4 items-start">
-            <div className="bg-red-100 p-2 rounded-lg h-fit shrink-0">
+          <div className="p-5 flex gap-4 items-start">
+            <div className="bg-red-100 p-2.5 rounded-lg h-fit shrink-0">
               <AlertTriangle className="w-5 h-5 text-red-600" />
             </div>
-            <div className="flex-1 space-y-2">
+            <div className="flex-1 space-y-3">
               <div className="flex justify-between items-center">
-                <h4 className="text-xs font-black text-red-900 uppercase tracking-tighter">
+                <h4 className="text-sm font-black text-red-900 uppercase tracking-tighter">
                   ⚠️ Revisi Ditolak: Catatan Peninjau
                 </h4>
-                <button
-                  onClick={handleDiscardDraft}
-                  className="p-1 hover:bg-red-200/50 rounded-md text-red-700 transition-colors"
-                  title="Abaikan Notifikasi">
-                  <X className="w-4 h-4" />
-                </button>
               </div>
-              <p className="text-xs text-red-800 leading-relaxed font-bold italic bg-white/60 p-2.5 rounded border border-red-200/50">
+              <p className="text-xs text-red-800 leading-relaxed font-medium bg-white/60 p-3 rounded-md border border-red-200/50 shadow-inner">
                 "
                 {rejectedSettings.rejection_reason ||
                   "Silakan perbaiki data sesuai arahan."}
                 "
               </p>
+
+              {/* --- ACTION BUTTONS CONTAINER --- */}
               <div className="pt-2 flex flex-col sm:flex-row sm:items-center gap-3">
+                {/* ACTION 1: PULIHKAN DATA (Primary Action) */}
                 <button
                   onClick={handleRestoreSettingsDraft}
                   disabled={!isEditing}
+                  title={
+                    !isEditing
+                      ? "Buka mode edit untuk memulihkan data"
+                      : "Pulihkan draf yang ditolak"
+                  }
                   className="flex items-center justify-center gap-2 bg-red-600 hover:bg-red-700 disabled:bg-red-300 disabled:cursor-not-allowed text-white px-5 py-2.5 rounded-lg text-xs font-bold transition-all shadow-sm active:scale-95">
-                  <RotateCcw className="w-3.5 h-3.5" /> PULIHKAN DRAF
+                  <RotateCcw
+                    className={`w-3.5 h-3.5 ${isEditing ? "" : "opacity-50"}`}
+                  />
+                  PULIHKAN DATA
                 </button>
+
+                {/* ACTION 2: ABAIKAN NOTIFIKASI (Secondary Action / Clean Discard) */}
+                <button
+                  onClick={handleDiscardDraft}
+                  className="flex items-center justify-center gap-2 bg-white border border-red-200 text-red-600 hover:bg-red-50 px-4 py-2.5 rounded-lg text-xs font-bold transition-all shadow-sm active:scale-95">
+                  <X className="w-3.5 h-3.5" />
+                  ABAIKAN NOTIFIKASI
+                </button>
+
+                {/* Helper Text jika tidak dalam mode edit */}
                 {!isEditing && (
-                  <p className="text-[10px] text-red-600 font-medium italic animate-pulse">
-                    * Aktifkan "Editing Mode" untuk memulihkan draf.
+                  <p className="text-[10px] text-red-500 font-medium italic animate-pulse ml-2">
+                    * Aktifkan "Editing Mode" untuk memulihkan.
                   </p>
                 )}
               </div>
@@ -756,8 +941,6 @@ export default function InvestmentsManager() {
                 const isLockedForEditor = isPending && !isSuperadmin;
                 const isOverrideModeItem = isPending && isSuperadmin;
 
-                // 🔵 2. VISUAL TOKENS (The Looks) - Blueprint Part 2
-                // Menggunakan border-l-4 (kiri tebal) sebagai indikator kuat
                 const cardStyle = isDeleting
                   ? "bg-rose-50/40 border-l-4 border-l-rose-500 border-rose-200 grayscale opacity-80"
                   : isNeedsRevision
@@ -767,158 +950,216 @@ export default function InvestmentsManager() {
                       : isLockedForEditor
                         ? "bg-slate-50 border-l-4 border-l-blue-500 border-slate-200 grayscale opacity-70 pointer-events-none"
                         : "bg-slate-50 border-slate-200 hover:border-slate-300 hover:shadow-sm";
-
+                const draft = rejectedAffiliates[company.id];
                 return (
                   <div
                     key={company.id}
-                    className={`flex gap-4 items-start p-5 rounded-xl border transition-all relative ${cardStyle}`}>
-                    {/* --- LOGO UPLOAD & INDICATOR BADGES --- */}
-                    <div className="w-24 shrink-0 relative">
-                      {/* Dynamic Badges Container */}
-                      <div className="absolute -top-3 -right-3 z-20 flex flex-col gap-1.5">
-                        {isDeleting && (
-                          <span
-                            className="flex h-5 w-5 items-center justify-center text-white rounded-full bg-rose-500 shadow-sm ring-2 ring-white"
-                            title="Menunggu Penghapusan">
-                            <Trash2 className="w-3 h-3" />
-                          </span>
-                        )}
-                        {isPending && !isDeleting && (
-                          <span
-                            className={`flex h-5 w-5 items-center justify-center text-white rounded-full shadow-sm ring-2 ring-white ${isSuperadmin ? "bg-amber-500" : "bg-blue-500"}`}
-                            title={`Terkunci: ${company.lock_ticket}`}>
-                            <Lock className="w-3 h-3" />
-                          </span>
-                        )}
-                        {isNeedsRevision && (
-                          <span
-                            className="flex h-5 w-5 relative"
-                            title="Revisi Ditolak: Butuh Perbaikan">
-                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
-                            <span className="relative inline-flex rounded-full h-5 w-5 bg-red-500 items-center justify-center text-[10px] text-white font-bold ring-2 ring-white">
-                              !
+                    className={`flex flex-col gap-4 p-5 rounded-xl border transition-all relative ${cardStyle}`}>
+                    {isNeedsRevision && draft && (
+                      <div className="w-full bg-red-50 border-l-4 border-l-red-500 border-y border-r border-red-200 rounded-lg p-3.5 shadow-sm animate-in fade-in slide-in-from-top-2">
+                        <div className="flex flex-col gap-2.5">
+                          <div className="flex items-center gap-2 text-red-900">
+                            <AlertTriangle className="w-4 h-4" />
+                            <span className="text-xs font-black uppercase tracking-tighter">
+                              ⚠️ Catatan Peninjau
                             </span>
-                          </span>
-                        )}
-                        {(company.isDirty || company.isNew) &&
-                          !isPending &&
-                          !isNeedsRevision && (
+                          </div>
+
+                          <p className="text-xs font-medium text-red-800 bg-white/60 p-2.5 rounded border border-red-200/50 shadow-inner">
+                            "
+                            {draft.rejection_reason ||
+                              "Silakan perbaiki data sesuai arahan."}
+                            "
+                          </p>
+
+                          {/* ACTION BUTTONS (Sama dengan format Tab 1 tapi ukuran lebih compact) */}
+                          <div className="flex flex-wrap items-center gap-2 mt-1">
+                            <button
+                              onClick={() =>
+                                handleRestoreAffiliateDraft(company.id)
+                              }
+                              disabled={!isEditing}
+                              title={
+                                !isEditing
+                                  ? "Buka mode edit untuk memulihkan"
+                                  : "Pulihkan draf"
+                              }
+                              className="flex items-center gap-1.5 bg-red-600 hover:bg-red-700 disabled:bg-red-300 disabled:cursor-not-allowed text-white px-4 py-2 rounded-md text-[10px] font-bold transition-all shadow-sm active:scale-95">
+                              <RotateCcw
+                                className={`w-3 h-3 ${isEditing ? "" : "opacity-50"}`}
+                              />
+                              PULIHKAN DATA
+                            </button>
+
+                            <button
+                              onClick={() =>
+                                handleDiscardAffiliateDraft(company.id)
+                              }
+                              className="flex items-center gap-1.5 bg-white border border-red-200 hover:bg-red-50 text-red-600 px-4 py-2 rounded-md text-[10px] font-bold transition-all shadow-sm active:scale-95">
+                              <X className="w-3 h-3" />
+                              ABAIKAN NOTIFIKASI
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                    <div className="flex gap-4 items-start w-full">
+                      {/* --- LOGO UPLOAD & INDICATOR BADGES --- */}
+                      <div className="w-24 shrink-0 relative">
+                        <div className="absolute -top-3 -right-3 z-20 flex flex-col gap-1.5">
+                          {isDeleting && (
                             <span
-                              className="flex h-5 w-5 items-center justify-center bg-daw-green text-white rounded-full shadow-sm ring-2 ring-white animate-in zoom-in"
-                              title="Perubahan Belum Disimpan">
-                              <Save className="w-2.5 h-2.5" />
+                              className="flex h-5 w-5 items-center justify-center text-white rounded-full bg-rose-500 shadow-sm ring-2 ring-white"
+                              title="Menunggu Penghapusan">
+                              <Trash2 className="w-3 h-3" />
                             </span>
+                          )}
+                          {isPending && !isDeleting && (
+                            <span
+                              className={`flex h-5 w-5 items-center justify-center text-white rounded-full shadow-sm ring-2 ring-white ${isSuperadmin ? "bg-amber-500" : "bg-blue-500"}`}
+                              title={`Terkunci: ${company.lock_ticket}`}>
+                              <Lock className="w-3 h-3" />
+                            </span>
+                          )}
+                          {/* Pulse Merah tetap ada sebagai fallback visual */}
+                          {isNeedsRevision && (
+                            <span
+                              className="flex h-5 w-5 relative"
+                              title="Revisi Ditolak: Butuh Perbaikan">
+                              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+                              <span className="relative inline-flex rounded-full h-5 w-5 bg-red-500 items-center justify-center text-[10px] text-white font-bold ring-2 ring-white">
+                                !
+                              </span>
+                            </span>
+                          )}
+                          {(company.isDirty || company.isNew) &&
+                            !isPending &&
+                            !isNeedsRevision && (
+                              <span
+                                className="flex h-5 w-5 items-center justify-center bg-daw-green text-white rounded-full shadow-sm ring-2 ring-white animate-in zoom-in"
+                                title="Perubahan Belum Disimpan">
+                                <Save className="w-2.5 h-2.5" />
+                              </span>
+                            )}
+                        </div>
+
+                        <LogoPreviewer
+                          file={company.newLogoFile}
+                          savedUrl={
+                            company.removePhoto ? null : company.logoUrl
+                          }
+                          isEditing={
+                            isEditing &&
+                            !isLockedForEditor &&
+                            !isDeleting &&
+                            !isNeedsRevision
+                          }
+                          onRemove={() => {
+                            updateCompany(company.id, "removePhoto", true);
+                            updateCompany(company.id, "newLogoFile", null);
+                          }}
+                        />
+                        {isEditing &&
+                          !isLockedForEditor &&
+                          !isDeleting &&
+                          !isNeedsRevision && (
+                            <input
+                              type="file"
+                              accept="image/*"
+                              onChange={(e) =>
+                                e.target.files?.[0] &&
+                                handleLogoChange(company.id, e.target.files[0])
+                              }
+                              className="absolute inset-0 opacity-0 cursor-pointer z-10"
+                            />
                           )}
                       </div>
 
-                      <LogoPreviewer
-                        file={company.newLogoFile}
-                        savedUrl={company.removePhoto ? null : company.logoUrl}
-                        // 🔵 Proteksi aksesibilitas editor
-                        isEditing={
-                          isEditing && !isLockedForEditor && !isDeleting
+                      {/* --- COMPANY DETAILS FORM --- */}
+                      <fieldset
+                        disabled={
+                          !isEditing ||
+                          isLockedForEditor ||
+                          isDeleting ||
+                          isNeedsRevision
                         }
-                        onRemove={() => {
-                          updateCompany(company.id, "removePhoto", true);
-                          updateCompany(company.id, "newLogoFile", null);
-                        }}
-                      />
-                      {/* Invisible Input File Cover */}
-                      {isEditing && !isLockedForEditor && !isDeleting && (
+                        className="flex-1 space-y-3">
+                        <div>
+                          <input
+                            type="text"
+                            value={company.name}
+                            placeholder="Company Name"
+                            onChange={(e) =>
+                              updateCompany(company.id, "name", e.target.value)
+                            }
+                            className={`w-full px-3 py-1.5 text-sm rounded-md font-bold transition-all duration-300 outline-none
+                              ${isDeleting ? "line-through text-rose-800" : "text-slate-900"} 
+                              ${isEditing && !isLockedForEditor && !isDeleting && !isNeedsRevision ? "bg-white border border-slate-300 focus:ring-2 focus:ring-daw-green/20" : "bg-transparent border-transparent"}`}
+                          />
+                        </div>
+                        <div className="grid grid-cols-2 gap-3">
+                          <input
+                            type="text"
+                            placeholder="Sub-text (Optional)"
+                            value={company.desc}
+                            onChange={(e) =>
+                              updateCompany(company.id, "desc", e.target.value)
+                            }
+                            className={`w-full px-3 py-1.5 text-xs rounded-md outline-none ${isEditing && !isLockedForEditor && !isDeleting && !isNeedsRevision ? "bg-white border border-slate-300 focus:border-daw-green" : "bg-transparent border-transparent text-slate-500"}`}
+                          />
+                          <select
+                            value={company.category}
+                            onChange={(e) =>
+                              updateCompany(
+                                company.id,
+                                "category",
+                                e.target.value,
+                              )
+                            }
+                            className={`w-full px-3 py-1.5 text-xs rounded-md outline-none ${isEditing && !isLockedForEditor && !isDeleting && !isNeedsRevision ? "bg-white border border-slate-300 focus:border-daw-green" : "bg-transparent border-transparent text-slate-500 appearance-none"}`}>
+                            <option value="fnb">Food & Beverage</option>
+                            <option value="steel">Steel</option>
+                            <option value="finance">Finance</option>
+                            <option value="edu">Education</option>
+                            {!["fnb", "steel", "finance", "edu"].includes(
+                              company.category,
+                            ) && (
+                              <option
+                                value={company.category}
+                                className="text-red-500">
+                                ⚠ Unknown ({company.category})
+                              </option>
+                            )}
+                          </select>
+                        </div>
                         <input
-                          type="file"
-                          accept="image/*"
+                          type="url"
+                          placeholder="Website URL (https://)"
+                          value={company.websiteUrl || ""}
                           onChange={(e) =>
-                            e.target.files?.[0] &&
                             updateCompany(
                               company.id,
-                              "newLogoFile",
-                              e.target.files[0],
-                            )
-                          }
-                          className="absolute inset-0 opacity-0 cursor-pointer z-10"
-                        />
-                      )}
-                    </div>
-
-                    {/* --- COMPANY DETAILS FORM --- */}
-                    <fieldset
-                      disabled={!isEditing || isLockedForEditor || isDeleting}
-                      className="flex-1 space-y-3">
-                      <div>
-                        <input
-                          type="text"
-                          value={company.name}
-                          placeholder="Company Name"
-                          onChange={(e) =>
-                            updateCompany(company.id, "name", e.target.value)
-                          }
-                          // 🔵 TYPOGRAPHY FEEDBACK: Coret judul jika mau dihapus
-                          className={`w-full px-3 py-1.5 text-sm rounded-md font-bold transition-all duration-300 outline-none
-                            ${isDeleting ? "line-through text-rose-800" : "text-slate-900"} 
-                            ${isEditing && !isLockedForEditor && !isDeleting ? "bg-white border border-slate-300 focus:ring-2 focus:ring-daw-green/20" : "bg-transparent border-transparent"}`}
-                        />
-                      </div>
-                      <div className="grid grid-cols-2 gap-3">
-                        <input
-                          type="text"
-                          placeholder="Sub-text (Optional)"
-                          value={company.desc}
-                          onChange={(e) =>
-                            updateCompany(company.id, "desc", e.target.value)
-                          }
-                          className={`w-full px-3 py-1.5 text-xs rounded-md outline-none ${isEditing && !isLockedForEditor && !isDeleting ? "bg-white border border-slate-300 focus:border-daw-green" : "bg-transparent border-transparent text-slate-500"}`}
-                        />
-                        <select
-                          value={company.category}
-                          onChange={(e) =>
-                            updateCompany(
-                              company.id,
-                              "category",
+                              "websiteUrl",
                               e.target.value,
                             )
                           }
-                          className={`w-full px-3 py-1.5 text-xs rounded-md outline-none ${isEditing && !isLockedForEditor && !isDeleting ? "bg-white border border-slate-300 focus:border-daw-green" : "bg-transparent border-transparent text-slate-500 appearance-none"}`}>
-                          <option value="fnb">Food & Beverage</option>
-                          <option value="steel">Steel</option>
-                          <option value="finance">Finance</option>
-                          <option value="edu">Education</option>
-                          {/* 🔵 Fallback untuk dirty data dari DB lama */}
-                          {!["fnb", "steel", "finance", "edu"].includes(
-                            company.category,
-                          ) && (
-                            <option
-                              value={company.category}
-                              className="text-red-500">
-                              ⚠ Unknown ({company.category})
-                            </option>
-                          )}
-                        </select>
-                      </div>
-                      <input
-                        type="url"
-                        placeholder="Website URL (https://)"
-                        value={company.websiteUrl || ""}
-                        onChange={(e) =>
-                          updateCompany(
-                            company.id,
-                            "websiteUrl",
-                            e.target.value,
-                          )
-                        }
-                        className={`w-full px-3 py-1.5 text-xs rounded-md outline-none ${isEditing && !isLockedForEditor && !isDeleting ? "bg-white border border-slate-300 focus:border-daw-green" : "bg-transparent border-transparent text-slate-500"}`}
-                      />
-                    </fieldset>
+                          className={`w-full px-3 py-1.5 text-xs rounded-md outline-none ${isEditing && !isLockedForEditor && !isDeleting && !isNeedsRevision ? "bg-white border border-slate-300 focus:border-daw-green" : "bg-transparent border-transparent text-slate-500"}`}
+                        />
+                      </fieldset>
 
-                    {/* --- ACTION BUTTONS --- */}
-                    {isEditing && !isLockedForEditor && !isDeleting && (
-                      <button
-                        onClick={() => removeCompany(company.id)}
-                        className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-md shrink-0 transition-colors"
-                        title="Ajukan Penghapusan">
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    )}
+                      {/* --- ACTION BUTTONS --- */}
+                      {isEditing &&
+                        !isLockedForEditor &&
+                        !isDeleting &&
+                        !isNeedsRevision && (
+                          <button
+                            onClick={() => removeCompany(company.id)}
+                            className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-md shrink-0 transition-colors"
+                            title="Ajukan Penghapusan">
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        )}
+                    </div>
                   </div>
                 );
               })}

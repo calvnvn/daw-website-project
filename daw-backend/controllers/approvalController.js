@@ -505,7 +505,17 @@ async function executeModelUpdate(
 
   // Create Handling
   if (action === "CREATE") {
-    await Model.create(payload, { transaction });
+    const placeholder = await Model.findByPk(targetId, { transaction });
+
+    if (placeholder) {
+      await placeholder.update(payload, { transaction });
+      console.log(
+        `>>> [HANDOVER SUCCESS] Placeholder ${module} ID ${targetId} telah di-update menjadi LIVE.`,
+      );
+    } else {
+      await Model.create({ ...payload, id: targetId }, { transaction });
+      console.log(`>>> [DIRECT CREATE] ${module} ID ${targetId} dibuat baru.`);
+    }
     return filesToTrash;
   }
 
