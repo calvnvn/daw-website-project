@@ -717,7 +717,7 @@ export default function InvestmentsManager() {
             )}
             <span>
               {currentLockState
-                ? "System Locked"
+                ? "Locked"
                 : isSettingsOverrideMode && isEditing && activeTab === "content"
                   ? "Override Mode"
                   : isEditing

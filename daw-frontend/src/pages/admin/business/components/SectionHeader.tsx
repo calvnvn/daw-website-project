@@ -96,7 +96,7 @@ export default function SectionHeader({
             <Lock className="w-4 h-4" />
           )}
           <span>
-            {isLocked ? "System Locked" : isEditing ? "Editing Mode" : "Locked"}
+            {isLocked ? "Locked" : isEditing ? "Editing Mode" : "Locked"}
           </span>
         </button>
 

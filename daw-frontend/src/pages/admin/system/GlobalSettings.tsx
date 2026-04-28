@@ -16,16 +16,21 @@ import {
   ShieldAlert,
   Loader2,
   Send,
+  X,
 } from "lucide-react";
 import { toast } from "sonner";
 import api from "@/lib/api";
 import { getCleanImageUrl } from "@/lib/utils";
 import { useSettings } from "@/contexts/SettingsContext";
-import { useAuth } from "@/contexts/AuthContext";
 
 export default function GlobalSettings() {
-  const { user } = useAuth();
-  const isSuperadmin = user?.role === "superadmin" || user?.role === "admin";
+  const {
+    settings,
+    rejectedSettings,
+    isLoading,
+    isSuperadmin,
+    refreshSettings,
+  } = useSettings();
 
   const [formData, setFormData] = useState({
     companyName: "",
@@ -36,7 +41,6 @@ export default function GlobalSettings() {
     googleMapsUrl: "",
     linkedinUrl: "",
   });
-
   const [originalData, setOriginalData] = useState(formData);
 
   const [logoFile, setLogoFile] = useState<File | null>(null);
@@ -46,20 +50,14 @@ export default function GlobalSettings() {
 
   const [isSaving, setIsSaving] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
-
   const [isDraggingLogo, setIsDraggingLogo] = useState(false);
   const [isDraggingFavicon, setIsDraggingFavicon] = useState(false);
-
   const [isOptimisticallyLocked, setIsOptimisticallyLocked] = useState(false);
 
-  const { settings, rejectedSettings, isLoading, refreshSettings } =
-    useSettings();
-
   const isDataLocked = settings?.is_locked === true || isOptimisticallyLocked;
-  const shouldLockUI = isDataLocked && !isSuperadmin; // Hanya Editor yang terkunci formnya
-  const isOverrideMode = isDataLocked && isSuperadmin; // Status jika Dewa memaksa masuk
+  const shouldLockUI = isDataLocked && !rejectedSettings && !isSuperadmin;
+  const isOverrideMode = isDataLocked && isSuperadmin;
 
-  // Blueprint v1.2: Konstanta gaya lockdown global
   const lockStyles = shouldLockUI
     ? "opacity-60 grayscale-[30%] pointer-events-none cursor-not-allowed select-none"
     : "";
@@ -70,7 +68,15 @@ export default function GlobalSettings() {
     return /^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`;
   };
 
-  // --- Sync Data from Context & Create Snapshot ---
+  // Sync Optimistic Lock
+  useEffect(() => {
+    if (settings && isOptimisticallyLocked) {
+      setIsOptimisticallyLocked(false);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [settings?.is_locked, settings?.lock_ticket]);
+
+  // Sync Data & Create Snapshot
   useEffect(() => {
     if (settings && !isEditing) {
       const liveData = {
@@ -102,30 +108,103 @@ export default function GlobalSettings() {
     };
   }, [logoPreview, faviconPreview]);
 
+  // Toggle Edit Guard
+  const toggleEditMode = () => {
+    if (shouldLockUI) {
+      return toast.error("Akses Dibatasi", {
+        description: "Data sedang dalam antrean approval.",
+      });
+    }
+
+    if (!isEditing && rejectedSettings) {
+      return toast.warning("Tindakan Diperlukan", {
+        description:
+          "Ada draf yang ditolak. Klik 'Pulihkan Draf' terlebih dahulu sebelum mengedit ulang.",
+      });
+    }
+
+    if (isEditing) {
+      setLogoFile(null);
+      setFaviconFile(null);
+      if (settings?.logoUrl) setLogoPreview(getCleanImageUrl(settings.logoUrl));
+      if (settings?.faviconUrl)
+        setFaviconPreview(getCleanImageUrl(settings.faviconUrl));
+    }
+
+    setIsEditing(!isEditing);
+  };
+
   // Restore Handler
-  const handleRestoreDraft = useCallback(() => {
-    if (!rejectedSettings?.payload) return;
-    const payload = rejectedSettings.payload;
+  const handleRestoreDraft = () => {
+    if (!rejectedSettings?.payload) {
+      toast.error("Data pemulihan tidak ditemukan.");
+      return;
+    }
 
-    setFormData((prev) => ({
-      companyName: payload.companyName ?? prev.companyName,
-      address: payload.address ?? prev.address,
-      phone: payload.phone ?? prev.phone,
-      email: payload.email ?? prev.email,
-      website: payload.website ?? prev.website,
-      googleMapsUrl: payload.googleMapsUrl ?? prev.googleMapsUrl,
-      linkedinUrl: payload.linkedinUrl ?? prev.linkedinUrl,
-    }));
+    // Safety guard untuk aksi DELETE (sesuai referensi lo)
+    if (rejectedSettings?.action === "DELETE") {
+      toast.error(
+        "Permintaan penghapusan yang ditolak tidak dapat dipulihkan ke dalam form.",
+      );
+      return;
+    }
 
-    if (payload.logoUrl) setLogoPreview(getCleanImageUrl(payload.logoUrl));
-    if (payload.faviconUrl)
-      setFaviconPreview(getCleanImageUrl(payload.faviconUrl));
+    try {
+      // Handle payload jika dalam bentuk string (Sequelize JSON sering kirim string)
+      const rawPayload = rejectedSettings.payload;
+      const payload =
+        typeof rawPayload === "string" ? JSON.parse(rawPayload) : rawPayload;
 
-    setIsEditing(true);
-    toast.info("Draf berhasil dipulihkan", {
-      description: "Silakan perbaiki dan simpan kembali.",
-    });
-  }, [rejectedSettings]);
+      // Deep Merge ke Form Data
+      setFormData((prev) => ({
+        ...prev,
+        companyName: payload.companyName ?? prev.companyName,
+        address: payload.address ?? prev.address,
+        phone: payload.phone ?? prev.phone,
+        email: payload.email ?? prev.email,
+        website: payload.website ?? prev.website,
+        googleMapsUrl: payload.googleMapsUrl ?? prev.googleMapsUrl,
+        linkedinUrl: payload.linkedinUrl ?? prev.linkedinUrl,
+      }));
+
+      setLogoFile(null);
+      setFaviconFile(null);
+
+      if (payload.logoUrl) setLogoPreview(getCleanImageUrl(payload.logoUrl));
+      if (payload.faviconUrl)
+        setFaviconPreview(getCleanImageUrl(payload.faviconUrl));
+
+      setIsEditing(true); // Masuk ke mode edit agar field bisa diketik ulang
+      toast.success("Konten draf berhasil dipulihkan!", {
+        description: "Silakan periksa kembali sebelum mengirim ulang.",
+      });
+    } catch (err) {
+      console.error("Restore Error:", err);
+      toast.error("Gagal memproses data pemulihan.");
+    }
+  };
+
+  // CLEAN DISCARD LOGIC
+  const handleDiscardDraft = async () => {
+    if (!rejectedSettings?.notrans) return;
+
+    const toastId = toast.loading("Mengabaikan notifikasi penolakan...");
+    try {
+      const safeTicket = encodeURIComponent(rejectedSettings.notrans);
+      await api.patch(`/approval/discard/${safeTicket}`);
+
+      toast.success("Notifikasi revisi berhasil diabaikan.", { id: toastId });
+
+      await refreshSettings();
+    } catch (error: any) {
+      toast.error("Gagal mengabaikan draf", {
+        id: toastId,
+        description:
+          error.response?.data?.message ||
+          "Kesalahan komunikasi dengan server.",
+      });
+    }
+  };
 
   const hasDataChanged = useCallback(() => {
     const textChanged =
@@ -134,33 +213,28 @@ export default function GlobalSettings() {
     return textChanged || filesChanged;
   }, [formData, originalData, logoFile, faviconFile]);
 
+  // Submission & Baton Pass
   const handleSave = async () => {
-    // 1. Cek Kasta & Akses
     if (shouldLockUI) {
       return toast.error("Akses Dibatasi.", {
-        description: "Data ini sedang dalam proses peninjauan.",
+        description: "Data ini sedang ditinjau.",
       });
     }
 
-    // 2. Diff Engine Check (Spam Prevention)
     if (!hasDataChanged()) {
       setIsEditing(false);
-      return toast.info("Tidak ada perubahan terdeteksi.", {
-        description: "Data profil masih sama dengan versi live.",
-        duration: 3000,
-      });
+      return toast.info("Tidak ada perubahan terdeteksi.");
     }
 
     setIsSaving(true);
     const loadingToast = toast.loading(
       isSuperadmin
         ? "Menyimpan pembaruan secara live..."
-        : "Mengirim revisi ke sistem...",
+        : "Mengirim revisi ke sistem ERP...",
     );
 
     try {
       const data = new FormData();
-
       const sanitizedData = {
         ...formData,
         website: sanitizeUrl(formData.website),
@@ -173,7 +247,7 @@ export default function GlobalSettings() {
 
       data.append("status", "Published");
 
-      // Jika ini hasil restorasi, kirim nomor tiket lama untuk di-cleanup oleh Backend
+      // Ghost Cleanup Ticket (Blueprint 7.4)
       if (rejectedSettings?.notrans) {
         data.append("previous_notrans", rejectedSettings.notrans);
       }
@@ -183,8 +257,7 @@ export default function GlobalSettings() {
 
       await api.put("/settings", data, { timeout: 60000 });
 
-      // Jika bukan admin, kunci form secara optimistis agar UX instan
-      if (!isSuperadmin) setIsOptimisticallyLocked(true);
+      if (!isSuperadmin) setIsOptimisticallyLocked(true); // UX Instan
 
       setIsEditing(false);
       setLogoFile(null);
@@ -193,16 +266,13 @@ export default function GlobalSettings() {
       await refreshSettings();
 
       toast.success(
-        isSuperadmin
-          ? "Perubahan berhasil di-publish secara live!"
-          : "Revisi pengaturan berhasil diajukan!",
+        isSuperadmin ? "Perubahan live berhasil!" : "Revisi diajukan",
         { id: loadingToast },
       );
     } catch (error: any) {
-      toast.error("Gagal Memperbarui Data", {
+      toast.error("Gagal Memperbarui", {
         description:
-          error.response?.data?.message ||
-          "Periksa koneksi atau tunggu beberapa saat.",
+          error.response?.data?.message || "Periksa koneksi internet.",
         id: loadingToast,
       });
     } finally {
@@ -213,24 +283,23 @@ export default function GlobalSettings() {
   const handleChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>,
   ) => {
-    setFormData({
-      ...formData,
-      [e.target.name]: e.target.value,
-    });
+    setFormData({ ...formData, [e.target.name]: e.target.value });
   };
 
   if (isLoading) {
     return (
-      <div className="p-12 text-center text-slate-500">
-        Memuat data pengaturan...
+      <div className="p-12 flex flex-col items-center justify-center text-slate-500 gap-3">
+        <Loader2 className="w-6 h-6 animate-spin text-daw-green" />
+        <p className="text-sm font-medium animate-pulse">Memuat Data...</p>
       </div>
     );
   }
 
   return (
     <div className="max-w-6xl mx-auto space-y-6 pb-12">
-      {/* --- SOVEREIGN BANNERS (Contextual Awareness) --- */}
-      {/* 1. Amber Banner (superadmin Override Warning) */}
+      {/* SOVEREIGN BANNERS */}
+
+      {/* 1. Amber Banner (Superadmin Override Warning) */}
       {isOverrideMode && (
         <div className="bg-amber-50 border border-amber-200 p-4 md:p-5 rounded-xl flex items-center gap-4 animate-in slide-in-from-top-4 shadow-sm">
           <div className="bg-amber-100 p-2 rounded-full text-amber-600 shrink-0">
@@ -269,11 +338,13 @@ export default function GlobalSettings() {
         </div>
       )}
 
-      {/* 3. Rejection Ribbon (Draft Needs Fixing) */}
+      {/* REJECTION RIBBON */}
       {rejectedSettings && (
         <div className="bg-amber-50 border border-amber-200 rounded-xl overflow-hidden shadow-sm animate-in slide-in-from-top-4 duration-300">
-          <div className="p-4 md:p-5 flex flex-col sm:flex-row items-start justify-between gap-4 relative">
+          <div className="p-4 md:p-5 flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4 relative">
+            {/* Semantic Left Border */}
             <div className="absolute left-0 top-0 bottom-0 w-1.5 bg-amber-500"></div>
+
             <div className="flex items-start gap-4">
               <div className="w-10 h-10 bg-amber-100 rounded-full flex items-center justify-center shrink-0 mt-0.5 animate-pulse">
                 <AlertTriangle className="w-5 h-5 text-amber-600" />
@@ -296,26 +367,40 @@ export default function GlobalSettings() {
               </div>
             </div>
 
-            <div className="w-full sm:w-auto flex flex-col items-center gap-2">
-              <button
-                onClick={handleRestoreDraft}
-                disabled={shouldLockUI || (!isEditing && !isSuperadmin)}
-                className="w-full shrink-0 flex items-center justify-center gap-2 px-5 py-2.5 bg-amber-600 hover:bg-amber-700 disabled:bg-amber-300 disabled:cursor-not-allowed text-white rounded-lg text-xs font-bold transition-all shadow-sm active:scale-95">
-                <RotateCcw className="w-3.5 h-3.5" />
-                PULIHKAN DRAF
-              </button>
-              {!isEditing && (
-                <p className="text-[10px] text-amber-600 font-medium italic animate-pulse text-center">
-                  * Aktifkan "Editing Mode" untuk memulihkan.
-                </p>
+            {/* RECOVERY ACTIONS */}
+            <div className="flex items-center gap-2 w-full lg:w-auto shrink-0">
+              {/* Opsi 1: Restoration Logic */}
+              {rejectedSettings.action !== "DELETE" && (
+                <button
+                  type="button"
+                  onClick={handleRestoreDraft}
+                  disabled={shouldLockUI}
+                  className="flex-1 lg:flex-none flex items-center justify-center gap-2 bg-amber-600 hover:bg-amber-700 text-white px-5 py-2.5 rounded-xl text-xs font-bold transition-all active:scale-95 shadow-sm shadow-amber-200 disabled:opacity-50 disabled:grayscale">
+                  <RotateCcw className="w-4 h-4" />
+                  Pulihkan Data
+                </button>
               )}
+
+              {/* Opsi 2: Discard Logic */}
+              <button
+                type="button"
+                onClick={handleDiscardDraft}
+                className="flex-1 lg:flex-none flex items-center justify-center gap-2 bg-white border border-amber-200 text-amber-600 hover:bg-amber-50 px-4 py-2.5 rounded-xl text-xs font-bold transition-all shadow-sm active:scale-95">
+                <X className="w-4 h-4" />
+                Abaikan Notifikasi
+              </button>
             </div>
+          </div>
+
+          {/* Progress Bar Animation (Sesuai Referensi) */}
+          <div className="h-1 bg-amber-200 w-full overflow-hidden">
+            <div className="h-full bg-amber-500 w-1/3 animate-pulse"></div>
           </div>
         </div>
       )}
 
-      {/* --- HEADER (MATRIX BUTTONS) --- */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white p-6 rounded-xl border border-slate-200 shadow-sm sticky top-0 z-30">
+      {/* HEADER (MATRIX BUTTONS) */}
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white p-6 rounded-xl border border-slate-200 shadow-sm top-0 z-30">
         <div className="flex-1 flex flex-col md:flex-row items-start md:items-center gap-2 md:gap-3">
           <div>
             <h1 className="text-xl md:text-2xl font-serif font-bold text-slate-900">
@@ -335,16 +420,8 @@ export default function GlobalSettings() {
         </div>
 
         <div className="flex items-center gap-2 w-full md:w-auto">
-          {/* Edit Toggle Button */}
           <button
-            onClick={() => {
-              if (shouldLockUI) {
-                return toast.error("Akses Dibatasi", {
-                  description: "Data sedang dalam antrean approval.",
-                });
-              }
-              setIsEditing(!isEditing);
-            }}
+            onClick={toggleEditMode}
             disabled={isSaving || shouldLockUI}
             className={`flex-1 md:flex-none flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg font-black text-[11px] uppercase tracking-widest transition-colors border shadow-sm ${
               shouldLockUI
@@ -362,7 +439,7 @@ export default function GlobalSettings() {
             )}
             <span>
               {shouldLockUI
-                ? "System Locked"
+                ? "Locked"
                 : isOverrideMode && isEditing
                   ? "Override Mode"
                   : isEditing
@@ -371,7 +448,6 @@ export default function GlobalSettings() {
             </span>
           </button>
 
-          {/* Matrix Action Button (Publish/Request) */}
           <button
             onClick={handleSave}
             disabled={isSaving || !isEditing || shouldLockUI}
@@ -380,9 +456,11 @@ export default function GlobalSettings() {
                 ? "bg-slate-300 text-slate-700"
                 : shouldLockUI
                   ? "bg-slate-200 text-slate-500"
-                  : isSuperadmin
-                    ? "bg-daw-green hover:bg-[#003b1c] text-white shadow-daw-green/20"
-                    : "bg-blue-600 hover:bg-blue-700 text-white shadow-blue-600/20"
+                  : isOverrideMode
+                    ? "bg-amber-600 hover:bg-amber-700 text-white shadow-amber-600/20"
+                    : isSuperadmin
+                      ? "bg-daw-green hover:bg-[#003b1c] text-white shadow-daw-green/20"
+                      : "bg-blue-600 hover:bg-blue-700 text-white shadow-blue-600/20"
             }`}>
             {isSaving ? (
               <Loader2 className="w-4 h-4 animate-spin" />
@@ -398,76 +476,89 @@ export default function GlobalSettings() {
                 ? "Memproses..."
                 : shouldLockUI
                   ? "Akses Terbatas"
-                  : isSuperadmin
-                    ? "Publish Live"
-                    : "Request Approval"}
+                  : isOverrideMode
+                    ? "Override & Publish"
+                    : isSuperadmin
+                      ? "Publish Live"
+                      : "Request Approval"}
             </span>
           </button>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        {/* KOLOM KIRI: Identitas & Sosial Media */}
+      {/* 3. THE FORM BODY (The Ledger Grid) */}
+      <div
+        className={`grid grid-cols-1 md:grid-cols-3 gap-6 transition-all duration-500 ${lockStyles}`}>
         <div className="space-y-6 md:col-span-1">
-          {/* Corporate Identity Card */}
-          <div
-            className={`bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden transition-all duration-300 ${lockStyles}`}>
+          <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
             <div className="px-5 py-4 border-b border-slate-100 bg-slate-50/50 flex items-center gap-2">
               <Building2 className="w-5 h-5 text-daw-green" />
-              <h2 className="font-bold text-slate-800">Identitas Perusahaan</h2>
+              <h2 className="font-bold text-sm text-slate-800">
+                Identitas Perusahaan
+              </h2>
             </div>
             <div className="p-5 space-y-4">
               <div>
-                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">
+                <label
+                  htmlFor="companyName"
+                  className="block text-[10px] font-black text-slate-500 uppercase tracking-wider mb-2">
                   Company Name
                 </label>
                 <input
+                  id="companyName"
                   type="text"
                   name="companyName"
                   value={formData.companyName}
                   onChange={handleChange}
                   disabled={!isEditing || shouldLockUI}
-                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-daw-green/20 focus:border-daw-green text-slate-700 transition-colors disabled:bg-slate-100 disabled:text-slate-400 disabled:cursor-not-allowed"
+                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-daw-green/20 focus:border-daw-green text-slate-700 transition-colors disabled:bg-slate-100 disabled:text-slate-400 disabled:cursor-not-allowed"
                 />
               </div>
             </div>
           </div>
 
           {/* Social Media Card */}
-          <div
-            className={`bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden transition-all duration-300 ${lockStyles}`}>
+          <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
             <div className="px-5 py-4 border-b border-slate-100 bg-slate-50/50 flex items-center gap-2">
               <Share2 className="w-5 h-5 text-daw-green" />
-              <h2 className="font-bold text-slate-800">Tautan Media Sosial</h2>
+              <h2 className="font-bold text-sm text-slate-800">
+                Tautan Media Sosial
+              </h2>
             </div>
             <div className="p-5 space-y-4">
               <div>
-                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">
+                <label
+                  htmlFor="linkedinUrl"
+                  className="block text-[10px] font-black text-slate-500 uppercase tracking-wider mb-2">
                   LinkedIn URL
                 </label>
                 <input
+                  id="linkedinUrl"
                   type="url"
                   name="linkedinUrl"
                   value={formData.linkedinUrl}
                   onChange={handleChange}
                   disabled={!isEditing || shouldLockUI}
-                  placeholder="https://linkedin.com/..."
-                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-daw-green/20 focus:border-daw-green text-slate-700 transition-colors disabled:bg-slate-100 disabled:text-slate-400 disabled:cursor-not-allowed"
+                  placeholder="https://linkedin.com/company/..."
+                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-daw-green/20 focus:border-daw-green text-slate-700 transition-colors disabled:bg-slate-100 disabled:text-slate-400 disabled:cursor-not-allowed"
                 />
               </div>
               <div>
-                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">
+                <label
+                  htmlFor="website"
+                  className="block text-[10px] font-black text-slate-500 uppercase tracking-wider mb-2">
                   Situs Utama (URL)
                 </label>
                 <div className="relative">
                   <Globe className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
                   <input
+                    id="website"
                     type="text"
                     name="website"
                     value={formData.website}
                     onChange={handleChange}
                     disabled={!isEditing || shouldLockUI}
-                    className="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-daw-green/20 focus:border-daw-green text-slate-700 transition-colors disabled:bg-slate-100 disabled:text-slate-400 disabled:cursor-not-allowed"
+                    className="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-daw-green/20 focus:border-daw-green text-slate-700 transition-colors disabled:bg-slate-100 disabled:text-slate-400 disabled:cursor-not-allowed"
                   />
                 </div>
               </div>
@@ -475,61 +566,68 @@ export default function GlobalSettings() {
           </div>
         </div>
 
-        {/* KOLOM KANAN: Kontak Utama & Maps */}
+        {/* KOLOM KANAN  */}
         <div className="space-y-6 md:col-span-2">
-          {/* Contact Information Card */}
-          <div
-            className={`bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden transition-all duration-300 ${lockStyles}`}>
+          <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
             <div className="px-5 py-4 border-b border-slate-100 bg-slate-50/50 flex items-center gap-2">
               <Phone className="w-5 h-5 text-daw-green" />
-              <h2 className="font-bold text-slate-800">
+              <h2 className="font-bold text-sm text-slate-800">
                 Informasi Kontak Utama
               </h2>
             </div>
             <div className="p-5 space-y-5">
               <div>
-                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                <label
+                  htmlFor="address"
+                  className="block text-[10px] font-black text-slate-500 uppercase tracking-wider mb-2 flex items-center gap-1.5">
                   <MapPin className="w-3.5 h-3.5" /> Alamat Kantor Pusat
                 </label>
                 <textarea
+                  id="address"
                   name="address"
                   rows={3}
                   value={formData.address}
                   onChange={handleChange}
                   disabled={!isEditing || shouldLockUI}
-                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-daw-green/20 focus:border-daw-green text-slate-700 resize-none transition-colors leading-relaxed disabled:bg-slate-100 disabled:text-slate-400 disabled:cursor-not-allowed"
+                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-daw-green/20 focus:border-daw-green text-slate-700 resize-none transition-colors leading-relaxed disabled:bg-slate-100 disabled:text-slate-400 disabled:cursor-not-allowed"
                 />
                 <p className="text-[11px] text-slate-400 mt-1.5">
-                  Alamat ini akan ditampilkan pada halaman 'Hubungi Kami' dan
-                  bagian bawah (footer) website.
+                  Ditampilkan pada halaman 'Hubungi Kami' dan bagian Footer
+                  website.
                 </p>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
                 <div>
-                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2 flex items-center gap-1.5">
-                    <Phone className="w-3.5 h-3.5" /> Phone Number
+                  <label
+                    htmlFor="phone"
+                    className="block text-[10px] font-black text-slate-500 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                    <Phone className="w-3.5 h-3.5" /> Nomor Telepon
                   </label>
                   <input
+                    id="phone"
                     type="text"
                     name="phone"
                     value={formData.phone}
                     onChange={handleChange}
                     disabled={!isEditing || shouldLockUI}
-                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-daw-green/20 focus:border-daw-green text-slate-700 transition-colors disabled:bg-slate-100 disabled:text-slate-400 disabled:cursor-not-allowed"
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-daw-green/20 focus:border-daw-green text-slate-700 transition-colors disabled:bg-slate-100 disabled:text-slate-400 disabled:cursor-not-allowed"
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2 flex items-center gap-1.5">
-                    <Mail className="w-3.5 h-3.5" /> General Email
+                  <label
+                    htmlFor="email"
+                    className="block text-[10px] font-black text-slate-500 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                    <Mail className="w-3.5 h-3.5" /> Email Utama
                   </label>
                   <input
+                    id="email"
                     type="email"
                     name="email"
                     value={formData.email}
                     onChange={handleChange}
                     disabled={!isEditing || shouldLockUI}
-                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-daw-green/20 focus:border-daw-green text-slate-700 transition-colors disabled:bg-slate-100 disabled:text-slate-400 disabled:cursor-not-allowed"
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-daw-green/20 focus:border-daw-green text-slate-700 transition-colors disabled:bg-slate-100 disabled:text-slate-400 disabled:cursor-not-allowed"
                   />
                 </div>
               </div>
@@ -537,32 +635,32 @@ export default function GlobalSettings() {
           </div>
         </div>
 
-        {/* ---> AREA BRANDING & SEO <--- */}
+        {/* AREA BAWAH: Maps & Branding  */}
         <div className="md:col-span-3 space-y-6">
           {/* Google Maps Embed Card */}
-          <div
-            className={`bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden transition-all duration-300 ${lockStyles}`}>
-            <div className="px-5 py-4 border-b border-slate-100 bg-slate-50/50 flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <Map className="w-5 h-5 text-daw-green" />
-                <h2 className="font-bold text-slate-800">
-                  Integrasi Google Maps
-                </h2>
-              </div>
+          <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+            <div className="px-5 py-4 border-b border-slate-100 bg-slate-50/50 flex items-center gap-2">
+              <Map className="w-5 h-5 text-daw-green" />
+              <h2 className="font-bold text-sm text-slate-800">
+                Integrasi Google Maps
+              </h2>
             </div>
             <div className="p-5 space-y-4">
               <div>
-                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">
-                  Tautan Peta Digital (Source URL)
+                <label
+                  htmlFor="googleMapsUrl"
+                  className="block text-[10px] font-black text-slate-500 uppercase tracking-wider mb-2">
+                  Tautan Peta Digital (Iframe Source URL)
                 </label>
                 <input
+                  id="googleMapsUrl"
                   type="text"
                   name="googleMapsUrl"
                   value={formData.googleMapsUrl}
                   onChange={handleChange}
-                  disabled={!isEditing || shouldLockUI} // 🚀 PERBAIKAN LOGIKA DISABLED
-                  placeholder="Paste the Google Maps embed link here..."
-                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-daw-green/20 focus:border-daw-green text-slate-700 transition-colors font-mono text-sm disabled:bg-slate-100 disabled:text-slate-400 disabled:cursor-not-allowed"
+                  disabled={!isEditing || shouldLockUI}
+                  placeholder="https://www.google.com/maps/embed?pb=..."
+                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm font-mono focus:outline-none focus:ring-2 focus:ring-daw-green/20 focus:border-daw-green text-slate-700 transition-colors disabled:bg-slate-100 disabled:text-slate-400 disabled:cursor-not-allowed"
                 />
                 <p className="text-[11px] text-slate-400 mt-2">
                   Buka Google Maps &gt; Bagikan &gt; Sematkan peta &gt; Salin
@@ -572,18 +670,18 @@ export default function GlobalSettings() {
             </div>
           </div>
 
-          <div
-            className={`bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden transition-all duration-300 ${lockStyles}`}>
+          {/* Branding & Identitas Visual Card */}
+          <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
             <div className="px-5 py-4 border-b border-slate-100 bg-slate-50/50 flex items-center gap-2">
               <ImageIcon className="w-5 h-5 text-daw-green" />
-              <h2 className="font-bold text-slate-800 text-sm md:text-base">
+              <h2 className="font-bold text-sm text-slate-800">
                 Branding & Identitas Visual
               </h2>
             </div>
 
             <div className="p-5 md:p-6 grid grid-cols-1 lg:grid-cols-2 gap-8">
-              {/* --- BOX UPLOAD LOGO UTAMA --- */}
-              <div className="space-y-4">
+              {/* BOX UPLOAD LOGO UTAMA */}
+              <div className="space-y-3">
                 <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest">
                   Logo Utama
                 </label>
@@ -599,7 +697,7 @@ export default function GlobalSettings() {
                   onDrop={(e) => {
                     e.preventDefault();
                     setIsDraggingLogo(false);
-                    // Guard keras: Batalkan jika tidak edit mode atau sedang dilock
+                    // 🛡️ Guard Keras: Batalkan jika tidak edit mode atau sedang dilock
                     if (!isEditing || shouldLockUI) return;
 
                     const file = e.dataTransfer.files?.[0];
@@ -608,36 +706,36 @@ export default function GlobalSettings() {
                       setLogoPreview(URL.createObjectURL(file));
                     } else if (file) {
                       toast.error(
-                        "Format file tidak didukung. Gunakan gambar.",
+                        "Format file tidak didukung. Gunakan gambar (JPG/PNG/SVG).",
                       );
                     }
                   }}
-                  className={`border-2 border-dashed rounded-xl p-4 flex flex-col items-center gap-4 transition-all duration-200 ${
+                  className={`border-2 border-dashed rounded-xl p-5 flex flex-col items-center gap-4 transition-all duration-200 ${
                     isDraggingLogo
                       ? "border-daw-green bg-daw-green/5 scale-[0.99] ring-4 ring-daw-green/10"
                       : "border-slate-200 bg-slate-50/50 hover:border-slate-300"
-                  } ${(!isEditing || shouldLockUI) && "opacity-70 cursor-not-allowed hover:border-slate-200"}`}>
-                  <div className="h-20 w-full max-w-[200px] flex items-center justify-center bg-white rounded-lg border border-slate-100 p-2 shadow-inner pointer-events-none">
+                  } ${!isEditing || shouldLockUI ? "opacity-70 cursor-not-allowed hover:border-slate-200" : ""}`}>
+                  <div className="h-24 w-full max-w-[240px] flex items-center justify-center bg-white rounded-lg border border-slate-100 p-2 shadow-sm pointer-events-none overflow-hidden bg-[url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI4IiBoZWlnaHQ9IjgiPgo8cmVjdCB3aWR0aD0iNCIgaGVpZ2h0PSI0IiBmaWxsPSIjZjFmMTE1Ij48L3JlY3Q+CjxyZWN0IHg9IjQiIHk9IjQiIHdpZHRoPSI0IiBoZWlnaHQ9IjQiIGZpbGw9IiNmMWYxMTUiPjwvcmVjdD4KPC9zdmc+')]">
                     {logoPreview ? (
                       <img
                         src={logoPreview}
-                        className="max-h-full object-contain"
-                        alt="Preview"
+                        className="max-h-full object-contain drop-shadow-sm"
+                        alt="Logo Preview"
                       />
                     ) : (
-                      <span className="text-slate-300 text-[10px]">
-                        No Logo
+                      <span className="text-slate-300 text-xs font-medium">
+                        No Logo Selected
                       </span>
                     )}
                   </div>
 
-                  <div className="text-center">
+                  <div className="text-center w-full">
                     <p className="text-xs font-bold text-slate-600 mb-1">
                       {isDraggingLogo
                         ? "Lepaskan file di sini"
                         : "Drag & drop logo"}
                     </p>
-                    <p className="text-[10px] text-slate-400 mb-2">atau</p>
+                    <p className="text-[10px] text-slate-400 mb-3">atau</p>
                     <input
                       type="file"
                       accept="image/*"
@@ -649,14 +747,14 @@ export default function GlobalSettings() {
                           setLogoPreview(URL.createObjectURL(file));
                         }
                       }}
-                      className="w-full text-[10px] file:mr-3 file:py-1.5 file:px-3 file:rounded-full file:border-0 file:bg-daw-green/10 file:text-daw-green file:font-bold cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                      className="w-full text-center text-[10px] file:mr-3 file:py-1.5 file:px-4 file:rounded-full file:border-0 file:bg-daw-green/10 file:text-daw-green file:font-bold file:cursor-pointer cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                     />
                   </div>
                 </div>
               </div>
 
-              {/* --- BOX UPLOAD FAVICON --- */}
-              <div className="space-y-4">
+              {/* BOX UPLOAD FAVICON */}
+              <div className="space-y-3">
                 <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest">
                   Ikon Tab (Favicon)
                 </label>
@@ -672,7 +770,7 @@ export default function GlobalSettings() {
                   onDrop={(e) => {
                     e.preventDefault();
                     setIsDraggingFavicon(false);
-                    // Guard keras: Batalkan jika tidak edit mode atau sedang dilock
+                    // 🛡️ Guard Keras
                     if (!isEditing || shouldLockUI) return;
 
                     const file = e.dataTransfer.files?.[0];
@@ -681,40 +779,40 @@ export default function GlobalSettings() {
                       setFaviconPreview(URL.createObjectURL(file));
                     } else if (file) {
                       toast.error(
-                        "Format file tidak didukung. Gunakan gambar.",
+                        "Format file tidak didukung. Gunakan gambar (ICO/PNG).",
                       );
                     }
                   }}
-                  className={`border-2 border-dashed rounded-xl p-4 flex flex-col items-center gap-4 transition-all duration-200 ${
+                  className={`border-2 border-dashed rounded-xl p-5 flex flex-col items-center gap-4 transition-all duration-200 ${
                     isDraggingFavicon
                       ? "border-daw-green bg-daw-green/5 scale-[0.99] ring-4 ring-daw-green/10"
                       : "border-slate-200 bg-slate-50/50 hover:border-slate-300"
-                  } ${(!isEditing || shouldLockUI) && "opacity-70 cursor-not-allowed hover:border-slate-200"}`}>
-                  <div className="h-20 w-20 flex items-center justify-center bg-white rounded-lg border border-slate-100 p-2 shadow-inner pointer-events-none">
+                  } ${!isEditing || shouldLockUI ? "opacity-70 cursor-not-allowed hover:border-slate-200" : ""}`}>
+                  <div className="h-24 w-24 flex items-center justify-center bg-white rounded-xl border border-slate-100 p-3 shadow-sm pointer-events-none overflow-hidden bg-[url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI4IiBoZWlnaHQ9IjgiPgo8cmVjdCB3aWR0aD0iNCIgaGVpZ2h0PSI0IiBmaWxsPSIjZjFmMTE1Ij48L3JlY3Q+CjxyZWN0IHg9IjQiIHk9IjQiIHdpZHRoPSI0IiBoZWlnaHQ9IjQiIGZpbGw9IiNmMWYxMTUiPjwvcmVjdD4KPC9zdmc+')]">
                     {faviconPreview ? (
                       <img
                         src={faviconPreview}
-                        className="max-h-full object-contain"
-                        alt="Preview"
+                        className="max-h-full object-contain drop-shadow-sm"
+                        alt="Favicon Preview"
                       />
                     ) : (
-                      <span className="text-slate-300 text-[10px] text-center leading-tight">
+                      <span className="text-slate-300 text-[10px] font-medium text-center leading-tight">
                         No Icon
                       </span>
                     )}
                   </div>
 
-                  <div className="text-center">
+                  <div className="text-center w-full">
                     <p className="text-xs font-bold text-slate-600 mb-1">
                       {isDraggingFavicon
                         ? "Lepaskan file di sini"
                         : "Drag & drop ikon"}
                     </p>
-                    <p className="text-[10px] text-slate-400 mb-2">atau</p>
+                    <p className="text-[10px] text-slate-400 mb-3">atau</p>
                     <input
                       type="file"
-                      accept="image/png, image/x-icon, image/svg+xml"
-                      disabled={!isEditing || shouldLockUI} // 🚀 PERBAIKAN LOGIKA DISABLED
+                      accept="image/png, image/x-icon, image/svg+xml, image/vnd.microsoft.icon"
+                      disabled={!isEditing || shouldLockUI}
                       onChange={(e) => {
                         const file = e.target.files?.[0];
                         if (file) {
@@ -722,7 +820,7 @@ export default function GlobalSettings() {
                           setFaviconPreview(URL.createObjectURL(file));
                         }
                       }}
-                      className="w-full text-[10px] file:mr-3 file:py-1.5 file:px-3 file:rounded-full file:border-0 file:bg-daw-green/10 file:text-daw-green file:font-bold cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                      className="w-full text-center text-[10px] file:mr-3 file:py-1.5 file:px-4 file:rounded-full file:border-0 file:bg-daw-green/10 file:text-daw-green file:font-bold file:cursor-pointer cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                     />
                   </div>
                 </div>

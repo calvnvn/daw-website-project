@@ -118,8 +118,8 @@ export default function DynamicNavbar() {
               alt={settings?.companyName || "DAW Logo"}
               className={`w-auto transition-all duration-300 object-contain ${
                 isScrolled
-                  ? "h-20 lg:h-24" // Saat scroll (navbar mengecil sedikit)
-                  : "h-24 lg:h-32" // Saat di atas (logo tampil maksimal)
+                  ? "h-12 lg:h-14" // SAAT SCROLL (Sangat Ramping)
+                  : "h-12 lg:h-14" // SAAT DI ATAS (Proporsional)
               } ${isTransparent ? "brightness-0 invert" : ""}`}
             />
           </Link>

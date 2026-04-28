@@ -12,8 +12,8 @@ router.put(
   "/",
   [verifyToken, checkPermission("manage_settings")],
   upload.fields([
-    { name: "logo", maxCount: 1 }, // Slot untuk Main Logo
-    { name: "favicon", maxCount: 1 }, // Slot untuk Tab Icon
+    { name: "logo", maxCount: 1 },
+    { name: "favicon", maxCount: 1 },
   ]),
   optimizeImage,
   settingsController.updateSettings,

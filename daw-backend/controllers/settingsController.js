@@ -2,56 +2,73 @@ const fs = require("fs");
 const path = require("path");
 const Settings = require("../models/Settings");
 const ApprovalDraft = require("../models/ApprovalDraft");
-const { ErpApprovalService } = require("../services/erpApprovalService");
+const ErpApprovalService = require("../services/erpApprovalService");
+
 const { deleteSingleFile } = require("../utils/fileRemover");
 const { invalidateOldDrafts } = require("../utils/draftCleanup");
 const sequelize = require("../config/database");
+const { generateNotrans } = require("../utils/notransGenerator");
 
 const JENIS_APP_CMS = process.env.CMS_APPROVAL_CODE;
 
 // HELPER: Safely Rename File for Editor Drafts
 const applyTempPrefix = (fileObj) => {
-  if (!fileObj) return null;
+  if (!fileObj || !fileObj.path) return null;
+
+  const oldPath = fileObj.path;
+  const directory = path.dirname(oldPath);
   const newFilename = `TEMP_${fileObj.filename}`;
-  const newPath = path.join(fileObj.destination, newFilename);
+  const newPath = path.join(directory, newFilename);
 
   try {
-    fs.renameSync(fileObj.path, newPath); // Rename fisik di storage
-    return newFilename; // Return nama baru untuk database
+    if (fs.existsSync(oldPath)) {
+      fs.renameSync(oldPath, newPath);
+      console.log(
+        `[FILE SYSTEM] Success: ${fileObj.filename} -> ${newFilename}`,
+      );
+      return newFilename;
+    } else {
+      console.warn(`🚨 File asli tidak ditemukan di: ${oldPath}`);
+      return fileObj.filename;
+    }
   } catch (err) {
     console.error(`🚨 Gagal me-rename file ke TEMP_: ${err.message}`);
-    return fileObj.filename; // Fallback ke nama asli jika rename gagal
+    return fileObj.filename;
   }
 };
 
 exports.getSettings = async (req, res) => {
   try {
-    const [settings, created] = await Settings.findOrCreate({
+    // 🚀 PERBAIKAN: Ubah nama variabel destructuring menjadi 'settingsInstance'
+    const [settingsInstance, created] = await Settings.findOrCreate({
       where: { id: 1 },
       defaults: {
         companyName: "PT Dharma Agung Wijaya",
         is_locked: false,
       },
-      attributes: [
-        "id",
-        "companyName",
-        "address",
-        "phone",
-        "email",
-        "website",
-        "googleMapsUrl",
-        "linkedinUrl",
-        "logoUrl",
-        "faviconUrl",
-        "is_locked",
-        "lock_ticket",
-      ],
     });
 
     if (created)
       console.log(">>> [SETTINGS] Initialized default record (ID 1)");
 
-    res.status(200).json({ success: true, data: settings });
+    // 🚀 AMAN: Ekstrak plain object dari 'settingsInstance' ke konstanta 'settings'
+    const settings = settingsInstance.get({ plain: true });
+
+    const rejectedDraft = await ApprovalDraft.findOne({
+      where: {
+        module_name: "Settings",
+        target_id: "1",
+        status: "Rejected",
+      },
+      order: [["createdAt", "DESC"]],
+    });
+
+    res.status(200).json({
+      success: true,
+      data: settings, // Kirim object bersih
+      has_rejected: !!rejectedDraft,
+      rejected_data: rejectedDraft || null,
+    });
   } catch (error) {
     console.error("🚨 Error GET Settings:", error);
     res
@@ -61,21 +78,38 @@ exports.getSettings = async (req, res) => {
 };
 
 exports.updateSettings = async (req, res) => {
+  const t = await sequelize.transaction();
+
+  // Deteksi file untuk kebutuhan cleanup jika error
+  const uploadedLogo = req.files?.["logo"] ? req.files["logo"][0] : null;
+  const uploadedFavicon = req.files?.["favicon"]
+    ? req.files["favicon"][0]
+    : null;
+  let tempLogoPath = null;
+  let tempFaviconPath = null;
+
   try {
-    const id = 1; // Singleton Constraint
-    const settings = await Settings.findByPk(id);
-
-    if (!settings) {
-      return res
-        .status(404)
-        .json({ success: false, message: "Record settings tidak ditemukan." });
-    }
-
+    const id = 1;
     const userRole = req.userRole ? req.userRole.toLowerCase().trim() : "";
+    const actorId = String(req.owl_username || req.karyawanId);
     const { status, previous_notrans, ...textContent } = req.body;
 
-    // THE GATEKEEPER
+    // FETCH & ROW-LEVEL LOCK
+    const settings = await Settings.findByPk(id, {
+      transaction: t,
+      lock: t.LOCK.UPDATE,
+    });
+
+    if (!settings) {
+      await t.rollback();
+      return res
+        .status(404)
+        .json({ success: false, message: "Settings not found." });
+    }
+
+    // CONCURRENCY GUARD
     if (userRole === "editor" && settings.is_locked) {
+      await t.rollback();
       return res.status(423).json({
         success: false,
         message:
@@ -84,113 +118,136 @@ exports.updateSettings = async (req, res) => {
       });
     }
 
-    let updatePayload = { ...textContent };
+    let updatePayload = {
+      ...settings.toJSON(),
+      ...textContent,
+    };
+    delete updatePayload.id;
+    delete updatePayload.createdAt;
+    delete updatePayload.updatedAt;
 
-    // Identifikasi File (Jika ada)
-    const uploadedLogo = req.files?.["logo"] ? req.files["logo"][0] : null;
-    const uploadedFavicon = req.files?.["favicon"]
-      ? req.files["favicon"][0]
-      : null;
-
-    // JALUR SUPERADMIN: SOVEREIGN BYPASS (LIVE COMMIT)
+    // JALUR SUPERADMIN: SOVEREIGN BYPASS (LIVE COMMIT - 200)
     if (userRole === "superadmin" || userRole === "admin") {
       console.log(">>> [SETTINGS] JALUR SUPERADMIN: BYPASSING APPROVAL <<<");
 
-      // Admin tidak butuh TEMP_ prefix
+      const oldLogoUrl = settings.logoUrl;
+      const oldFaviconUrl = settings.faviconUrl;
+
       if (uploadedLogo) updatePayload.logoUrl = uploadedLogo.filename;
       if (uploadedFavicon) updatePayload.faviconUrl = uploadedFavicon.filename;
 
-      const t = await sequelize.transaction();
-      try {
-        // 1. The Atomic Draft Killer: Bunuh draf Editor yang menggantung
-        await invalidateOldDrafts("Settings", id, t);
+      await invalidateOldDrafts("Settings", id, t);
 
-        // 2. Commit Update ke DB Lokal
-        await settings.update(
-          {
-            ...updatePayload,
-            is_locked: false,
-            lock_ticket: null,
-          },
-          { transaction: t },
-        );
+      // Commit Update ke DB Lokal
+      await settings.update(
+        {
+          ...updatePayload,
+          is_locked: false,
+          lock_ticket: null,
+        },
+        { transaction: t },
+      );
 
-        await t.commit();
+      await t.commit();
+      await settings.reload();
 
-        // 3. Final Physical Asset Management (Hapus file LAMA hanya jika transaksi DB SUKSES)
-        if (uploadedLogo && settings.logoUrl)
-          deleteSingleFile(settings.logoUrl);
-        if (uploadedFavicon && settings.faviconUrl)
-          deleteSingleFile(settings.faviconUrl);
+      if (uploadedLogo && oldLogoUrl) deleteSingleFile(oldLogoUrl);
+      if (uploadedFavicon && oldFaviconUrl) deleteSingleFile(oldFaviconUrl);
 
-        return res.status(200).json({
-          success: true,
-          message: "Settings diperbarui secara live!",
-          data: settings,
-        });
-      } catch (dbError) {
-        await t.rollback();
-        throw dbError;
-      }
+      return res.status(200).json({
+        success: true,
+        message: "Settings diperbarui secara live!",
+        data: settings.get({ plain: true }),
+      });
     }
 
-    // JALUR EDITOR: INITIATING HANDSHAKE (DRAFT MODE)
+    // EDITOR
     if (userRole === "editor") {
-      console.log(">>> [SETTINGS] JALUR EDITOR: INITIATING HANDSHAKE <<<");
+      console.log(">>> [SETTINGS] JALUR EDITOR: THE BATON PASS PROTOCOL <<<");
 
-      // 1. File Handling: Tambahkan TEMP_ prefix agar aman di storage
-      if (uploadedLogo) updatePayload.logoUrl = applyTempPrefix(uploadedLogo);
-      if (uploadedFavicon)
-        updatePayload.faviconUrl = applyTempPrefix(uploadedFavicon);
+      // File Handling (Temp Prefix)
+      if (uploadedLogo) {
+        tempLogoPath = applyTempPrefix(uploadedLogo);
+        updatePayload.logoUrl = tempLogoPath;
+      }
+      if (uploadedFavicon) {
+        tempFaviconPath = applyTempPrefix(uploadedFavicon);
+        updatePayload.faviconUrl = tempFaviconPath;
+      }
 
-      // 2. Draft Resolution: Tandai draf lama sebagai 'Replaced' jika ini resubmission
+      // Draft Resolution
       if (previous_notrans) {
         await ApprovalDraft.update(
           { status: "Replaced" },
-          { where: { notrans: previous_notrans } },
+          { where: { notrans: previous_notrans }, transaction: t },
         );
       }
+      await invalidateOldDrafts("Settings", id, t);
 
-      // 3. Network Call to ERP
-      try {
-        const result = await ErpApprovalService.initiateApproval({
-          model: Settings,
-          targetId: id,
+      const notrans = await generateNotrans("SET");
+
+      await ApprovalDraft.create(
+        {
+          notrans,
+          module_name: "Settings",
+          target_id: String(id),
           action: "UPDATE",
           payload: updatePayload,
-          userId: req.userId,
-          owlUsername: req.owl_username,
+          created_by: actorId,
+          status: "Pending",
+        },
+        { transaction: t },
+      );
+
+      await settings.update(
+        {
+          is_locked: true,
+          lock_ticket: notrans,
+        },
+        { transaction: t },
+      );
+
+      await t.commit();
+
+      try {
+        await ErpApprovalService.initiateApproval({
+          notrans,
+          moduleName: "Settings",
+          karyawanId: req.karyawanId,
           token: req.owl_token,
         });
-
-        // 4. Optimistic Lock Local Data
-        await settings.update({
-          is_locked: true,
-          lock_ticket: result.notrans,
-        });
-
-        return res.status(202).json({
-          success: true,
-          message: "Revisi profil diajukan. Data sekarang dikunci.",
-          ticket: result.notrans,
-        });
       } catch (owlError) {
-        if (updatePayload.logoUrl) deleteSingleFile(updatePayload.logoUrl);
-        if (updatePayload.faviconUrl)
-          deleteSingleFile(updatePayload.faviconUrl);
-
         console.error(
-          "🚨 [SETTINGS] ERP Approval Gagal. Membersihkan file TEMP_ orphaned.",
+          "🚨 [SETTINGS] ERP Initiate Failed (Local Draft Secured):",
+          owlError.message,
         );
-        throw owlError;
       }
+
+      return res.status(202).json({
+        success: true,
+        message: "Revisi profil diajukan. Data sekarang dikunci.",
+        ticket: notrans,
+      });
     }
 
-    // Fallback Security
+    if (t && !t.finished) await t.rollback();
     return res
       .status(403)
       .json({ success: false, message: "Role Anda tidak valid." });
   } catch (error) {
+    if (t && !t.finished) {
+      console.log(">>> [DATABASE] Rolling back transaction due to error...");
+      await t.rollback();
+    }
+
+    // Hapus file fisik TEMP yang terlanjur terbuat jika DB gagal commit
+    if (tempLogoPath) deleteSingleFile(tempLogoPath);
+    if (tempFaviconPath) deleteSingleFile(tempFaviconPath);
+    // Hapus file asli yang diupload Admin jika gagal
+    if (uploadedLogo && !tempLogoPath) deleteSingleFile(uploadedLogo.filename);
+    if (uploadedFavicon && !tempFaviconPath)
+      deleteSingleFile(uploadedFavicon.filename);
+
     console.error("🚨 ERROR UPDATE SETTINGS:", error);
     res.status(500).json({
       success: false,

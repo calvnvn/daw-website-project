@@ -9,6 +9,8 @@ import {
   useCallback,
 } from "react";
 import api from "@/lib/api";
+import { toast } from "sonner";
+import { useAuth } from "@/contexts/AuthContext";
 
 export interface SettingsData {
   companyName: string;
@@ -27,10 +29,18 @@ export interface SettingsData {
   previous_notrans?: string | null;
 }
 
+export interface RejectedDraft {
+  notrans: string;
+  action: "CREATE" | "UPDATE" | "DELETE";
+  payload: Partial<SettingsData>;
+  rejection_reason?: string;
+}
+
 interface SettingsContextType {
   settings: SettingsData | null;
-  rejectedSettings: any | null;
+  rejectedSettings: RejectedDraft | null;
   isLoading: boolean;
+  isSuperadmin: boolean;
   refreshSettings: () => Promise<void>;
 }
 
@@ -38,42 +48,58 @@ const SettingsContext = createContext<SettingsContextType>({
   settings: null,
   rejectedSettings: null,
   isLoading: true,
+  isSuperadmin: false,
   refreshSettings: async () => {},
 });
 
 export function SettingsProvider({ children }: { children: ReactNode }) {
   const [settings, setSettings] = useState<SettingsData | null>(null);
-  const [rejectedSettings, setRejectedSettings] = useState<any | null>(null);
+  const [rejectedSettings, setRejectedSettings] =
+    useState<RejectedDraft | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+
+  const { user } = useAuth();
+  const isSuperadmin =
+    user?.role?.toLowerCase() === "superadmin" ||
+    user?.role?.toLowerCase() === "admin";
 
   const fetchSettings = useCallback(async (signal?: AbortSignal) => {
     setIsLoading(true);
     try {
-      // Mengambil data Live dan data Rejected (Draft) secara bersamaan tanpa saling memblokir
       const results = await Promise.allSettled([
         api.get("/settings", { signal }),
         api.get("/approval/rejected/1?module=Settings", { signal }),
       ]);
 
-      // 1. Handle Live Data
+      let finalRejectedData: RejectedDraft | null = null;
+
       if (results[0].status === "fulfilled") {
-        // Backend baru membalas dengan { success: true, data: {...} }
-        const liveData = results[0].value.data.data || results[0].value.data;
+        const res = results[0].value.data;
+        const liveData = res.data || res;
         setSettings(liveData);
-      } else {
-        if (results[0].reason?.name !== "CanceledError") {
-          console.error("🚨 Failed to fetch live settings:", results[0].reason);
+
+        if (res.has_rejected || res.hasRejected) {
+          console.log("🎯 Radar Detected Rejection via Main Ledger");
+          finalRejectedData = res.rejected_data || res.rejectedData;
         }
       }
 
-      // 2. Handle Rejected Draft Data
-      if (
-        results[1].status === "fulfilled" &&
-        results[1].value.data.hasRejected
-      ) {
-        setRejectedSettings(results[1].value.data.data);
-      } else {
-        setRejectedSettings(null); // Bersihkan jika tidak ada atau API gagal
+      if (!finalRejectedData && results[1].status === "fulfilled") {
+        const resRadar = results[1].value.data;
+        if (resRadar.has_rejected || resRadar.hasRejected || resRadar.success) {
+          const draftData = resRadar.rejected_data || resRadar.data;
+          if (draftData) {
+            console.log("📡 Radar Detected Rejection via Secondary Vault Scan");
+            finalRejectedData = draftData;
+          }
+        }
+      }
+
+      setRejectedSettings(finalRejectedData);
+    } catch (err: any) {
+      if (err.name !== "CanceledError") {
+        console.error("🚨 Radar System Failure:", err);
+        toast.error("Gagal sinkronisasi radar birokrasi.");
       }
     } finally {
       setIsLoading(false);
@@ -94,9 +120,10 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
       settings,
       rejectedSettings,
       isLoading,
+      isSuperadmin,
       refreshSettings: () => fetchSettings(),
     }),
-    [settings, rejectedSettings, isLoading, fetchSettings],
+    [settings, rejectedSettings, isLoading, isSuperadmin, fetchSettings],
   );
 
   return (

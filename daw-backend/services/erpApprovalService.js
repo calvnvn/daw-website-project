@@ -111,7 +111,7 @@ class ErpApprovalService {
       };
 
       console.log(
-        `>>> [ERP COURIER] Membuka Keran Data (getData) untuk NIK: ${karyawanid}...`,
+        `>>> [ERP COURIER] Membuka Data (getData) untuk NIK: ${karyawanid}...`,
       );
 
       const response = await dawApi.post(

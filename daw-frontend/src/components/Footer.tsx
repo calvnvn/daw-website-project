@@ -75,7 +75,7 @@ export default function Footer() {
                       : logoDaw
                   }
                   alt="DAW Group"
-                  className="h-24 lg:h-32 w-auto brightness-0 mb-5 invert opacity-90 transition-opacity hover:opacity-100"
+                  className="h-10 lg:h-12 w-auto brightness-0 mb-5 invert opacity-90 transition-opacity hover:opacity-100"
                 />
               </Link>
               <div className="space-y-6">

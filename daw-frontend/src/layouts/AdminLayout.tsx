@@ -255,7 +255,7 @@ export default function AdminLayout() {
               settings?.logoUrl ? getCleanImageUrl(settings.logoUrl) : logoDaw
             }
             alt="DAW Admin Logo"
-            className="h-24 lg:h-32 w-auto object-contain"
+            className="h-10 w-auto object-contain"
           />
         </div>
 
