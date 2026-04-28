@@ -7,7 +7,7 @@ const commitTempFile = (fileInput) => {
   const filename = path.basename(fileInput);
   if (!filename.startsWith("TEMP_")) return filename;
 
-  const uploadPath = path.resolve(process.cwd(), "public", "uploads");
+  const uploadPath = path.join(__dirname, "..", "public", "uploads");
   const oldPath = path.join(uploadPath, filename);
 
   const newFilename = filename.replace(/^TEMP_/, "");
@@ -29,17 +29,12 @@ const commitTempFile = (fileInput) => {
       console.log(`✅ [FILE COMMITTED] ${filename} -> ${newFilename}`);
       return newFilename;
     } else {
-      console.error(
-        `🚨 [PROMOTION CRITICAL] File FISIK ${filename} tidak ditemukan di ${uploadPath}!`,
-      );
-      return null;
+      console.error(`🚨 [PROMOTION FAIL] File ${filename} raib dari disk!`);
+      return filename;
     }
   } catch (error) {
-    console.error(
-      `🚨 [FILE COMMIT ERROR] Gagal merename ${filename}:`,
-      error.message,
-    );
-    return null;
+    console.error(`🚨 [FILE COMMIT ERROR]:`, error.message);
+    return filename; // Fallback ke nama asli jika gagal rename
   }
 };
 

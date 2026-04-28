@@ -228,10 +228,34 @@ exports.executeDecision = async (req, res) => {
     }
 
     // CASE B: APPROVAL
+    // CASE B: APPROVAL
     if (status === "1") {
       if (isFinalLocal) {
-        // FINAL STAGE: Inject draft data to Live Table
-        let cleanPayload = { ...payload };
+        console.log(
+          ">>> [HANDOVER] Memulai proses finalisasi ke tabel utama...",
+        );
+
+        // 🚀 THE CRITICAL FIX: Pastikan Payload adalah PLAIN OBJECT
+        // Tanpa ini, loop 'for...in' di handleFileCommit bakal GAGAL baca key logoUrl
+        let cleanPayload;
+        try {
+          // Kita cuci objeknya biar jadi objek JS murni
+          const rawPayload = draftData.payload;
+          cleanPayload =
+            typeof rawPayload === "string"
+              ? JSON.parse(rawPayload)
+              : JSON.parse(JSON.stringify(rawPayload));
+
+          console.log(
+            "🔍 [DEBUG] Keys found in payload:",
+            Object.keys(cleanPayload),
+          );
+        } catch (e) {
+          console.error("🚨 [HANDOVER FAIL] Gagal parsing payload:", e.message);
+          throw new Error("Payload draf korup.");
+        }
+
+        // Pembersihan metadata birokrasi
         ["id", "createdAt", "updatedAt", "is_locked", "lock_ticket"].forEach(
           (f) => delete cleanPayload[f],
         );
@@ -239,8 +263,13 @@ exports.executeDecision = async (req, res) => {
         cleanPayload.is_locked = false;
         cleanPayload.lock_ticket = null;
 
-        // Commit Temp Files to Permanent Storage
+        // 🚀 PROMOSI FILE: Ubah TEMP_ jadi permanen
+        // Sekarang handleFileCommit pasti bisa nemuin key 'logoUrl'
         cleanPayload = handleFileCommit(cleanPayload);
+
+        console.log(
+          `>>> [EXECUTION] Mengirim data bersih ke modul: ${moduleName}`,
+        );
 
         // Update DB via Relational Execution Engine
         const filesToTrash = await executeModelUpdate(
@@ -251,17 +280,17 @@ exports.executeDecision = async (req, res) => {
           t,
         );
 
-        // Close the Draft
+        // Tutup draf
         await draftData.update({ status: "Approved" }, { transaction: t });
 
-        // COMMIT DB CHANGES BEFORE DELETING PHYSICAL FILES
         await t.commit();
 
-        // Safe Physical Cleanup (Post-Commit)
-        if (filesToTrash && filesToTrash.length > 0) {
-          filesToTrash.forEach((file) => deleteSingleFile(file));
+        // Cleanup fisik (Hanya jalan jika DB sukses commit)
+        if (filesToTrash && Array.isArray(filesToTrash)) {
+          filesToTrash.forEach((file) => file && deleteSingleFile(file));
         }
 
+        console.log(`✅ [SUCCESS] Handover ${moduleName} selesai sempurna.`);
         return res.status(200).json({
           message: "Persetujuan Final Berhasil. Data telah dipublikasikan!",
         });
