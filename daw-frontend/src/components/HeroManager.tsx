@@ -16,6 +16,7 @@ import {
   ShieldAlert,
   Loader2,
   Send,
+  XCircle,
 } from "lucide-react";
 import { toast } from "sonner";
 import api, { BASE_UPLOAD_URL } from "@/lib/api";
@@ -25,19 +26,19 @@ interface EditableSlide extends Omit<HeroSlides, "id"> {
   id: string | number;
   file?: File | null;
   previewUrl?: string;
+  previous_notrans?: string;
+  isDeleting?: boolean;
 }
 
 export default function HeroManager() {
-  const { slides: initialSlides, refreshData } = useHome();
+  const { slides: initialSlides, rejectedSlidesMap, refreshData } = useHome();
   const { user } = useAuth();
 
-  // Identity Sync
   const isSuperadmin =
     user?.role?.toLowerCase() === "superadmin" ||
     user?.role?.toLowerCase() === "admin";
   const isEditor = user?.role?.toLowerCase() === "editor";
 
-  // States
   const [slides, setSlides] = useState<EditableSlide[]>([]);
   const [originalSlides, setOriginalSlides] = useState<EditableSlide[]>([]);
 
@@ -47,21 +48,20 @@ export default function HeroManager() {
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
   const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
 
-  const [rejectedDrafts, setRejectedDrafts] = useState<any[]>([]);
   const [isOptimisticallyLocked, setIsOptimisticallyLocked] = useState(false);
 
   const fileInputRefs = useRef<{ [key: string]: HTMLInputElement | null }>({});
 
-  // Interaction Shield
   const hasLockedSlides = slides.some((s) => s.is_locked);
   const shouldLockGlobalActions =
     (hasLockedSlides || isOptimisticallyLocked) && !isSuperadmin;
 
+  // LIFECYCLE EFFECTS
+  // Data Synchronization & Snapshotting (Blueprint 2.2)
   useEffect(() => {
     if (initialSlides && !isEditing) {
       const cleanSlides = initialSlides.map((s) => ({ ...s }));
       setSlides(cleanSlides);
-
       setOriginalSlides(initialSlides.map((s) => ({ ...s })));
 
       if (!initialSlides.some((s) => s.is_locked)) {
@@ -70,87 +70,64 @@ export default function HeroManager() {
     }
   }, [initialSlides, isEditing]);
 
-  useEffect(() => {
-    // superadmin tidak perlu melihat banner restorasi draf
-    if (isSuperadmin) return;
-
-    const controller = new AbortController();
-
-    const fetchRejectedDrafts = async () => {
-      try {
-        const promises = slides.map((s) =>
-          api
-            .get(`/approval/rejected/${s.id}?module=HeroSlide`, {
-              signal: controller.signal,
-            })
-            .catch(() => null),
-        );
-
-        const results = await Promise.all(promises);
-
-        const rejected = results
-          .filter((res) => res && res.data && res.data.hasRejected)
-          .map((res) => res!.data.data);
-
-        setRejectedDrafts(rejected);
-      } catch (err: any) {
-        if (err.name !== "CanceledError") {
-          console.error("Gagal menarik data pemulihan:", err);
-        }
-      }
-    };
-
-    if (slides.length > 0 && !isEditing) {
-      fetchRejectedDrafts();
-    }
-
-    return () => controller.abort();
-  }, [slides.length, isEditing, isSuperadmin]);
-
+  // Garbage Collection & Memory Safety
   useEffect(() => {
     return () => {
       slides.forEach((slide) => {
         if (slide.previewUrl) {
           URL.revokeObjectURL(slide.previewUrl);
           console.log(
-            `🧠 Memory Cleared: Preview for slide ${slide.id} revoked.`,
+            `🧠 [Memory Safety]: Preview image for slide ${slide.id} revoked.`,
           );
         }
       });
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  const handleDiscardDraft = async (notrans: string) => {
+    toast("Abaikan Notifikasi?", {
+      description:
+        "Tindakan ini akan menghapus draf penolakan secara permanen.",
+      action: {
+        label: "Abaikan",
+        onClick: async () => {
+          try {
+            await api.patch(`/approval/discard/${encodeURIComponent(notrans)}`);
+            toast.success("Notifikasi diabaikan.");
+            await refreshData();
+          } catch {
+            toast.error("Gagal mengabaikan draf.");
+          }
+        },
+      },
+    });
+  };
 
   const handleRestoreDraft = useCallback(
     (targetId: string | number) => {
-      const draft = rejectedDrafts.find(
-        (d) => String(d.target_id) === String(targetId),
-      );
+      const draft = rejectedSlidesMap[String(targetId)];
       if (!draft?.payload) return;
-
-      const payload = draft.payload;
 
       setSlides((prev) =>
         prev.map((s) => {
           if (String(s.id) === String(targetId)) {
             return {
               ...s,
-              title: payload.title ?? s.title,
-              subtitle: payload.subtitle ?? s.subtitle,
-              order: payload.order ?? s.order,
-              imageUrl: payload.imageUrl ?? s.imageUrl,
+              ...draft.payload,
               file: null,
               previewUrl: undefined,
               previous_notrans: draft.notrans,
-            } as EditableSlide;
+            };
           }
           return s;
         }),
       );
 
       setIsEditing(true);
-      toast.info("Draf revisi berhasil dipulihkan.");
+      toast.info("Draf berhasil dipulihkan.");
     },
-    [rejectedDrafts],
+    [rejectedSlidesMap],
   );
 
   const addSlide = () => {
@@ -167,21 +144,32 @@ export default function HeroManager() {
   };
 
   const removeSlide = async (id: string | number) => {
-    toast("Hapus Slide?", {
+    toast("Konfirmasi Penghapusan", {
       description: isSuperadmin
-        ? "Data akan langsung terhapus."
-        : "Tindakan ini akan diajukan untuk disetujui.",
+        ? "Data akan dihapus permanen dari sistem."
+        : "Tindakan ini akan diajukan untuk disetujui (Pending Delete).",
       action: {
         label: "Hapus",
         onClick: async () => {
           toast.promise(
             async () => {
-              if (typeof id === "number") {
+              if (
+                typeof id === "number" ||
+                (typeof id === "string" && !id.startsWith("new-"))
+              ) {
                 const res = await api.delete(`/homepage/hero/${id}`);
+
                 if (res.status === 202) {
                   setSlides((prev) =>
                     prev.map((s) =>
-                      s.id === id ? { ...s, is_locked: true } : s,
+                      s.id === id
+                        ? {
+                            ...s,
+                            is_locked: true,
+                            isDeleting: true,
+                            lock_ticket: res.data.ticket,
+                          }
+                        : s,
                     ),
                   );
                   return "Permintaan hapus dikirim. Menunggu persetujuan.";
@@ -194,27 +182,23 @@ export default function HeroManager() {
             {
               loading: "Memproses...",
               success: (msg) => msg,
-              error: (err) => {
-                console.error("Delete error: ", err);
-                return (
-                  err.response?.data?.message || "Failed to delete from server"
-                );
-              },
+              error: (err) =>
+                err.response?.data?.message || "Gagal menghapus slide.",
             },
           );
         },
       },
       cancel: {
-        label: "Cancel",
-        onClick: () => console.log("Delete cancelled"),
+        label: "Batal",
+        onClick: () => {},
       },
     });
   };
-
   const moveSlide = (index: number, direction: "up" | "down") => {
     if (shouldLockGlobalActions) {
-      return toast.error("Urutan terkunci", {
-        description: "Terdapat slide yang sedang dalam proses peninjauan.",
+      return toast.error("Akses Dibatasi", {
+        description:
+          "Terdapat slide dalam antrean peninjauan. Urutan dikunci sementara.",
       });
     }
 
@@ -227,42 +211,10 @@ export default function HeroManager() {
       updatedSlides[index],
     ];
 
-    // Re-index urutan secara otomatis
+    // Re-index otomatis
     setSlides(updatedSlides.map((slide, idx) => ({ ...slide, order: idx })));
   };
 
-  const getChangedSlides = useCallback(() => {
-    return slides.filter((slide) => {
-      if (slide.is_locked && !isSuperadmin) return false;
-
-      if (typeof slide.id === "string" && slide.id.startsWith("new-"))
-        return true;
-
-      const original = originalSlides.find((os) => os.id === slide.id);
-      if (!original) return false;
-
-      const isTextChanged =
-        slide.title !== original.title || slide.subtitle !== original.subtitle;
-      const isOrderChanged = slide.order !== original.order;
-      const isImageChanged = !!slide.file;
-
-      return isTextChanged || isOrderChanged || isImageChanged;
-    });
-  }, [slides, originalSlides, isSuperadmin]);
-
-  const handleImageChange = (id: string | number, file: File) => {
-    if (!file) return;
-
-    const currentSlide = slides.find((s) => s.id === id);
-    if (currentSlide?.previewUrl) URL.revokeObjectURL(currentSlide.previewUrl);
-
-    const previewUrl = URL.createObjectURL(file);
-    setSlides(
-      slides.map((s) => (s.id === id ? { ...s, file, previewUrl } : s)),
-    );
-  };
-
-  // --- DRAG AND DROP LOGIC ---
   const handleDragStart = (
     e: React.DragEvent<HTMLDivElement>,
     index: number,
@@ -285,9 +237,8 @@ export default function HeroManager() {
     setDragOverIndex(index);
   };
 
-  const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
-    e.preventDefault(); // WAJIB ada agar elemen bisa di-drop
-  };
+  const handleDragOver = (e: React.DragEvent<HTMLDivElement>) =>
+    e.preventDefault();
 
   const handleDragEnd = () => {
     setDraggedIndex(null);
@@ -308,35 +259,52 @@ export default function HeroManager() {
     updatedSlides.splice(draggedIndex, 1);
     updatedSlides.splice(index, 0, draggedItem);
 
-    const finalSlides = updatedSlides.map((slide, idx) => ({
-      ...slide,
-      order: idx,
-    }));
-
-    setSlides(finalSlides);
+    setSlides(updatedSlides.map((slide, idx) => ({ ...slide, order: idx })));
     setDraggedIndex(null);
     setDragOverIndex(null);
+  };
+
+  const handleImageChange = (id: string | number, file: File) => {
+    if (!file) return;
+    const currentSlide = slides.find((s) => s.id === id);
+    if (currentSlide?.previewUrl) URL.revokeObjectURL(currentSlide.previewUrl);
+
+    const previewUrl = URL.createObjectURL(file);
+    setSlides(
+      slides.map((s) => (s.id === id ? { ...s, file, previewUrl } : s)),
+    );
   };
 
   const getDisplayImageUrl = (slide: EditableSlide) => {
     if (slide.previewUrl) return slide.previewUrl;
     if (slide.imageUrl) {
-      // Konsep "Split & Pop": Apapun isinya (path lengkap atau cuma nama),
-      // kita hanya ambil bagian paling ujung (nama filenya).
       const filename = slide.imageUrl.split("/").pop();
-
-      // Konsep "Sanitized Join": Pastikan base URL tidak diakhiri slash,
-      // lalu kita tambahkan satu slash "/" secara manual agar konsisten.
       const cleanBase = BASE_UPLOAD_URL.replace(/\/$/, "");
-
       return `${cleanBase}/${filename}`;
     }
     return null;
   };
 
+  const getChangedSlides = useCallback(() => {
+    return slides.filter((slide) => {
+      if (slide.is_locked && !isSuperadmin) return false;
+      if (typeof slide.id === "string" && slide.id.startsWith("new-"))
+        return true;
+
+      const original = originalSlides.find((os) => os.id === slide.id);
+      if (!original) return false;
+
+      const isTextChanged =
+        slide.title !== original.title || slide.subtitle !== original.subtitle;
+      const isOrderChanged = slide.order !== original.order;
+      const isImageChanged = !!slide.file;
+
+      return isTextChanged || isOrderChanged || isImageChanged;
+    });
+  }, [slides, originalSlides, isSuperadmin]);
+
   const handleSave = async () => {
     const changedData = getChangedSlides();
-
     if (changedData.length === 0) {
       toast.info("Tidak ada perubahan", {
         description: "Data slide masih sama dengan versi Live.",
@@ -352,8 +320,11 @@ export default function HeroManager() {
         : "Mengajukan revisi spanduk...",
     );
 
+    const successfulIds: (string | number)[] = [];
+    let hasError = false;
+
     try {
-      const promises = changedData.map(async (slide) => {
+      for (const slide of changedData) {
         const isNew =
           typeof slide.id === "string" && slide.id.startsWith("new-");
         const url = isNew ? "/homepage/hero" : `/homepage/hero/${slide.id}`;
@@ -364,49 +335,78 @@ export default function HeroManager() {
         formData.append("order", slide.order.toString());
         formData.append("status", isSuperadmin ? "Active" : "Published");
 
-        if ((slide as any).previous_notrans) {
-          formData.append("previous_notrans", (slide as any).previous_notrans);
+        const radarDraft = rejectedSlidesMap[String(slide.id)];
+        const ticketToClear = slide.previous_notrans || radarDraft?.notrans;
+
+        if (ticketToClear && isEditor) {
+          formData.append("previous_notrans", ticketToClear);
         }
 
-        // 🚀 ASSET DIFFING: Hanya kirim binary gambar jika ada file baru (Hemat Bandwidth)
         if (slide.file) {
           formData.append("image", slide.file);
         }
 
-        return isNew ? api.post(url, formData) : api.put(url, formData);
-      });
+        try {
+          const res = isNew
+            ? await api.post(url, formData)
+            : await api.put(url, formData);
+          successfulIds.push(slide.id);
 
-      await Promise.all(promises);
-
-      if (isEditor) setIsOptimisticallyLocked(true);
+          // Optimistic UI Instan (Blueprint 3.5)
+          if (isEditor && res.status === 202) {
+            setSlides((prev) =>
+              prev.map((s) =>
+                s.id === slide.id
+                  ? { ...s, is_locked: true, lock_ticket: res.data.ticket }
+                  : s,
+              ),
+            );
+          }
+        } catch (itemError: any) {
+          console.error(`Gagal menyimpan slide ${slide.id}:`, itemError);
+          hasError = true;
+          toast.error(`Gagal menyimpan slide: ${slide.title || "Baru"}`, {
+            description:
+              itemError.response?.data?.message || "Kesalahan jaringan.",
+          });
+        }
+      }
 
       await refreshData();
-      setIsEditing(false);
-      toast.success(isSuperadmin ? "Banner diperbarui!" : "Revisi diajukan!", {
-        id: loadingToast,
-      });
-    } catch (error: any) {
-      console.error(error);
-      toast.error(
-        error.response?.data?.message || "Gagal menyimpan perubahan",
-        { id: loadingToast },
-      );
+
+      if (!hasError) {
+        setIsEditing(false);
+        if (isEditor) setIsOptimisticallyLocked(true);
+        toast.success(
+          isSuperadmin ? "Banner diperbarui!" : "Seluruh revisi diajukan!",
+          { id: loadingToast },
+        );
+      } else {
+        toast.warning("Sebagian data gagal disimpan", {
+          id: loadingToast,
+          description:
+            "Data yang berhasil telah diajukan. Silakan periksa sisa data yang gagal.",
+        });
+      }
     } finally {
       setIsSaving(false);
     }
   };
 
+  const hasRejectedSlides = Object.keys(rejectedSlidesMap || {}).length > 0;
+
   return (
     <div className="space-y-6 animate-in fade-in duration-300">
-      {/* --- SOVEREIGN BANNERS (Contextual Awareness) --- */}
-      {/* 1. Amber Banner (superadmin Override Warning) */}
+      {/* SOVEREIGN BANNERS */}
+
+      {/* 1. Amber Banner (Superadmin Override Warning) */}
       {hasLockedSlides && isSuperadmin && (
         <div className="bg-amber-50 border border-amber-200 p-4 md:p-5 rounded-xl flex items-center gap-4 animate-in slide-in-from-top-4 shadow-sm mb-4">
           <div className="bg-amber-100 p-2 rounded-full text-amber-600 shrink-0">
             <ShieldAlert className="w-5 h-5" />
           </div>
           <div>
-            <h4 className="text-xs md:text-sm font-black text-amber-900 uppercase tracking-tight">
+            <h4 className="text-xs md:text-sm font-bold text-amber-900 uppercase tracking-tight">
               Mode Override Aktif
             </h4>
             <p className="text-[11px] md:text-xs text-amber-700 leading-relaxed mt-0.5 max-w-2xl">
@@ -426,7 +426,7 @@ export default function HeroManager() {
             <Lock className="w-5 h-5" />
           </div>
           <div>
-            <h4 className="text-xs md:text-sm font-black text-blue-900 uppercase tracking-tight">
+            <h4 className="text-xs md:text-sm font-bold text-blue-900 uppercase tracking-tight">
               Akses Dibatasi
             </h4>
             <p className="text-[11px] md:text-xs text-blue-700 leading-relaxed mt-0.5 max-w-2xl">
@@ -437,15 +437,25 @@ export default function HeroManager() {
         </div>
       )}
 
-      {/* --- HEADER MANAGER (MATRIX BUTTONS) --- */}
+      {/* HEADER MANAGER & MATRIX BUTTONS */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-4 border-b border-slate-100 pb-4 gap-4">
         <div>
-          <h3 className="text-lg font-bold text-slate-900 flex items-center gap-2">
+          <h3 className="text-lg font-bold text-slate-500 flex items-center gap-2">
             Hero Carousel
-            {hasLockedSlides && !isSuperadmin && (
-              <span className="bg-blue-50 text-blue-600 border border-blue-200 text-[10px] px-2 py-0.5 rounded-full flex items-center gap-1 animate-pulse">
-                <Lock className="w-3 h-3" /> Ada Draf Tertunda
-              </span>
+            {/* Visual Mirroring: Status Indicators */}
+            {!isSuperadmin && (
+              <>
+                {hasRejectedSlides && (
+                  <span className="bg-red-50 text-red-600 border border-red-200 text-[10px] px-2 py-0.5 rounded-full flex items-center gap-1 animate-pulse">
+                    <AlertTriangle className="w-3 h-3" /> Perlu Revisi
+                  </span>
+                )}
+                {hasLockedSlides && !hasRejectedSlides && (
+                  <span className="bg-blue-50 text-blue-600 border border-blue-200 text-[10px] px-2 py-0.5 rounded-full flex items-center gap-1 animate-pulse">
+                    <Lock className="w-3 h-3" /> Draf Tertunda
+                  </span>
+                )}
+              </>
             )}
           </h3>
           <p className="text-sm text-slate-500">
@@ -465,7 +475,7 @@ export default function HeroManager() {
               setIsEditing(!isEditing);
             }}
             disabled={isSaving || shouldLockGlobalActions}
-            className={`flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg font-black text-[11px] uppercase tracking-widest transition-colors border shadow-sm ${
+            className={`flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg font-bold text-[11px] uppercase tracking-widest transition-colors border shadow-sm ${
               shouldLockGlobalActions
                 ? "bg-slate-50 text-slate-300 border-slate-100 cursor-not-allowed"
                 : isEditing
@@ -480,19 +490,20 @@ export default function HeroManager() {
             <span>{isEditing ? "Editing Mode" : "Locked"}</span>
           </button>
 
+          {/* Add Slide Guard */}
           {isEditing && !shouldLockGlobalActions && (
             <button
               onClick={() => slides.length < 5 && addSlide()}
-              className="flex items-center gap-1.5 px-4 py-2 bg-daw-green/10 hover:bg-daw-green hover:text-white text-daw-green rounded-lg text-[11px] font-black uppercase tracking-widest transition-colors">
+              className="flex items-center gap-1.5 px-4 py-2 bg-daw-green/10 hover:bg-daw-green hover:text-white text-daw-green rounded-lg text-[11px] font-bold uppercase tracking-widest transition-colors">
               <Plus className="w-4 h-4" /> Add Slide
             </button>
           )}
 
-          {/* Matrix Action Button (Publish Live vs Request Approval) */}
+          {/* Matrix Action Button (Rule 2.5: Sovereign vs Restrictive) */}
           <button
             onClick={handleSave}
             disabled={isSaving || !isEditing || shouldLockGlobalActions}
-            className={`flex-1 sm:flex-none flex items-center justify-center gap-2 px-6 py-2.5 rounded-lg font-black text-[11px] uppercase tracking-widest transition-all shadow-lg active:scale-95 disabled:cursor-not-allowed disabled:shadow-none ${
+            className={`flex-1 sm:flex-none flex items-center justify-center gap-2 px-6 py-2.5 rounded-lg font-bold text-[11px] uppercase tracking-widest transition-all shadow-lg active:scale-95 disabled:cursor-not-allowed disabled:shadow-none ${
               isSaving
                 ? "bg-slate-300 text-slate-700"
                 : shouldLockGlobalActions
@@ -524,21 +535,17 @@ export default function HeroManager() {
           const displayImage = getDisplayImageUrl(slide);
           const isLocked = !!slide.is_locked;
 
-          // Row Authority Logic
           const shouldLockRowUI = isLocked && !isSuperadmin;
           const isOverrideRow = isLocked && isSuperadmin;
 
           const isDragging = draggedIndex === index;
           const isTargeted = dragOverIndex === index && draggedIndex !== index;
 
-          const rejectedDraft = rejectedDrafts.find(
-            (d) => String(d.target_id) === String(slide.id),
-          );
+          const rejectedDraft = rejectedSlidesMap[String(slide.id)];
 
           return (
             <div
               key={slide.id}
-              // 🚀 KONEKSIKAN SEMUA DND HANDLERS (Cleanup unused variables)
               draggable={isEditing && !shouldLockRowUI}
               onDragStart={(e) => handleDragStart(e, index)}
               onDragEnter={(e) => handleDragEnter(e, index)}
@@ -546,47 +553,75 @@ export default function HeroManager() {
               onDragEnd={handleDragEnd}
               onDrop={() => handleDrop(index)}
               className={`flex flex-col md:flex-row gap-6 p-5 rounded-xl border transition-all duration-300 relative overflow-hidden ${
-                shouldLockRowUI
-                  ? "opacity-60 grayscale-[30%] pointer-events-none bg-slate-50"
-                  : isOverrideRow
-                    ? "bg-amber-50/30 border-amber-200 shadow-sm"
-                    : isEditing
-                      ? "bg-white border-slate-200 shadow-sm"
-                      : "bg-slate-50 border-slate-100"
-              } ${isDragging ? "opacity-20 scale-95 border-daw-green border-dashed" : ""} ${
-                isTargeted
-                  ? "border-t-4 border-t-daw-green shadow-lg scale-[1.01]"
-                  : ""
-              }`}>
-              {/* STATUS OVERLAYS */}
+                slide.isDeleting
+                  ? "bg-rose-50/40 border-rose-200 opacity-60 grayscale-[50%] pointer-events-none"
+                  : shouldLockRowUI
+                    ? "bg-slate-50 opacity-70 border-slate-200 pointer-events-none"
+                    : isOverrideRow
+                      ? "bg-amber-50/40 border-amber-200 shadow-sm"
+                      : isEditing
+                        ? "bg-white border-slate-200 shadow-sm"
+                        : "bg-slate-50/50 border-slate-100 hover:bg-slate-50/80"
+              } ${isDragging ? "opacity-20 scale-95 border-daw-green border-dashed" : ""} 
+                ${isTargeted ? "border-t-4 border-t-daw-green shadow-lg scale-[1.01]" : ""}`}>
+              {/* STATUS OVERLAYS (The Bureaucratic Mirror) */}
+
+              {/* Rejection Ribbon (Needs Revision) */}
               {rejectedDraft && !isEditing && !isSuperadmin && (
-                <div className="absolute top-0 left-0 right-0 bg-amber-500 text-white text-[10px] font-bold px-3 py-1 flex justify-between items-center z-10 animate-in slide-in-from-top-2">
-                  <span className="flex items-center gap-1.5 uppercase tracking-tighter">
-                    <AlertTriangle className="w-3 h-3" /> Catatan Peninjau: "
-                    {rejectedDraft.rejection_reason}"
+                <div className="absolute top-0 left-0 right-0 bg-red-500 text-white text-[10px] font-bold px-3 py-1.5 flex justify-between items-center z-10 animate-in slide-in-from-top-2">
+                  <span className="flex items-center gap-1.5 uppercase tracking-wider">
+                    <AlertTriangle className="w-3 h-3" />
+                    <span className="hidden sm:inline">Catatan Peninjau:</span>
+                    <span className="font-medium italic truncate max-w-[200px] md:max-w-md">
+                      "{rejectedDraft.rejection_reason}"
+                    </span>
                   </span>
-                  <button
-                    onClick={() => handleRestoreDraft(slide.id)}
-                    className="bg-white/20 hover:bg-white/30 px-2 py-0.5 rounded transition-colors pointer-events-auto">
-                    <RotateCcw className="w-3 h-3 inline mr-1" /> Pulihkan Draf
-                  </button>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => handleRestoreDraft(slide.id)}
+                      className="flex items-center gap-1 bg-white/20 hover:bg-white/30 px-2 py-0.5 rounded transition-colors pointer-events-auto">
+                      <RotateCcw className="w-3 h-3" /> Pulihkan Data
+                    </button>
+                    <button
+                      onClick={() => handleDiscardDraft(rejectedDraft.notrans)}
+                      title="Abaikan Notifikasi"
+                      className="p-0.5 hover:bg-white/20 rounded transition-colors pointer-events-auto text-red-100 hover:text-white">
+                      <XCircle className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
                 </div>
               )}
 
+              {/* 2. Override Mode (Admin Only) */}
               {isOverrideRow && (
-                <div className="absolute top-0 left-0 right-0 bg-amber-100 border-b border-amber-200 text-amber-800 text-[10px] font-black px-3 py-1 flex items-center justify-center gap-1.5 z-10 uppercase tracking-widest">
+                <div className="absolute top-0 left-0 right-0 bg-amber-100 border-b border-amber-200 text-amber-800 text-[10px] font-bold px-3 py-1 flex items-center justify-center gap-1.5 z-10 uppercase tracking-widest">
                   <ShieldAlert className="w-3 h-3 text-amber-600" /> Mode
                   Override: Sedang Ditinjau Editor
                 </div>
               )}
 
+              {/* 3. Locked & Pending Delete Status */}
               {shouldLockRowUI && (
-                <div className="absolute top-0 left-0 right-0 bg-blue-50 border-b border-blue-100 text-blue-600 text-[10px] font-black px-3 py-1 flex items-center justify-center gap-1.5 z-10 uppercase tracking-widest">
-                  <Lock className="w-3 h-3" /> Akses Dibatasi
+                <div
+                  className={`absolute top-0 left-0 right-0 border-b text-[10px] font-bold px-3 py-1 flex items-center justify-center gap-1.5 z-10 uppercase tracking-widest ${
+                    slide.isDeleting
+                      ? "bg-rose-100 border-rose-200 text-rose-700"
+                      : "bg-blue-50 border-blue-100 text-blue-600"
+                  }`}>
+                  {slide.isDeleting ? (
+                    <>
+                      <Trash2 className="w-3 h-3" /> Menunggu Persetujuan Hapus
+                    </>
+                  ) : (
+                    <>
+                      <Lock className="w-3 h-3" /> Akses Dibatasi (Dalam
+                      Peninjauan)
+                    </>
+                  )}
                 </div>
               )}
 
-              {/* SEQUENTIAL CONTROLS */}
+              {/* SEQUENTIAL CONTROLS (DND) */}
               {isEditing && !shouldLockRowUI && (
                 <div className="flex flex-row md:flex-col items-center justify-center gap-1 border-b md:border-b-0 md:border-r border-slate-100 pb-4 md:pb-0 md:pr-4 shrink-0 cursor-grab active:cursor-grabbing">
                   <button
@@ -608,24 +643,24 @@ export default function HeroManager() {
               {/* ASSET AREA (IMAGE) */}
               <div
                 className={`md:w-1/3 shrink-0 flex flex-col gap-2 relative mt-${(rejectedDraft || isLocked) && !isSuperadmin ? "6" : isOverrideRow ? "6" : "0"}`}>
-                <label className="block text-[9px] font-black text-slate-400 uppercase tracking-widest text-center mb-1">
+                <label className="block text-[9px] font-bold text-slate-400 uppercase tracking-widest text-center mb-1">
                   Gambar Latar
                 </label>
                 <div
                   onClick={() =>
                     !shouldLockRowUI && fileInputRefs.current[slide.id]?.click()
                   }
-                  className={`relative aspect-video rounded-lg border-2 border-dashed flex flex-col items-center justify-center overflow-hidden transition-all ${
+                  className={`relative aspect-video rounded-lg border-2 flex flex-col items-center justify-center overflow-hidden transition-all ${
                     !shouldLockRowUI
-                      ? "cursor-pointer border-slate-300 bg-white hover:border-daw-green"
-                      : "border-slate-200 bg-slate-50"
+                      ? "cursor-pointer border-dashed border-slate-300 bg-white hover:border-daw-green"
+                      : "border-solid border-transparent bg-slate-100/50"
                   }`}>
                   {displayImage ? (
                     <>
                       <img
                         src={displayImage}
-                        className="absolute inset-0 w-full h-full object-cover"
-                        alt="Preview"
+                        className={`absolute inset-0 w-full h-full object-cover ${slide.isDeleting ? "opacity-40" : ""}`}
+                        alt="Slide preview"
                       />
                       {!shouldLockRowUI && (
                         <div className="absolute inset-0 bg-black/40 opacity-0 hover:opacity-100 transition-opacity flex flex-col items-center justify-center text-white">
@@ -659,24 +694,25 @@ export default function HeroManager() {
                 </div>
               </div>
 
-              {/* CONTENT AREA */}
+              {/* CONTENT AREA (TEXT) */}
               <div
                 className={`flex-1 flex flex-col gap-4 mt-${(rejectedDraft || isLocked) && !isSuperadmin ? "6" : isOverrideRow ? "6" : "0"}`}>
                 <div className="flex justify-between items-center">
-                  <span className="bg-slate-100 text-slate-500 font-black px-2 py-0.5 rounded text-[9px] uppercase tracking-widest">
+                  <span className="bg-slate-100 text-slate-500 font-bold px-2 py-0.5 rounded text-[9px] uppercase tracking-widest">
                     Slide #{index + 1}
                   </span>
                   {isEditing && !shouldLockRowUI && (
                     <button
                       onClick={() => removeSlide(slide.id)}
-                      className="text-slate-300 hover:text-red-500 transition-colors">
+                      className="text-slate-300 hover:text-red-500 transition-colors p-1">
                       <Trash2 className="w-4 h-4" />
                     </button>
                   )}
                 </div>
+
                 <div className="space-y-3">
                   <div>
-                    <label className="block text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">
+                    <label className="block text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-1">
                       Judul Utama
                     </label>
                     <input
@@ -692,15 +728,15 @@ export default function HeroManager() {
                           ),
                         )
                       }
-                      className={`w-full px-3 py-1.5 text-sm font-black rounded-lg transition-all ${
-                        isEditing
+                      className={`w-full px-3 py-1.5 text-sm font-bold rounded-lg transition-all ${
+                        isEditing && !shouldLockRowUI
                           ? "bg-white border border-slate-200 focus:ring-2 focus:ring-daw-green/10"
                           : "bg-transparent border-transparent"
-                      }`}
+                      } ${slide.isDeleting ? "line-through text-slate-400" : ""}`} // 🎨 The Line-Through Rule
                     />
                   </div>
                   <div>
-                    <label className="block text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">
+                    <label className="block text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-1">
                       Sub-judul
                     </label>
                     <textarea
@@ -717,10 +753,10 @@ export default function HeroManager() {
                         )
                       }
                       className={`w-full px-3 py-1.5 text-xs font-medium rounded-lg transition-all resize-none ${
-                        isEditing
+                        isEditing && !shouldLockRowUI
                           ? "bg-white border border-slate-200 focus:ring-2 focus:ring-daw-green/10"
                           : "bg-transparent border-transparent"
-                      }`}
+                      } ${slide.isDeleting ? "line-through text-slate-400" : ""}`}
                     />
                   </div>
                 </div>
@@ -731,7 +767,7 @@ export default function HeroManager() {
 
         {slides.length === 0 && (
           <div className="text-center py-20 text-slate-400 italic bg-slate-50 rounded-2xl border border-dashed border-slate-200">
-            Belum ada slide. Klik “Tambah Slide Baru” untuk memulai.
+            Belum ada slide. Klik “Tambah Slide” untuk memulai.
           </div>
         )}
       </div>

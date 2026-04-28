@@ -5,7 +5,7 @@ const { upload, optimizeImage } = require("../middleware/upload");
 const { verifyToken, checkPermission } = require("../middleware/authJwt");
 
 // --- 1. Public Site ---
-router.get("/", homeController.getHomepageData);
+router.get("/", [verifyToken], homeController.getHomepageData);
 
 // --- 2. Home Intro Settings (Singleton) ---
 router.put(

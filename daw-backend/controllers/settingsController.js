@@ -9,16 +9,16 @@ const { invalidateOldDrafts } = require("../utils/draftCleanup");
 const sequelize = require("../config/database");
 const { generateNotrans } = require("../utils/notransGenerator");
 
+const MODULE_NAME = "Settings";
+const NOTRANS_PREFIX = "SET";
+
 const JENIS_APP_CMS = process.env.CMS_APPROVAL_CODE;
 // HELPER: Safely Rename File for Editor Drafts
 const applyTempPrefix = (fileObj) => {
-  // 🚀 PERBAIKAN 1: Jangan bergantung pada fileObj.path karena bisa dihapus oleh middleware [REFINERY]
   if (!fileObj || !fileObj.filename) return null;
 
   const filename = fileObj.filename;
 
-  // 🚀 PERBAIKAN 2: Jika middleware [REFINERY] SUDAH memberikan prefix TEMP_,
-  // jangan di-rename lagi (mencegah TEMP_TEMP_logo.webp) dan langsung return namanya.
   if (filename.startsWith("TEMP_")) {
     console.log(
       `🛡️ [FILE SYSTEM] File sudah di-karantina oleh Refinery: ${filename}`,

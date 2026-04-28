@@ -10,6 +10,7 @@ import {
 } from "react";
 import api from "@/lib/api";
 
+// 1. TYPE DEFINITIONS
 export interface HeroSlides {
   id: number | string;
   title: string;
@@ -41,68 +42,85 @@ export interface ImpactStats {
   has_rejected?: boolean;
 }
 
+export interface RejectionDraft {
+  notrans: string;
+  module_name: string;
+  target_id: string;
+  payload: any;
+  rejection_reason: string;
+  created_by: string;
+  createdAt: string;
+}
+
 interface HomeContextType {
+  // Data Ledger (Live)
   slides: HeroSlides[];
   stats: ImpactStats[];
   settings: HomeSettings | null;
-  rejectedIntro: any | null; //
+
+  // Data Vault (Rejection Radar)
+  rejectedIntro: RejectionDraft | null;
+  rejectedSlidesMap: Record<string, RejectionDraft>;
+  rejectedStatsMap: Record<string, RejectionDraft>;
+
+  // Lifecycle
   isLoading: boolean;
   refreshData: () => Promise<void>;
+  refreshSettings: () => Promise<void>;
 }
 
+// 2. CONTEXT INITIALIZATION
 export const HomeContext = createContext<HomeContextType>({
   slides: [],
   stats: [],
   settings: null,
   rejectedIntro: null,
+  rejectedSlidesMap: {},
+  rejectedStatsMap: {},
   isLoading: true,
   refreshData: async () => {},
+  refreshSettings: async () => {},
 });
 
 export function HomeProvider({ children }: { children: ReactNode }) {
+  // Data States
   const [slides, setSlides] = useState<HeroSlides[]>([]);
   const [stats, setStats] = useState<ImpactStats[]>([]);
   const [settings, setSettings] = useState<HomeSettings | null>(null);
-  const [rejectedIntro, setRejectedIntro] = useState<any | null>(null);
+
+  // Raw Radar State
+  const [rawRejectionRadar, setRawRejectionRadar] = useState<RejectionDraft[]>(
+    [],
+  );
+
+  // Loading State
   const [isLoading, setIsLoading] = useState(true);
 
+  //FETCHING
   const fetchData = useCallback(async (signal?: AbortSignal) => {
+    setIsLoading(true);
     try {
-      const results = await Promise.allSettled([
-        api.get("/homepage", { signal }),
-        // Kita tarik draf rejected untuk Intro (Singleton ID 1) di level context
-        api.get("/approval/rejected/1?module=HomeSettings", { signal }),
-      ]);
+      const response = await api.get("/homepage", { signal });
+      const payload = response.data?.data || response.data;
 
-      // 1. Handle Live Homepage Data
-      if (results[0].status === "fulfilled") {
-        const data = results[0].value.data.data || results[0].value.data;
-        setSlides(data.slides || []);
-        setStats(data.stats || []);
-        setSettings(data.settings || null);
-      } else {
-        if (results[0].reason?.name !== "CanceledError") {
-          console.error(
-            "🚨 Failed to fetch live homepage data:",
-            results[0].reason,
-          );
-        }
-      }
+      setSlides(payload.slides || []);
+      setStats(payload.stats || []);
+      setSettings(payload.settings || null);
 
-      // 2. Handle Rejected Intro Draft (Singleton)
-      if (
-        results[1].status === "fulfilled" &&
-        results[1].value.data.hasRejected
-      ) {
-        setRejectedIntro(results[1].value.data.data);
-      } else {
-        setRejectedIntro(null);
+      setRawRejectionRadar(payload.rejectionRadar || []);
+    } catch (error: any) {
+      if (error.name !== "CanceledError") {
+        console.error("🚨 [HomeContext] Gagal menarik data:", error.message);
+        setSlides([]);
+        setStats([]);
+        setRawRejectionRadar([]);
       }
     } finally {
       setIsLoading(false);
     }
   }, []);
 
+  // ABORT CONTROLLER LIFECYCLE
   useEffect(() => {
     const controller = new AbortController();
     fetchData(controller.signal);
@@ -112,17 +130,60 @@ export function HomeProvider({ children }: { children: ReactNode }) {
     };
   }, [fetchData]);
 
+  // DERIVED STATES
+  const rejectedIntro = useMemo(() => {
+    return (
+      rawRejectionRadar.find((d) => d.module_name === "HomeSettings") || null
+    );
+  }, [rawRejectionRadar]);
+
+  const rejectedSlidesMap = useMemo(() => {
+    return rawRejectionRadar
+      .filter((d) => d.module_name === "HeroSlides")
+      .reduce(
+        (acc, curr) => {
+          acc[String(curr.target_id)] = curr;
+          return acc;
+        },
+        {} as Record<string, RejectionDraft>,
+      );
+  }, [rawRejectionRadar]);
+
+  const rejectedStatsMap = useMemo(() => {
+    return rawRejectionRadar
+      .filter((d) => d.module_name === "ImpactStats")
+      .reduce(
+        (acc, curr) => {
+          acc[String(curr.target_id)] = curr;
+          return acc;
+        },
+        {} as Record<string, RejectionDraft>,
+      );
+  }, [rawRejectionRadar]);
+
+  // CONTEXT VALUE MEMOIZATION
   const contextValue = useMemo(
     () => ({
       slides,
       stats,
       settings,
       rejectedIntro,
+      rejectedSlidesMap,
+      rejectedStatsMap,
       isLoading,
-      refreshSettings: () => fetchData(), // Alias konsisten
+      refreshSettings: () => fetchData(),
       refreshData: () => fetchData(),
     }),
-    [slides, stats, settings, rejectedIntro, isLoading, fetchData],
+    [
+      slides,
+      stats,
+      settings,
+      rejectedIntro,
+      rejectedSlidesMap,
+      rejectedStatsMap,
+      isLoading,
+      fetchData,
+    ],
   );
 
   return (
@@ -130,6 +191,7 @@ export function HomeProvider({ children }: { children: ReactNode }) {
   );
 }
 
+// HOOK EXPORT
 export function useHome() {
   const context = useContext(HomeContext);
   if (!context) {

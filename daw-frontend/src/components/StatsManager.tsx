@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react"; // Tambahkan useCallback
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useHome, type ImpactStats } from "@/contexts/HomeContext";
 import { useAuth } from "@/contexts/AuthContext";
 import {
@@ -9,6 +9,7 @@ import {
   Unlock,
   AlertTriangle,
   RotateCcw,
+  XCircle,
 } from "lucide-react";
 import * as Icons from "lucide-react";
 import { toast } from "sonner";
@@ -26,104 +27,119 @@ const AVAILABLE_ICONS = [
 ];
 
 export default function StatsManager() {
-  const { stats: initialStats, refreshData } = useHome();
+  const { stats: initialStats, refreshData, rejectedStatsMap } = useHome();
   const { user } = useAuth();
 
-  // 🚀 Sub-Langkah 3.1: Identity Alignment
   const isSuperadmin = user?.role === "superadmin" || user?.role === "admin";
   const isEditor = user?.role?.toLowerCase() === "editor";
 
-  // --- States ---
+  // States
   const [stats, setStats] = useState<ImpactStats[]>([]);
   const [originalStats, setOriginalStats] = useState<ImpactStats[]>([]);
+
+  const [restoredTickets, setRestoredTickets] = useState<
+    Record<string, string>
+  >({});
 
   const [isEditing, setIsEditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
-  const [rejectedDrafts, setRejectedDrafts] = useState<any[]>([]);
 
   const hasLockedItems = stats.some((s) => s.is_locked);
-  const shouldLockGlobalActions = hasLockedItems && !isSuperadmin;
 
-  // --- 1. SINKRONISASI DATA & SNAPSHOTTING ---
+  const abortControllerRef = useRef<AbortController | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (abortControllerRef.current) abortControllerRef.current.abort();
+    };
+  }, []);
+
+  // 1. SINKRONISASI DATA & SNAPSHOTTING
   useEffect(() => {
     if (initialStats && !isEditing) {
       const cleanStats = initialStats.map((s) => ({ ...s }));
       setStats(cleanStats);
-      setOriginalStats(cleanStats); // Simpan jangkar komparasi
+      setOriginalStats(cleanStats);
+      setRestoredTickets({}); // Reset tracker saat data sinkron
     }
   }, [initialStats, isEditing]);
 
-  // --- 2. REJECTED DRAFTS FETCHING ---
-  useEffect(() => {
-    if (isSuperadmin) return;
-    const controller = new AbortController();
-
-    const fetchRejectedDrafts = async () => {
-      try {
-        const promises = stats
-          .filter(
-            (s) =>
-              typeof s.id === "number" ||
-              (typeof s.id === "string" && !s.id.startsWith("new-")),
-          )
-          .map((s) =>
-            api
-              .get(`/approval/rejected/${s.id}?module=ImpactStat`, {
-                signal: controller.signal,
-              })
-              .catch(() => null),
-          );
-
-        const results = await Promise.all(promises);
-        const rejected = results
-          .filter((res) => res && res.data && res.data.hasRejected)
-          .map((res) => res!.data.data);
-
-        setRejectedDrafts(rejected);
-      } catch (err: any) {
-        if (err.name !== "CanceledError")
-          console.log("Gagal sinkronisasi draf ditolak.");
-      }
-    };
-
-    if (stats.length > 0 && !isEditing) fetchRejectedDrafts();
-    return () => controller.abort();
-  }, [stats.length, isEditing, isSuperadmin]);
-
+  // 2. RESTORATION ENGINE (Anti-Corruption Guard)
   const handleRestoreDraft = useCallback(
     (targetId: string | number) => {
-      const draft = rejectedDrafts.find(
-        (d) => String(d.target_id) === String(targetId),
-      );
+      const draft = rejectedStatsMap[String(targetId)];
       if (!draft?.payload) return;
+
+      let payloadObj = draft.payload;
+      if (typeof payloadObj === "string") {
+        try {
+          payloadObj = JSON.parse(payloadObj);
+        } catch (error) {
+          console.error("🚨 [Anti-Corruption] Gagal parse draf:", error);
+          return toast.error("Data draf korup.");
+        }
+      }
 
       setStats((prev) =>
         prev.map((s) => {
           if (String(s.id) === String(targetId)) {
             return {
               ...s,
-              icon: draft.payload.icon ?? s.icon,
-              value: draft.payload.value ?? s.value,
-              label: draft.payload.label ?? s.label,
-              desc: draft.payload.desc ?? s.desc,
-              order: draft.payload.order ?? s.order,
-              previous_notrans: draft.notrans,
-            } as any;
+              icon: payloadObj.icon ?? s.icon,
+              value: payloadObj.value ?? s.value,
+              label: payloadObj.label ?? s.label,
+              desc: payloadObj.desc ?? s.desc,
+              order: payloadObj.order ?? s.order,
+            } as ImpactStats;
           }
           return s;
         }),
       );
 
+      setRestoredTickets((prev) => ({
+        ...prev,
+        [targetId]: draft.notrans,
+      }));
+
       setIsEditing(true);
-      toast.info("Draf dipulihkan ke dalam form", {
-        description: "Silakan perbaiki dan klik Save.",
+      toast.info("Draf dipulihkan ke form", {
+        description: "Silakan perbaiki data dan klik Save/Request.",
       });
     },
-    [rejectedDrafts],
+    [rejectedStatsMap],
   );
 
-  // --- DRAG AND DROP HANDLERS ---
+  // 3. DISCARD LOGIC (Ghost Cleanup Lanjutan)
+  const handleDiscardDraft = async (targetId: string | number) => {
+    const draft = rejectedStatsMap[String(targetId)];
+    if (!draft?.notrans) return;
+
+    toast("Abaikan Notifikasi?", {
+      description: "Draf penolakan ini akan dihapus secara permanen.",
+      action: {
+        label: "Abaikan",
+        onClick: async () => {
+          const toastId = toast.loading("Membersihkan draf...");
+          try {
+            await api.patch(
+              `/approval/discard/${encodeURIComponent(draft.notrans)}`,
+            );
+            toast.success("Notifikasi berhasil diabaikan.", { id: toastId });
+            await refreshData(); // Flush Global State
+          } catch (error: any) {
+            toast.error("Gagal mengabaikan draf.", {
+              description: error.response?.data?.message || "Kesalahan server.",
+              id: toastId,
+            });
+          }
+        },
+      },
+      cancel: { label: "Batal", onClick: () => {} },
+    });
+  };
+
+  // 4. GRANULAR DRAG AND DROP HANDLERS
   const reorderStats = (startIndex: number, endIndex: number) => {
     const result = Array.from(stats);
     const [removed] = result.splice(startIndex, 1);
@@ -137,17 +153,25 @@ export default function StatsManager() {
   };
 
   const handleDragStart = (index: number) => {
-    if (shouldLockGlobalActions)
-      return toast.error("Interaksi dibatasi", {
-        description: "Data sedang dalam antrean.",
+    if (stats[index]?.is_locked && !isSuperadmin) {
+      return toast.error("Akses Dibatasi", {
+        description: "Statistik ini sedang dalam antrean peninjauan.",
       });
+    }
     setDraggedIndex(index);
   };
 
   const handleDragOver = (e: React.DragEvent) => e.preventDefault();
 
   const handleDrop = (index: number) => {
-    if (shouldLockGlobalActions || draggedIndex === null) return;
+    if (draggedIndex === null) return;
+    if (stats[index]?.is_locked && !isSuperadmin) {
+      toast.error("Posisi Terkunci", {
+        description: "Tidak dapat menggeser ke area item yang terkunci.",
+      });
+      setDraggedIndex(null);
+      return;
+    }
     reorderStats(draggedIndex, index);
     setDraggedIndex(null);
   };
@@ -162,9 +186,9 @@ export default function StatsManager() {
     );
   };
 
-  // --- 3. GUARDRAIL & LIMIT ENFORCEMENT ---
+  // 5. ACTION GUARDS (Blueprint 3.1)
   const addStat = () => {
-    if (stats.length >= 4 || shouldLockGlobalActions) return;
+    if (stats.length >= 4) return;
     setStats([
       ...stats,
       {
@@ -179,9 +203,10 @@ export default function StatsManager() {
   };
 
   const removeStat = async (id: string | number) => {
-    if (shouldLockGlobalActions) {
+    const targetStat = stats.find((s) => s.id === id);
+    if (targetStat?.is_locked && !isSuperadmin) {
       return toast.error("Akses Terbatas", {
-        description: "Terdapat data yang sedang ditinjau.",
+        description: "Item ini sedang dalam proses peninjauan.",
       });
     }
 
@@ -223,20 +248,19 @@ export default function StatsManager() {
     });
   };
 
+  // 6. ROBUST DIFF ENGINE
   const getChangedStats = useCallback(() => {
     return stats.filter((stat) => {
-      // Jika data dikunci dan user bukan admin, abaikan (mencegah spam)
       if (stat.is_locked && !isSuperadmin) return false;
 
-      // Jika item baru ditambahkan
       if (typeof stat.id === "string" && stat.id.startsWith("new-"))
         return true;
 
-      // Cari pasangan di data asli
-      const original = originalStats.find((s) => s.id === stat.id);
+      const original = originalStats.find(
+        (s) => String(s.id) === String(stat.id),
+      );
       if (!original) return false;
 
-      // Deteksi perubahan sekecil apapun (termasuk Drag & Drop / Order)
       return (
         stat.icon !== original.icon ||
         stat.value !== original.value ||
@@ -247,7 +271,7 @@ export default function StatsManager() {
     });
   }, [stats, originalStats, isSuperadmin]);
 
-  // --- 4. ATOMIC SUBMISSION ---
+  // 7. PARTIAL SYNC RESILIENCE SUBMISSION
   const handleSave = async () => {
     const changedData = getChangedStats();
 
@@ -264,60 +288,98 @@ export default function StatsManager() {
       isSuperadmin ? "Menerapkan perubahan live..." : "Mengajukan revisi...",
     );
 
+    abortControllerRef.current = new AbortController();
+
     try {
       const promises = changedData.map((stat) => {
         const isNew = typeof stat.id === "string" && stat.id.startsWith("new-");
         const url = isNew ? "/homepage/stats" : `/homepage/stats/${stat.id}`;
 
-        const payload = {
-          ...stat,
+        const payload: any = {
+          icon: stat.icon,
+          value: stat.value,
+          label: stat.label,
+          desc: stat.desc,
+          order: stat.order,
           status: isSuperadmin ? "Active" : "Published",
         };
 
+        if (restoredTickets[stat.id] && isEditor) {
+          payload.previous_notrans = restoredTickets[stat.id];
+        }
+
         return isNew
-          ? api.post(url, payload, { timeout: 60000 })
-          : api.put(url, payload, { timeout: 60000 });
+          ? api.post(url, payload, {
+              signal: abortControllerRef.current?.signal,
+            })
+          : api.put(url, payload, {
+              signal: abortControllerRef.current?.signal,
+            });
       });
 
-      await Promise.all(promises);
+      const results = await Promise.allSettled(promises);
 
-      // Lock optimistic update for Editor
-      if (isEditor) {
-        const changedIds = changedData.map((s) => s.id);
+      const successfulIds: (string | number)[] = [];
+      let failCount = 0;
+
+      results.forEach((result, index) => {
+        if (result.status === "fulfilled") {
+          successfulIds.push(changedData[index].id);
+        } else {
+          failCount++;
+          console.error(
+            `🚨 Gagal simpan ID ${changedData[index].id}:`,
+            result.reason,
+          );
+        }
+      });
+
+      if (isEditor && successfulIds.length > 0) {
         setStats((prev) =>
           prev.map((s) =>
-            changedIds.includes(s.id) ? { ...s, is_locked: true } : s,
+            successfulIds.includes(s.id) ? { ...s, is_locked: true } : s,
           ),
         );
       }
 
       await refreshData();
-      toast.success(
-        isSuperadmin
-          ? "Statistik diperbarui secara live!"
-          : "Revisi berhasil diajukan!",
-        { id: loadingToast },
-      );
-      setIsEditing(false);
+
+      if (failCount === 0) {
+        toast.success(
+          isSuperadmin
+            ? "Statistik diperbarui secara live!"
+            : "Semua revisi berhasil diajukan!",
+          { id: loadingToast },
+        );
+        setIsEditing(false);
+      } else {
+        toast.warning(
+          `Berhasil menyimpan ${successfulIds.length} item. ${failCount} item gagal.`,
+          {
+            id: loadingToast,
+            description:
+              "Silakan periksa koneksi dan coba simpan ulang item yang gagal.",
+          },
+        );
+      }
     } catch (error: any) {
-      console.error(error);
-      toast.error("Gagal menyimpan data", {
-        description:
-          error.response?.data?.message || "Periksa koneksi server Anda.",
+      if (error.name === "CanceledError") return;
+      console.error("Critical Save Error:", error);
+      toast.error("Terjadi kesalahan fatal saat menyimpan.", {
         id: loadingToast,
       });
     } finally {
       setIsSaving(false);
     }
   };
-
   return (
     <div className="space-y-6 animate-in fade-in duration-300">
-      {/* --- HEADER (MATRIX BUTTONS) --- */}
+      {/* HEADER (MATRIX BUTTONS) */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 border-b border-slate-100 pb-4 gap-4">
         <div>
           <h3 className="text-lg font-bold text-slate-900 flex items-center gap-2">
             Impact Statistics
+            {/* Global Warning: Jika ada item terkunci tapi bukan Admin */}
             {hasLockedItems && !isSuperadmin && (
               <span className="bg-blue-50 text-blue-600 border border-blue-200 text-[10px] px-2 py-0.5 rounded-full flex items-center gap-1 animate-pulse">
                 <Lock className="w-3 h-3" /> Ada Draf Tertunda
@@ -330,44 +392,28 @@ export default function StatsManager() {
         </div>
 
         <div className="flex gap-3 w-full sm:w-auto">
-          {/* Edit Toggle Button */}
+          {/* Edit Toggle Button (Tidak Terkunci Secara Global di V4.0) */}
           <button
-            onClick={() => {
-              if (shouldLockGlobalActions) {
-                return toast.error("Akses Dibatasi", {
-                  description: "Terdapat data yang sedang ditinjau.",
-                });
-              }
-              setIsEditing(!isEditing);
-            }}
-            disabled={isSaving || shouldLockGlobalActions}
-            className={`flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-2 rounded-lg font-black text-[11px] uppercase tracking-widest transition-colors border shadow-sm ${
-              shouldLockGlobalActions
-                ? "bg-slate-50 text-slate-300 border-slate-100 cursor-not-allowed"
-                : isEditing
-                  ? "bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100"
-                  : "bg-white text-slate-600 border-slate-200 hover:bg-slate-50"
+            onClick={() => setIsEditing(!isEditing)}
+            disabled={isSaving}
+            className={`flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-2 rounded-lg font-bold text-[11px] uppercase tracking-widest transition-colors border shadow-sm ${
+              isEditing
+                ? "bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100"
+                : "bg-white text-slate-600 border-slate-200 hover:bg-slate-50"
             }`}>
-            {shouldLockGlobalActions ? (
-              <Lock className="w-4 h-4 text-slate-300" />
-            ) : isEditing ? (
+            {isEditing ? (
               <Unlock className="w-4 h-4 text-amber-500" />
             ) : (
               <Lock className="w-4 h-4 text-slate-400" />
             )}
-            <span>
-              {shouldLockGlobalActions
-                ? "System Locked"
-                : isEditing
-                  ? "Editing Mode"
-                  : "Locked"}
-            </span>
+            <span>{isEditing ? "Editing Mode" : "Locked"}</span>
           </button>
 
-          {isEditing && stats.length < 4 && !shouldLockGlobalActions && (
+          {/* Add Stat Button - Bebas menambah meskipun ada item lain yang dikunci */}
+          {isEditing && stats.length < 4 && (
             <button
               onClick={addStat}
-              className="flex items-center gap-1.5 px-4 py-2 bg-daw-green/10 hover:bg-daw-green hover:text-white text-daw-green rounded-lg text-[11px] font-black uppercase tracking-widest transition-colors">
+              className="flex items-center gap-1.5 px-4 py-2 bg-daw-green/10 hover:bg-daw-green hover:text-white text-daw-green rounded-lg text-[11px] font-bold uppercase tracking-widest transition-colors">
               <Plus className="w-4 h-4" /> Add Stat
             </button>
           )}
@@ -375,20 +421,16 @@ export default function StatsManager() {
           {/* Matrix Save Button */}
           <button
             onClick={handleSave}
-            disabled={isSaving || !isEditing || shouldLockGlobalActions}
-            className={`flex-1 sm:flex-none flex items-center justify-center gap-2 px-6 py-2 rounded-lg font-black text-[11px] uppercase tracking-widest transition-all shadow-lg active:scale-95 disabled:cursor-not-allowed disabled:shadow-none ${
+            disabled={isSaving || !isEditing}
+            className={`flex-1 sm:flex-none flex items-center justify-center gap-2 px-6 py-2 rounded-lg font-bold text-[11px] uppercase tracking-widest transition-all shadow-lg active:scale-95 disabled:cursor-not-allowed disabled:shadow-none ${
               isSaving
                 ? "bg-slate-300 text-slate-700"
-                : shouldLockGlobalActions
-                  ? "bg-slate-200 text-slate-500"
-                  : isSuperadmin
-                    ? "bg-daw-green hover:bg-[#003b1c] text-white shadow-daw-green/20"
-                    : "bg-blue-600 hover:bg-blue-700 text-white shadow-blue-600/20"
+                : isSuperadmin
+                  ? "bg-daw-green hover:bg-[#003b1c] text-white shadow-daw-green/20"
+                  : "bg-blue-600 hover:bg-blue-700 text-white shadow-blue-600/20"
             }`}>
             {isSaving ? (
               <Icons.Loader2 className="w-4 h-4 animate-spin" />
-            ) : shouldLockGlobalActions ? (
-              <Lock className="w-4 h-4" />
             ) : isSuperadmin ? (
               <Save className="w-4 h-4" />
             ) : (
@@ -405,20 +447,38 @@ export default function StatsManager() {
         </div>
       </div>
 
-      {/* --- GRID LIST --- */}
+      {/* GRID LIST (The Bureaucratic Mirror) */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {stats.map((stat, index) => {
           const IconComponent = (Icons as any)[stat.icon] || Icons.HelpCircle;
           const isDragging = draggedIndex === index;
           const isLocked = !!stat.is_locked;
 
-          // Otoritas Baris: Editor terkunci, Admin hanya di-highlight
+          // 🛡️ Otoritas Baris (Granular Isolation)
           const shouldLockThisRowUI = isLocked && !isSuperadmin;
           const isOverrideThisRow = isLocked && isSuperadmin;
 
-          const rejectedDraft = rejectedDrafts.find(
-            (d) => String(d.target_id) === String(stat.id),
-          );
+          // Cek apakah item ini punya draf ditolak
+          const rejectedDraft = rejectedStatsMap[String(stat.id)];
+
+          // 🎨 Semantic Styling Engine
+          let cardStyle = "bg-slate-50 border-slate-100";
+          if (shouldLockThisRowUI) {
+            // Blue/Slate untuk Pending Update
+            cardStyle =
+              "opacity-60 bg-blue-50/50 border-blue-100 pointer-events-none select-none";
+          } else if (isOverrideThisRow) {
+            // Amber untuk Admin Override
+            cardStyle =
+              "bg-amber-50/50 border-amber-200 shadow-sm border-l-4 border-l-amber-500";
+          } else if (rejectedDraft && !isSuperadmin) {
+            // Red/Crimson untuk Rejected Needs Revision (Jika Editor sedang tidak Edit)
+            cardStyle =
+              "bg-red-50/30 border-red-200 border-l-4 border-l-red-500";
+          } else if (isEditing) {
+            cardStyle =
+              "bg-white border-slate-200 shadow-sm cursor-grab active:cursor-grabbing";
+          }
 
           return (
             <div
@@ -428,63 +488,75 @@ export default function StatsManager() {
               onDragOver={handleDragOver}
               onDrop={() => handleDrop(index)}
               onDragEnd={() => setDraggedIndex(null)}
-              className={`flex gap-4 items-start p-5 rounded-xl border transition-all duration-300 relative overflow-hidden ${
-                shouldLockThisRowUI
-                  ? "opacity-60 grayscale-[30%] pointer-events-none cursor-not-allowed bg-slate-50"
-                  : isOverrideThisRow
-                    ? "bg-amber-50/50 border-amber-200 shadow-sm"
-                    : isEditing
-                      ? "bg-white border-slate-200 shadow-sm cursor-grab active:cursor-grabbing"
-                      : "bg-slate-50 border-slate-100"
-              } ${isDragging ? "opacity-30 scale-95 border-daw-green border-dashed" : ""}`}>
-              {rejectedDraft && !isEditing && !isSuperadmin && (
-                <div className="absolute top-0 left-0 right-0 bg-amber-500 text-white text-[10px] font-bold px-3 py-1 flex justify-between items-center z-10 animate-in slide-in-from-top-2">
-                  <span className="flex items-center gap-1.5 uppercase tracking-tighter">
-                    <AlertTriangle className="w-3 h-3" /> Revisi Ditolak: "
-                    {rejectedDraft.rejection_reason}"
+              className={`flex gap-4 items-start p-5 rounded-xl border transition-all duration-300 relative overflow-hidden ${cardStyle} ${isDragging ? "opacity-30 scale-95 border-daw-green border-dashed" : ""}`}>
+              {/* 1. REJECTION BANNER (Prioritas Tertinggi untuk Editor) */}
+              {rejectedDraft && !isSuperadmin && (
+                <div className="absolute top-0 left-0 right-0 bg-red-500 text-white text-[10px] font-bold px-3 py-1.5 flex justify-between items-center z-10 animate-in slide-in-from-top-2">
+                  <span className="flex items-center gap-1.5 uppercase tracking-tighter truncate max-w-[60%]">
+                    <AlertTriangle className="w-3 h-3 shrink-0" /> Revisi
+                    Ditolak: "{rejectedDraft.rejection_reason}"
                   </span>
-                  <button
-                    onClick={() => handleRestoreDraft(stat.id)}
-                    className="bg-white/20 hover:bg-white/30 px-2 py-0.5 rounded transition-colors pointer-events-auto">
-                    <RotateCcw className="w-3 h-3 inline mr-1" /> Pulihkan
-                  </button>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => handleRestoreDraft(stat.id)}
+                      className="bg-white/20 hover:bg-white/30 px-2 py-0.5 rounded transition-colors pointer-events-auto">
+                      <RotateCcw className="w-3 h-3 inline mr-1" /> Pulihkan
+                    </button>
+                    {/* Ghost Cleanup Button */}
+                    <button
+                      onClick={() => handleDiscardDraft(stat.id)}
+                      className="text-white/80 hover:text-white px-1 py-0.5 rounded transition-colors pointer-events-auto"
+                      title="Abaikan Notifikasi">
+                      <XCircle className="w-4 h-4" />
+                    </button>
+                  </div>
                 </div>
               )}
 
+              {/* 2. OVERRIDE BANNER (Khusus Admin) */}
               {isOverrideThisRow && (
-                <div className="absolute top-0 left-0 right-0 bg-amber-100 border-b border-amber-200 text-amber-800 text-[10px] font-black px-3 py-1 flex items-center justify-center gap-1.5 z-10 uppercase tracking-widest">
+                <div className="absolute top-0 left-0 right-0 bg-amber-100 border-b border-amber-200 text-amber-800 text-[10px] font-bold px-3 py-1 flex items-center justify-center gap-1.5 z-10 uppercase tracking-widest">
                   <Icons.ShieldAlert className="w-3 h-3 text-amber-600" /> Mode
                   Override: Sedang Ditinjau Editor
                 </div>
               )}
 
-              {shouldLockThisRowUI && (
-                <div className="absolute top-0 left-0 right-0 bg-blue-50 border-b border-blue-100 text-blue-600 text-[10px] font-black px-3 py-1 flex items-center justify-center gap-1.5 z-10 uppercase tracking-widest">
-                  <Lock className="w-3 h-3" /> Akses Dibatasi
+              {/* 3. PENDING BANNER (Birokrasi Mengunci Editor) */}
+              {shouldLockThisRowUI && !rejectedDraft && (
+                <div className="absolute top-0 left-0 right-0 bg-blue-100 border-b border-blue-200 text-blue-700 text-[10px] font-bold px-3 py-1 flex items-center justify-center gap-1.5 z-10 uppercase tracking-widest">
+                  <Lock className="w-3 h-3" /> Akses Dibatasi (Menunggu
+                  Persetujuan)
                 </div>
               )}
 
+              {/* CONTENT AREA */}
               <div
-                className={`flex w-full gap-4 mt-${(rejectedDraft || isLocked) && !isSuperadmin ? "6" : isOverrideThisRow ? "6" : "0"}`}>
-                {/* Orders Control */}
-                {isEditing && !shouldLockThisRowUI && (
-                  <div className="flex flex-col items-center gap-1 pr-2 border-r border-slate-100 pt-1 shrink-0">
+                className={`flex w-full gap-4 mt-${rejectedDraft || isLocked || isOverrideThisRow ? "6" : "0"} transition-all`}>
+                {/* Orders Control (Drag Handles) */}
+                {isEditing && (
+                  <div
+                    className={`flex flex-col items-center gap-1 pr-2 border-r border-slate-100 pt-1 shrink-0 ${shouldLockThisRowUI ? "opacity-20" : ""}`}>
                     <button
                       onClick={() =>
-                        index > 0 && reorderStats(index, index - 1)
+                        !shouldLockThisRowUI &&
+                        index > 0 &&
+                        reorderStats(index, index - 1)
                       }
-                      disabled={index === 0}
-                      className="p-1 hover:bg-slate-100 rounded disabled:opacity-10">
+                      disabled={index === 0 || shouldLockThisRowUI}
+                      className="p-1 hover:bg-slate-100 rounded disabled:opacity-10 pointer-events-auto">
                       <Icons.ChevronUp className="w-4 h-4 text-slate-500" />
                     </button>
-                    <Icons.GripVertical className="w-4 h-4 text-slate-300" />
+                    <Icons.GripVertical className="w-4 h-4 text-slate-300 cursor-grab" />
                     <button
                       onClick={() =>
+                        !shouldLockThisRowUI &&
                         index < stats.length - 1 &&
                         reorderStats(index, index + 1)
                       }
-                      disabled={index === stats.length - 1}
-                      className="p-1 hover:bg-slate-100 rounded disabled:opacity-10">
+                      disabled={
+                        index === stats.length - 1 || shouldLockThisRowUI
+                      }
+                      className="p-1 hover:bg-slate-100 rounded disabled:opacity-10 pointer-events-auto">
                       <Icons.ChevronDown className="w-4 h-4 text-slate-500" />
                     </button>
                   </div>
@@ -492,11 +564,11 @@ export default function StatsManager() {
 
                 {/* ICON AREA */}
                 <div className="w-16 shrink-0">
-                  <label className="block text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1 text-center">
+                  <label className="block text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-1 text-center">
                     Icon
                   </label>
                   <div
-                    className={`aspect-square rounded-lg border flex items-center justify-center shadow-sm ${isOverrideThisRow ? "bg-amber-100 border-amber-200 text-amber-600" : "bg-white border-slate-200 text-daw-green"}`}>
+                    className={`aspect-square rounded-lg border flex items-center justify-center shadow-sm ${isOverrideThisRow ? "bg-amber-50 border-amber-200 text-amber-600" : "bg-white border-slate-200 text-daw-green"}`}>
                     <IconComponent className="w-7 h-7 stroke-[1.5px]" />
                   </div>
                 </div>
@@ -504,13 +576,21 @@ export default function StatsManager() {
                 {/* DETAILS AREA */}
                 <div className="flex-1 space-y-3">
                   <div className="flex justify-between items-center">
-                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
                       Statistic #{index + 1}
+                      {typeof stat.id === "string" &&
+                        stat.id.startsWith("new-") && (
+                          <span className="ml-2 text-daw-green italic">
+                            (New)
+                          </span>
+                        )}
                     </span>
+
+                    {/* Delete Button (Hanya jika tidak terkunci atau Admin) */}
                     {isEditing && !shouldLockThisRowUI && (
                       <button
                         onClick={() => removeStat(stat.id)}
-                        className="text-slate-300 hover:text-red-500 transition-colors">
+                        className="text-slate-300 hover:text-red-500 transition-colors pointer-events-auto z-10 relative">
                         <Trash2 className="w-4 h-4" />
                       </button>
                     )}
@@ -518,7 +598,7 @@ export default function StatsManager() {
 
                   <div className="grid grid-cols-2 gap-3">
                     <div>
-                      <label className="block text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">
+                      <label className="block text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-1">
                         Value
                       </label>
                       <input
@@ -528,11 +608,12 @@ export default function StatsManager() {
                         onChange={(e) =>
                           updateStatField(stat.id, "value", e.target.value)
                         }
-                        className={`w-full px-3 py-1.5 text-sm font-black rounded-md transition-all ${isEditing ? "bg-white border border-slate-200 focus:ring-2 focus:ring-daw-green/10" : "bg-transparent border-transparent"}`}
+                        className={`w-full px-3 py-1.5 text-sm font-bold rounded-md transition-all ${isEditing && !shouldLockThisRowUI ? "bg-white border border-slate-200 focus:ring-2 focus:ring-daw-green/10" : "bg-transparent border-transparent"}`}
+                        placeholder="E.g., 500+"
                       />
                     </div>
                     <div>
-                      <label className="block text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">
+                      <label className="block text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-1">
                         Select Icon
                       </label>
                       <select
@@ -541,7 +622,7 @@ export default function StatsManager() {
                         onChange={(e) =>
                           updateStatField(stat.id, "icon", e.target.value)
                         }
-                        className={`w-full px-2 py-1.5 text-[11px] rounded-md appearance-none transition-all ${isEditing ? "bg-white border border-slate-200" : "bg-transparent border-transparent"}`}>
+                        className={`w-full px-2 py-1.5 text-[11px] font-medium rounded-md appearance-none transition-all ${isEditing && !shouldLockThisRowUI ? "bg-white border border-slate-200" : "bg-transparent border-transparent"}`}>
                         {AVAILABLE_ICONS.map((i) => (
                           <option key={i.name} value={i.name}>
                             {i.label}
@@ -552,7 +633,7 @@ export default function StatsManager() {
                   </div>
 
                   <div>
-                    <label className="block text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">
+                    <label className="block text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-1">
                       Label
                     </label>
                     <input
@@ -562,11 +643,12 @@ export default function StatsManager() {
                       onChange={(e) =>
                         updateStatField(stat.id, "label", e.target.value)
                       }
-                      className={`w-full px-3 py-1.5 text-xs font-black uppercase rounded-md transition-all ${isEditing ? "bg-white border border-slate-200" : "bg-transparent border-transparent"}`}
+                      className={`w-full px-3 py-1.5 text-xs font-bold uppercase tracking-wide rounded-md transition-all ${isEditing && !shouldLockThisRowUI ? "bg-white border border-slate-200 focus:ring-2 focus:ring-daw-green/10" : "bg-transparent border-transparent"}`}
+                      placeholder="E.g., Global Projects"
                     />
                   </div>
                   <div>
-                    <label className="block text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">
+                    <label className="block text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-1">
                       Description
                     </label>
                     <input
@@ -576,7 +658,8 @@ export default function StatsManager() {
                       onChange={(e) =>
                         updateStatField(stat.id, "desc", e.target.value)
                       }
-                      className={`w-full px-3 py-1.5 text-xs rounded-md transition-all ${isEditing ? "bg-white border border-slate-200" : "bg-transparent border-transparent"}`}
+                      className={`w-full px-3 py-1.5 text-[11px] rounded-md transition-all ${isEditing && !shouldLockThisRowUI ? "bg-white border border-slate-200 focus:ring-2 focus:ring-daw-green/10" : "bg-transparent border-transparent"}`}
+                      placeholder="Short description here..."
                     />
                   </div>
                 </div>
@@ -584,9 +667,17 @@ export default function StatsManager() {
             </div>
           );
         })}
+
+        {/* Empty State */}
         {stats.length === 0 && (
-          <div className="col-span-full py-16 text-center text-slate-400 italic bg-slate-50 rounded-2xl border border-dashed border-slate-200">
-            No statistics yet. Click "Add Stat" to start.
+          <div className="col-span-full py-16 text-center text-slate-400 bg-slate-50 rounded-2xl border-2 border-dashed border-slate-200 flex flex-col items-center justify-center">
+            <Icons.BarChart3 className="w-10 h-10 text-slate-300 mb-3" />
+            <p className="font-bold text-slate-500 uppercase tracking-widest text-xs">
+              Belum ada statistik
+            </p>
+            <p className="text-xs mt-1">
+              Aktifkan Editing Mode dan klik "Add Stat" untuk mulai menambahkan.
+            </p>
           </div>
         )}
       </div>

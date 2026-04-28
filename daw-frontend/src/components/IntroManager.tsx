@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useHome } from "@/contexts/HomeContext";
 import { useAuth } from "@/contexts/AuthContext";
 import {
@@ -10,6 +10,7 @@ import {
   Send,
   ShieldAlert,
   Loader2,
+  XCircle,
 } from "lucide-react";
 import { toast } from "sonner";
 import api from "@/lib/api";
@@ -24,6 +25,10 @@ export default function IntroManager() {
 
   // 🚀 Global Intelligence: Tarik rejectedIntro dari Context v1.2
   const { settings: initialSettings, rejectedIntro, refreshData } = useHome();
+  console.log("🔍 DEBUG INTRO MANAGER:");
+  console.log("- User Role:", user?.role);
+  console.log("- is_locked from Server:", initialSettings?.is_locked);
+  console.log("- Rejected Draft Found:", rejectedIntro);
 
   // --- State Utama Form ---
   const [settings, setSettings] = useState({
@@ -32,12 +37,26 @@ export default function IntroManager() {
   });
 
   // 🚀 Sub-Langkah 2.1: Snapshotting (Jangkar Diff Engine)
-  const [originalData, setOriginalData] = useState(settings);
+  const [originalData, setOriginalData] = useState({
+    introHeadline: "",
+    introBody: "",
+  });
 
   // State UI & Lifecycle
   const [isEditing, setIsEditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [isOptimisticallyLocked, setIsOptimisticallyLocked] = useState(false);
+
+  // Controller untuk Memory Safety (Blueprint 8.2.C)
+  const abortControllerRef = useRef<AbortController | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
+    };
+  }, []);
 
   const isServerLocked = !!initialSettings?.is_locked;
   const isDataLocked = isServerLocked || isOptimisticallyLocked;
@@ -45,6 +64,7 @@ export default function IntroManager() {
   const shouldLockUI = isDataLocked && !isSuperadmin;
   const isOverrideMode = isDataLocked && isSuperadmin;
 
+  const isFormLocked = !isEditing || shouldLockUI;
   const lockStyles = shouldLockUI
     ? "opacity-60 grayscale-[30%] pointer-events-none cursor-not-allowed select-none"
     : "";
@@ -52,12 +72,14 @@ export default function IntroManager() {
   // --- 1. SINKRONISASI DATA & SNAPSHOTTING ---
   useEffect(() => {
     if (initialSettings && !isEditing) {
-      const data = {
-        introHeadline: initialSettings.introHeadline || "",
-        introBody: initialSettings.introBody || "",
+      // 🛡️ Sanitasi ketat: null/undefined WAJIB menjadi ""
+      const cleanData = {
+        introHeadline: initialSettings.introHeadline ?? "",
+        introBody: initialSettings.introBody ?? "",
       };
-      setSettings(data);
-      setOriginalData(data);
+
+      setSettings(cleanData);
+      setOriginalData(cleanData);
 
       if (!initialSettings.is_locked) {
         setIsOptimisticallyLocked(false);
@@ -65,14 +87,35 @@ export default function IntroManager() {
     }
   }, [initialSettings, isEditing]);
 
-  // --- 2. RESTORE HANDLER (Menggunakan Data Context) ---
+  // --- 2. ROBUST DIFF ENGINE ---
+  const hasDataChanged = useCallback(() => {
+    return (
+      settings.introHeadline.trim() !== originalData.introHeadline.trim() ||
+      settings.introBody.trim() !== originalData.introBody.trim()
+    );
+  }, [settings, originalData]);
+
+  // --- 3. RESTORE HANDLER (Anti-Corruption Guard) ---
   const handleRestoreDraft = useCallback(() => {
     if (!rejectedIntro?.payload) return;
-    const payload = rejectedIntro.payload;
+
+    let payloadObj = rejectedIntro.payload;
+
+    if (typeof payloadObj === "string") {
+      try {
+        payloadObj = JSON.parse(payloadObj);
+      } catch (error) {
+        console.error(
+          "🚨 [Anti-Corruption] Gagal mem-parse payload draf:",
+          error,
+        );
+        return toast.error("Data draf korup. Silakan abaikan notifikasi ini.");
+      }
+    }
 
     setSettings((prev) => ({
-      introHeadline: payload.introHeadline ?? prev.introHeadline,
-      introBody: payload.introBody ?? prev.introBody,
+      introHeadline: payloadObj.introHeadline ?? prev.introHeadline,
+      introBody: payloadObj.introBody ?? prev.introBody,
     }));
 
     setIsEditing(true);
@@ -81,20 +124,46 @@ export default function IntroManager() {
     });
   }, [rejectedIntro]);
 
-  const hasDataChanged = useCallback(() => {
-    return JSON.stringify(settings) !== JSON.stringify(originalData);
-  }, [settings, originalData]);
+  // --- 4. GHOST CLEANUP (DISCARD) ---
+  const handleDiscardDraft = async () => {
+    if (!rejectedIntro?.notrans) return;
 
-  // --- 3. ATOMIC SUBMISSION ---
+    toast("Abaikan Notifikasi?", {
+      description: "Draf penolakan ini akan dihapus secara permanen.",
+      action: {
+        label: "Abaikan Draf",
+        onClick: async () => {
+          const toastId = toast.loading("Membersihkan draf...");
+          try {
+            await api.patch(
+              `/approval/discard/${encodeURIComponent(rejectedIntro.notrans)}`,
+            );
+            toast.success("Notifikasi berhasil diabaikan.", { id: toastId });
+            setIsEditing(false);
+            await refreshData();
+          } catch (error: any) {
+            toast.error("Gagal mengabaikan draf.", {
+              description: error.response?.data?.message || "Kesalahan server.",
+              id: toastId,
+            });
+          }
+        },
+      },
+      cancel: {
+        label: "Batal",
+        onClick: () => {},
+      },
+    });
+  };
+
+  // --- 5. ATOMIC SUBMISSION ---
   const handleSave = async () => {
-    // Guardrail tambahan: Cegah eksekusi paksa jika form sedang terkunci
     if (shouldLockUI) {
       return toast.error("Akses Dibatasi", {
         description: "Data ini sedang ditinjau.",
       });
     }
 
-    // Eksekusi Diff Engine
     if (!hasDataChanged()) {
       toast.info("Tidak ada perubahan terdeteksi.", {
         description: "Data intro masih sama dengan versi Live.",
@@ -110,19 +179,23 @@ export default function IntroManager() {
         : "Mengajukan persetujuan...",
     );
 
+    abortControllerRef.current = new AbortController();
+
     try {
       const payload: any = {
-        introHeadline: settings.introHeadline,
-        introBody: settings.introBody,
+        introHeadline: settings.introHeadline.trim(),
+        introBody: settings.introBody.trim(),
         status: isSuperadmin ? "Active" : "Published",
       };
 
-      // Injeksi tiket lama jika ini adalah resubmission draf yang ditolak
       if (rejectedIntro?.notrans && isEditor) {
         payload.previous_notrans = rejectedIntro.notrans;
       }
 
-      await api.put("/settings", payload, { timeout: 60000 });
+      await api.put("/homepage/settings", payload, {
+        timeout: 60000,
+        signal: abortControllerRef.current.signal,
+      });
 
       if (isEditor) {
         setIsOptimisticallyLocked(true);
@@ -138,6 +211,7 @@ export default function IntroManager() {
         { id: loadingToast },
       );
     } catch (error: any) {
+      if (error.name === "CanceledError") return;
       console.error(error);
       toast.error("Gagal menyimpan data", {
         description:
@@ -150,11 +224,11 @@ export default function IntroManager() {
     }
   };
 
-  const isFormLocked = !isEditing || shouldLockUI;
   return (
     <div className="space-y-6 animate-in fade-in duration-300">
       {/* --- SOVEREIGN BANNERS (Contextual Awareness) --- */}
-      {/* 1. Amber Banner (superadmin Override Warning) */}
+
+      {/* 1. Amber Banner (Superadmin Override Warning) */}
       {isOverrideMode && (
         <div className="bg-amber-50 border border-amber-200 p-4 md:p-5 rounded-xl flex items-center gap-4 animate-in slide-in-from-top-4 shadow-sm">
           <div className="bg-amber-100 p-2 rounded-full text-amber-600 shrink-0">
@@ -193,20 +267,20 @@ export default function IntroManager() {
         </div>
       )}
 
-      {/* 3. Rejection Ribbon (Draft Needs Fixing) */}
+      {/* 3. Rejection Ribbon (Draft Needs Fixing) - 🛡️ Diubah menjadi Merah sesuai Blueprint */}
       {rejectedIntro && !isSuperadmin && (
-        <div className="bg-amber-50 border border-amber-200 rounded-xl overflow-hidden shadow-sm animate-in slide-in-from-top-4 duration-300">
+        <div className="bg-red-50 border border-red-200 rounded-xl overflow-hidden shadow-sm animate-in slide-in-from-top-4 duration-300">
           <div className="p-4 md:p-5 flex flex-col sm:flex-row items-start justify-between gap-4 relative">
-            <div className="absolute left-0 top-0 bottom-0 w-1.5 bg-amber-500"></div>
+            <div className="absolute left-0 top-0 bottom-0 w-1.5 bg-red-500"></div>
             <div className="flex items-start gap-4">
-              <div className="w-10 h-10 bg-amber-100 rounded-full flex items-center justify-center shrink-0 mt-0.5 animate-pulse">
-                <AlertTriangle className="w-5 h-5 text-amber-600" />
+              <div className="w-10 h-10 bg-red-100 rounded-full flex items-center justify-center shrink-0 mt-0.5 animate-pulse">
+                <AlertTriangle className="w-5 h-5 text-red-600" />
               </div>
               <div>
-                <h4 className="text-xs md:text-sm font-black text-amber-900 uppercase tracking-tighter mb-0.5">
+                <h4 className="text-xs md:text-sm font-black text-red-900 uppercase tracking-tighter mb-0.5">
                   Revisi Welcome Intro Ditolak
                 </h4>
-                <p className="text-xs text-amber-800 leading-relaxed max-w-2xl">
+                <p className="text-xs text-red-800 leading-relaxed max-w-2xl">
                   Catatan Peninjau:{" "}
                   <span className="font-bold italic">
                     "
@@ -221,16 +295,25 @@ export default function IntroManager() {
               </div>
             </div>
 
-            <div className="w-full sm:w-auto flex flex-col items-center gap-2">
+            <div className="w-full sm:w-auto flex flex-col sm:flex-row items-center gap-2">
               <button
                 onClick={handleRestoreDraft}
                 disabled={shouldLockUI || !isEditing}
-                className="w-full shrink-0 flex items-center justify-center gap-2 px-5 py-2.5 bg-amber-600 hover:bg-amber-700 disabled:bg-amber-300 disabled:cursor-not-allowed text-white rounded-lg text-xs font-bold transition-all shadow-sm active:scale-95">
+                className="w-full sm:w-auto shrink-0 flex items-center justify-center gap-2 px-5 py-2.5 bg-red-600 hover:bg-red-700 disabled:bg-red-300 disabled:cursor-not-allowed text-white rounded-lg text-xs font-bold transition-all shadow-sm active:scale-95">
                 <RotateCcw className="w-3.5 h-3.5" />
                 PULIHKAN DRAF
               </button>
+
+              <button
+                onClick={handleDiscardDraft}
+                disabled={shouldLockUI}
+                className="w-full sm:w-auto shrink-0 flex items-center justify-center gap-2 px-5 py-2.5 bg-white border border-red-200 text-red-600 hover:bg-red-50 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg text-xs font-bold transition-all shadow-sm active:scale-95">
+                <XCircle className="w-3.5 h-3.5" />
+                ABAIKAN
+              </button>
+
               {!isEditing && (
-                <p className="text-[10px] text-amber-600 font-medium italic animate-pulse text-center">
+                <p className="text-[10px] text-red-600 font-medium italic animate-pulse text-center absolute -bottom-5 sm:static sm:mt-2 w-full">
                   * Aktifkan "Editing Mode" untuk memulihkan.
                 </p>
               )}
@@ -297,12 +380,14 @@ export default function IntroManager() {
             </span>
           </button>
 
-          {/* Matrix Action Button (Publish/Request) */}
+          {/* Matrix Action Button (Publish/Request) - 🛡️ Disable jika !hasDataChanged() */}
           <button
             onClick={handleSave}
-            disabled={isSaving || !isEditing || shouldLockUI}
+            disabled={
+              isSaving || !isEditing || shouldLockUI || !hasDataChanged()
+            }
             className={`flex-1 sm:flex-none flex items-center justify-center gap-2 px-6 py-2.5 rounded-lg font-black text-[11px] uppercase tracking-widest transition-all shadow-lg active:scale-95 disabled:cursor-not-allowed disabled:shadow-none ${
-              isSaving
+              isSaving || !hasDataChanged()
                 ? "bg-slate-300 text-slate-700"
                 : shouldLockUI
                   ? "bg-slate-200 text-slate-500"
@@ -324,9 +409,11 @@ export default function IntroManager() {
                 ? "Memproses..."
                 : shouldLockUI
                   ? "Akses Terbatas"
-                  : isSuperadmin
-                    ? "Publish Live"
-                    : "Request Approval"}
+                  : !hasDataChanged() && isEditing
+                    ? "No Changes"
+                    : isSuperadmin
+                      ? "Publish Live"
+                      : "Request Approval"}
             </span>
           </button>
         </div>
@@ -343,12 +430,12 @@ export default function IntroManager() {
             <input
               type="text"
               value={settings.introHeadline}
-              disabled={!isEditing}
+              disabled={isFormLocked}
               onChange={(e) =>
                 setSettings({ ...settings, introHeadline: e.target.value })
               }
               className={`w-full px-4 py-3 rounded-lg font-serif text-2xl transition-all ${
-                isEditing
+                isEditing && !isFormLocked
                   ? "bg-white border border-slate-300 focus:ring-2 focus:ring-daw-green/20 shadow-sm"
                   : "bg-slate-100/50 border-transparent text-slate-500 cursor-not-allowed"
               }`}
@@ -361,12 +448,12 @@ export default function IntroManager() {
             <textarea
               rows={5}
               value={settings.introBody}
-              disabled={!isEditing}
+              disabled={isFormLocked}
               onChange={(e) =>
                 setSettings({ ...settings, introBody: e.target.value })
               }
-              className={`w-full px-4 py-3 rounded-lg text-base transition-all ${
-                isEditing
+              className={`w-full px-4 py-3 rounded-lg text-base transition-all resize-none ${
+                isEditing && !isFormLocked
                   ? "bg-white border border-slate-300 focus:ring-2 focus:ring-daw-green/20 shadow-sm"
                   : "bg-slate-100/50 border-transparent text-slate-500 cursor-not-allowed"
               }`}

@@ -6,8 +6,13 @@ const ImpactStats = require("../models/ImpactStats");
 const ApprovalDraft = require("../models/ApprovalDraft");
 const { deleteSingleFile } = require("../utils/fileRemover");
 const { invalidateOldDrafts } = require("../utils/draftCleanup");
+const { generateNotrans } = require("../utils/notransGenerator");
 const ErpApprovalService = require("../services/erpApprovalService");
 const sequelize = require("../config/database");
+const { Op } = require("sequelize");
+
+const MODULE_NAME = "HomeSettings";
+const NOTRANS_PREFIX = "HOME";
 
 const getRole = (req) =>
   req.userRole ? req.userRole.toLowerCase().trim() : "";
@@ -52,7 +57,12 @@ const applyTempPrefix = (fileObj) => {
 exports.getHomepageData = async (req, res) => {
   try {
     const lockAttributes = ["is_locked", "lock_ticket"];
-    const actorId = String(req.owl_username || req.karyawanId || "");
+
+    const actorId = String(req.owl_username || req.karyawanId || "")
+      .trim()
+      .toLowerCase();
+
+    console.log(`🕵️ [RADAR SCAN] Searching rejections for: "${actorId}"`);
 
     const results = await Promise.allSettled([
       HeroSlides.findAll({
@@ -64,11 +74,23 @@ exports.getHomepageData = async (req, res) => {
         attributes: { include: lockAttributes },
       }),
       HomeSettings.findByPk(1, { attributes: { include: lockAttributes } }),
+
+      // 🚀 FIX 3 Robust Query (Case-Insensitive & Collation Safe)
       ApprovalDraft.findAll({
         where: {
-          module_name: ["HeroSlides", "ImpactStats", "HomeSettings"],
+          module_name: [
+            "HeroSlides",
+            "HeroSlide",
+            "ImpactStats",
+            "HomeSettings",
+          ],
           status: "Rejected",
-          created_by: actorId,
+          [Op.and]: [
+            sequelize.where(
+              sequelize.fn("LOWER", sequelize.col("created_by")),
+              actorId,
+            ),
+          ],
         },
       }),
     ]);
@@ -78,6 +100,9 @@ exports.getHomepageData = async (req, res) => {
     let settings = results[2].status === "fulfilled" ? results[2].value : null;
     const rejections =
       results[3].status === "fulfilled" ? results[3].value : [];
+
+    // Diagnostic Log
+    console.log(`📡 [RADAR RESULT] Found ${rejections.length} rejected items.`);
 
     if (!settings && results[2].status === "fulfilled") {
       settings = await HomeSettings.create({
@@ -104,39 +129,77 @@ exports.getHomepageData = async (req, res) => {
   }
 };
 
-// UPDATE HOME SETTINGS
 exports.updateSettings = async (req, res) => {
+  console.log("🔥 [SYSTEM AUDIT] MENJALANKAN LOGIC SELECTIVE PACKING V2.0");
+  console.log("🔥 [SYSTEM AUDIT] PREFIX YANG DIGUNAKAN:", NOTRANS_PREFIX);
   const t = await sequelize.transaction();
   try {
-    const userRole = getRole(req);
+    const userRole = String(req.userRole || "").toLowerCase();
     const { introHeadline, introBody, status, previous_notrans } = req.body;
-    const actorId = String(req.owl_username || req.karyawanId);
 
-    // FETCH & LOCK
+    const safeHeadline = (introHeadline || "").trim();
+    const safeBody = (introBody || "").trim();
+
+    const actorId = String(req.owl_username || req.karyawanId || "")
+      .trim()
+      .toLowerCase();
+
     let settings = await HomeSettings.findByPk(1, {
       transaction: t,
       lock: t.LOCK.UPDATE,
     });
+
     if (!settings) {
       settings = await HomeSettings.create({ id: 1 }, { transaction: t });
     }
 
-    // CONCURRENCY CHECK
-    if (userRole === "editor" && settings.is_locked) {
-      await t.rollback();
-      return res.status(423).json({
-        success: false,
-        message: "Data sedang dalam proses peninjauan (Locked).",
-        ticket: settings.lock_ticket,
-      });
-    }
+    if (userRole === "editor") {
+      if (settings.is_locked) {
+        await t.rollback();
+        return res.status(423).json({
+          success: false,
+          message: "Data sedang dalam proses peninjauan (Locked).",
+          ticket: settings.lock_ticket,
+        });
+      }
 
-    if (userRole === "editor" && status === "Published") {
-      await invalidateOldDrafts(1, "HomeSettings", t, previous_notrans);
+      const notrans = await generateNotrans(NOTRANS_PREFIX);
+
+      const ticketToClear = previous_notrans || settings.lock_ticket;
+      if (ticketToClear) {
+        await ApprovalDraft.update(
+          { status: "Replaced" },
+          {
+            where: {
+              notrans: ticketToClear,
+              module_name: MODULE_NAME,
+            },
+            transaction: t,
+          },
+        );
+      }
+
+      await ApprovalDraft.create(
+        {
+          notrans,
+          module_name: MODULE_NAME,
+          action: "UPDATE",
+          target_id: "1",
+          payload: {
+            introHeadline: safeHeadline,
+            introBody: safeBody,
+            status: "Published",
+          },
+          created_by: actorId,
+          status: "Pending",
+        },
+        { transaction: t },
+      );
+
       await settings.update(
         {
           is_locked: true,
-          lock_ticket: "PENDING_SYNC",
+          lock_ticket: notrans,
         },
         { transaction: t },
       );
@@ -144,39 +207,43 @@ exports.updateSettings = async (req, res) => {
       await t.commit();
 
       try {
-        const result = await ErpApprovalService.initiateApproval({
-          model: "HomeSettings",
-          targetId: 1,
-          action: "UPDATE",
-          payload: { introHeadline, introBody },
-          userId: req.userId,
-          owlUsername: req.owl_username,
-          token: req.headers["authorization"]?.split(" ")[1],
+        await ErpApprovalService.initiateApproval({
+          notrans,
+          moduleName: MODULE_NAME,
+          karyawanId: req.karyawanId,
+          token: req.headers["authorization"]?.split(" ")[1] || req.owl_token,
         });
-
-        await settings.update({ lock_ticket: result.notrans });
-
-        return res.status(202).json({
-          success: true,
-          message: "Revisi diajukan ke ERP OWL.",
-          ticket: result.notrans,
-        });
-      } catch (erpErr) {
-        console.error("🚨 [ERP SYNC FAILED]:", erpErr.message);
-        return res.status(202).json({
-          success: true,
-          message: "Data terkunci lokal, namun sinkronisasi ERP tertunda.",
-          warning: erpErr.message,
-        });
+      } catch (owlError) {
+        console.error(
+          `🚨 [ERP SYNC FAILED] Ticket ${notrans}:`,
+          owlError.message,
+        );
       }
+
+      return res.status(202).json({
+        success: true,
+        message: "Revisi sambutan beranda diajukan ke ERP OWL.",
+        ticket: notrans,
+      });
     }
 
-    await invalidateOldDrafts(1, "HomeSettings", t);
+    // 1. Invalidate ALL old drafts for this module
+    await ApprovalDraft.update(
+      { status: "Obsolete" },
+      {
+        where: {
+          module_name: MODULE_NAME,
+          status: ["Pending", "Rejected"],
+        },
+        transaction: t,
+      },
+    );
 
+    // 2. Update Ledger langsung (Menggunakan variabel yang sudah di-sanitize)
     await settings.update(
       {
-        introHeadline,
-        introBody,
+        introHeadline: safeHeadline,
+        introBody: safeBody,
         is_locked: false,
         lock_ticket: null,
       },
@@ -184,9 +251,11 @@ exports.updateSettings = async (req, res) => {
     );
 
     await t.commit();
-    return res
-      .status(200)
-      .json({ success: true, message: "Perubahan live berhasil disimpan!" });
+
+    return res.status(200).json({
+      success: true,
+      message: "Perubahan live berhasil disimpan secara instan!",
+    });
   } catch (error) {
     if (t && !t.finished) await t.rollback();
     console.error("🚨 [ATOMIC FAILURE]:", error.message);
@@ -219,52 +288,58 @@ exports.createHeroSlide = async (req, res) => {
           : uploadedImage.filename;
     }
 
-    if (userRole === "editor") {
+    if (userRole === "editor" && status === "Published") {
+      const actorId = String(req.owl_username || req.karyawanId);
+      const notrans = await generateNotrans("HERO");
+
+      await ApprovalDraft.create(
+        {
+          notrans,
+          module_name: "HeroSlides",
+          action: "CREATE",
+          target_id: "0",
+          payload: { ...slideData, status: "Published" },
+          created_by: actorId,
+          status: "Pending",
+        },
+        { transaction: t },
+      );
+
       slideData.is_locked = true;
-      slideData.lock_ticket = "PENDING_SYNC";
+      slideData.lock_ticket = notrans;
     }
 
     newSlide = await HeroSlides.create(slideData, { transaction: t });
 
-    await t.commit();
-
-    // 3EXTERNAL HANDSHAKE
     if (userRole === "editor" && status === "Published") {
-      try {
-        const result = await ErpApprovalService.initiateApproval({
-          model: "HeroSlides",
-          targetId: newSlide.id,
-          action: "CREATE",
-          payload: slideData,
-          userId: req.userId,
-          owlUsername: req.owl_username,
-          token: req.headers["authorization"]?.split(" ")[1],
-        });
-
-        // FINAL SYNC
-        await newSlide.update({ lock_ticket: result.notrans });
-
-        return res.status(202).json({
-          success: true,
-          message: "Permintaan slide baru berhasil diajukan.",
-          ticket: result.notrans,
-        });
-      } catch (owlError) {
-        console.error(
-          `🚨 [ERP FAIL] Rollback manual untuk Slide ID: ${newSlide.id}`,
-        );
-        await newSlide.destroy();
-        if (slideData.imageUrl) deleteSingleFile(slideData.imageUrl);
-
-        return res.status(500).json({
-          success: false,
-          message: "Gagal menyinkronkan dengan ERP. Pembuatan dibatalkan.",
-          error: owlError.message,
-        });
-      }
+      await ApprovalDraft.update(
+        { target_id: String(newSlide.id) },
+        { where: { notrans: slideData.lock_ticket }, transaction: t },
+      );
     }
 
-    // SUPERADMIN
+    await t.commit();
+
+    // EXTERNAL HANDSHAKE
+    if (userRole === "editor" && status === "Published") {
+      try {
+        await ErpApprovalService.initiateApproval({
+          notrans: slideData.lock_ticket,
+          moduleName: "HeroSlides",
+          karyawanId: req.karyawanId,
+          token: req.headers["authorization"]?.split(" ")[1] || req.owl_token,
+        });
+      } catch (erpErr) {
+        console.error("⚠️ [ERP_SYNC_WARNING]:", erpErr.message);
+      }
+
+      return res.status(202).json({
+        success: true,
+        message: "Permintaan slide baru diajukan.",
+        ticket: slideData.lock_ticket,
+      });
+    }
+
     return res
       .status(201)
       .json({ success: true, message: "Slide created live", data: newSlide });
@@ -316,46 +391,53 @@ exports.updateHeroSlide = async (req, res) => {
 
     //  EDITOR
     if (userRole === "editor" && status === "Published") {
-      await invalidateOldDrafts(id, "HeroSlides", t, previous_notrans);
+      const actorId = String(req.owl_username || req.karyawanId);
+      const notrans = await generateNotrans("HERO");
 
-      await slide.update(
+      if (previous_notrans) {
+        await ApprovalDraft.update(
+          { status: "Replaced" },
+          { where: { notrans: previous_notrans }, transaction: t },
+        );
+      }
+
+      await ApprovalDraft.create(
         {
-          is_locked: true,
-          lock_ticket: "PENDING_SYNC",
+          notrans,
+          module_name: "HeroSlides",
+          action: "UPDATE",
+          target_id: String(id),
+          payload: { ...updatedData, status: "Published" },
+          created_by: actorId,
+          status: "Pending",
         },
+        { transaction: t },
+      );
+
+      // 3. Lockng
+      await slide.update(
+        { is_locked: true, lock_ticket: notrans },
         { transaction: t },
       );
 
       await t.commit();
 
-      // External Handshake
       try {
-        const result = await ErpApprovalService.initiateApproval({
-          model: "HeroSlides",
-          targetId: id,
-          action: "UPDATE",
-          payload: JSON.parse(JSON.stringify(updatedData)),
-          userId: req.userId,
-          owlUsername: req.owl_username,
-          token: req.headers["authorization"]?.split(" ")[1],
-        });
-
-        // Update tiket aslinya
-        await slide.update({ lock_ticket: result.notrans });
-
-        return res.status(202).json({
-          success: true,
-          message: "Revisi slide berhasil diajukan.",
-          ticket: result.notrans,
+        await ErpApprovalService.initiateApproval({
+          notrans,
+          moduleName: "HeroSlides",
+          karyawanId: req.karyawanId,
+          token: req.headers["authorization"]?.split(" ")[1] || req.owl_token,
         });
       } catch (owlError) {
         console.error("🚨 [ERP SYNC FAILED]:", owlError.message);
-        return res.status(202).json({
-          success: true,
-          message: "Data terkunci lokal, namun sinkronisasi ERP tertunda.",
-          warning: owlError.message,
-        });
       }
+
+      return res.status(202).json({
+        success: true,
+        message: "Revisi slide berhasil diajukan ke ERP OWL.",
+        ticket: notrans,
+      });
     }
 
     //  SUPERADMIN
@@ -411,50 +493,58 @@ exports.deleteHeroSlide = async (req, res) => {
       });
     }
 
-    //  EDITOR 
+    //  EDITOR
     if (userRole === "editor") {
-      await invalidateOldDrafts(id, "HeroSlides", t, req.body.previous_notrans);
+      const actorId = String(req.owl_username || req.karyawanId);
+      const notrans = await generateNotrans("HERO_DEL");
+      const fullSnapshot = slide.get({ plain: true });
+
+      const ticketToClear = req.body?.previous_notrans;
+
+      if (ticketToClear) {
+        await ApprovalDraft.update(
+          { status: "Replaced" },
+          { where: { notrans: ticketToClear }, transaction: t },
+        );
+      }
+
+      await ApprovalDraft.create(
+        {
+          notrans,
+          module_name: "HeroSlides",
+          action: "DELETE",
+          target_id: String(id),
+          payload: { ...fullSnapshot, reason: "Request Delete" },
+          created_by: actorId,
+          status: "Pending",
+        },
+        { transaction: t },
+      );
 
       await slide.update(
-        {
-          is_locked: true,
-          lock_ticket: "PENDING_SYNC",
-        },
+        { is_locked: true, lock_ticket: notrans },
         { transaction: t },
       );
 
       await t.commit();
 
-      // External Handshake
       try {
-        const result = await ErpApprovalService.initiateApproval({
-          model: "HeroSlides",
-          targetId: slide.id,
-          action: "DELETE",
-          payload: { title: slide.title },
-          userId: req.userId,
-          owlUsername: req.owl_username,
-          token: req.headers["authorization"]?.split(" ")[1],
-        });
-
-        await slide.update({ lock_ticket: result.notrans });
-
-        return res.status(202).json({
-          success: true,
-          message: "Permintaan hapus slide diajukan.",
-          ticket: result.notrans,
+        await ErpApprovalService.initiateApproval({
+          notrans,
+          moduleName: "HeroSlides",
+          karyawanId: req.karyawanId,
+          token: req.headers["authorization"]?.split(" ")[1] || req.owl_token,
         });
       } catch (owlError) {
         console.error("🚨 [ERP SYNC FAILED]:", owlError.message);
-        return res.status(202).json({
-          success: true,
-          message:
-            "Slide dikunci untuk dihapus, tapi sinkronisasi ERP tertunda.",
-          warning: owlError.message,
-        });
       }
-    }
 
+      return res.status(202).json({
+        success: true,
+        message: "Permintaan hapus slide diajukan. Data dikunci sementara.",
+        ticket: notrans,
+      });
+    }
     //  SUPERADMIN
     await invalidateOldDrafts(id, "HeroSlides", t);
 
@@ -502,52 +592,57 @@ exports.createStat = async (req, res) => {
       is_locked: false,
     };
 
-    if (userRole === "editor") {
+    if (userRole === "editor" && status === "Published") {
+      const actorId = String(req.owl_username || req.karyawanId);
+      const notrans = await generateNotrans("STAT");
+
+      await ApprovalDraft.create(
+        {
+          notrans,
+          module_name: "ImpactStats",
+          action: "CREATE",
+          target_id: "0",
+          payload: { ...statData, status: "Published" },
+          created_by: actorId,
+          status: "Pending",
+        },
+        { transaction: t },
+      );
+
       statData.is_locked = true;
-      statData.lock_ticket = "PENDING_SYNC";
+      statData.lock_ticket = notrans;
     }
 
     newStat = await ImpactStats.create(statData, { transaction: t });
 
-    await t.commit();
-
-    // External Hanadshake (Editor)
     if (userRole === "editor" && status === "Published") {
-      try {
-        const result = await ErpApprovalService.initiateApproval({
-          model: "ImpactStats",
-          targetId: newStat.id,
-          action: "CREATE",
-          payload: statData,
-          userId: req.userId,
-          owlUsername: req.owl_username,
-          token: req.headers["authorization"]?.split(" ")[1],
-        });
-
-        // PFINAL SYNC
-        await newStat.update({ lock_ticket: result.notrans });
-
-        return res.status(202).json({
-          success: true,
-          message: "Permintaan statistik baru berhasil diajukan.",
-          ticket: result.notrans,
-        });
-      } catch (owlError) {
-        console.error(
-          `🚨 [ERP FAIL] Rollback manual untuk Stat ID: ${newStat.id}`,
-        );
-        await newStat.destroy();
-
-        return res.status(500).json({
-          success: false,
-          message:
-            "Gagal menyinkronkan dengan ERP. Pembuatan statistik dibatalkan.",
-          error: owlError.message,
-        });
-      }
+      await ApprovalDraft.update(
+        { target_id: String(newStat.id) },
+        { where: { notrans: statData.lock_ticket }, transaction: t },
+      );
     }
 
-    // SUPERADMIN
+    await t.commit();
+
+    // EXTERNAL HANDSHAKE
+    if (userRole === "editor" && status === "Published") {
+      try {
+        await ErpApprovalService.initiateApproval({
+          notrans: statData.lock_ticket,
+          moduleName: "ImpactStats",
+          karyawanId: req.karyawanId,
+          token: req.headers["authorization"]?.split(" ")[1] || req.owl_token,
+        });
+      } catch (erpErr) {
+        console.error("⚠️ [ERP_SYNC_WARNING]:", erpErr.message);
+      }
+      return res.status(202).json({
+        success: true,
+        message: "Permintaan statistik diajukan.",
+        ticket: statData.lock_ticket,
+      });
+    }
+
     return res
       .status(201)
       .json({ success: true, message: "Stat created live", data: newStat });
@@ -591,61 +686,61 @@ exports.updateStat = async (req, res) => {
 
     //  EDITOR
     if (userRole === "editor" && status === "Published") {
-      await invalidateOldDrafts(id, "ImpactStats", t, previous_notrans);
+      const actorId = String(req.owl_username || req.karyawanId);
+      const notrans = await generateNotrans("STAT");
 
-      await stat.update(
+      if (previous_notrans) {
+        await ApprovalDraft.update(
+          { status: "Replaced" },
+          { where: { notrans: previous_notrans }, transaction: t },
+        );
+      }
+
+      await ApprovalDraft.create(
         {
-          is_locked: true,
-          lock_ticket: "PENDING_SYNC",
+          notrans,
+          module_name: "ImpactStats",
+          action: "UPDATE",
+          target_id: String(id),
+          payload: { ...updatedData, status: "Published" },
+          created_by: actorId,
+          status: "Pending",
         },
         { transaction: t },
       );
 
+      await stat.update(
+        { is_locked: true, lock_ticket: notrans },
+        { transaction: t },
+      );
       await t.commit();
 
-      // External Handshake
       try {
-        const result = await ErpApprovalService.initiateApproval({
-          model: "ImpactStats",
-          targetId: id,
-          action: "UPDATE",
-          payload: updatedData,
-          userId: req.userId,
-          owlUsername: req.owl_username,
-          token: req.headers["authorization"]?.split(" ")[1],
+        await ErpApprovalService.initiateApproval({
+          notrans,
+          moduleName: "ImpactStats",
+          karyawanId: req.karyawanId,
+          token: req.headers["authorization"]?.split(" ")[1] || req.owl_token,
         });
-
-        // Sinkronisasi tiket final
-        await stat.update({ lock_ticket: result.notrans });
-
-        return res.status(202).json({
-          success: true,
-          message: "Revisi statistik berhasil diajukan.",
-          ticket: result.notrans,
-        });
-      } catch (owlError) {
-        console.error("🚨 [ERP SYNC FAILED]:", owlError.message);
-        return res.status(202).json({
-          success: true,
-          message: "Data terkunci lokal, namun sinkronisasi ERP tertunda.",
-          warning: owlError.message,
-        });
+      } catch (erpErr) {
+        console.error("🚨 [ERP_SYNC_FAILED]:", erpErr.message);
       }
+
+      return res.status(202).json({
+        success: true,
+        message: "Revisi statistik diajukan.",
+        ticket: notrans,
+      });
     }
 
-    //  SUPERADMIN
-    await invalidateOldDrafts(id, "ImpactStats", t);
-
+    // SUPERADMIN PATH (Direct Override)
+    await invalidateOldDrafts("ImpactStats", String(id), t);
     await stat.update(
-      {
-        ...updatedData,
-        is_locked: false,
-        lock_ticket: null,
-      },
+      { ...updatedData, is_locked: false, lock_ticket: null },
       { transaction: t },
     );
-
     await t.commit();
+
     return res
       .status(200)
       .json({ success: true, message: "Statistik updated live!", data: stat });
@@ -684,46 +779,49 @@ exports.deleteStat = async (req, res) => {
 
     //  EDITOR
     if (userRole === "editor") {
-      await invalidateOldDrafts(id, "ImpactStats", t);
+      const actorId = String(req.owl_username || req.karyawanId);
+      const notrans = await generateNotrans("STAT_DEL");
+      const fullSnapshot = stat.get({ plain: true });
 
-      await stat.update(
+      // 1. Simpan niat penghapusan ke Vault
+      await ApprovalDraft.create(
         {
-          is_locked: true,
-          lock_ticket: "PENDING_SYNC",
+          notrans,
+          module_name: "ImpactStats",
+          action: "DELETE",
+          target_id: String(id),
+          payload: { ...fullSnapshot, reason: "Request Delete" },
+          created_by: actorId,
+          status: "Pending",
         },
+        { transaction: t },
+      );
+
+      // 2. Pasang Gembok Hapus
+      await stat.update(
+        { is_locked: true, lock_ticket: notrans },
         { transaction: t },
       );
 
       await t.commit();
 
-      // External Handshake
+      // 3. External Handshake
       try {
-        const result = await ErpApprovalService.initiateApproval({
-          model: "ImpactStats",
-          targetId: stat.id,
-          action: "DELETE",
-          payload: { label: stat.label },
-          userId: req.userId,
-          owlUsername: req.owl_username,
-          token: req.headers["authorization"]?.split(" ")[1],
+        await ErpApprovalService.initiateApproval({
+          notrans,
+          moduleName: "ImpactStats",
+          karyawanId: req.karyawanId,
+          token: req.headers["authorization"]?.split(" ")[1] || req.owl_token,
         });
-
-        await stat.update({ lock_ticket: result.notrans });
-
-        return res.status(202).json({
-          success: true,
-          message: "Permintaan hapus statistik diajukan.",
-          ticket: result.notrans,
-        });
-      } catch (owlError) {
-        console.error("🚨 [ERP SYNC FAILED]:", owlError.message);
-        return res.status(202).json({
-          success: true,
-          message:
-            "Statistik dikunci untuk dihapus, sinkronisasi ERP tertunda.",
-          warning: owlError.message,
-        });
+      } catch (erpError) {
+        console.error("🚨 [ERP SYNC FAILED]:", erpError.message);
       }
+
+      return res.status(202).json({
+        success: true,
+        message: "Permintaan hapus statistik diajukan. Data dikunci sementara.",
+        ticket: notrans,
+      });
     }
 
     // SUPERADMIN

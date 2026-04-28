@@ -20,24 +20,30 @@ export default function HomepageManager() {
   const { user } = useAuth();
   const isSuperadmin = user?.role === "superadmin" || user?.role === "admin";
 
-  const { slides, stats, settings, rejectedIntro } = useHome();
+  const {
+    slides,
+    stats,
+    settings,
+    rejectedIntro,
+    rejectedSlidesMap,
+    rejectedStatsMap,
+  } = useHome();
 
   const getTabStatus = (type: "hero" | "intro" | "stats") => {
     if (type === "hero")
       return {
         locked: slides.some((s) => s.is_locked),
-        rejected: slides.some((s) => s.has_rejected),
+        rejected: Object.keys(rejectedSlidesMap || {}).length > 0,
       };
     if (type === "intro")
       return {
         locked: settings?.is_locked,
-        // Intro menggunakan rejectedIntro snapshot dari Context v1.2
-        rejected: !!rejectedIntro || settings?.has_rejected,
+        rejected: !!rejectedIntro,
       };
     if (type === "stats")
       return {
         locked: stats.some((s) => s.is_locked),
-        rejected: stats.some((s) => s.has_rejected),
+        rejected: Object.keys(rejectedStatsMap || {}).length > 0,
       };
     return { locked: false, rejected: false };
   };
@@ -50,7 +56,7 @@ export default function HomepageManager() {
 
   return (
     <div className="max-w-6xl mx-auto space-y-6 animate-in fade-in duration-500 pb-12">
-      {/* --- HEADER --- */}
+      {/* HEADER */}
       <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm flex justify-between items-center">
         <div>
           <h1 className="text-2xl font-serif font-bold text-slate-900">
@@ -67,7 +73,7 @@ export default function HomepageManager() {
         )}
       </div>
 
-      {/* --- TABS NAVIGATION DENGAN MATRIX INDICATOR --- */}
+      {/* TABS NAVIGATION DENGAN MATRIX INDICATOR */}
       <div className="flex items-end overflow-x-auto border border-slate-200 border-b-0 shadow-sm bg-white rounded-t-xl px-2 pt-2 hide-scrollbar">
         {tabs.map((tab) => {
           const status = getTabStatus(tab.id as any);
@@ -87,16 +93,15 @@ export default function HomepageManager() {
               />
               {tab.label}
 
-              {/* 🚀 MATRIX TAB BADGE (Visual Authority) */}
               <div className="flex gap-1.5 ml-2 items-center">
-                {/* 1. Indikator Revisi (Amber Pulse) */}
+                {/* Indikator Revisi (Amber Pulse) */}
                 {status.rejected && (
                   <span title="Revision Required">
                     <div className="w-2 h-2 bg-amber-500 rounded-full animate-pulse shadow-[0_0_8px_rgba(245,158,11,0.6)]" />
                   </span>
                 )}
 
-                {/* 2. Indikator Gembok Berdasarkan Kasta */}
+                {/* Indikator Gembok Berdasarkan Kasta */}
                 {status.locked && (
                   <span
                     title={
@@ -117,7 +122,7 @@ export default function HomepageManager() {
         })}
       </div>
 
-      {/* --- TAB CONTENT AREA --- */}
+      {/* TAB CONTENT AREA */}
       <div className="bg-white rounded-b-xl border border-t-0 border-slate-200 shadow-sm p-6 lg:p-8 min-h-[500px]">
         <div className={activeTab === "hero" ? "block" : "hidden"}>
           <HeroManager />

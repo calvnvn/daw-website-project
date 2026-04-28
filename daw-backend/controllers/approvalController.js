@@ -189,8 +189,6 @@ exports.executeDecision = async (req, res) => {
     }
 
     // 3. SEQUENCE CONTROL: Tembak ERP DULU
-    // Reason: We can rollback MySQL, but we can't rollback ERP.
-    // ERP is the master of workflow status.
     await ErpApprovalService.submitDecision({
       status,
       kodeapp: nourut, // Mapping nourut to ERP's kodeapp field
@@ -477,9 +475,13 @@ const MODEL_MAPPING = {
   AboutInfo,
 };
 
-function getModelByModuleName(module) {
+function getModelByModuleName(moduleName) {
+  if (!moduleName) return null;
+  const normalizedName =
+    moduleName.toLowerCase() === "settings" ? "HomeSettings" : moduleName;
+
   const standardKey = Object.keys(MODEL_MAPPING).find(
-    (k) => k.toLowerCase() === module.toLowerCase(),
+    (k) => k.toLowerCase() === normalizedName.toLowerCase(),
   );
   return MODEL_MAPPING[standardKey] || null;
 }
@@ -511,7 +513,9 @@ async function executeModelUpdate(
   action,
   transaction,
 ) {
-  const Model = getModelByModuleName(module);
+  const effectiveModule =
+    module.toLowerCase() === "settings" ? "HomeSettings" : module;
+  const Model = getModelByModuleName(effectiveModule);
 
   if (!Model) {
     throw new Error(`Mapping Model untuk modul '${module}' tidak ditemukan.`);
@@ -520,9 +524,25 @@ async function executeModelUpdate(
   const filesToTrash = payload._filesToDelete || [];
   delete payload._filesToDelete;
 
-  // Delete Handling
+  const validAttributes = Object.keys(Model.rawAttributes);
+  const scrubbedPayload = {};
+
+  Object.keys(payload).forEach((key) => {
+    if (validAttributes.includes(key)) {
+      scrubbedPayload[key] = payload[key];
+    }
+  });
+
+  scrubbedPayload.is_locked = false;
+  scrubbedPayload.lock_ticket = null;
+
+  console.log(
+    `>>> [SCRUBBING] Module: ${effectiveModule} | Accepted Keys:`,
+    Object.keys(scrubbedPayload),
+  );
+
   if (action === "DELETE") {
-    if (module === "BusinessSection") {
+    if (effectiveModule === "BusinessSection") {
       await BusinessMapMarker.destroy({
         where: { sectionId: targetId },
         transaction,
@@ -532,35 +552,38 @@ async function executeModelUpdate(
     return filesToTrash;
   }
 
-  // Create Handling
   if (action === "CREATE") {
     const placeholder = await Model.findByPk(targetId, { transaction });
-
     if (placeholder) {
-      await placeholder.update(payload, { transaction });
+      await placeholder.update(scrubbedPayload, { transaction });
       console.log(
-        `>>> [HANDOVER SUCCESS] Placeholder ${module} ID ${targetId} telah di-update menjadi LIVE.`,
+        `>>> [HANDOVER SUCCESS] ${effectiveModule} ID ${targetId} Updated.`,
       );
     } else {
-      await Model.create({ ...payload, id: targetId }, { transaction });
-      console.log(`>>> [DIRECT CREATE] ${module} ID ${targetId} dibuat baru.`);
+      await Model.create({ ...scrubbedPayload, id: targetId }, { transaction });
+      console.log(
+        `>>> [DIRECT CREATE] ${effectiveModule} ID ${targetId} Created.`,
+      );
     }
     return filesToTrash;
   }
 
-  // Update Handling (Singleton & Relational)
   const singletonModules = [
     "AboutInfo",
     "HomeSettings",
     "InvestmentSettings",
     "Settings",
   ];
-  if (singletonModules.includes(module)) {
-    await Model.update(payload, { where: { id: 1 }, transaction });
+
+  if (singletonModules.includes(effectiveModule)) {
+    await Model.update(scrubbedPayload, {
+      where: { id: 1 },
+      transaction,
+    });
     return filesToTrash;
   }
 
-  switch (module) {
+  switch (effectiveModule) {
     case "History":
       await History.destroy({ where: {}, transaction });
       if (payload.histories && Array.isArray(payload.histories)) {
@@ -575,7 +598,7 @@ async function executeModelUpdate(
       break;
 
     case "BusinessSection":
-      const parentPayload = { ...payload };
+      const parentPayload = { ...scrubbedPayload };
       delete parentPayload.mapMarkers;
 
       await BusinessSection.update(parentPayload, {
@@ -612,12 +635,18 @@ async function executeModelUpdate(
           { where: {}, transaction },
         );
       } else {
-        await Menu.update(payload, { where: { id: targetId }, transaction });
+        await Menu.update(scrubbedPayload, {
+          where: { id: targetId },
+          transaction,
+        });
       }
       break;
 
     default:
-      await Model.update(payload, { where: { id: targetId }, transaction });
+      await Model.update(scrubbedPayload, {
+        where: { id: targetId },
+        transaction,
+      });
       break;
   }
 
