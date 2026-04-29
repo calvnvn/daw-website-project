@@ -457,6 +457,46 @@ exports.discardDraft = async (req, res) => {
   }
 };
 
+exports.forcePurgeGhostTicket = async (req, res) => {
+  const { notrans, nourut, level, komentar } = req.body;
+  const tokenOWL = req.owl_token;
+  const nikApprover = String(req.karyawanId);
+
+  try {
+    console.log(
+      `⚠️  [GHOST BUSTER] Memulai Force Purge untuk tiket: ${notrans}`,
+    );
+
+    // Kita langsung tembak ERP dengan status "2" (Reject)
+    // Kenapa Reject? Karena data lokalnya udah ga ada, jadi nggak mungkin di-Approve.
+    await ErpApprovalService.submitDecision({
+      status: "2",
+      nourut: nourut, // Di ERP mapping ke kodeapp
+      notrans: notrans,
+      level: Number(level),
+      komentar: komentar || "SYSTEM PURGE: Local Draft Missing",
+      nextApp: "", // Kosongkan karena kita ingin mematikan tiket ini
+      token: tokenOWL,
+      karyawanid: nikApprover,
+    });
+
+    console.log(
+      `✅ [GHOST BUSTER] Tiket ${notrans} berhasil dibersihkan dari ERP.`,
+    );
+
+    return res.status(200).json({
+      success: true,
+      message: "Tiket yatim piatu berhasil dimusnahkan dari antrean ERP.",
+    });
+  } catch (error) {
+    console.error("🚨 [GHOST BUSTER ERROR]:", error.message);
+    res.status(500).json({
+      message: "Gagal membersihkan tiket dari ERP DAW.",
+      error: error.message,
+    });
+  }
+};
+
 // PRIVATE HELPERS (MAINTAINABILITY & EXECUTION ENGINE)
 const MODEL_MAPPING = {
   Project,

@@ -38,14 +38,14 @@ export default function HeroPreview({ data }: { data: any }) {
 
       {/* 🛡️ LAYER 3: BUREAUCRATIC MIRROR (BADGES) */}
       <div className="absolute top-4 left-4 right-4 flex justify-between items-start z-20">
-        <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-white/10 backdrop-blur-md border border-white/20 text-white text-[9px] font-bold uppercase tracking-widest shadow-lg">
+        <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-white/10  border border-white/20 text-white text-[9px] font-bold uppercase tracking-widest shadow-lg">
           <Layers className="w-3 h-3 text-daw-green" />
           Preview Layar
         </div>
 
         {/* POSITIONAL BADGE: Sangat krusial untuk mendeteksi Drag & Drop */}
         <div className="inline-flex flex-col items-end">
-          <div className="px-3 py-1 rounded-md bg-amber-500/90 backdrop-blur-sm border border-amber-400/50 text-white text-[10px] font-black uppercase tracking-widest shadow-lg">
+          <div className="px-3 py-1 rounded-md bg-amber-500/90  border border-amber-400/50 text-white text-[10px] font-black uppercase tracking-widest shadow-lg">
             Posisi Slide: {orderNum + 1}
           </div>
         </div>
@@ -77,7 +77,7 @@ export default function HeroPreview({ data }: { data: any }) {
             <div className="px-6 py-2.5 bg-daw-green text-white rounded-full text-[10px] font-bold flex items-center gap-2 shadow-lg shadow-daw-green/20 border border-daw-green/50 transition-all hover:bg-[#003b1c]">
               CTA Primary <ArrowRight className="w-3 h-3" />
             </div>
-            <div className="px-6 py-2.5 bg-white/10 backdrop-blur-md text-white rounded-full text-[10px] font-bold border border-white/20 hover:bg-white/20 transition-all">
+            <div className="px-6 py-2.5 bg-white/10  text-white rounded-full text-[10px] font-bold border border-white/20 hover:bg-white/20 transition-all">
               CTA Secondary
             </div>
           </div>

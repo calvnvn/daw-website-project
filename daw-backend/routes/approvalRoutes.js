@@ -20,6 +20,13 @@ router.post(
   approvalController.executeDecision,
 );
 
+router.post(
+  "/force-purge",
+  verifyToken,
+  checkPermission("manage_approvals"),
+  approvalController.forcePurgeGhostTicket,
+);
+
 // Mengambil data asli untuk pembanding (Diff Viewer)
 router.get(
   "/original-data",

@@ -15,6 +15,11 @@ import {
   ChevronRight,
   AlertTriangle,
   ChevronLeft,
+  Database,
+  Trash2,
+  PenTool,
+  Globe,
+  Sparkles,
 } from "lucide-react";
 import api from "@/lib/api";
 import { useAuth } from "@/contexts/AuthContext";
@@ -43,14 +48,11 @@ export interface ApprovalDraft {
   _isGhost?: boolean;
 }
 
-// UTILITY HELPER
-
 const isHtmlString = (str: any): boolean => {
   if (typeof str !== "string") return false;
   return /<[a-z][\s\S]*>/i.test(str);
 };
 
-// Helper: Membuang field bawaan DB agar tidak menjadi "Noise"
 const sanitizeForDiff = (data: any) => {
   if (!data || typeof data !== "object") return {};
   const cleanData = { ...data };
@@ -106,6 +108,13 @@ const DiffModal = ({
   const [loadingOld, setLoadingOld] = useState(true);
   const [activeTab, setActiveTab] = useState<"visual" | "code">("visual");
 
+  // 🚀 FITUR BARU: Layout Controller untuk mencegah layout terpotong
+  const [previewLayout, setPreviewLayout] = useState<"split" | "stacked">(
+    "split",
+  );
+
+  const minRejectChars = 5;
+
   // Fetch Live Data
   useEffect(() => {
     const abortController = new AbortController();
@@ -136,6 +145,22 @@ const DiffModal = ({
 
   const displayPayload = draft.payload;
 
+  // CHANGE HIGHLIGHT LOGIC
+  const changedFields = useMemo(() => {
+    if (!oldData || draft.action !== "UPDATE") return [];
+    const safeOld = sanitizeForDiff(oldData);
+    const safeNew = sanitizeForDiff(displayPayload || {});
+    const changes: string[] = [];
+
+    const allKeys = new Set([...Object.keys(safeOld), ...Object.keys(safeNew)]);
+    allKeys.forEach((key) => {
+      if (JSON.stringify(safeOld[key]) !== JSON.stringify(safeNew[key])) {
+        changes.push(key);
+      }
+    });
+    return changes;
+  }, [oldData, displayPayload, draft.action]);
+
   // PEMISAHAN DATA: METADATA VS HTML CONTENT
   const { oldMeta, newMeta, oldHtml, newHtml } = useMemo(() => {
     const safeOldData = sanitizeForDiff(oldData || {});
@@ -148,37 +173,35 @@ const DiffModal = ({
   }, [oldData, displayPayload]);
 
   const isBrandNewData = draft.action === "CREATE";
+  const isDeleteAction = draft.action === "DELETE";
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/80 animate-in fade-in duration-200">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-6xl max-h-[95vh] flex flex-col overflow-hidden animate-in zoom-in-95 duration-200">
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 lg:p-6 bg-slate-900/80  animate-in fade-in duration-200 whitespace-normal break-words text-left">
+      <div className="bg-white rounded-3xl shadow-2xl w-full max-w-7xl max-h-[95vh] flex flex-col overflow-hidden animate-in zoom-in-95 duration-200 border border-slate-200">
         {/* HEADER MODAL */}
-        <div className="px-6 py-4 border-b border-slate-200 flex justify-between items-center bg-slate-50 shrink-0">
+        <div className="px-6 py-4 lg:px-8 lg:py-5 border-b border-slate-200 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-slate-50 shrink-0">
           <div>
-            <h2 className="text-xl font-black text-slate-900 flex items-center gap-2 tracking-tight">
-              <FileText className="w-6 h-6 text-daw-green" />
+            <h2 className="text-lg lg:text-xl font-black text-slate-900 flex items-center gap-2 tracking-tight">
+              <FileText className="w-5 h-5 lg:w-6 lg:h-6 text-daw-green" />
               Tinjauan Perubahan: {draft.module_name}
             </h2>
-            <p className="text-xs text-slate-500 mt-1.5 font-mono">
+            <div className="flex items-center gap-2 mt-1.5 lg:mt-2">
               <span
-                className={`px-2 py-0.5 rounded font-bold mr-2 text-white ${
-                  isBrandNewData
-                    ? "bg-green-500"
-                    : draft.action === "DELETE"
-                      ? "bg-red-500"
-                      : "bg-blue-500"
-                }`}>
+                className={`px-2.5 py-0.5 rounded-md text-[10px] font-black uppercase tracking-widest text-white shadow-sm
+                ${isBrandNewData ? "bg-emerald-500" : isDeleteAction ? "bg-rose-500" : "bg-blue-500"}`}>
                 {draft.action}
               </span>
-              Tiket: {draft.notrans} | Level: {draft.level}
-            </p>
+              <span className="text-[11px] lg:text-xs text-slate-500 font-mono">
+                Tiket: <strong>{draft.notrans}</strong>
+              </span>
+            </div>
           </div>
 
-          <div className="flex items-center gap-4">
-            <div className="flex bg-slate-200 p-1 rounded-lg">
+          <div className="flex items-center gap-4 w-full sm:w-auto">
+            <div className="flex bg-slate-200/70 p-1.5 rounded-xl w-full sm:w-auto">
               <button
                 onClick={() => setActiveTab("visual")}
-                className={`flex items-center gap-2 px-4 py-1.5 rounded-md text-sm font-bold transition-all ${
+                className={`flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 lg:px-6 py-2 rounded-lg text-xs lg:text-sm font-bold transition-all ${
                   activeTab === "visual"
                     ? "bg-white text-daw-green shadow-sm"
                     : "text-slate-500 hover:text-slate-700"
@@ -187,7 +210,7 @@ const DiffModal = ({
               </button>
               <button
                 onClick={() => setActiveTab("code")}
-                className={`flex items-center gap-2 px-4 py-1.5 rounded-md text-sm font-bold transition-all ${
+                className={`flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 lg:px-6 py-2 rounded-lg text-xs lg:text-sm font-bold transition-all ${
                   activeTab === "code"
                     ? "bg-white text-blue-600 shadow-sm"
                     : "text-slate-500 hover:text-slate-700"
@@ -195,37 +218,65 @@ const DiffModal = ({
                 <Code2 className="w-4 h-4" /> Raw JSON
               </button>
             </div>
-
             <button
               onClick={onClose}
               disabled={isSubmitting}
-              className="p-2 bg-white hover:bg-red-50 hover:text-red-600 border border-slate-200 rounded-full transition-all shadow-sm disabled:opacity-50">
+              className="p-2.5 bg-white hover:bg-red-50 hover:text-red-600 border border-slate-200 rounded-xl transition-all shadow-sm disabled:opacity-50">
               <X className="w-5 h-5" />
             </button>
           </div>
         </div>
 
+        {/* INSIGHT BANNER */}
+        {!loadingOld && activeTab === "visual" && changedFields.length > 0 && (
+          <div className="bg-amber-50/80 border-b border-amber-100 px-6 lg:px-8 py-3 shrink-0 flex items-center gap-3 overflow-x-auto custom-scrollbar">
+            <Sparkles className="w-4 h-4 text-amber-500 animate-pulse shrink-0" />
+            <span className="text-xs font-bold text-amber-800 shrink-0">
+              Insight Analisis:
+            </span>
+            <div className="flex gap-1.5 flex-nowrap">
+              {changedFields.map((field) => (
+                <span
+                  key={field}
+                  className="px-2 py-0.5 bg-amber-200/50 text-amber-700 border border-amber-300 rounded text-[10px] font-bold font-mono shadow-sm whitespace-nowrap">
+                  {field}
+                </span>
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* BODY KONTEN */}
-        <div className="flex-1 overflow-y-auto bg-slate-100/50 p-6 relative">
+        <div className="flex-1 overflow-y-auto bg-slate-100/50 p-4 lg:p-6 relative custom-scrollbar">
           {loadingOld ? (
-            <div className="absolute inset-0 bg-white/70 z-10 flex flex-col items-center justify-center">
+            <div className="absolute inset-0 bg-white/70 z-10 flex flex-col items-center justify-center ">
               <Loader2 className="w-10 h-10 animate-spin text-daw-green mb-3" />
               <p className="text-sm font-bold text-slate-600 tracking-wide">
-                Menarik Data Live dari Server...
+                Menganalisis Perubahan Server...
               </p>
             </div>
           ) : activeTab === "code" ? (
-            <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden p-4">
-              {/* RAW JSON PROTECTOR */}
+            // RAW JSON TAB
+            <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden p-6">
               {isBrandNewData ? (
-                <div className="bg-slate-50 p-6 rounded-lg border border-dashed border-slate-300">
-                  <p className="text-sm font-bold text-slate-500 mb-4 flex items-center gap-2">
-                    <Check className="w-4 h-4 text-green-500" /> Ini adalah
-                    pembuatan data baru.
+                <div className="bg-emerald-50 p-8 rounded-xl border border-dashed border-emerald-200">
+                  <p className="text-sm font-black text-emerald-700 mb-4 flex items-center gap-2 uppercase tracking-tight">
+                    <Check className="w-5 h-5" /> Pembuatan Data Baru (Payload)
                   </p>
-                  <pre className="text-xs text-slate-700 overflow-x-auto bg-white p-4 rounded border border-slate-200">
+                  <pre className="text-xs text-slate-700 overflow-x-auto bg-white p-6 rounded-lg border border-slate-200 shadow-inner">
                     {JSON.stringify(sanitizeForDiff(displayPayload), null, 2)}
                   </pre>
+                </div>
+              ) : isDeleteAction ? (
+                <div className="bg-rose-50 p-8 rounded-xl border border-dashed border-rose-200 flex flex-col items-center text-center">
+                  <Trash2 className="w-12 h-12 text-rose-300 mb-3" />
+                  <p className="text-base font-black text-rose-700 uppercase tracking-tight">
+                    Permintaan Penghapusan Data
+                  </p>
+                  <p className="text-sm text-rose-600 mt-2">
+                    Tidak ada perbandingan JSON karena target data akan dihapus
+                    sepenuhnya dari database.
+                  </p>
                 </div>
               ) : (
                 <ReactDiffViewer
@@ -237,47 +288,119 @@ const DiffModal = ({
                   )}
                   splitView={true}
                   compareMethod={DiffMethod.WORDS}
-                  leftTitle="Versi Produksi"
-                  rightTitle="Usulan Draf"
+                  leftTitle="Versi Produksi (Saat Ini)"
+                  rightTitle="Usulan Draf (Perubahan)"
+                  styles={{
+                    variables: {
+                      light: {
+                        addedBackground: "#e6ffed",
+                        removedBackground: "#ffeef0",
+                      },
+                    },
+                  }}
                 />
               )}
             </div>
           ) : (
-            <div className="space-y-6">
-              {/* COMPONENT PREVIEW */}
+            // VISUAL & META TAB
+            <div className="space-y-8">
               {(() => {
                 const PreviewComponent = PREVIEW_REGISTRY[draft.module_name];
                 if (!PreviewComponent)
                   return (
-                    <div className="p-4 bg-amber-50 text-amber-700 border border-amber-200 rounded-lg text-sm font-bold text-center">
-                      Modul "{draft.module_name}" tidak memiliki Visual Preview
-                      Component terdaftar. Silakan gunakan tab "Raw JSON".
+                    <div className="p-6 bg-amber-50 text-amber-700 border border-amber-200 rounded-2xl text-sm font-bold text-center flex flex-col items-center gap-2">
+                      <LayoutTemplate className="w-8 h-8 opacity-50" />
+                      Modul "{draft.module_name}" tidak memiliki Visual
+                      Registry. Gunakan tab "Raw JSON".
                     </div>
                   );
 
                 return (
-                  <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-                    <div className="grid grid-cols-1 md:grid-cols-2 divide-x divide-slate-100 bg-slate-50/30">
-                      <div className="p-6 opacity-75">
-                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4">
-                          Live Version
-                        </p>
-                        {!isBrandNewData && oldData && !oldData._system_note ? (
-                          <PreviewComponent data={oldData} />
-                        ) : (
-                          <div className="h-32 flex flex-col items-center justify-center border-2 border-dashed border-slate-200 rounded-xl text-slate-400 text-xs bg-slate-50/50">
-                            <LayoutTemplate className="w-6 h-6 mb-2 opacity-50" />
-                            {isBrandNewData
-                              ? "Data Baru (Belum ada versi tayang)"
-                              : "Tidak ada visual Live."}
-                          </div>
-                        )}
+                  <div className="space-y-3">
+                    {/* LAYOUT CONTROLLER */}
+                    <div className="flex justify-end">
+                      <div className="flex bg-white border border-slate-200 rounded-lg p-1 shadow-sm">
+                        <button
+                          onClick={() => setPreviewLayout("split")}
+                          className={`px-3 py-1.5 text-xs font-bold rounded-md transition-all ${previewLayout === "split" ? "bg-slate-900 text-white shadow" : "text-slate-500 hover:bg-slate-50"}`}>
+                          Kiri Kanan (Side-by-Side)
+                        </button>
+                        <button
+                          onClick={() => setPreviewLayout("stacked")}
+                          className={`px-3 py-1.5 text-xs font-bold rounded-md transition-all ${previewLayout === "stacked" ? "bg-slate-900 text-white shadow" : "text-slate-500 hover:bg-slate-50"}`}>
+                          Atas Bawah (Stacked)
+                        </button>
                       </div>
-                      <div className="p-6 bg-white">
-                        <p className="text-[10px] font-black text-daw-green uppercase tracking-widest mb-4">
-                          Proposed Draft
-                        </p>
-                        <PreviewComponent data={displayPayload} />
+                    </div>
+
+                    {/* 🚀 THE RESPONSIVE DIFF CANVAS (Strict 50/50 Grid) */}
+                    <div className="w-full overflow-x-auto custom-scrollbar pb-2 rounded-3xl">
+                      <div
+                        className={`bg-white rounded-3xl shadow-sm border border-slate-200 overflow-hidden 
+                        ${previewLayout === "split" ? "grid grid-cols-2 min-w-[1200px] divide-x divide-slate-200" : "flex flex-col divide-y divide-slate-200"}`}>
+                        {/* LEFT PANEL: LIVE VERSION */}
+                        <div className="bg-slate-50/50 flex flex-col w-full overflow-hidden">
+                          <div className="px-6 py-3 bg-slate-100 border-b border-slate-200 flex items-center justify-between sticky top-0 z-10 shadow-sm shrink-0">
+                            <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">
+                              Live Version (Server)
+                            </span>
+                            {!isBrandNewData && (
+                              <Globe className="w-3 h-3 text-slate-400" />
+                            )}
+                          </div>
+                          <div className="p-6 flex-1 opacity-70 hover:opacity-100 transition-opacity overflow-hidden">
+                            {!isBrandNewData &&
+                            oldData &&
+                            !oldData._system_note ? (
+                              <div className="pointer-events-none select-none w-full">
+                                <PreviewComponent data={oldData} />
+                              </div>
+                            ) : (
+                              <div className="h-full min-h-[300px] flex flex-col items-center justify-center border-2 border-dashed border-slate-200 rounded-2xl text-slate-400 text-xs bg-white w-full">
+                                <Check className="w-8 h-8 mb-3 text-emerald-300" />
+                                {isBrandNewData
+                                  ? "Area Kosong (Data Baru)"
+                                  : "Data Live tidak ditemukan"}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* RIGHT PANEL: PROPOSED DRAFT */}
+                        <div className="bg-white flex flex-col w-full overflow-hidden">
+                          <div
+                            className={`px-6 py-3 border-b flex items-center justify-between sticky top-0 z-10 shadow-sm shrink-0 ${isDeleteAction ? "bg-rose-100 border-rose-200" : "bg-blue-50 border-blue-100"}`}>
+                            <span
+                              className={`text-[10px] font-black uppercase tracking-widest ${isDeleteAction ? "text-rose-700" : "text-blue-700"}`}>
+                              {isDeleteAction
+                                ? "Action: DELETE"
+                                : "Proposed Draft"}
+                            </span>
+                            {isDeleteAction ? (
+                              <Trash2 className="w-3 h-3 text-rose-500" />
+                            ) : (
+                              <PenTool className="w-3 h-3 text-blue-500" />
+                            )}
+                          </div>
+                          <div className="p-6 flex-1 overflow-hidden">
+                            {isDeleteAction ? (
+                              <div className="h-full min-h-[300px] flex flex-col items-center justify-center border-2 border-dashed border-rose-200 rounded-2xl text-rose-600 bg-rose-50 text-center px-4 w-full">
+                                <ShieldAlert className="w-10 h-10 mb-3 opacity-50" />
+                                <p className="font-bold text-sm uppercase tracking-tight">
+                                  Halaman Ini Akan Dihapus
+                                </p>
+                                <p className="text-xs mt-2 opacity-80">
+                                  Jika disetujui, data Live di sebelah kiri akan
+                                  dilenyapkan dari database permanen.
+                                </p>
+                              </div>
+                            ) : (
+                              <div className="ring-4 ring-blue-50/50 rounded-xl p-2 bg-white w-full">
+                                <PreviewComponent data={displayPayload} />
+                              </div>
+                            )}
+                          </div>
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -285,86 +408,104 @@ const DiffModal = ({
               })()}
 
               {/* METADATA DIFF PROTECTOR */}
-              {!isBrandNewData && (
-                <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-                  <div className="bg-slate-50 px-4 py-2 text-[10px] font-black text-slate-400 uppercase">
-                    Metadata Analysis
+              {!isBrandNewData &&
+                !isDeleteAction &&
+                Object.keys(oldMeta).length > 0 && (
+                  <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+                    <div className="bg-slate-50 px-6 py-3 border-b border-slate-200 text-[10px] font-black text-slate-500 uppercase tracking-widest flex items-center gap-2">
+                      <Database className="w-4 h-4" /> Metadata Analysis
+                    </div>
+                    <div className="p-2 overflow-x-auto">
+                      <ReactDiffViewer
+                        oldValue={JSON.stringify(oldMeta, null, 2)}
+                        newValue={JSON.stringify(newMeta, null, 2)}
+                        splitView={true}
+                      />
+                    </div>
                   </div>
-                  <ReactDiffViewer
-                    oldValue={JSON.stringify(oldMeta, null, 2)}
-                    newValue={JSON.stringify(newMeta, null, 2)}
-                    splitView={true}
-                  />
-                </div>
-              )}
+                )}
 
               {/* HTML DIFF PROTECTOR */}
               {!isBrandNewData &&
+                !isDeleteAction &&
                 (Object.keys(oldHtml).length > 0 ||
                   Object.keys(newHtml).length > 0) && (
-                  <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden mt-6">
-                    <div className="bg-slate-50 px-4 py-2 text-[10px] font-black text-slate-400 uppercase">
-                      Rich Text (HTML) Analysis
+                  <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden mt-6">
+                    <div className="bg-slate-50 px-6 py-3 border-b border-slate-200 text-[10px] font-black text-slate-500 uppercase tracking-widest flex items-center gap-2">
+                      <Code2 className="w-4 h-4" /> Rich Text (HTML) Analysis
                     </div>
-                    <ReactDiffViewer
-                      oldValue={JSON.stringify(oldHtml, null, 2)}
-                      newValue={JSON.stringify(newHtml, null, 2)}
-                      splitView={true}
-                    />
+                    <div className="p-2 overflow-x-auto">
+                      <ReactDiffViewer
+                        oldValue={JSON.stringify(oldHtml, null, 2)}
+                        newValue={JSON.stringify(newHtml, null, 2)}
+                        splitView={true}
+                      />
+                    </div>
                   </div>
                 )}
             </div>
           )}
         </div>
 
-        {/* FOOTER ACTIONS */}
-        <div className="px-6 py-4 bg-white border-t border-slate-200 flex flex-col sm:flex-row justify-between items-center gap-4 shrink-0">
+        {/* FOOTER ACTIONS (HARDENED REJECT ENGINE) */}
+        <div className="px-6 py-4 lg:px-8 lg:py-5 bg-white border-t border-slate-200 flex flex-col sm:flex-row justify-between items-center gap-4 shrink-0">
           {isReadOnly ? (
-            <div className="w-full flex items-center justify-center p-3 bg-amber-50 border border-amber-200 rounded-lg text-amber-800 text-sm font-bold gap-2">
-              <ShieldAlert className="w-5 h-5 text-amber-600" />
-              Hanya Approver tingkat terkait yang berhak mengeksekusi tiket ini.
+            <div className="w-full flex items-center justify-center p-4 bg-amber-50 border border-amber-200 rounded-xl text-amber-800 text-xs lg:text-sm font-bold gap-3">
+              <ShieldAlert className="w-5 h-5 text-amber-600 shrink-0" />
+              Anda tidak memiliki otoritas (Level) untuk mengeksekusi tiket ini.
             </div>
           ) : (
             <>
-              <div className="flex-1 flex gap-2 w-full sm:w-auto">
+              <div className="flex-1 flex gap-3 w-full sm:w-auto">
                 {isRejecting ? (
-                  <div className="flex w-full gap-2 animate-in slide-in-from-left-2">
-                    <input
-                      type="text"
-                      placeholder="Alasan penolakan (min. 5 karakter)..."
-                      className="flex-1 text-sm border-2 border-red-200 rounded-lg px-3 py-2 outline-none focus:border-red-500"
-                      value={rejectReason}
-                      onChange={(e) => setRejectReason(e.target.value)}
-                      disabled={isSubmitting}
-                      autoFocus
-                    />
-                    <button
-                      onClick={() => onReject(draft, rejectReason)}
-                      disabled={
-                        !rejectReason.trim() ||
-                        rejectReason.length < 5 ||
-                        isSubmitting
-                      }
-                      className="px-6 py-2 bg-red-600 hover:bg-red-700 disabled:opacity-50 text-white text-sm font-bold rounded-lg transition-all flex items-center gap-2">
-                      {isSubmitting ? (
-                        <Loader2 className="w-4 h-4 animate-spin" />
-                      ) : (
-                        "Konfirmasi Tolak"
-                      )}
-                    </button>
-                    <button
-                      onClick={() => setIsRejecting(false)}
-                      disabled={isSubmitting}
-                      className="px-4 py-2 bg-slate-100 text-slate-600 hover:bg-slate-200 text-sm font-bold rounded-lg transition-all">
-                      Batal
-                    </button>
+                  <div className="flex flex-col sm:flex-row w-full gap-3 animate-in slide-in-from-left-4 bg-red-50 p-2 rounded-2xl border border-red-100">
+                    <div className="flex-1 relative">
+                      <input
+                        type="text"
+                        placeholder="Alasan penolakan (Min 5 char)..."
+                        className={`w-full text-sm border-2 rounded-xl px-4 py-3 outline-none transition-colors pr-16
+                          ${rejectReason.length < minRejectChars ? "border-red-300 focus:border-red-500 bg-white" : "border-emerald-300 focus:border-emerald-500 bg-white"}`}
+                        value={rejectReason}
+                        onChange={(e) => setRejectReason(e.target.value)}
+                        disabled={isSubmitting}
+                        autoFocus
+                      />
+                      <span
+                        className={`absolute right-4 top-1/2 -translate-y-1/2 text-[10px] font-black ${rejectReason.length < minRejectChars ? "text-red-500" : "text-emerald-500"}`}>
+                        {rejectReason.length}/{minRejectChars}
+                      </span>
+                    </div>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => onReject(draft, rejectReason)}
+                        disabled={
+                          rejectReason.trim().length < minRejectChars ||
+                          isSubmitting
+                        }
+                        className="flex-1 sm:flex-none px-6 py-3 bg-red-600 hover:bg-red-700 disabled:opacity-50 disabled:bg-slate-300 text-white text-sm font-bold rounded-xl transition-all flex justify-center items-center gap-2 shadow-sm whitespace-nowrap">
+                        {isSubmitting ? (
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                        ) : (
+                          "Eksekusi Tolak"
+                        )}
+                      </button>
+                      <button
+                        onClick={() => {
+                          setIsRejecting(false);
+                          setRejectReason("");
+                        }}
+                        disabled={isSubmitting}
+                        className="px-5 py-3 bg-white text-slate-600 border border-slate-200 hover:bg-slate-100 text-sm font-bold rounded-xl transition-all">
+                        Batal
+                      </button>
+                    </div>
                   </div>
                 ) : (
                   <button
                     onClick={() => setIsRejecting(true)}
                     disabled={isSubmitting}
-                    className="px-6 py-2.5 bg-white border border-red-200 text-red-600 hover:bg-red-50 text-sm font-bold rounded-lg transition-all flex items-center gap-2 shadow-sm">
-                    <X className="w-4 h-4" /> Tolak Revisi
+                    className="w-full sm:w-auto px-8 py-3.5 bg-white border-2 border-red-100 text-red-600 hover:bg-red-50 hover:border-red-200 text-sm font-black tracking-tight rounded-2xl transition-all flex justify-center items-center gap-2 shadow-sm active:scale-95">
+                    <X className="w-5 h-5" /> Tolak Draf
                   </button>
                 )}
               </div>
@@ -373,16 +514,15 @@ const DiffModal = ({
                 <button
                   onClick={() => onApprove(draft)}
                   disabled={loadingOld || isSubmitting}
-                  className="px-8 py-2.5 bg-daw-green hover:bg-[#003b1c] disabled:opacity-50 text-white text-sm font-bold rounded-lg transition-all flex items-center gap-2 shadow-md active:scale-95">
+                  className="w-full sm:w-auto px-8 lg:px-10 py-3.5 bg-daw-green hover:bg-[#003b1c] disabled:opacity-50 text-white text-sm font-black tracking-tight uppercase rounded-2xl transition-all flex justify-center items-center gap-2 shadow-xl shadow-daw-green/20 active:scale-95 transform hover:-translate-y-0.5">
                   {isSubmitting ? (
                     <>
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                      Memproses...
+                      <Loader2 className="w-5 h-5 animate-spin" /> Meneruskan ke
+                      ERP...
                     </>
                   ) : (
                     <>
-                      <Check className="w-5 h-5" />
-                      Setujui & Sinkronkan
+                      <Check className="w-5 h-5" /> Setujui & Sinkronkan
                     </>
                   )}
                 </button>
@@ -433,7 +573,7 @@ export default function ApprovalCenter() {
   const { can, user } = useAuth();
   const isSuperadmin = user?.role === "superadmin" || user?.role === "admin";
 
-  // 1. SYSTEM STATES (Data Fetching & Modals)
+  // SYSTEM STATES (Data Fetching & Modals)
   const [drafts, setDrafts] = useState<ApprovalDraft[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [selectedDraft, setSelectedDraft] = useState<ApprovalDraft | null>(
@@ -441,7 +581,14 @@ export default function ApprovalCenter() {
   );
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // 2. ENGINE STATES (Search, Filter, Pagination)
+  // POWER STATES
+  const [selectedTickets, setSelectedTickets] = useState<Set<string>>(
+    new Set(),
+  );
+  const [isBulkApproving, setIsBulkApproving] = useState(false);
+  const [isPurging, setIsPurging] = useState<string | null>(null); // Menyimpan notrans yang sedang di-purge
+
+  // ENGINE STATES (Search, Filter, Pagination)
   const [activeTab, setActiveTab] = useState<"my_queue" | "history" | "all">(
     "all",
   );
@@ -451,6 +598,7 @@ export default function ApprovalCenter() {
 
   useEffect(() => {
     setCurrentPage(1);
+    setSelectedTickets(new Set());
   }, [activeTab, searchQuery]);
 
   // 3. API FETCHING
@@ -478,6 +626,36 @@ export default function ApprovalCenter() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // THE STATISTICS PROCESSOR (Bento Metrics)
+  const stats = useMemo(() => {
+    let urgent = 0;
+    let aging = 0;
+    let ghosts = 0;
+    let myTurn = 0;
+    const now = new Date().getTime();
+
+    drafts.forEach((d) => {
+      if (d.action === "DELETE") urgent++;
+      if (d._isGhost) ghosts++;
+      if (d.isMyQueue) myTurn++;
+
+      const draftDate = new Date(d.createdAt || Date.now()).getTime();
+      if (now - draftDate > 3 * 24 * 60 * 60 * 1000) aging++;
+    });
+
+    return { total: drafts.length, urgent, aging, ghosts, myTurn };
+  }, [drafts]);
+
+  // SELECTION TOGGLE (Untuk Bulk Action)
+  const toggleTicketSelection = (notrans: string) => {
+    setSelectedTickets((prev) => {
+      const newSet = new Set(prev);
+      if (newSet.has(notrans)) newSet.delete(notrans);
+      else newSet.add(notrans);
+      return newSet;
+    });
+  };
 
   // 4. ACTION HANDLERS (Secure Execution)
   const handleApprove = async (draft: ApprovalDraft) => {
@@ -570,6 +748,80 @@ export default function ApprovalCenter() {
     }
   };
 
+  const handleBulkApprove = async () => {
+    if (selectedTickets.size === 0) return;
+
+    setIsBulkApproving(true);
+    const toastId = toast.loading(
+      `Mengeksekusi ${selectedTickets.size} persetujuan massal...`,
+    );
+
+    const targets = drafts.filter((d) => selectedTickets.has(d.notrans));
+    let successCount = 0;
+    let failCount = 0;
+
+    // Menggunakan Promise.allSettled agar satu kegagalan tidak menghentikan yang lain
+    const promises = targets.map((draft) =>
+      api.post("/approval/decide", {
+        status: "1",
+        notrans: draft.notrans,
+        kodeapp: draft.kodeapp,
+        nourut: draft.nourut,
+        level: draft.level,
+      }),
+    );
+
+    const results = await Promise.allSettled(promises);
+
+    results.forEach((result) => {
+      if (result.status === "fulfilled") successCount++;
+      else failCount++;
+    });
+
+    if (failCount === 0) {
+      toast.success(`${successCount} draf berhasil disetujui massal!`, {
+        id: toastId,
+      });
+    } else {
+      toast.warning(
+        `${successCount} berhasil, ${failCount} gagal dieksekusi.`,
+        { id: toastId },
+      );
+    }
+
+    setSelectedTickets(new Set()); // Bersihkan pilihan
+    setIsBulkApproving(false);
+    fetchApprovals();
+  };
+
+  const handleForcePurge = async (draft: ApprovalDraft) => {
+    if (!isSuperadmin) return toast.error("Akses ditolak.");
+
+    setIsPurging(draft.notrans);
+    const toastId = toast.loading("Membersihkan antrean ERP (Force Purge)...");
+
+    try {
+      await api.post("/approval/force-purge", {
+        notrans: draft.notrans,
+        kodeapp: draft.kodeapp,
+        nourut: draft.nourut,
+        level: draft.level,
+        komentar: "SYSTEM OVERRIDE: Purging Orphaned Ticket",
+      });
+
+      toast.success("Tiket hantu berhasil dimusnahkan!", { id: toastId });
+      fetchApprovals();
+    } catch (error: any) {
+      toast.error("Gagal melakukan Purge", {
+        description:
+          error.response?.data?.message || "ERP OWL menolak permintaan.",
+        id: toastId,
+      });
+    } finally {
+      setIsPurging(null);
+    }
+  };
+
   // 5. DERIVED DATA PIPELINE
   const { filteredDrafts, paginatedDrafts, totalPages } = useMemo(() => {
     let result = drafts.filter((d) => {
@@ -590,6 +842,26 @@ export default function ApprovalCenter() {
       );
     }
 
+    const now = new Date().getTime();
+    result.sort((a, b) => {
+      // 1. Ghost Tickets turun ke paling bawah (biar nggak ganggu kerjaan utama)
+      if (a._isGhost !== b._isGhost) return a._isGhost ? 1 : -1;
+
+      // 2. Aksi DELETE naik ke paling atas (Urgency level tinggi)
+      if (a.action === "DELETE" && b.action !== "DELETE") return -1;
+      if (b.action === "DELETE" && a.action !== "DELETE") return 1;
+
+      // 3. Aging Tickets (> 3 hari) naik ke atas
+      const aAge = now - new Date(a.createdAt || now).getTime();
+      const bAge = now - new Date(b.createdAt || now).getTime();
+      const aIsAging = aAge > 3 * 24 * 60 * 60 * 1000;
+      const bIsAging = bAge > 3 * 24 * 60 * 60 * 1000;
+      if (aIsAging !== bIsAging) return aIsAging ? -1 : 1;
+
+      // 4. Sisanya urutkan berdasarkan yang paling baru
+      return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+    });
+
     const total = Math.ceil(result.length / itemsPerPage);
     const startIndex = (currentPage - 1) * itemsPerPage;
     const slicedData = result.slice(startIndex, startIndex + itemsPerPage);
@@ -601,7 +873,17 @@ export default function ApprovalCenter() {
     };
   }, [drafts, activeTab, searchQuery, currentPage, isSuperadmin]);
 
-  // 6. EARLY RETURN (Auth Gate)
+  const groupedDrafts = useMemo(() => {
+    const groups: Record<string, ApprovalDraft[]> = {};
+    paginatedDrafts.forEach((draft) => {
+      const modName = draft.module_name || "UNKNOWN_MODULE";
+      if (!groups[modName]) groups[modName] = [];
+      groups[modName].push(draft);
+    });
+    return groups;
+  }, [paginatedDrafts]);
+
+  // EARLY RETURN (Auth Gate)
   if (!can("manage_approvals")) {
     return (
       <div className="p-8 flex flex-col items-center justify-center text-red-500 min-h-[50vh]">
@@ -615,33 +897,127 @@ export default function ApprovalCenter() {
 
   return (
     <div className="animate-in fade-in duration-500 max-w-6xl mx-auto space-y-6 pb-12">
-      {/* HEADER SECTION */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white p-6 rounded-xl border border-slate-200 shadow-sm relative overflow-hidden">
-        <div className="absolute top-0 right-0 w-32 h-32 bg-daw-green/5 rounded-bl-full -z-0 pointer-events-none"></div>
-        <div className="z-10">
-          <h1 className="text-2xl font-serif font-black text-slate-900 flex items-center gap-3">
-            Approval Center
-            <span className="bg-daw-green/10 text-daw-green text-xs px-2.5 py-1 rounded-md font-sans border border-daw-green/20">
-              {filteredDrafts.length} Tiket Terdeteksi
-            </span>
-          </h1>
-          <p className="text-sm text-slate-500 mt-1.5 font-medium">
-            {isSuperadmin
-              ? "Pemantauan seluruh jalur persetujuan aktif."
-              : "Tinjau dan eksekusi draf revisi Anda."}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        {/* CARD 1: TOTAL TICKETS */}
+        <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm relative overflow-hidden group">
+          <div className="absolute top-0 right-0 w-24 h-24 bg-blue-50 rounded-bl-full -z-0 transition-transform group-hover:scale-110"></div>
+          <div className="relative z-10 flex justify-between items-start">
+            <div>
+              <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">
+                Total Antrean
+              </p>
+              <h3 className="text-4xl font-serif font-black text-slate-800">
+                {stats.total}
+              </h3>
+            </div>
+            <div className="w-10 h-10 rounded-xl bg-blue-100 text-blue-500 flex items-center justify-center">
+              <FileText className="w-5 h-5" />
+            </div>
+          </div>
+          <p className="text-xs text-slate-500 mt-4 font-medium flex items-center gap-1">
+            <span className="text-blue-500 font-bold">{stats.myTurn}</span>{" "}
+            tiket menunggu Anda
           </p>
         </div>
 
-        {/* ACTION BAR: Search & Refresh */}
-        <div className="flex items-center gap-3 w-full sm:w-auto z-10">
-          <div className="relative w-full sm:w-64">
+        {/* CARD 2: URGENT (DELETE) */}
+        <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm relative overflow-hidden group">
+          <div className="absolute top-0 right-0 w-24 h-24 bg-rose-50 rounded-bl-full -z-0 transition-transform group-hover:scale-110"></div>
+          <div className="relative z-10 flex justify-between items-start">
+            <div>
+              <p className="text-[10px] font-black text-rose-400 uppercase tracking-widest mb-1">
+                Urgent (Hapus)
+              </p>
+              <h3 className="text-4xl font-serif font-black text-rose-600">
+                {stats.urgent}
+              </h3>
+            </div>
+            <div className="w-10 h-10 rounded-xl bg-rose-100 text-rose-500 flex items-center justify-center">
+              <Trash2 className="w-5 h-5" />
+            </div>
+          </div>
+          <p className="text-xs text-slate-500 mt-4 font-medium">
+            Aksi permanen. Butuh review.
+          </p>
+        </div>
+
+        {/* CARD 3: AGING TICKETS */}
+        <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm relative overflow-hidden group">
+          <div className="absolute top-0 right-0 w-24 h-24 bg-amber-50 rounded-bl-full -z-0 transition-transform group-hover:scale-110"></div>
+          <div className="relative z-10 flex justify-between items-start">
+            <div>
+              <p className="text-[10px] font-black text-amber-500 uppercase tracking-widest mb-1">
+                Tiket Tertunda
+              </p>
+              <h3 className="text-4xl font-serif font-black text-amber-600">
+                {stats.aging}
+              </h3>
+            </div>
+            <div className="w-10 h-10 rounded-xl bg-amber-100 text-amber-500 flex items-center justify-center">
+              <Clock className="w-5 h-5" />
+            </div>
+          </div>
+          <p className="text-xs text-slate-500 mt-4 font-medium">
+            Mengendap lebih dari 3 hari.
+          </p>
+        </div>
+
+        {/* CARD 4: GHOST TICKETS (Hanya Admin) */}
+        {isSuperadmin && (
+          <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm relative overflow-hidden group">
+            <div className="absolute top-0 right-0 w-24 h-24 bg-slate-100 rounded-bl-full -z-0 transition-transform group-hover:scale-110"></div>
+            <div className="relative z-10 flex justify-between items-start">
+              <div>
+                <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1">
+                  Ghost Tickets
+                </p>
+                <h3 className="text-4xl font-serif font-black text-slate-700">
+                  {stats.ghosts}
+                </h3>
+              </div>
+              <div className="w-10 h-10 rounded-xl bg-slate-200 text-slate-600 flex items-center justify-center">
+                <AlertTriangle className="w-5 h-5" />
+              </div>
+            </div>
+            <p className="text-xs text-red-500 mt-4 font-bold flex items-center gap-1">
+              Data Desync. Butuh Force Purge.
+            </p>
+          </div>
+        )}
+      </div>
+
+      {/* --- ACTION BAR (Tab & Search) --- */}
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-white p-3 rounded-2xl border border-slate-200 shadow-sm">
+        {/* TAB NAVIGATION */}
+        <div className="flex space-x-1 bg-slate-100 p-1 rounded-xl w-full md:w-fit">
+          {[
+            { id: "my_queue", label: "Tugas Anda" },
+            { id: "history", label: "Riwayat" },
+            ...(isSuperadmin ? [{ id: "all", label: "Semua Jalur" }] : []),
+          ].map((tab) => (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id as any)}
+              className={`flex-1 md:flex-none px-6 py-2 text-sm font-bold rounded-lg transition-all ${
+                activeTab === tab.id
+                  ? "bg-white text-daw-green shadow-sm ring-1 ring-slate-200"
+                  : "text-slate-500 hover:text-slate-700"
+              }`}>
+              {tab.label}
+            </button>
+          ))}
+        </div>
+
+        {/* SEARCH & REFRESH */}
+        <div className="flex items-center gap-2 w-full md:w-auto">
+          <div className="relative w-full md:w-72">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
             <input
               type="text"
-              placeholder="Cari tiket atau editor..."
+              placeholder="Cari No. Tiket atau Editor..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-10 pr-10 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-daw-green/20 focus:border-daw-green transition-all"
+              className="w-full pl-10 pr-10 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-daw-green/20 focus:border-daw-green transition-all outline-none"
             />
             {searchQuery && (
               <button
@@ -653,378 +1029,341 @@ export default function ApprovalCenter() {
           </div>
           <button
             onClick={fetchApprovals}
-            className="inline-flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 text-sm font-bold rounded-xl transition-all shadow-sm active:scale-95">
+            disabled={isLoading}
+            className="p-2.5 bg-slate-100 border border-slate-200 text-slate-600 hover:bg-daw-green hover:text-white hover:border-daw-green rounded-xl transition-all shadow-sm active:scale-95 disabled:opacity-50"
+            title="Refresh Data">
             <Clock
-              className={`w-4 h-4 ${isLoading ? "animate-spin text-daw-green" : ""}`}
+              className={`w-5 h-5 ${isLoading ? "animate-spin text-daw-green" : ""}`}
             />
-            Refresh
           </button>
         </div>
       </div>
 
-      {/* TAB NAVIGATION */}
-      <div className="flex space-x-1 bg-slate-100/50 p-1 rounded-lg border border-slate-200 w-fit">
-        {[
-          { id: "my_queue", label: "Tugas Anda" },
-          { id: "history", label: "Riwayat" },
-          ...(isSuperadmin ? [{ id: "all", label: "Semua" }] : []),
-        ].map((tab) => (
-          <button
-            key={tab.id}
-            onClick={() => setActiveTab(tab.id as any)}
-            className={`px-5 py-2 text-sm font-bold rounded-md transition-all ${
-              activeTab === tab.id
-                ? "bg-white text-daw-green shadow-sm ring-1 ring-slate-200"
-                : "text-slate-500 hover:text-slate-700"
-            }`}>
-            {tab.label}
-          </button>
-        ))}
-      </div>
-
-      {/* DATA TABLE */}
-      <div className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden flex flex-col min-h-[400px]">
+      <div className="space-y-8">
         {isLoading ? (
           // SKELETON LOADER STATE
-          <div className="p-6">
-            <div className="animate-pulse space-y-6">
-              <div className="h-4 bg-slate-100 rounded w-1/4 mb-8"></div>
-              {[1, 2, 3].map((i) => (
-                <div
-                  key={i}
-                  className="flex items-center justify-between py-2 border-b border-slate-50 last:border-0">
-                  <div className="flex gap-4 items-center w-1/3">
-                    <div className="w-20 h-8 bg-slate-100 rounded-md"></div>
-                    <div className="w-24 h-3 bg-slate-100 rounded"></div>
-                  </div>
-                  <div className="flex gap-3 items-center w-1/3">
-                    <div className="w-8 h-8 bg-slate-100 rounded-lg"></div>
-                    <div className="space-y-2">
-                      <div className="w-20 h-4 bg-slate-100 rounded"></div>
-                      <div className="w-32 h-3 bg-slate-100 rounded"></div>
-                    </div>
-                  </div>
-                  <div className="w-24 h-10 bg-slate-100 rounded-xl"></div>
-                </div>
-              ))}
-            </div>
+          <div className="bg-white border border-slate-200 rounded-2xl shadow-sm p-6 space-y-6">
+            <div className="h-4 bg-slate-100 rounded w-1/4 mb-8 animate-pulse"></div>
+            {[1, 2, 3].map((i) => (
+              <div
+                key={i}
+                className="flex gap-4 items-center animate-pulse border-b border-slate-50 pb-4 last:border-0">
+                <div className="w-20 h-8 bg-slate-100 rounded-md"></div>
+                <div className="w-64 h-4 bg-slate-100 rounded"></div>
+              </div>
+            ))}
           </div>
         ) : paginatedDrafts.length === 0 ? (
           // EMPTY STATE
-          <div className="p-24 text-center flex flex-col items-center flex-1 justify-center">
-            <div className="w-20 h-20 bg-slate-50 rounded-full flex items-center justify-center mb-5 ring-8 ring-slate-50/50 border border-slate-100 shadow-inner">
+          <div className="bg-white border border-slate-200 rounded-2xl shadow-sm p-24 text-center flex flex-col items-center justify-center min-h-[400px]">
+            <div className="w-24 h-24 bg-slate-50 rounded-full flex items-center justify-center mb-5 ring-8 ring-slate-50/50 border border-slate-100 shadow-inner">
               {searchQuery ? (
-                <Search className="w-8 h-8 text-slate-300" />
+                <Search className="w-10 h-10 text-slate-300" />
               ) : (
-                <Check className="w-10 h-10 text-slate-300" />
+                <Check className="w-12 h-12 text-slate-300" />
               )}
             </div>
-            <h3 className="text-xl font-black text-slate-800">
-              {searchQuery ? "Tidak Ada Hasil" : "Antrean Bersih"}
+            <h3 className="text-xl font-black text-slate-800 tracking-tight">
+              {searchQuery ? "Tidak Ada Hasil" : "Antrean Bersih, Manajer!"}
             </h3>
-            <p className="text-sm text-slate-500 mt-2">
+            <p className="text-sm text-slate-500 mt-2 font-medium">
               {searchQuery
                 ? `Pencarian "${searchQuery}" tidak ditemukan.`
-                : "Tidak ada draf yang memerlukan perhatian saat ini."}
+                : "Semua draf telah dieksekusi. Nikmati kopi Anda."}
             </p>
           </div>
         ) : (
-          // MAIN TABLE
-          <div className="overflow-x-auto rounded-t-xl flex-1">
-            <table className="w-full text-left border-collapse whitespace-nowrap">
-              <thead>
-                <tr className="bg-slate-50/80 border-b border-slate-200 text-[10px] uppercase tracking-widest font-black text-slate-500">
-                  <th className="px-6 py-4 rounded-tl-xl">
-                    Detail Tiket & Waktu
-                  </th>
-                  <th className="px-6 py-4">Konteks Modul</th>
-                  <th className="px-6 py-4">Diajukan Oleh</th>
-                  <th className="px-6 py-4 text-right rounded-tr-xl">Aksi</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100/80">
-                {paginatedDrafts.map((draft) => {
-                  const draftDate = new Date(draft.createdAt || Date.now());
-                  const isAged =
-                    new Date().getTime() - draftDate.getTime() >
-                    3 * 24 * 60 * 60 * 1000;
-                  const isGhost = draft._isGhost;
-                  const isRejected = draft.status === "Rejected";
-
-                  // 🛡️ UX PROTECTOR: Komparasi longgar untuk memunculkan tombol Discard
-                  // Kita cek apakah ID/Username user saat ini ada di dalam string created_by.
-                  // (Misal DB nyimpen "Budi (budi.dev)", user saat ini punya name "Budi")
-                  const isCreator =
-                    draft.created_by &&
-                    ((user?.owl_username &&
-                      draft.created_by.includes(user.owl_username)) ||
-                      (user?.name && draft.created_by.includes(user.name)) ||
-                      // Tampilkan saja untuk Superadmin agar bisa bersih-bersih
-                      isSuperadmin);
-
-                  return (
-                    <tr
-                      key={draft.notrans}
-                      className={`transition-colors group ${isGhost ? "bg-red-50/30" : "hover:bg-slate-50"}`}>
-                      {/* KOLOM 1: TIKET & STATUS */}
-                      <td className="px-6 py-4">
-                        <div className="flex flex-col gap-1.5">
-                          <div className="flex items-center gap-2">
-                            <span
-                              className={`font-mono text-sm font-bold px-2.5 py-1 rounded-md shadow-sm ring-1 ${isGhost ? "text-red-700 bg-red-100/80 ring-red-200/50" : "text-slate-700 bg-slate-100/80 ring-slate-200/50"}`}>
-                              {draft.notrans}
-                            </span>
-                            {draft.level && !isGhost && (
-                              <span className="text-[9px] font-black bg-blue-50 text-blue-600 px-2 py-0.5 rounded border border-blue-100">
-                                LVL {draft.level}
-                              </span>
-                            )}
-                            {isGhost && (
-                              <span className="text-[9px] font-black bg-red-100 text-red-600 px-2 py-0.5 rounded border border-red-200 flex items-center gap-1">
-                                <AlertTriangle className="w-3 h-3" /> YATIM
-                                PIATU
-                              </span>
-                            )}
-                            {draft.rejection_reason && !isGhost && (
-                              <span className="inline-flex items-center gap-1 text-[9px] bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full font-black border border-amber-200 animate-pulse">
-                                <RotateCcw className="w-2.5 h-2.5" />{" "}
-                                RESUBMISSION
-                              </span>
-                            )}
-                            {isAged && !isGhost && (
-                              <span
-                                title="Tertunda lebih dari 3 hari"
-                                className="flex h-2 w-2 relative">
-                                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
-                                <span className="relative inline-flex rounded-full h-2 w-2 bg-amber-500"></span>
-                              </span>
-                            )}
-                          </div>
-                          <div
-                            className={`flex items-center gap-1.5 text-[11px] font-medium ${isGhost ? "text-red-400" : "text-slate-500"}`}
-                            title={draftDate.toLocaleString("id-ID")}>
-                            <Clock
-                              className={`w-3.5 h-3.5 ${isGhost ? "text-red-300" : "text-slate-400"}`}
-                            />
-                            {isGhost
-                              ? "Waktu Pengajuan Hilang"
-                              : timeAgo(draft.createdAt)}
-                          </div>
-
-                          {/* VISUAL STATE MAPPING */}
-                          <div className="mt-1">
-                            {isGhost ? (
-                              <div className="flex items-center gap-1.5 text-[9px] font-black text-red-600 bg-red-50 px-2 py-1 rounded border border-red-100 w-fit shadow-sm">
-                                <ShieldAlert className="w-3 h-3" /> DRAF LOKAL
-                                TERHAPUS
-                              </div>
-                            ) : draft.isMyQueue ? (
-                              <div className="flex items-center gap-1.5 text-[9px] font-black text-emerald-600 bg-emerald-50 px-2 py-1 rounded border border-emerald-100 w-fit shadow-sm">
-                                <Check className="w-3 h-3" /> TUGAS ANDA
-                                SEKARANG
-                              </div>
-                            ) : draft.owlStatus === "9" ? (
-                              <div className="flex items-center gap-1.5 text-[9px] font-bold text-amber-600 bg-amber-50 px-2 py-1 rounded border border-amber-100 w-fit">
-                                <Clock className="w-3 h-3" /> MENUNGGU LEVEL
-                                SEBELUMNYA
-                              </div>
-                            ) : draft.owlStatus === "1" ||
-                              draft.owlStatus === "2" ? (
-                              <div className="flex items-center gap-1.5 text-[9px] font-bold text-blue-600 bg-blue-50 px-2 py-1 rounded border border-blue-100 w-fit">
-                                <FileText className="w-3 h-3" /> SUDAH ANDA
-                                PROSES
-                              </div>
-                            ) : (
-                              <div className="text-[9px] font-bold text-slate-400 italic">
-                                {isSuperadmin
-                                  ? "Sedang menunggu approver..."
-                                  : "Dalam antrean pihak lain..."}
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      </td>
-
-                      {/* KOLOM 2: MODUL & TINDAKAN */}
-                      <td className="px-6 py-4">
-                        <div
-                          className={`flex items-center gap-3 ${isGhost ? "opacity-50" : ""}`}>
-                          <span
-                            className={`flex items-center justify-center w-8 h-8 rounded-lg border shadow-sm ${
-                              draft.action === "CREATE"
-                                ? "bg-green-50 border-green-100 text-green-600"
-                                : draft.action === "DELETE"
-                                  ? "bg-red-50 border-red-100 text-red-600"
-                                  : "bg-amber-50 border-amber-100 text-amber-600"
-                            }`}>
-                            {draft.action === "CREATE" ? (
-                              <div className="font-black text-lg">+</div>
-                            ) : draft.action === "DELETE" ? (
-                              <X className="w-4 h-4" />
-                            ) : (
-                              <FileText className="w-4 h-4" />
-                            )}
-                          </span>
-                          <div>
-                            <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-black tracking-wider bg-slate-100 text-slate-600 border border-slate-200/60 uppercase">
-                              {draft.module_name}
-                            </span>
-                            <p className="text-xs font-bold text-slate-800 mt-1 uppercase tracking-wide">
-                              {draft.action}{" "}
-                              {draft.target_id && (
-                                <span className="text-slate-400 font-mono font-medium normal-case">
-                                  #{draft.target_id.slice(0, 8)}...
-                                </span>
-                              )}
-                            </p>
-                          </div>
-                        </div>
-                      </td>
-
-                      {/* KOLOM 3: SUBMITTER */}
-                      <td className="px-6 py-4">
-                        <div
-                          className={`flex items-center gap-3 ${isGhost ? "opacity-50" : ""}`}>
-                          <div
-                            className={`w-8 h-8 rounded-full flex items-center justify-center text-white text-[10px] font-bold shadow-sm ring-2 ring-white ${isGhost ? "bg-slate-300" : "bg-gradient-to-br from-daw-green to-emerald-600"}`}>
-                            {isGhost ? "?" : getInitials(draft.created_by)}
-                          </div>
-                          <div className="flex flex-col">
-                            <span className="text-sm font-bold text-slate-700">
-                              {isGhost
-                                ? "Sistem"
-                                : draft.created_by || "Editor Unknown"}
-                            </span>
-                            <span className="text-[10px] text-slate-400 font-medium">
-                              Divisi Konten
-                            </span>
-                          </div>
-                        </div>
-                      </td>
-
-                      {/* KOLOM 4: TOMBOL AKSI */}
-                      <td className="px-6 py-4 text-right">
-                        <div className="flex justify-end gap-2">
-                          {isGhost ? (
-                            <button
-                              onClick={() =>
-                                handleReject(
-                                  draft,
-                                  "Force Reject: Draf lokal tidak ditemukan.",
-                                )
-                              }
-                              className="inline-flex items-center justify-center gap-2 px-5 py-2.5 bg-red-50 text-red-600 hover:bg-red-100 border border-red-200 text-sm font-bold rounded-xl transition-all shadow-sm active:scale-95">
-                              <RotateCcw className="w-4 h-4" />
-                              <span>Force Reject</span>
-                            </button>
-                          ) : isRejected &&
-                            isCreator &&
-                            activeTab === "history" ? (
-                            // PHASE 4: DISCARD BUTTON
-                            <button
-                              onClick={() => handleDiscard(draft.notrans)}
-                              className="inline-flex items-center justify-center gap-2 px-5 py-2.5 bg-slate-100 text-slate-600 hover:bg-slate-200 border border-slate-200 text-sm font-bold rounded-xl transition-all shadow-sm active:scale-95">
-                              <Eye className="w-4 h-4" />
-                              <span>Abaikan</span>
-                            </button>
-                          ) : draft.isMyQueue ? (
-                            <button
-                              onClick={() => setSelectedDraft(draft)}
-                              className="inline-flex items-center justify-center gap-2 px-5 py-2.5 bg-daw-green text-white hover:bg-[#003b1c] text-sm font-bold rounded-xl transition-all shadow-md active:scale-95 group-hover:scale-105 ring-1 ring-transparent hover:ring-emerald-200">
-                              <Check className="w-4 h-4" />
-                              <span>Eksekusi</span>
-                            </button>
-                          ) : (
-                            <button
-                              onClick={() => setSelectedDraft(draft)}
-                              className="inline-flex items-center justify-center gap-2 px-5 py-2.5 bg-white border border-slate-200 text-slate-400 hover:text-slate-700 text-sm font-bold rounded-xl transition-all shadow-sm active:scale-95">
-                              <Eye className="w-4 h-4" />
-                              <span>Pantau Revisi</span>
-                            </button>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        )}
-
-        {/* SMART PAGINATION CONTROLS */}
-        {!isLoading && filteredDrafts.length > 0 && (
-          <div className="px-6 py-4 border-t border-slate-200 bg-slate-50 flex items-center justify-between mt-auto">
-            <p className="text-xs font-medium text-slate-500">
-              Menampilkan{" "}
-              <span className="font-bold text-slate-700">
-                {(currentPage - 1) * itemsPerPage + 1}
-              </span>{" "}
-              hingga{" "}
-              <span className="font-bold text-slate-700">
-                {Math.min(currentPage * itemsPerPage, filteredDrafts.length)}
-              </span>{" "}
-              dari{" "}
-              <span className="font-bold text-slate-700">
-                {filteredDrafts.length}
-              </span>{" "}
-              tiket
-            </p>
-            <div className="flex items-center gap-2">
-              <button
-                onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-                disabled={currentPage === 1}
-                className="p-1.5 rounded-lg border border-slate-200 bg-white text-slate-500 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed transition-all">
-                <ChevronLeft className="w-5 h-5" />
-              </button>
-
-              <div className="flex items-center gap-1">
-                {/* 🛡️ SLIDING WINDOW LOGIC: Menampilkan 5 halaman di sekitar current page */}
-                {Array.from({ length: totalPages }, (_, i) => i + 1)
-                  .filter(
-                    (page) =>
-                      Math.abs(page - currentPage) <= 2 ||
-                      page === 1 ||
-                      page === totalPages,
-                  )
-                  .map((page, index, array) => {
-                    // Menyisipkan elipsis jika ada lompatan angka
-                    const showEllipsis =
-                      index > 0 && page - array[index - 1] > 1;
-                    return (
-                      <div key={page} className="flex items-center">
-                        {showEllipsis && (
-                          <span className="px-2 text-slate-400 font-bold">
-                            ...
-                          </span>
-                        )}
-                        <button
-                          onClick={() => setCurrentPage(page)}
-                          className={`w-8 h-8 rounded-lg text-xs font-bold transition-all ${
-                            currentPage === page
-                              ? "bg-daw-green text-white shadow-sm"
-                              : "bg-white border border-slate-200 text-slate-600 hover:bg-slate-50"
-                          }`}>
-                          {page}
-                        </button>
-                      </div>
-                    );
-                  })}
+          // 🚀 THE CLUSTER RENDERER (Render per Modul)
+          Object.entries(groupedDrafts).map(([moduleName, moduleDrafts]) => (
+            <div
+              key={moduleName}
+              className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden animate-in slide-in-from-bottom-4">
+              {/* CLUSTER HEADER */}
+              <div className="bg-slate-50/80 border-b border-slate-200 px-6 py-4 flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-white rounded-lg shadow-sm border border-slate-200">
+                    <LayoutTemplate className="w-4 h-4 text-slate-500" />
+                  </div>
+                  <h3 className="text-sm font-black text-slate-700 uppercase tracking-widest">
+                    MODUL: <span className="text-daw-green">{moduleName}</span>
+                  </h3>
+                </div>
+                <span className="bg-white border border-slate-200 text-slate-500 text-[10px] font-bold px-3 py-1 rounded-full shadow-sm">
+                  {moduleDrafts.length} Draf
+                </span>
               </div>
 
-              <button
-                onClick={() =>
-                  setCurrentPage((p) => Math.min(totalPages, p + 1))
-                }
-                disabled={currentPage === totalPages}
-                className="p-1.5 rounded-lg border border-slate-200 bg-white text-slate-500 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed transition-all">
-                <ChevronRight className="w-5 h-5" />
-              </button>
+              {/* CLUSTER TABLE */}
+              <div className="overflow-x-auto">
+                <table className="w-full text-left border-collapse whitespace-nowrap">
+                  <tbody className="divide-y divide-slate-100">
+                    {moduleDrafts.map((draft) => {
+                      const isGhost = draft._isGhost;
+                      const isRejected = draft.status === "Rejected";
+                      const isSelected = selectedTickets.has(draft.notrans);
+                      const isActionable =
+                        draft.isMyQueue &&
+                        !isGhost &&
+                        draft.action !== "DELETE"; // Delete gak boleh bulk
+
+                      // 🎨 SEMANTIC ROW AURA (Visual Hierarchy)
+                      const rowAura = isGhost
+                        ? "border-l-4 border-l-slate-300 bg-slate-50/50 grayscale-[50%]"
+                        : draft.action === "DELETE"
+                          ? "border-l-4 border-l-rose-500 bg-rose-50/20"
+                          : draft.action === "CREATE"
+                            ? "border-l-4 border-l-emerald-500 hover:bg-slate-50"
+                            : "border-l-4 border-l-blue-500 hover:bg-slate-50";
+
+                      return (
+                        <tr
+                          key={draft.notrans}
+                          className={`transition-all group ${rowAura} ${isSelected ? "bg-daw-green/5" : ""}`}>
+                          {/* CHECKBOX UNTUK BULK ACTION */}
+                          <td className="pl-6 py-4 w-10">
+                            {isActionable ? (
+                              <input
+                                type="checkbox"
+                                checked={isSelected}
+                                onChange={() =>
+                                  toggleTicketSelection(draft.notrans)
+                                }
+                                className="w-5 h-5 rounded border-slate-300 text-daw-green focus:ring-daw-green/20 cursor-pointer transition-all"
+                              />
+                            ) : (
+                              <div
+                                className="w-5 h-5 rounded border-2 border-slate-200 bg-slate-100 cursor-not-allowed opacity-50"
+                                title="Tidak dapat dibulk"></div>
+                            )}
+                          </td>
+
+                          {/* KOLOM 1: TIKET & BATON PASS HUD */}
+                          <td className="px-4 py-4 w-1/3">
+                            <div className="flex flex-col gap-2">
+                              <div className="flex items-center gap-2">
+                                <span className="font-mono text-xs font-bold px-2.5 py-1 rounded-md shadow-sm ring-1 ring-slate-200/50 bg-white text-slate-700">
+                                  {draft.notrans}
+                                </span>
+                                <span
+                                  className={`text-[9px] font-black px-2 py-0.5 rounded border uppercase tracking-widest ${
+                                    draft.action === "DELETE"
+                                      ? "bg-rose-100 text-rose-700 border-rose-200"
+                                      : draft.action === "CREATE"
+                                        ? "bg-emerald-100 text-emerald-700 border-emerald-200"
+                                        : "bg-blue-100 text-blue-700 border-blue-200"
+                                  }`}>
+                                  {draft.action}
+                                </span>
+                              </div>
+
+                              {/* 🚀 THE BATON-PASS VISUALIZER */}
+                              <div className="flex items-center gap-1.5 mt-1 text-[10px] font-bold font-mono">
+                                <span className="text-slate-400">EDITOR</span>
+                                <ChevronRight className="w-3 h-3 text-slate-300" />
+                                {isGhost ? (
+                                  <span className="text-red-500 bg-red-50 px-1.5 py-0.5 rounded border border-red-200 animate-pulse">
+                                    DESYNC
+                                  </span>
+                                ) : draft.isMyQueue ? (
+                                  <span className="text-amber-600 bg-amber-100 px-1.5 py-0.5 rounded border border-amber-200 shadow-sm animate-pulse">
+                                    YOU (ACT)
+                                  </span>
+                                ) : draft.owlStatus === "1" ||
+                                  draft.owlStatus === "2" ? (
+                                  <span className="text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200">
+                                    YOU (DONE)
+                                  </span>
+                                ) : (
+                                  <span className="text-slate-400">WAIT</span>
+                                )}
+                                <ChevronRight className="w-3 h-3 text-slate-300" />
+                                <span className="text-slate-400">ERP LIVE</span>
+                              </div>
+                            </div>
+                          </td>
+
+                          {/* KOLOM 2: TARGET IDENTIFIER */}
+                          <td className="px-6 py-4">
+                            <div className="flex flex-col">
+                              <span className="text-sm font-bold text-slate-700">
+                                {isGhost
+                                  ? "Orphaned Data"
+                                  : `Target ID: #${draft.target_id?.slice(0, 8)}`}
+                              </span>
+                              <span className="text-[11px] font-medium text-slate-500 mt-1 flex items-center gap-1">
+                                <Clock className="w-3 h-3" />{" "}
+                                {isGhost
+                                  ? "Waktu Hilang"
+                                  : timeAgo(draft.createdAt)}
+                              </span>
+                            </div>
+                          </td>
+
+                          {/* KOLOM 3: SUBMITTER */}
+                          <td className="px-6 py-4">
+                            <div
+                              className={`flex items-center gap-3 ${isGhost ? "opacity-50" : ""}`}>
+                              <div
+                                className={`w-8 h-8 rounded-full flex items-center justify-center text-white text-[10px] font-bold shadow-sm ring-2 ring-white ${isGhost ? "bg-slate-300" : "bg-gradient-to-br from-daw-green to-emerald-600"}`}>
+                                {isGhost ? "?" : getInitials(draft.created_by)}
+                              </div>
+                              <div className="flex flex-col">
+                                <span className="text-sm font-bold text-slate-700">
+                                  {isGhost
+                                    ? "System"
+                                    : draft.created_by || "Editor Unknown"}
+                                </span>
+                                <span className="text-[10px] text-slate-400 font-medium">
+                                  Divisi Konten
+                                </span>
+                              </div>
+                            </div>
+                          </td>
+
+                          {/* KOLOM 4: AKSI EKSKLUSIF */}
+                          <td className="px-6 py-4 text-right pr-8">
+                            {isGhost && isSuperadmin ? (
+                              <button
+                                onClick={() => handleForcePurge(draft)}
+                                disabled={isPurging === draft.notrans}
+                                className="inline-flex items-center justify-center gap-2 px-5 py-2.5 bg-slate-900 text-white hover:bg-red-600 text-xs font-black uppercase tracking-widest rounded-xl transition-all shadow-lg active:scale-95 disabled:opacity-50">
+                                {isPurging === draft.notrans ? (
+                                  <Loader2 className="w-4 h-4 animate-spin" />
+                                ) : (
+                                  <AlertTriangle className="w-4 h-4" />
+                                )}
+                                Force Purge
+                              </button>
+                            ) : draft.isMyQueue ? (
+                              <button
+                                onClick={() => setSelectedDraft(draft)}
+                                className="inline-flex items-center justify-center gap-2 px-6 py-2.5 bg-daw-green text-white hover:bg-[#003b1c] text-xs font-black uppercase tracking-widest rounded-xl transition-all shadow-md shadow-daw-green/20 active:scale-95 transform hover:-translate-y-0.5">
+                                Review & Decide{" "}
+                                <ChevronRight className="w-4 h-4" />
+                              </button>
+                            ) : (
+                              <button
+                                onClick={() => setSelectedDraft(draft)}
+                                className="inline-flex items-center justify-center gap-2 px-5 py-2.5 bg-white border border-slate-200 text-slate-500 hover:text-daw-green hover:border-daw-green hover:bg-daw-green/5 text-xs font-black uppercase tracking-widest rounded-xl transition-all shadow-sm active:scale-95">
+                                <Eye className="w-4 h-4" /> Pantau
+                              </button>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
             </div>
-          </div>
+          ))
         )}
       </div>
 
+      {/* SMART PAGINATION CONTROLS */}
+      {!isLoading && filteredDrafts.length > 0 && (
+        <div className="bg-white border border-slate-200 rounded-2xl shadow-sm px-6 py-4 flex flex-col sm:flex-row items-center justify-between gap-4">
+          <p className="text-xs font-medium text-slate-500">
+            Menampilkan{" "}
+            <span className="font-bold text-slate-700">
+              {(currentPage - 1) * itemsPerPage + 1}
+            </span>{" "}
+            hingga{" "}
+            <span className="font-bold text-slate-700">
+              {Math.min(currentPage * itemsPerPage, filteredDrafts.length)}
+            </span>{" "}
+            dari{" "}
+            <span className="font-bold text-slate-700">
+              {filteredDrafts.length}
+            </span>{" "}
+            tiket
+          </p>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+              disabled={currentPage === 1}
+              className="p-2 rounded-xl border border-slate-200 bg-white text-slate-500 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed transition-all">
+              <ChevronLeft className="w-4 h-4" />
+            </button>
+            <div className="flex items-center gap-1">
+              {Array.from({ length: totalPages }, (_, i) => i + 1)
+                .filter(
+                  (page) =>
+                    Math.abs(page - currentPage) <= 2 ||
+                    page === 1 ||
+                    page === totalPages,
+                )
+                .map((page, index, array) => {
+                  const showEllipsis = index > 0 && page - array[index - 1] > 1;
+                  return (
+                    <div key={page} className="flex items-center">
+                      {showEllipsis && (
+                        <span className="px-2 text-slate-400 font-bold">
+                          ...
+                        </span>
+                      )}
+                      <button
+                        onClick={() => setCurrentPage(page)}
+                        className={`w-9 h-9 rounded-xl text-xs font-bold transition-all ${currentPage === page ? "bg-daw-green text-white shadow-md" : "bg-white border border-slate-200 text-slate-600 hover:bg-slate-50"}`}>
+                        {page}
+                      </button>
+                    </div>
+                  );
+                })}
+            </div>
+            <button
+              onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+              disabled={currentPage === totalPages}
+              className="p-2 rounded-xl border border-slate-200 bg-white text-slate-500 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed transition-all">
+              <ChevronRight className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* ============================================================ */}
+      {/* 🚀 FASE 3.3: FLOATING ACTION BAR (Untuk Bulk Action)         */}
+      {/* ============================================================ */}
+      {selectedTickets.size > 0 && (
+        <div className="fixed bottom-8 left-1/2 -translate-x-1/2 z-40 animate-in slide-in-from-bottom-10 fade-in duration-300">
+          <div className="bg-slate-900 text-white px-6 py-4 rounded-2xl shadow-2xl flex items-center gap-6 border border-slate-700">
+            <div className="flex items-center gap-3">
+              <div className="w-8 h-8 rounded-full bg-blue-500/20 flex items-center justify-center">
+                <Check className="w-4 h-4 text-blue-400" />
+              </div>
+              <div>
+                <p className="text-sm font-bold">
+                  {selectedTickets.size} Tiket Terpilih
+                </p>
+                <p className="text-[10px] text-slate-400 font-medium">
+                  Siap untuk dieksekusi massal
+                </p>
+              </div>
+            </div>
+            <div className="h-8 w-px bg-slate-700"></div>
+            <div className="flex gap-2">
+              <button
+                onClick={() => setSelectedTickets(new Set())}
+                className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold rounded-xl transition-all">
+                Batal
+              </button>
+              <button
+                onClick={handleBulkApprove}
+                disabled={isBulkApproving}
+                className="px-6 py-2 bg-daw-green hover:bg-emerald-500 text-white text-xs font-black uppercase tracking-widest rounded-xl transition-all shadow-lg shadow-daw-green/20 flex items-center gap-2 disabled:opacity-50">
+                {isBulkApproving ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <Check className="w-4 h-4" />
+                )}
+                Approve All
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* DIFF MODAL RENDERER */}
       {selectedDraft && !selectedDraft._isGhost && (
         <DiffModal
           draft={selectedDraft}

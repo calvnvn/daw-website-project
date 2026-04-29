@@ -296,7 +296,7 @@ export default function DynamicNavbar() {
 
         {/* MENU MOBILE (HP) - HYBRID SYSTEM */}
         <div
-          className={`md:hidden absolute top-full left-0 right-0 bg-white/90 backdrop-blur-md border-b border-slate-200 shadow-xl overflow-hidden transition-all duration-300 ease-in-out ${isMobileMenuOpen ? "max-h-[80vh] opacity-100 overflow-y-auto" : "max-h-0 opacity-0 pointer-events-none"}`}>
+          className={`md:hidden absolute top-full left-0 right-0 bg-white/90  border-b border-slate-200 shadow-xl overflow-hidden transition-all duration-300 ease-in-out ${isMobileMenuOpen ? "max-h-[80vh] opacity-100 overflow-y-auto" : "max-h-0 opacity-0 pointer-events-none"}`}>
           <div className="flex flex-col px-6 pt-4 pb-8 space-y-2">
             {/* 1. STATIC: HOME */}
             <Link
