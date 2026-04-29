@@ -25,6 +25,7 @@ import {
 import api, { BASE_UPLOAD_URL } from "@/lib/api";
 import imageCompression from "browser-image-compression";
 import { useContent } from "@/contexts/ContentContext";
+import { useAuth } from "@/contexts/AuthContext";
 interface Page {
   id: string;
   title: string;
@@ -37,29 +38,36 @@ interface Page {
   sidebarLinks?: { label: string; url: string }[];
   is_locked?: boolean;
   lock_ticket?: string | null;
+  has_rejected?: boolean;
 }
 
 interface RejectedDraft {
   id: string;
   notrans: string;
+  action: "CREATE" | "UPDATE" | "DELETE";
   payload: Partial<Page>;
   rejection_reason: string;
 }
 
 export default function PageBuilder() {
-  const { pages, isLoading, refreshData } = useContent();
+  const { pages: rawPages, isLoading, refreshData } = useContent();
+  const pages = rawPages as Page[];
+  const { user } = useAuth();
+  const isSuperadmin = user?.role === "superadmin" || user?.role === "admin";
 
   const [isSaving, setIsSaving] = useState(false);
+  const [isDiscarding, setIsDiscarding] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [isPreviewMode, setIsPreviewMode] = useState(false);
 
-  // Approval System State
   const [activeItemLocked, setActiveItemLocked] = useState<boolean>(false);
   const [activeLockTicket, setActiveLockTicket] = useState<string | null>(null);
   const [rejectedDraft, setRejectedDraft] = useState<RejectedDraft | null>(
     null,
   );
+
+  const [originalSnapshot, setOriginalSnapshot] = useState<string | null>(null);
 
   const [formData, setFormData] = useState({
     title: "",
@@ -76,6 +84,32 @@ export default function PageBuilder() {
   const [heroFile, setHeroFile] = useState<File | null>(null);
   const [heroImage, setHeroImage] = useState<string>("");
   const quillRef = useRef<ReactQuill>(null);
+
+  useEffect(() => {
+    return () => {
+      if (heroImage && heroImage.startsWith("blob:")) {
+        URL.revokeObjectURL(heroImage);
+      }
+    };
+  }, [heroImage]);
+
+  const hasDataChanged = useMemo(() => {
+    if (!originalSnapshot) return true;
+
+    const cleanContent =
+      formData.content.replace(/<[^>]*>?/gm, "").trim() === ""
+        ? ""
+        : formData.content;
+
+    const currentData = {
+      ...formData,
+      content: cleanContent,
+    };
+
+    return (
+      JSON.stringify(currentData) !== originalSnapshot || heroFile !== null
+    );
+  }, [formData, originalSnapshot, heroFile]);
 
   const imageHandler = useCallback(() => {
     const input = document.createElement("input");
@@ -120,7 +154,6 @@ export default function PageBuilder() {
           const errorMsg =
             error.response?.data?.message || "Internal Upload Error";
           toast.error(`Failed to process asset: ${errorMsg}`, { id: toastId });
-          console.error("Rich Text Upload Error:", error);
         }
       }
     };
@@ -156,9 +189,8 @@ export default function PageBuilder() {
           .replace(/[^a-z0-9]+/g, "-")
           .replace(/(^-|-$)+/g, "");
         return { ...prev, title: newTitle, slug: autoSlug };
-      } else {
-        return { ...prev, title: newTitle };
       }
+      return { ...prev, title: newTitle };
     });
   };
 
@@ -169,7 +201,7 @@ export default function PageBuilder() {
       .replace(/[^a-z0-9]+/g, "-")
       .replace(/(^-|-$)+/g, "");
     setFormData({ ...formData, slug: newSlug });
-    toast.success("Slug synchronized / Slug berhasil disinkronkan!");
+    toast.success("Slug berhasil disinkronkan!");
   };
 
   const resetForm = () => {
@@ -179,6 +211,7 @@ export default function PageBuilder() {
     setActiveItemLocked(false);
     setActiveLockTicket(null);
     setRejectedDraft(null);
+    setOriginalSnapshot(null);
     setFormData({
       title: "",
       slug: "",
@@ -197,7 +230,6 @@ export default function PageBuilder() {
     const toastId = toast.loading(`Membuka "${pageOption.title}"...`);
     const controller = new AbortController();
     try {
-      // Parallel fetch: Data Live vs Draft Ditolak
       const [liveRes, rejectedRes] = await Promise.allSettled([
         api.get(`/pages/slug/${pageOption.slug}`, {
           signal: controller.signal,
@@ -218,7 +250,6 @@ export default function PageBuilder() {
       setActiveItemLocked(exactData.is_locked || false);
       setActiveLockTicket(exactData.lock_ticket || null);
 
-      // Load Draf Ditolak jika ada
       if (
         rejectedRes.status === "fulfilled" &&
         rejectedRes.value.data?.hasRejected
@@ -229,7 +260,13 @@ export default function PageBuilder() {
       }
 
       setHeroImage(exactData.heroImage || "");
-      setFormData({
+
+      const cleanSidebar =
+        typeof exactData.sidebarLinks === "string"
+          ? JSON.parse(exactData.sidebarLinks)
+          : exactData.sidebarLinks || [];
+
+      const initialData = {
         title: exactData.title || "",
         slug: exactData.slug || "",
         subtitle: exactData.subtitle || "",
@@ -238,11 +275,18 @@ export default function PageBuilder() {
         showDropCap: exactData.showDropCap ?? true,
         metaDescription: exactData.metaDescription || "",
         status: "Published",
-        sidebarLinks:
-          typeof exactData.sidebarLinks === "string"
-            ? JSON.parse(exactData.sidebarLinks)
-            : exactData.sidebarLinks || [],
-      });
+        sidebarLinks: cleanSidebar,
+      };
+
+      setFormData(initialData);
+
+      const cleanContent =
+        initialData.content.replace(/<[^>]*>?/gm, "").trim() === ""
+          ? ""
+          : initialData.content;
+      setOriginalSnapshot(
+        JSON.stringify({ ...initialData, content: cleanContent }),
+      );
 
       toast.dismiss(toastId);
     } catch {
@@ -252,6 +296,14 @@ export default function PageBuilder() {
 
   const handleRestoreDraft = () => {
     if (!rejectedDraft || !rejectedDraft.payload) return;
+
+    // 🛡️ ANTI-CORRUPTION GUARD: Cegah restore jika action === DELETE
+    if (rejectedDraft.action === "DELETE") {
+      return toast.error(
+        "Draf ini adalah pengajuan Hapus. Tidak ada konten yang bisa direstorasi.",
+      );
+    }
+
     const p = rejectedDraft.payload as any;
 
     setFormData((prev) => ({
@@ -273,40 +325,78 @@ export default function PageBuilder() {
     setHeroFile(null);
 
     toast.success(
-      "Draf berhasil direstorasi. Silakan perbaiki dan submit ulang.",
+      "Draf berhasil disuntikkan. Silakan periksa kembali konten Anda.",
     );
   };
 
-  const handleDelete = (id: string, title: string, isLocked: boolean) => {
-    if (isLocked)
-      return toast.error("Halaman ini sedang dikunci oleh proses approval.");
+  const handleDiscardDraft = async () => {
+    if (!rejectedDraft?.notrans) return;
 
-    toast(`Hapus "${title}"?`, {
-      description: "Aksi ini tidak dapat dibatalkan.",
-      action: {
-        label: "Hapus",
-        onClick: async () => {
-          const toastId = toast.loading("Memproses penghapusan...");
-          try {
-            const res = await api.delete(`/pages/${id}`);
-            if (res.status === 202) {
-              toast.success("Permintaan hapus dikirim ke admin.", {
+    setIsDiscarding(true);
+    const toastId = toast.loading("Membersihkan status birokrasi...");
+
+    try {
+      await api.patch(
+        `/approval/discard/${encodeURIComponent(rejectedDraft.notrans)}`,
+      );
+
+      setRejectedDraft(null);
+      refreshData();
+      toast.success("Notifikasi revisi diabaikan. Gembok telah dilepas.", {
+        id: toastId,
+      });
+    } catch (error: any) {
+      toast.error(error.response?.data?.message || "Gagal membersihkan draf.", {
+        id: toastId,
+      });
+    } finally {
+      setIsDiscarding(false);
+    }
+  };
+
+  const handleDelete = (id: string, title: string, isLocked: boolean) => {
+    if (isLocked && !isSuperadmin) {
+      return toast.error(
+        "Halaman ini sedang dikunci oleh proses approval. (Hubungi Admin)",
+      );
+    }
+
+    toast(
+      isSuperadmin && isLocked
+        ? `[OVERRIDE] Hapus Paksa "${title}"?`
+        : `Hapus "${title}"?`,
+      {
+        description:
+          isSuperadmin && isLocked
+            ? "Ini akan membatalkan draf Editor dan langsung menghapus halaman."
+            : "Aksi ini akan mengajukan penghapusan halaman.",
+        action: {
+          label: isSuperadmin && isLocked ? "Force Delete" : "Hapus",
+          onClick: async () => {
+            const toastId = toast.loading("Memproses penghapusan...");
+            try {
+              const res = await api.delete(`/pages/${id}`);
+
+              // Branching Respon berdasarkan Baton Pass (Editor vs Admin)
+              if (res.status === 202) {
+                toast.success("Permintaan hapus diajukan. Menunggu approval.", {
+                  id: toastId,
+                });
+              } else {
+                toast.success("Halaman terhapus permanen.", { id: toastId });
+                if (editingId === id) resetForm();
+              }
+              refreshData();
+            } catch (error: any) {
+              toast.error(error.response?.data?.message || "Gagal menghapus", {
                 id: toastId,
               });
-            } else {
-              toast.success("Halaman terhapus", { id: toastId });
             }
-            refreshData();
-            if (editingId === id) resetForm();
-          } catch (error: any) {
-            toast.error(error.response?.data?.message || "Gagal menghapus", {
-              id: toastId,
-            });
-          }
+          },
         },
+        cancel: { label: "Batal", onClick: () => {} },
       },
-      cancel: { label: "Batal", onClick: () => {} },
-    });
+    );
   };
 
   const handleSubmit = async (
@@ -317,10 +407,16 @@ export default function PageBuilder() {
     if (!formData.title || !formData.slug)
       return toast.error("Judul & Slug wajib diisi!");
 
+    if (submitStatus === "Published" && !hasDataChanged && !isSuperadmin) {
+      return toast.info("Tidak ada perubahan yang terdeteksi untuk diajukan.");
+    }
+
     setIsSaving(true);
     const toastId = toast.loading(
       submitStatus === "Published"
-        ? "Mengirim pengajuan..."
+        ? isSuperadmin
+          ? "Mempublikasikan live..."
+          : "Mengirim pengajuan..."
         : "Menyimpan draf lokal...",
     );
 
@@ -336,8 +432,10 @@ export default function PageBuilder() {
       payload.append("sidebarLinks", JSON.stringify(formData.sidebarLinks));
       payload.append("status", submitStatus);
 
-      if (rejectedDraft)
+      if (rejectedDraft) {
         payload.append("previous_notrans", rejectedDraft.notrans);
+      }
+
       if (heroFile) payload.append("heroImage", heroFile);
 
       const config = { timeout: 60000 };
@@ -345,23 +443,37 @@ export default function PageBuilder() {
 
       if (editingId) {
         res = await api.put(`/pages/${editingId}`, payload, config);
-        toast.success(res.data.message || "Berhasil!", { id: toastId });
+        toast.success(
+          res.status === 202 ? "Revisi Diajukan!" : "Berhasil Diperbarui Live!",
+          { id: toastId },
+        );
       } else {
         res = await api.post("/pages", payload, config);
-        toast.success(res.data.message || "Berhasil diterbitkan!", {
-          id: toastId,
-        });
+        toast.success(
+          res.status === 202
+            ? "Draf Baru Diajukan!"
+            : "Berhasil Diterbitkan Live!",
+          { id: toastId },
+        );
       }
 
       if (submitStatus === "Published" && res.status === 202) {
         setActiveItemLocked(true);
         setActiveLockTicket(res.data.ticket);
       }
-
       if (submitStatus === "Published") setRejectedDraft(null);
 
       refreshData();
       if (!editingId && submitStatus === "Published") resetForm();
+
+      const cleanContent =
+        formData.content.replace(/<[^>]*>?/gm, "").trim() === ""
+          ? ""
+          : formData.content;
+      setOriginalSnapshot(
+        JSON.stringify({ ...formData, content: cleanContent }),
+      );
+      setHeroFile(null);
     } catch (error: any) {
       toast.error(
         error.response?.data?.message || "Gagal menyimpan ke server.",
@@ -373,9 +485,9 @@ export default function PageBuilder() {
   };
 
   const handleImageUpload = async (file: File) => {
-    if (activeItemLocked)
+    if (activeItemLocked && !isSuperadmin) {
       return toast.error("Halaman terkunci. Tidak dapat mengubah gambar.");
-
+    }
     if (!file) return;
     if (!file.type.startsWith("image/"))
       return toast.error("Gunakan file gambar saja.");
@@ -391,27 +503,26 @@ export default function PageBuilder() {
         initialQuality: 0.7,
       });
       setHeroFile(compressedFile);
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setHeroImage(reader.result as string);
-        toast.success("Asset dioptimasi!", { id: toastId });
-      };
-      reader.readAsDataURL(compressedFile);
+
+      const objectUrl = URL.createObjectURL(compressedFile);
+      setHeroImage(objectUrl);
+
+      toast.success("Asset dioptimasi!", { id: toastId });
     } catch {
       toast.error("Kompresi gagal.", { id: toastId });
     }
   };
 
   const getDynamicSeoDescription = () => {
-    if (formData.metaDescription && formData.metaDescription.trim() !== "") {
+    if (formData.metaDescription && formData.metaDescription.trim() !== "")
       return formData.metaDescription;
-    }
-
-    if (formData.subtitle && formData.subtitle.trim() !== "") {
+    if (formData.subtitle && formData.subtitle.trim() !== "")
       return formData.subtitle;
-    }
 
-    const plainText = formData.content.replace(/<[^>]*>?/gm, "").trim();
+    const plainText = formData.content
+      .replace(/<[^>]*>?/gm, "")
+      .replace(/&nbsp;/g, " ")
+      .trim();
     return plainText.slice(0, 150) + (plainText.length > 150 ? "..." : "");
   };
 
@@ -421,29 +532,31 @@ export default function PageBuilder() {
       {!isPreviewMode && (
         <div className="lg:col-span-4 space-y-4">
           <div className="bg-slate-50 border border-slate-200 rounded-[2rem] p-6 sticky top-24 shadow-sm">
+            {/* Header Sidebar */}
             <div className="flex justify-between items-end mb-6">
               <div>
                 <h3 className="text-xl font-serif font-black text-slate-900 tracking-tight">
                   Daftar Halaman
                 </h3>
                 <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-1">
-                  Halaman Terpublikasi
+                  Repositori Publikasi
                 </p>
               </div>
               {!editingId && (
                 <button
                   onClick={resetForm}
-                  className="text-xs font-bold text-daw-green bg-daw-green/10 px-3 py-2 rounded-xl hover:bg-daw-green hover:text-white transition-all flex items-center gap-1 shadow-sm">
+                  className="text-xs font-bold text-daw-green bg-daw-green/10 px-3 py-2 rounded-xl hover:bg-daw-green hover:text-white transition-all flex items-center gap-1 shadow-sm active:scale-95">
                   <Plus className="w-4 h-4" /> Buat Halaman Baru
                 </button>
               )}
             </div>
 
+            {/* List Renderer */}
             {isLoading ? (
               <div className="py-12 text-center animate-pulse">
                 <div className="w-8 h-8 border-4 border-slate-200 border-t-daw-green rounded-full animate-spin mx-auto mb-3" />
                 <p className="text-[10px] text-slate-400 font-bold tracking-widest uppercase">
-                  Fetching data...
+                  Menyinkronkan data...
                 </p>
               </div>
             ) : pages.length === 0 ? (
@@ -452,14 +565,10 @@ export default function PageBuilder() {
                   <FileText className="w-8 h-8 text-slate-300" />
                 </div>
                 <h4 className="text-sm font-bold text-slate-900 mb-1">
-                  No Documents Found
+                  Repositori Kosong
                 </h4>
                 <p className="text-xs text-slate-400 font-medium mb-6">
-                  Mulai susun konten pertama Anda untuk mengisi daftar ini.{" "}
-                  <br />
-                  <span className="italic text-[10px]">
-                    Buat artikel pertama Anda untuk mengisi repositori ini.
-                  </span>
+                  Mulai susun konten pertama Anda untuk mengisi daftar ini.
                 </p>
                 <button
                   onClick={resetForm}
@@ -470,72 +579,115 @@ export default function PageBuilder() {
             ) : (
               <div className="space-y-3 max-h-[65vh] overflow-y-auto custom-scrollbar pr-2">
                 {pages.map((p) => {
-                  const isLocked = p.is_locked;
+                  const isNeedsRevision = p.has_rejected;
+                  const isPending = p.is_locked && !isNeedsRevision;
+                  const isDeleting =
+                    isPending && p.lock_ticket?.includes("DEL");
+
+                  const isLockedForEditor = isPending && !isSuperadmin;
+                  const isOverrideMode = isPending && isSuperadmin;
+
+                  const containerStyle =
+                    editingId === p.id
+                      ? "border-daw-green ring-4 ring-daw-green/10 shadow-sm bg-white"
+                      : isNeedsRevision
+                        ? "border-red-200 bg-red-50/40 hover:border-red-400"
+                        : isDeleting
+                          ? "border-rose-200 bg-rose-50/40 opacity-80 grayscale-[20%] hover:border-rose-400"
+                          : isOverrideMode
+                            ? "border-amber-200 bg-amber-50/40 hover:border-amber-400"
+                            : isPending
+                              ? "border-blue-200 bg-blue-50/40 hover:border-blue-400"
+                              : "border-slate-200 bg-white hover:border-daw-green/50";
 
                   return (
                     <div
                       key={p.id}
-                      className={`p-4 rounded-2xl border transition-all group cursor-pointer hover:shadow-md
-                      ${
-                        editingId === p.id
-                          ? "border-daw-green ring-4 ring-daw-green/10 shadow-sm bg-white"
-                          : isLocked
-                            ? "border-blue-200 bg-blue-50/40 hover:border-blue-300" // Visual Lockdown Background
-                            : "border-slate-200 bg-white hover:border-daw-green/50"
-                      }`}
+                      className={`p-4 rounded-2xl border transition-all group cursor-pointer hover:shadow-md ${containerStyle}`}
                       onClick={() => handleEdit(p)}>
                       <div className="flex justify-between items-start">
                         <div className="min-w-0 pr-2">
-                          <div className="flex items-center gap-2">
+                          <div className="flex flex-wrap items-center gap-2">
                             <h4
                               className={`font-bold text-sm truncate transition-colors ${
                                 editingId === p.id
                                   ? "text-daw-green"
-                                  : isLocked
-                                    ? "text-blue-700" // Teks kebiruan untuk PENDING
-                                    : "text-slate-900"
+                                  : isDeleting
+                                    ? "text-rose-700 line-through"
+                                    : isNeedsRevision
+                                      ? "text-red-700"
+                                      : isOverrideMode
+                                        ? "text-amber-700"
+                                        : isPending
+                                          ? "text-blue-700"
+                                          : "text-slate-900"
                               }`}>
                               {p.title}
                             </h4>
 
-                            {/* Double-Badge System (PENDING) */}
-                            {isLocked && (
-                              <span className="flex items-center gap-1 px-1.5 py-0.5 rounded md bg-blue-100 text-blue-600 text-[8px] font-black uppercase tracking-widest shadow-sm">
-                                <Lock className="w-2.5 h-2.5" /> Pending
+                            {/* HIERARKI BADGE */}
+                            {isDeleting ? (
+                              <span className="flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-rose-100 text-rose-600 text-[8px] font-black uppercase tracking-widest shadow-sm animate-pulse">
+                                <Trash2 className="w-2.5 h-2.5" /> Pending
+                                Delete
                               </span>
-                            )}
+                            ) : isPending ? (
+                              <span
+                                className={`flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[8px] font-black uppercase tracking-widest shadow-sm ${isOverrideMode ? "bg-amber-100 text-amber-600" : "bg-blue-100 text-blue-600"}`}>
+                                <Lock className="w-2.5 h-2.5" />{" "}
+                                {isOverrideMode ? "Override" : "Pending"}
+                              </span>
+                            ) : isNeedsRevision ? (
+                              <span className="flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-red-600 text-white text-[8px] font-black uppercase tracking-widest shadow-sm shadow-red-200 animate-pulse">
+                                <AlertTriangle className="w-2.5 h-2.5" />{" "}
+                                Revision
+                              </span>
+                            ) : null}
                           </div>
 
-                          <p
-                            className={`text-[10px] font-mono mt-1.5 flex items-center gap-1 truncate transition-colors ${
-                              isLocked ? "text-blue-400" : "text-slate-400"
-                            }`}>
-                            <Globe className="w-3 h-3" /> /page/{p.slug}
-                          </p>
+                          {/* IDENTIFIER URL / TICKET */}
+                          {isPending && p.lock_ticket ? (
+                            <p className="text-[9px] font-mono mt-1.5 text-blue-500 uppercase flex items-center gap-1">
+                              <Lock className="w-3 h-3" /> {p.lock_ticket}
+                            </p>
+                          ) : (
+                            <p
+                              className={`text-[10px] font-mono mt-1.5 flex items-center gap-1 truncate transition-colors ${
+                                isNeedsRevision
+                                  ? "text-red-400"
+                                  : "text-slate-400"
+                              }`}>
+                              <Globe className="w-3 h-3" /> /page/{p.slug}
+                            </p>
+                          )}
                         </div>
 
+                        {/* QUICK ACTION (DELETE) */}
                         <div
                           className={`flex gap-1 transition-opacity ${
-                            isLocked
+                            isPending || isNeedsRevision
                               ? "opacity-100"
                               : "opacity-0 group-hover:opacity-100"
                           }`}>
-                          {/* Disable tombol Delete jika terkunci */}
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
-                              handleDelete(p.id, p.title, !!isLocked);
+                              handleDelete(p.id, p.title, !!p.is_locked);
                             }}
-                            disabled={isLocked}
+                            disabled={isLockedForEditor}
                             className={`p-2 rounded-lg transition-all ${
-                              isLocked
-                                ? "text-slate-300 cursor-not-allowed bg-slate-50 opacity-50"
-                                : "bg-slate-50 text-slate-400 hover:text-red-500 hover:bg-red-50"
+                              isLockedForEditor
+                                ? "text-slate-300 cursor-not-allowed bg-slate-50/50 opacity-50"
+                                : isOverrideMode
+                                  ? "bg-amber-50 text-amber-500 hover:text-red-500 hover:bg-red-50"
+                                  : "bg-slate-50 text-slate-400 hover:text-red-500 hover:bg-red-50"
                             }`}
                             title={
-                              isLocked
-                                ? "Data sedang terkunci oleh proses approval"
-                                : "Hapus Halaman"
+                              isLockedForEditor
+                                ? "Halaman sedang dikunci oleh proses approval"
+                                : isOverrideMode
+                                  ? "Force Delete (Abaikan Draf Editor)"
+                                  : "Hapus Halaman"
                             }>
                             <Trash2 className="w-4 h-4" />
                           </button>
@@ -552,14 +704,19 @@ export default function PageBuilder() {
 
       {/*  RIGHT: EDITORIAL WORKSPACE (Main Form) */}
       <div
-        className={`${isPreviewMode ? "lg:col-span-12 transition-all duration-500" : "lg:col-span-8 transition-all duration-500"}`}>
+        className={`${isPreviewMode ? "lg:col-span-12" : "lg:col-span-8"} transition-all duration-500`}>
         <form
-          onSubmit={handleSubmit}
-          className="bg-white rounded-[2.5rem] border border-slate-200 shadow-xl shadow-slate-200/50 overflow-hidden">
-          {/* Header Workspace */}
-          <div className="flex justify-between items-center p-8 border-b border-slate-100 bg-slate-50/50">
+          onSubmit={(e) => handleSubmit(e, "Published")}
+          className={`bg-white rounded-[2.5rem] border transition-all duration-500 shadow-xl shadow-slate-200/50 overflow-hidden
+            ${activeItemLocked && !isSuperadmin ? "border-blue-200" : activeItemLocked && isSuperadmin ? "border-amber-200" : "border-slate-200"}`}>
+          {/* WORKSPACE HEADER */}
+          <div
+            className={`flex justify-between items-center p-8 border-b transition-colors
+            ${activeItemLocked && isSuperadmin ? "bg-amber-50/50 border-amber-100" : "bg-slate-50/50 border-slate-100"}`}>
             <div className="flex items-center gap-3">
-              <div className="w-12 h-12 bg-daw-green/10 rounded-2xl flex items-center justify-center text-daw-green">
+              <div
+                className={`w-12 h-12 rounded-2xl flex items-center justify-center 
+                ${editingId ? "bg-daw-green/10 text-daw-green" : "bg-blue-50 text-blue-500"}`}>
                 {editingId ? (
                   <PenTool className="w-6 h-6" />
                 ) : (
@@ -570,11 +727,13 @@ export default function PageBuilder() {
                 <h2 className="text-xl font-bold text-slate-900 tracking-tight">
                   {editingId ? "Edit Document" : "Create Document"}
                 </h2>
-                <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest mt-0.5">
-                  {editingId
-                    ? "Perbarui isi konten yang sudah ada"
-                    : "Mulai menyusun publikasi baru"}
-                </p>
+                <div className="flex items-center gap-2 mt-0.5">
+                  <span
+                    className={`text-[10px] font-black uppercase tracking-widest px-2 py-0.5 rounded
+                    ${isSuperadmin ? "bg-amber-100 text-amber-700" : "bg-slate-100 text-slate-500"}`}>
+                    {isSuperadmin ? "Sovereign Mode" : "Restrictive Mode"}
+                  </span>
+                </div>
               </div>
             </div>
 
@@ -590,11 +749,12 @@ export default function PageBuilder() {
                 {isPreviewMode ? (
                   <PenTool className="w-4 h-4" />
                 ) : (
-                  <Sparkles className="w-4 h-4" />
+                  <Globe className="w-4 h-4" />
                 )}
                 {isPreviewMode ? "Back to Editor" : "Live Preview"}
               </button>
-              {!activeItemLocked && (
+
+              {(!activeItemLocked || isSuperadmin) && (
                 <button
                   type="button"
                   onClick={resetForm}
@@ -607,14 +767,34 @@ export default function PageBuilder() {
             </div>
           </div>
 
-          {/* The Command Center (Banners) */}
+          {/* THE COMMAND CENTER (Banners Hierarchy) */}
           {(activeItemLocked || rejectedDraft) && (
             <div className="px-8 pt-6 pb-0 space-y-4">
-              {/* LOCK ALERT BANNER */}
-              {activeItemLocked && (
+              {/* 1. SOVEREIGN OVERRIDE BANNER (Amber - Untuk Admin) */}
+              {activeItemLocked && isSuperadmin && (
+                <div className="flex items-start gap-4 p-5 bg-amber-50 border border-amber-200 rounded-2xl animate-in slide-in-from-top-4 shadow-sm">
+                  <div className="p-2.5 bg-amber-100 text-amber-600 rounded-xl shrink-0">
+                    <AlertTriangle className="w-6 h-6" />
+                  </div>
+                  <div>
+                    <h4 className="text-sm font-black text-amber-900 uppercase tracking-tight">
+                      System Intervention Required
+                    </h4>
+                    <p className="text-xs text-amber-700 mt-1 leading-relaxed">
+                      Data ini sedang dikunci (Tiket:{" "}
+                      <strong>{activeLockTicket}</strong>). Sebagai Admin, Anda
+                      dapat mengabaikan birokrasi dan memublikasikan perubahan
+                      secara langsung (Override).
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              {/* 2. LOCKED UI BANNER (Biru - Untuk Editor) */}
+              {activeItemLocked && !isSuperadmin && (
                 <div className="flex items-start gap-3 p-4 bg-blue-50 border border-blue-200 rounded-2xl animate-in fade-in shadow-sm">
                   <div className="p-2 bg-blue-100 text-blue-600 rounded-xl shrink-0">
-                    <Lock className="w-5 h-5" />
+                    <Lock className="w-5 h-5 animate-pulse" />
                   </div>
                   <div>
                     <h4 className="text-sm font-bold text-blue-900">
@@ -622,39 +802,49 @@ export default function PageBuilder() {
                     </h4>
                     <p className="text-xs text-blue-700 mt-1 leading-relaxed">
                       Halaman ini sedang dikunci karena dalam proses peninjauan
-                      Admin (Tiket:{" "}
-                      <strong className="tracking-wider">
-                        {activeLockTicket}
-                      </strong>
-                      ). Anda tidak dapat mengubah data sampai proses selesai.
+                      (Tiket: <strong>{activeLockTicket}</strong>).
                     </p>
                   </div>
                 </div>
               )}
 
-              {/* REJECTION BANNER & RESTORE ENGINE */}
+              {/* 3. REJECTION BANNER & RESTORE ENGINE (Merah) */}
               {rejectedDraft && !activeItemLocked && (
-                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 p-5 bg-amber-50 border border-amber-200 rounded-2xl animate-in slide-in-from-top-2 shadow-sm">
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 p-5 bg-red-50/50 border border-red-200 rounded-2xl animate-in slide-in-from-top-2 shadow-sm">
                   <div className="flex items-start gap-3">
-                    <div className="p-2 bg-amber-100 text-amber-600 rounded-xl shrink-0">
-                      <AlertTriangle className="w-5 h-5 animate-pulse" />
+                    <div className="p-2 bg-red-100 text-red-600 rounded-xl shrink-0">
+                      <AlertTriangle className="w-5 h-5 animate-bounce" />
                     </div>
                     <div>
-                      <h4 className="text-sm font-bold text-amber-900">
+                      <h4 className="text-sm font-black text-red-900 uppercase tracking-tight">
                         Revisi Diperlukan
                       </h4>
-                      <p className="text-xs text-amber-700 mt-1 leading-relaxed">
-                        <span className="font-bold">Catatan Admin:</span> "
-                        {rejectedDraft.rejection_reason}"
+                      <p className="text-xs text-red-800 bg-white/50 p-2 rounded-lg mt-1 italic border border-red-100">
+                        "{rejectedDraft.rejection_reason}"
                       </p>
                     </div>
                   </div>
-                  <button
-                    type="button"
-                    onClick={handleRestoreDraft}
-                    className="flex items-center gap-2 px-5 py-2.5 bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold rounded-xl shadow-lg shadow-amber-500/20 transition-all shrink-0 transform hover:-translate-y-0.5">
-                    <RotateCcw className="w-4 h-4" /> Pulihkan Draf
-                  </button>
+                  <div className="flex gap-2 shrink-0">
+                    <button
+                      type="button"
+                      onClick={handleRestoreDraft}
+                      className="flex items-center gap-2 px-5 py-2.5 bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold rounded-xl shadow-md transition-all active:scale-95">
+                      <RotateCcw className="w-4 h-4" /> Pulihkan Draf
+                    </button>
+                    {/* 🚀 TOMBOL DISCARD (PATCH) */}
+                    <button
+                      type="button"
+                      disabled={isDiscarding}
+                      onClick={handleDiscardDraft}
+                      className="flex items-center gap-2 px-5 py-2.5 bg-white hover:bg-red-50 text-red-600 border border-red-200 text-xs font-bold rounded-xl shadow-sm transition-all disabled:opacity-50">
+                      {isDiscarding ? (
+                        <RefreshCw className="w-4 h-4 animate-spin" />
+                      ) : (
+                        <X className="w-4 h-4" />
+                      )}
+                      Abaikan Notif
+                    </button>
+                  </div>
                 </div>
               )}
             </div>
@@ -681,8 +871,9 @@ export default function PageBuilder() {
                     required
                     value={formData.title}
                     onChange={handleTitleChange}
-                    readOnly={activeItemLocked}
-                    className="w-full px-5 py-4 rounded-2xl bg-slate-50 border border-slate-200 focus:bg-white focus:border-daw-green focus:ring-4 focus:ring-daw-green/10 outline-none font-bold text-slate-800 transition-all"
+                    readOnly={activeItemLocked && !isSuperadmin}
+                    className={`w-full px-5 py-4 rounded-2xl border transition-all font-bold text-slate-800 outline-none
+                      ${activeItemLocked && !isSuperadmin ? "bg-slate-50 border-slate-200 opacity-60 cursor-not-allowed" : "bg-slate-50 border-slate-200 focus:bg-white focus:border-daw-green focus:ring-4 focus:ring-daw-green/10"}`}
                     placeholder="e.g. Corporate Sustainability Report"
                   />
                 </div>
@@ -691,7 +882,9 @@ export default function PageBuilder() {
                   <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">
                     Tautan Alamat (URL)
                   </label>
-                  <div className="flex items-center w-full rounded-2xl bg-slate-50 border border-slate-200 focus-within:bg-white focus-within:border-daw-green focus-within:ring-4 focus-within:ring-daw-green/10 overflow-hidden transition-all">
+                  <div
+                    className={`flex items-center w-full rounded-2xl border overflow-hidden transition-all
+                    ${activeItemLocked && !isSuperadmin ? "bg-slate-50 border-slate-200 opacity-60" : "bg-slate-50 border-slate-200 focus-within:bg-white focus-within:border-daw-green focus-within:ring-4 focus-within:ring-daw-green/10"}`}>
                     <div className="pl-5 pr-2 py-4 text-slate-400 flex items-center gap-2 border-r border-slate-200/50">
                       <Globe className="w-4 h-4" />{" "}
                       <span className="text-sm font-mono">/page/</span>
@@ -700,7 +893,7 @@ export default function PageBuilder() {
                       type="text"
                       required
                       value={formData.slug}
-                      readOnly={activeItemLocked}
+                      readOnly={activeItemLocked && !isSuperadmin}
                       onChange={(e) =>
                         setFormData((prev) => ({
                           ...prev,
@@ -712,12 +905,12 @@ export default function PageBuilder() {
                       className="w-full p-4 bg-transparent outline-none font-mono text-sm text-slate-600"
                       placeholder="corporate-report"
                     />
-                    {editingId && !activeItemLocked && (
+                    {editingId && (!activeItemLocked || isSuperadmin) && (
                       <button
                         type="button"
                         onClick={syncSlugWithTitle}
-                        title="Sync Slug dengan Judul"
-                        className="pr-5 pl-3 text-slate-400 hover:text-daw-green transition-colors border-l border-slate-200/50">
+                        className="pr-5 pl-3 text-slate-400 hover:text-daw-green transition-colors border-l border-slate-200/50"
+                        title="Sync Slug dengan Judul">
                         <RefreshCw className="w-4 h-4" />
                       </button>
                     )}
@@ -731,20 +924,22 @@ export default function PageBuilder() {
                   <input
                     type="text"
                     value={formData.subtitle}
-                    readOnly={activeItemLocked}
+                    readOnly={activeItemLocked && !isSuperadmin}
                     onChange={(e) =>
                       setFormData((prev) => ({
                         ...prev,
                         subtitle: e.target.value,
                       }))
                     }
-                    className="w-full px-5 py-4 rounded-2xl bg-slate-50 border border-slate-200 focus:bg-white focus:border-daw-green focus:ring-4 focus:ring-daw-green/10 outline-none text-slate-600 transition-all"
+                    className={`w-full px-5 py-4 rounded-2xl border transition-all outline-none text-slate-600
+                      ${activeItemLocked && !isSuperadmin ? "bg-slate-50 border-slate-200 opacity-60 cursor-not-allowed" : "bg-slate-50 border-slate-200 focus:bg-white focus:border-daw-green focus:ring-4 focus:ring-daw-green/10"}`}
                     placeholder="Brief overview or engaging hook for the article..."
                   />
                 </div>
               </div>
             </div>
 
+            {/* LIVE PREVIEW ENGINE */}
             {isPreviewMode && (
               <div className="sticky top-24 h-[80vh] overflow-y-auto rounded-[2rem] border-4 border-slate-900 bg-white shadow-2xl custom-scrollbar">
                 <div className="bg-slate-900 p-3 flex justify-center gap-1.5 border-b border-slate-800">
@@ -752,7 +947,6 @@ export default function PageBuilder() {
                   <div className="w-2 h-2 rounded-full bg-amber-500" />
                   <div className="w-2 h-2 rounded-full bg-green-500" />
                 </div>
-
                 <div className="p-8 md:p-10">
                   {(formData.subtitle || !editingId) && (
                     <p className="text-daw-green font-bold tracking-[0.3em] uppercase text-[10px] mb-5 drop-shadow-sm">
@@ -762,42 +956,13 @@ export default function PageBuilder() {
                   <h1 className="text-3xl md:text-4xl font-serif font-bold text-slate-900 mb-8 leading-[1.15] tracking-tight">
                     {formData.title || "Untitled Document"}
                   </h1>
-
                   <hr className="mb-8 border-slate-200" />
-
-                  {/*  Bagian Content: Sinkronisasi 100% dengan DynamicPage.tsx */}
                   <article
-                    className={`w-full text-left break-words [&>*:first-child]:mt-0
-                        /* Core Prose */
-                        prose prose-slate max-w-none
-                        prose-p:leading-[1.8] prose-p:text-slate-600 prose-p:mb-8 prose-p:text-[1.05rem]
-                        
-                        /* Headings */
-                        prose-headings:font-serif prose-headings:text-slate-900 prose-headings:tracking-tight prose-headings:font-bold
-                        prose-h2:text-2xl prose-h2:mt-12 prose-h2:mb-6 
-                        prose-h3:text-xl prose-h3:mt-8
-                        
-                        /* Media Styling (Images & iFrames) */
-                        [&_img]:rounded-[1.5rem] [&_img]:my-10 [&_img]:shadow-sm
-                        [&_iframe]:rounded-[1rem] [&_iframe]:shadow-lg [&_iframe]:my-8
-                        
-                        /* Lists */
-                        prose-li:marker:text-daw-green prose-li:my-1.5
-                        
-                        /* Conditional Drop Cap (Disesuaikan proporsinya untuk layar split) */
-                        ${
-                          formData.showDropCap
-                            ? `prose-p:first-of-type:first-letter:text-[4.5rem] 
-                              prose-p:first-of-type:first-letter:font-serif 
-                              prose-p:first-of-type:first-letter:font-black 
-                              prose-p:first-of-type:first-letter:text-daw-green 
-                              prose-p:first-of-type:first-letter:mr-4 
-                              prose-p:first-of-type:first-letter:float-left 
-                              prose-p:first-of-type:first-letter:leading-[0.8] 
-                              prose-p:first-of-type:first-letter:mt-2 
-                              prose-p:first-of-type:first-letter:drop-shadow-sm`
-                            : ""
-                        }`}
+                    className={`w-full text-left break-words [&>*:first-child]:mt-0 prose prose-slate max-w-none prose-p:leading-[1.8] prose-p:text-slate-600 prose-p:mb-8 prose-p:text-[1.05rem] prose-headings:font-serif prose-headings:text-slate-900 prose-headings:tracking-tight prose-headings:font-bold prose-h2:text-2xl prose-h2:mt-12 prose-h2:mb-6 prose-h3:text-xl prose-h3:mt-8 [&_img]:rounded-[1.5rem] [&_img]:my-10 [&_img]:shadow-sm [&_iframe]:rounded-[1rem] [&_iframe]:shadow-lg [&_iframe]:my-8 prose-li:marker:text-daw-green prose-li:my-1.5 ${
+                      formData.showDropCap
+                        ? `prose-p:first-of-type:first-letter:text-[4.5rem] prose-p:first-of-type:first-letter:font-serif prose-p:first-of-type:first-letter:font-black prose-p:first-of-type:first-letter:text-daw-green prose-p:first-of-type:first-letter:mr-4 prose-p:first-of-type:first-letter:float-left prose-p:first-of-type:first-letter:leading-[0.8] prose-p:first-of-type:first-letter:mt-2 prose-p:first-of-type:first-letter:drop-shadow-sm`
+                        : ""
+                    }`}
                     dangerouslySetInnerHTML={{
                       __html:
                         formData.content ||
@@ -808,67 +973,55 @@ export default function PageBuilder() {
               </div>
             )}
 
-            {/* SECTION 1.5: SEARCH ENGINE OPTIMIZATION (SEO) */}
-            <div className="space-y-6 bg-slate-50/50 p-6 rounded-[2rem] border border-slate-200 shadow-inner">
-              <div className="flex items-center gap-2 border-b border-slate-100 pb-2">
-                <Search className="w-4 h-4 text-blue-500" />
-                <h3 className="text-sm font-bold text-slate-900">
-                  Search Engine Optimization (SEO)
+            {/* SECTION 1.5: SEO ENGINE */}
+            <div className="space-y-6 bg-slate-900 p-8 rounded-[2rem] shadow-2xl">
+              <div className="flex items-center gap-2 border-b border-white/10 pb-3">
+                <Search className="w-5 h-5 text-blue-400" />
+                <h3 className="text-sm font-black text-white uppercase tracking-widest">
+                  Search Engine Optimization
                 </h3>
               </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                {/* A. SEO Input Field */}
+              <div className="grid grid-cols-1 xl:grid-cols-2 gap-8">
                 <div className="space-y-4">
-                  <div className="space-y-2">
-                    <div className="flex justify-between items-center px-1">
-                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
-                        Custom Meta Description
-                      </label>
-                      <span
-                        className={`text-[9px] font-bold ${formData.metaDescription?.length > 160 ? "text-red-500" : "text-slate-400"}`}>
-                        {formData.metaDescription?.length || 0}/160
-                      </span>
-                    </div>
-                    <textarea
-                      placeholder={
-                        formData.subtitle ||
-                        "Tulis deskripsi SEO manual di sini..."
-                      }
-                      readOnly={activeItemLocked}
-                      className={`w-full p-4 rounded-2xl bg-white border outline-none text-sm text-slate-600 h-28 resize-none transition-all focus:ring-4 focus:ring-blue-500/5 ${
-                        activeItemLocked ? "opacity-60 cursor-not-allowed" : ""
-                      } ${
-                        formData.metaDescription?.length > 160
-                          ? "border-red-300 focus:border-red-500"
-                          : "border-slate-200 focus:border-blue-400"
-                      }`}
-                      value={formData.metaDescription}
-                      onChange={(e) =>
-                        setFormData({
-                          ...formData,
-                          metaDescription: e.target.value,
-                        })
-                      }
-                    />
-                    <p className="text-[9px] text-slate-400 italic ml-1 leading-relaxed">
-                      *Jika dikosongkan, sistem akan otomatis menggunakan{" "}
-                      <strong>Subtitle</strong> atau ringkasan{" "}
-                      <strong>Konten</strong> sebagai fallback.
-                    </p>
+                  <div className="flex justify-between items-center">
+                    <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest">
+                      Custom Meta Description
+                    </label>
+                    <span
+                      className={`text-[9px] font-bold ${formData.metaDescription?.length > 160 ? "text-red-400" : "text-slate-400"}`}>
+                      {formData.metaDescription?.length || 0}/160
+                    </span>
                   </div>
+                  <textarea
+                    readOnly={activeItemLocked && !isSuperadmin}
+                    placeholder={
+                      formData.subtitle ||
+                      "Tulis deskripsi SEO manual di sini..."
+                    }
+                    value={formData.metaDescription}
+                    onChange={(e) =>
+                      setFormData({
+                        ...formData,
+                        metaDescription: e.target.value,
+                      })
+                    }
+                    className={`w-full p-4 rounded-2xl bg-slate-800 border outline-none text-sm text-slate-300 h-32 resize-none transition-all focus:ring-4 focus:ring-blue-500/10 custom-scrollbar ${
+                      activeItemLocked && !isSuperadmin
+                        ? "opacity-60 border-white/5 cursor-not-allowed"
+                        : formData.metaDescription?.length > 160
+                          ? "border-red-400 focus:border-red-500"
+                          : "border-white/10 focus:border-blue-500"
+                    }`}
+                  />
+                  <p className="text-[9px] text-slate-500 italic leading-relaxed">
+                    *Jika dikosongkan, sistem akan otomatis menggunakan Subtitle
+                    atau ringkasan Konten sebagai fallback.
+                  </p>
                 </div>
-
-                {/* B. Visual Google Preview Card */}
-                <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm flex flex-col justify-center relative overflow-hidden group">
-                  {/* Dekorasi Card */}
-                  <div className="absolute top-0 left-0 w-1 h-full bg-blue-500 opacity-0 group-hover:opacity-100 transition-opacity" />
-
+                <div className="bg-white p-6 rounded-2xl shadow-inner flex flex-col justify-center relative overflow-hidden group">
                   <p className="text-[10px] font-black text-slate-300 uppercase mb-3 flex items-center gap-2">
                     <Globe className="w-3 h-3" /> Pratinjau Tampilan Google
                   </p>
-
-                  {/* Google Search Result Simulation */}
                   <div className="space-y-1">
                     <p className="text-[#1a0dab] text-xl font-medium truncate hover:underline cursor-pointer">
                       {formData.title || "Untitled Document"}
@@ -895,24 +1048,26 @@ export default function PageBuilder() {
                   Gambar Latar Utama
                 </h3>
               </div>
-
               <div className="mt-2">
                 {heroImage ? (
                   <div className="relative w-full h-[300px] rounded-3xl overflow-hidden group border border-slate-200 shadow-sm">
                     <img
                       src={
-                        heroImage.startsWith("data:")
+                        heroImage.startsWith("blob:")
                           ? heroImage
                           : `${BASE_UPLOAD_URL}/${heroImage}`
                       }
                       alt="Hero Preview"
                       className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
                     />
-                    {!activeItemLocked && (
+                    {(!activeItemLocked || isSuperadmin) && (
                       <div className="absolute inset-0 bg-slate-900/60 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-center justify-center">
                         <button
                           type="button"
-                          onClick={() => setHeroImage("")}
+                          onClick={() => {
+                            setHeroImage("");
+                            setHeroFile(null);
+                          }}
                           className="bg-red-500 text-white px-6 py-3 rounded-2xl flex items-center gap-2 font-bold shadow-lg transform hover:scale-105 transition-all">
                           <Trash2 className="w-5 h-5" /> Remove Asset
                         </button>
@@ -923,27 +1078,25 @@ export default function PageBuilder() {
                   <div
                     onDragOver={(e) => {
                       e.preventDefault();
-                      if (!activeItemLocked) setIsDragging(true);
+                      if (!activeItemLocked || isSuperadmin)
+                        setIsDragging(true);
                     }}
                     onDragLeave={() => setIsDragging(false)}
                     onDrop={(e) => {
                       e.preventDefault();
                       setIsDragging(false);
-                      if (!activeItemLocked && e.dataTransfer.files?.[0])
+                      if (
+                        (!activeItemLocked || isSuperadmin) &&
+                        e.dataTransfer.files?.[0]
+                      )
                         handleImageUpload(e.dataTransfer.files[0]);
                     }}
                     className={`relative border-2 border-dashed rounded-3xl p-14 flex flex-col items-center justify-center transition-all duration-300 group 
-                      ${
-                        activeItemLocked
-                          ? "border-slate-200 bg-slate-100 opacity-60 cursor-not-allowed"
-                          : isDragging
-                            ? "border-daw-green bg-daw-green/5 scale-[0.99] ring-4 ring-daw-green/10"
-                            : "border-slate-300 bg-slate-50 hover:border-daw-green hover:bg-slate-50/80"
-                      }`}>
+                      ${activeItemLocked && !isSuperadmin ? "border-slate-200 bg-slate-100 opacity-60 cursor-not-allowed" : isDragging ? "border-daw-green bg-daw-green/5 scale-[0.99] ring-4 ring-daw-green/10" : "border-slate-300 bg-slate-50 hover:border-daw-green hover:bg-slate-50/80"}`}>
                     <input
                       type="file"
                       accept="image/*"
-                      disabled={activeItemLocked}
+                      disabled={activeItemLocked && !isSuperadmin} // 🛡️ Hard-Lock pada Input File
                       onChange={(e) =>
                         e.target.files && handleImageUpload(e.target.files[0])
                       }
@@ -951,7 +1104,7 @@ export default function PageBuilder() {
                     />
                     <div
                       className={`p-5 rounded-2xl mb-4 transition-all duration-500 ${isDragging ? "bg-daw-green text-white scale-110 rotate-6" : "bg-white text-slate-400 shadow-sm group-hover:text-daw-green"}`}>
-                      {activeItemLocked ? (
+                      {activeItemLocked && !isSuperadmin ? (
                         <Lock className="w-10 h-10 text-slate-300" />
                       ) : (
                         <UploadCloud
@@ -961,13 +1114,13 @@ export default function PageBuilder() {
                     </div>
                     <div className="text-center space-y-2">
                       <p className="text-base font-bold text-slate-700">
-                        {activeItemLocked
+                        {activeItemLocked && !isSuperadmin
                           ? "Unggah Terkunci"
                           : isDragging
                             ? "Drop asset here"
                             : "Drag & Drop cover image"}
                       </p>
-                      {!activeItemLocked && (
+                      {(!activeItemLocked || isSuperadmin) && (
                         <p className="text-[11px] text-slate-500 font-medium">
                           or browse from local workstation / atau pilih dari
                           folder lokal
@@ -978,18 +1131,18 @@ export default function PageBuilder() {
                 )}
               </div>
             </div>
-            {/* 🌟 SECTION 3: WIDGET MANAGER */}
+            {/* SECTION 3: WIDGET MANAGER */}
             <div className="space-y-6">
               <div className="flex justify-between items-center border-b border-slate-100 pb-2">
                 <div className="flex items-center gap-2">
                   <LinkIcon className="w-4 h-4 text-slate-400" />
                   <h3 className="text-sm font-bold text-slate-900">
-                    Tautan Terkait
+                    Tautan Terkait (Sidebar)
                   </h3>
                 </div>
                 <button
                   type="button"
-                  disabled={activeItemLocked}
+                  disabled={activeItemLocked && !isSuperadmin} // 🛡️ Blueprint: Admin Override
                   onClick={() =>
                     setFormData((prev) => ({
                       ...prev,
@@ -999,7 +1152,7 @@ export default function PageBuilder() {
                       ],
                     }))
                   }
-                  className="text-[10px] font-black uppercase tracking-widest text-daw-green bg-daw-green/10 px-3 py-1.5 rounded-lg hover:bg-daw-green hover:text-white transition-all flex items-center gap-1">
+                  className="text-[10px] font-black uppercase tracking-widest text-daw-green bg-daw-green/10 px-3 py-1.5 rounded-lg hover:bg-daw-green hover:text-white transition-all flex items-center gap-1 disabled:opacity-50 disabled:cursor-not-allowed">
                   <Plus className="w-3 h-3" /> Insert Link
                 </button>
               </div>
@@ -1010,7 +1163,6 @@ export default function PageBuilder() {
                     Belum ada tautan tambahan. Gunakan bagian ini jika Anda
                     ingin menampilkan referensi halaman lain di sisi samping
                     artikel.
-                    <br />
                   </p>
                 ) : (
                   formData.sidebarLinks.map((link, index) => (
@@ -1024,11 +1176,12 @@ export default function PageBuilder() {
                           </label>
                           <select
                             value={link.url}
-                            disabled={activeItemLocked}
+                            disabled={activeItemLocked && !isSuperadmin}
                             onChange={(e) => {
                               const newLinks = [...formData.sidebarLinks];
                               const selectedUrl = e.target.value;
                               newLinks[index].url = selectedUrl;
+
                               if (!newLinks[index].label && selectedUrl) {
                                 const staticPages = [
                                   { url: "/", label: "Homepage" },
@@ -1056,11 +1209,11 @@ export default function PageBuilder() {
                                 sidebarLinks: newLinks,
                               }));
                             }}
-                            className="w-full text-sm p-3 bg-slate-50 outline-none font-bold text-daw-green border border-slate-200 rounded-xl focus:border-daw-green focus:ring-2 focus:ring-daw-green/10 cursor-pointer">
+                            className="w-full text-sm p-3 bg-slate-50 outline-none font-bold text-daw-green border border-slate-200 rounded-xl focus:border-daw-green focus:ring-2 focus:ring-daw-green/10 cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed">
                             <option value="">-- Assign Destination --</option>
                             <optgroup label="Main Pages">
-                              <option value="/">Homepage</option>{" "}
-                              <option value="/about">About Us</option>{" "}
+                              <option value="/">Homepage</option>
+                              <option value="/about">About Us</option>
                               <option value="/businesses">
                                 Our Businesses
                               </option>
@@ -1084,7 +1237,7 @@ export default function PageBuilder() {
                             type="text"
                             placeholder="Auto-filled if empty..."
                             value={link.label}
-                            readOnly={activeItemLocked}
+                            readOnly={activeItemLocked && !isSuperadmin}
                             onChange={(e) => {
                               const newLinks = [...formData.sidebarLinks];
                               newLinks[index].label = e.target.value;
@@ -1093,11 +1246,13 @@ export default function PageBuilder() {
                                 sidebarLinks: newLinks,
                               }));
                             }}
-                            className="w-full text-sm p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:border-daw-green focus:bg-white text-slate-700 font-medium transition-colors"
+                            className={`w-full text-sm p-3 border border-slate-200 rounded-xl outline-none font-medium transition-colors
+                              ${activeItemLocked && !isSuperadmin ? "bg-slate-50 opacity-60" : "bg-slate-50 focus:border-daw-green focus:bg-white text-slate-700"}`}
                           />
                         </div>
                       </div>
-                      {!activeItemLocked && ( // 🛡️ BLUEPRINT: Sembunyikan tombol hapus link
+
+                      {(!activeItemLocked || isSuperadmin) && (
                         <button
                           type="button"
                           onClick={() => {
@@ -1119,6 +1274,7 @@ export default function PageBuilder() {
                 )}
               </div>
             </div>
+
             <div className="flex items-center gap-3 bg-white p-4 rounded-2xl border border-slate-200 shadow-sm mt-4">
               <div
                 className={`w-10 h-10 rounded-xl flex items-center justify-center transition-colors ${formData.showDropCap ? "bg-daw-green/10 text-daw-green" : "bg-slate-100 text-slate-400"}`}>
@@ -1134,20 +1290,21 @@ export default function PageBuilder() {
               </div>
               <button
                 type="button"
-                disabled={activeItemLocked}
+                disabled={activeItemLocked && !isSuperadmin}
                 onClick={() =>
                   setFormData((prev) => ({
                     ...prev,
                     showDropCap: !prev.showDropCap,
                   }))
                 }
-                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none ${formData.showDropCap ? "bg-daw-green" : "bg-slate-300"}`}>
+                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none disabled:opacity-50 ${formData.showDropCap ? "bg-daw-green" : "bg-slate-300"}`}>
                 <span
                   className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${formData.showDropCap ? "translate-x-6" : "translate-x-1"}`}
                 />
               </button>
             </div>
-            {/* 🌟 SECTION 4: TEXT EDITOR */}
+
+            {/* SECTION 4: TEXT EDITOR */}
             <div className="space-y-6">
               <div className="flex items-center gap-2 border-b border-slate-100 pb-2">
                 <FileText className="w-4 h-4 text-slate-400" />
@@ -1158,12 +1315,12 @@ export default function PageBuilder() {
 
               <div
                 className={`rounded-[1.5rem] border overflow-hidden bg-white shadow-sm transition-all
-                ${activeItemLocked ? "border-slate-200 opacity-70 pointer-events-none" : "border-slate-200 focus-within:ring-4 focus-within:ring-daw-green/10 focus-within:border-daw-green"}`}>
+                ${activeItemLocked && !isSuperadmin ? "border-slate-200 opacity-70 pointer-events-none" : "border-slate-200 focus-within:ring-4 focus-within:ring-daw-green/10 focus-within:border-daw-green"}`}>
                 <ReactQuill
                   ref={quillRef}
                   theme="snow"
                   value={formData.content}
-                  readOnly={activeItemLocked} // 🛡️ BLUEPRINT: Kunci Quill Editor
+                  readOnly={activeItemLocked && !isSuperadmin} // 🛡️ Admin bisa ngetik saat Override!
                   onChange={(val) =>
                     setFormData((prev) => ({ ...prev, content: val }))
                   }
@@ -1174,44 +1331,61 @@ export default function PageBuilder() {
             </div>
           </div>
 
-          {/* 🛡️ BLUEPRINT: SPLIT SAVE ACTION (Footer) */}
-          <div className="px-8 py-6 bg-slate-900 flex justify-between items-center mt-4">
+          {/* ============================================================ */}
+          {/* 🛡️ BLUEPRINT: MASTER ACTION FOOTER (Baton Pass Logic)        */}
+          {/* ============================================================ */}
+          <div className="px-8 py-6 bg-slate-900 flex flex-col sm:flex-row justify-between items-center mt-4 gap-4">
             <div>
               <p className="text-[11px] text-slate-400 font-bold uppercase tracking-widest">
                 System Status
               </p>
               <p className="text-xs text-slate-300 italic mt-0.5">
-                {activeItemLocked
+                {activeItemLocked && !isSuperadmin
                   ? "Form terkunci. Menunggu hasil tinjauan."
-                  : "Perubahan lokal akan ditayangkan setelah disetujui."}
+                  : activeItemLocked && isSuperadmin
+                    ? "Sovereign Mode aktif. Anda dapat menimpa draf ini."
+                    : "Perubahan lokal akan ditayangkan setelah disetujui."}
               </p>
             </div>
 
-            {/* Conditional Rendering Footer Buttons */}
-            {activeItemLocked ? (
-              <div className="px-8 py-4 bg-slate-800 border border-slate-700 rounded-2xl flex items-center gap-3">
+            {/* BATON PASS DECISION TREE */}
+            {activeItemLocked && !isSuperadmin ? (
+              // JALUR 1: EDITOR TERKUNCI (RESTRICTIVE MODE)
+              <div className="px-8 py-4 bg-slate-800 border border-slate-700 rounded-2xl flex items-center gap-3 w-full sm:w-auto justify-center">
                 <div className="w-2 h-2 rounded-full bg-blue-500 animate-pulse" />
                 <span className="text-sm font-bold text-slate-300">
-                  Menunggu Review Admin
+                  Menunggu Review Manajer
                 </span>
               </div>
             ) : (
-              <div className="flex items-center gap-3">
+              // JALUR 2: FORM AKTIF (EDITOR BARU/OVERRIDE ADMIN)
+              <div className="flex flex-col sm:flex-row items-center gap-3 w-full sm:w-auto">
                 <button
                   type="button"
-                  disabled={isSaving}
+                  disabled={isSaving || (!hasDataChanged && !isSuperadmin)}
                   onClick={(e) => handleSubmit(e, "Draft")}
-                  className="bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 px-6 py-4 rounded-2xl font-bold transition-all disabled:opacity-50">
+                  className="w-full sm:w-auto bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 px-6 py-4 rounded-2xl font-bold transition-all disabled:opacity-50 disabled:cursor-not-allowed">
                   {isSaving ? "..." : "Simpan Draf Lokal"}
                 </button>
 
                 <button
                   type="button"
-                  disabled={isSaving}
+                  disabled={isSaving || (!hasDataChanged && !isSuperadmin)}
                   onClick={(e) => handleSubmit(e, "Published")}
-                  className="bg-daw-green hover:bg-emerald-500 text-white px-8 py-4 rounded-2xl font-bold shadow-xl shadow-daw-green/20 flex items-center gap-2 disabled:bg-slate-700 transition-all transform hover:-translate-y-0.5">
+                  className={`w-full sm:w-auto text-white px-8 py-4 rounded-2xl font-bold flex items-center justify-center gap-2 transition-all transform hover:-translate-y-0.5 disabled:opacity-50 disabled:transform-none disabled:cursor-not-allowed
+                    ${
+                      isSuperadmin && activeItemLocked
+                        ? "bg-amber-500 hover:bg-amber-600 shadow-xl shadow-amber-500/20"
+                        : "bg-emerald-600 hover:bg-emerald-700 shadow-xl shadow-emerald-600/20"
+                    }`}>
                   <Save className="w-5 h-5" />
-                  {isSaving ? "Menyinkronkan..." : "Request Approval"}
+                  {isSaving
+                    ? "Menyinkronkan..."
+                    : isSuperadmin
+                      ? activeItemLocked
+                        ? "Override & Publish"
+                        : "Publish Live"
+                      : "Request Approval"}
                 </button>
               </div>
             )}
