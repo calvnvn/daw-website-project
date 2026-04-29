@@ -626,6 +626,38 @@ export default function ApprovalCenter() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  useEffect(() => {
+    if (!isLoading && drafts.length > 0) {
+      const searchParams = new URLSearchParams(window.location.search);
+      const ticketQuery = searchParams.get("ticket");
+
+      if (ticketQuery) {
+        const targetDraft = drafts.find(
+          (d) => d.notrans.toLowerCase() === ticketQuery.toLowerCase(),
+        );
+
+        if (targetDraft) {
+          setSelectedDraft(targetDraft);
+
+          toast.success("Tiket Ditemukan!", {
+            description: `Membuka draf ${targetDraft.notrans} secara otomatis.`,
+          });
+        } else {
+          toast.error("Tiket Tidak Ditemukan", {
+            description: `Draf ${ticketQuery} tidak ada di antrean Anda saat ini.`,
+          });
+        }
+
+        const newUrl =
+          window.location.protocol +
+          "//" +
+          window.location.host +
+          window.location.pathname;
+        window.history.replaceState({ path: newUrl }, "", newUrl);
+      }
+    }
+  }, [isLoading, drafts]);
+
   // THE STATISTICS PROCESSOR (Bento Metrics)
   const stats = useMemo(() => {
     let urgent = 0;
@@ -979,7 +1011,7 @@ export default function ApprovalCenter() {
               </div>
             </div>
             <p className="text-xs text-red-500 mt-4 font-bold flex items-center gap-1">
-              Data Desync. Butuh Force Purge.
+              Data Desync. Butuh Dibersihkan IT.
             </p>
           </div>
         )}

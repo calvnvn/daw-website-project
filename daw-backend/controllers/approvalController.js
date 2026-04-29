@@ -21,6 +21,8 @@ const Settings = require("../models/Settings");
 const AboutInfo = require("../models/AboutInfo");
 const { Op } = require("sequelize");
 const { deleteSingleFile } = require("../utils/fileRemover");
+const User = require("../models/User");
+const { sendApprovalNotification } = require("../utils/mailer");
 
 exports.getPendingApprovals = async (req, res) => {
   try {
@@ -146,14 +148,14 @@ exports.executeDecision = async (req, res) => {
   const nikApprover = String(req.karyawanId);
   const currentLevel = Number(level);
 
-  // START TRANSACTION: Cover both local DB and ERP sequence
+  // START TRANSACTION
   const t = await sequelize.transaction();
 
   try {
     if (!kodeapp)
       throw new Error("Akses Ditolak: Parameter kodeapp/nourut tidak valid.");
 
-    // 1. VAULT VALIDATION: Get source of truth from local DB
+    // VAULT VALIDATION
     const draftData = await ApprovalDraft.findByPk(notrans, { transaction: t });
     if (!draftData) throw new Error("Draf tidak ditemukan di server lokal.");
 
@@ -164,7 +166,7 @@ exports.executeDecision = async (req, res) => {
       payload,
     } = draftData;
 
-    // 2. DISCOVERY: Calculate Baton Pass (Next Level & Next User)
+    //  DISCOVERY
     let pureNextApp = "";
     let isFinalLocal = false;
 
@@ -189,7 +191,7 @@ exports.executeDecision = async (req, res) => {
       }
     }
 
-    // 3. SEQUENCE CONTROL: Tembak ERP DULU
+    // SEQUENCE CONTROL: Tembak ERP DULU
     await ErpApprovalService.submitDecision({
       status,
       kodeapp: nourut, // Mapping nourut to ERP's kodeapp field
@@ -202,18 +204,16 @@ exports.executeDecision = async (req, res) => {
       karyawanid: nikApprover,
     });
 
-    // 4. LOCAL ORCHESTRATION: Reflect ERP changes to MySQL
-
+    // LOCAL ORCHESTRATION
     // CASE A: REJECTION
     if (status === "2") {
       const Model = getModelByModuleName(moduleName);
       if (Model && targetId) {
         // Safe Unlock: Back to Editor's hands
-        const result = await Model.update(
+        await Model.update(
           { is_locked: false, lock_ticket: null },
           { where: { id: targetId }, transaction: t },
         );
-        console.log("DEBUG UNLOCK RESULT:", result);
       }
       await draftData.update(
         { status: "Rejected", rejection_reason: komentar },
@@ -221,12 +221,12 @@ exports.executeDecision = async (req, res) => {
       );
 
       await t.commit();
+      _notifyActor({ type: "REJECTED", draftData, reason: komentar });
       return res.status(200).json({
         message: "Keputusan ditolak. Data telah dibuka kembali untuk revisi.",
       });
     }
 
-    // CASE B: APPROVAL
     // CASE B: APPROVAL
     if (status === "1") {
       if (isFinalLocal) {
@@ -234,23 +234,14 @@ exports.executeDecision = async (req, res) => {
           ">>> [HANDOVER] Memulai proses finalisasi ke tabel utama...",
         );
 
-        // 🚀 THE CRITICAL FIX: Pastikan Payload adalah PLAIN OBJECT
-        // Tanpa ini, loop 'for...in' di handleFileCommit bakal GAGAL baca key logoUrl
         let cleanPayload;
         try {
-          // Kita cuci objeknya biar jadi objek JS murni
           const rawPayload = draftData.payload;
           cleanPayload =
             typeof rawPayload === "string"
               ? JSON.parse(rawPayload)
               : JSON.parse(JSON.stringify(rawPayload));
-
-          console.log(
-            "🔍 [DEBUG] Keys found in payload:",
-            Object.keys(cleanPayload),
-          );
         } catch (e) {
-          console.error("🚨 [HANDOVER FAIL] Gagal parsing payload:", e.message);
           throw new Error("Payload draf korup.");
         }
 
@@ -262,15 +253,8 @@ exports.executeDecision = async (req, res) => {
         cleanPayload.is_locked = false;
         cleanPayload.lock_ticket = null;
 
-        // 🚀 PROMOSI FILE: Ubah TEMP_ jadi permanen
-        // Sekarang handleFileCommit pasti bisa nemuin key 'logoUrl'
         cleanPayload = handleFileCommit(cleanPayload);
 
-        console.log(
-          `>>> [EXECUTION] Mengirim data bersih ke modul: ${moduleName}`,
-        );
-
-        // Update DB via Relational Execution Engine
         const filesToTrash = await executeModelUpdate(
           moduleName,
           targetId,
@@ -279,15 +263,15 @@ exports.executeDecision = async (req, res) => {
           t,
         );
 
-        // Tutup draf
         await draftData.update({ status: "Approved" }, { transaction: t });
 
         await t.commit();
 
-        // Cleanup fisik (Hanya jalan jika DB sukses commit)
         if (filesToTrash && Array.isArray(filesToTrash)) {
           filesToTrash.forEach((file) => file && deleteSingleFile(file));
         }
+
+        _notifyActor({ type: "APPROVED", draftData });
 
         console.log(`✅ [SUCCESS] Handover ${moduleName} selesai sempurna.`);
         return res.status(200).json({
@@ -295,13 +279,13 @@ exports.executeDecision = async (req, res) => {
         });
       } else {
         await t.commit();
+        _notifyActor({ type: "NEW_REQUEST", pureNextApp, draftData });
         return res.status(200).json({
           message: `Disetujui di Level ${currentLevel}. Menunggu persetujuan level selanjutnya.`,
         });
       }
     }
   } catch (error) {
-    // If anything fails (ERP timeout, DB constraint, etc), MySQL stays untouched.
     if (t && !t.finished) await t.rollback();
     console.error("🚨 [DECISION ENGINE ERROR]:", error.message);
     res.status(500).json({
@@ -527,6 +511,48 @@ function getModelByModuleName(moduleName) {
     (k) => k.toLowerCase() === normalizedName.toLowerCase(),
   );
   return MODEL_MAPPING[standardKey] || null;
+}
+
+async function _notifyActor({ type, pureNextApp, draftData, reason }) {
+  try {
+    let targetUser = null;
+
+    if (type === "NEW_REQUEST" && pureNextApp) {
+      targetUser = await User.findOne({ where: { owl_username: pureNextApp } });
+    } else if (type === "REJECTED" || type === "APPROVED") {
+      targetUser = await User.findOne({
+        where: {
+          [Op.or]: [
+            { owl_username: String(draftData.created_by) },
+            { id: String(draftData.created_by) },
+            { name: String(draftData.created_by) },
+          ],
+        },
+      });
+    }
+
+    if (!targetUser || !targetUser.email) {
+      console.log(
+        `⚠️ [MAIL SKIP] Target email tidak ditemukan untuk identifier: ${pureNextApp || draftData.created_by}`,
+      );
+      return;
+    }
+
+    await sendApprovalNotification({
+      toEmail: targetUser.email,
+      recipientName: targetUser.name || "Tim DAW",
+      type: type,
+      draftInfo: {
+        notrans: draftData.notrans,
+        module_name: draftData.module_name,
+        action: draftData.action,
+        created_by: draftData.created_by,
+      },
+      reason: reason,
+    });
+  } catch (error) {
+    console.error("🚨 [_notifyActor ERROR]:", error.message);
+  }
 }
 
 // Recursive File Commit Engine (The Sanitizer)
