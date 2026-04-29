@@ -1,26 +1,29 @@
-import { useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { FileText, Map } from "lucide-react";
 import NavigationBuilder from "./builder/NavigationBuilder";
 import PageBuilder from "./builder/PageBuilder";
 
 export default function ContentManager() {
-  // --- MASTER TAB STATE ---
-  const [activeTab, setActiveTab] = useState<"pages" | "menus">("pages");
+  const [searchParams, setSearchParams] = useSearchParams();
+
+  const activeTab = searchParams.get("tab") === "menus" ? "menus" : "pages";
+
+  const setActiveTab = (tab: "pages" | "menus") => {
+    setSearchParams({ tab });
+  };
 
   return (
     <div className="max-w-7xl mx-auto space-y-8 animate-in fade-in duration-700 pb-20">
-      {/* --- MASTER HEADER & TABS --- */}
+      {/* MASTER HEADER & TABS */}
       <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
         <div className="p-6 flex flex-col md:flex-row md:items-center justify-between gap-6">
-          <div className="flex items-center gap-4">
-            <div>
-              <h1 className="text-2xl font-serif font-bold text-slate-900">
-                Content Manager
-              </h1>
-              <p className="text-sm text-slate-500">
-                Kelola halaman dan struktur navigasi situs web.
-              </p>
-            </div>
+          <div>
+            <h1 className="text-2xl font-serif font-bold text-slate-900">
+              Content Manager
+            </h1>
+            <p className="text-sm text-slate-500">
+              Kelola halaman dan struktur navigasi situs web.
+            </p>
           </div>
 
           {/* Tab Navigation Hub */}
@@ -31,8 +34,7 @@ export default function ContentManager() {
                 activeTab === "pages"
                   ? "bg-white text-daw-green shadow-sm ring-1 ring-black/5"
                   : "text-slate-500 hover:text-slate-800 hover:bg-slate-200/50"
-              }`}
-            >
+              }`}>
               <FileText className="w-4 h-4" /> Pages
             </button>
             <button
@@ -41,34 +43,19 @@ export default function ContentManager() {
                 activeTab === "menus"
                   ? "bg-white text-daw-green shadow-sm ring-1 ring-black/5"
                   : "text-slate-500 hover:text-slate-800 hover:bg-slate-200/50"
-              }`}
-            >
+              }`}>
               <Map className="w-4 h-4" /> Navigation
             </button>
           </div>
         </div>
       </div>
 
-      {/* --- DYNAMIC RENDERER --- */}
+      {/* DYNAMIC RENDERER */}
       <div className="min-h-[600px] relative">
-        {/* Tab Pages: Tetap terpasang di memori, hanya diatur visibilitasnya */}
-        <div
-          className={
-            activeTab === "pages"
-              ? "block animate-in fade-in duration-500"
-              : "hidden"
-          }
-        >
+        <div className={activeTab === "pages" ? "block" : "hidden"}>
           <PageBuilder />
         </div>
-        {/* Tab Navigation: Tetap terpasang di memori */}
-        <div
-          className={
-            activeTab === "menus"
-              ? "block animate-in fade-in duration-500"
-              : "hidden"
-          }
-        >
+        <div className={activeTab === "menus" ? "block" : "hidden"}>
           <NavigationBuilder />
         </div>
       </div>

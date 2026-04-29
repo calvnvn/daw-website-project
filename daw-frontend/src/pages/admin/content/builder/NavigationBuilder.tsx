@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useMemo } from "react";
 import { toast } from "sonner";
 import {
   Edit2,
@@ -10,19 +10,12 @@ import {
   Plus,
   Settings2,
   Globe,
-  ExternalLink,
   LayoutGrid,
   Folder,
-  Lock,
+  ExternalLink,
 } from "lucide-react";
 import api from "@/lib/api";
 import { useContent } from "@/contexts/ContentContext";
-
-interface PageOption {
-  id: string;
-  title: string;
-  slug?: string;
-}
 
 interface Menu {
   id: string;
@@ -33,8 +26,6 @@ interface Menu {
   pageId: string | null;
   externalLink: string | null;
   isActive: boolean;
-  is_locked?: boolean;
-  lock_ticket?: string | null;
   children?: Menu[];
 }
 
@@ -51,7 +42,7 @@ export default function NavigationBuilder() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [draggedMenuId, setDraggedMenuId] = useState<string | null>(null);
   const [dragOverMenuId, setDragOverMenuId] = useState<string | null>(null);
-  const MAX_ALLOWED_DEPTH = 1; // 0 = Root only, 1 = Root + 1 Level Dropdown
+  const MAX_ALLOWED_DEPTH = 1;
 
   const [formData, setFormData] = useState({
     label: "",
@@ -60,7 +51,6 @@ export default function NavigationBuilder() {
     externalLink: "",
     parentId: "",
     isActive: true,
-    status: "Published",
   });
 
   const getMaxDepth = (menu: Menu): number => {
@@ -91,7 +81,6 @@ export default function NavigationBuilder() {
       externalLink: "",
       parentId: "",
       isActive: true,
-      status: "Published",
     });
   };
 
@@ -118,7 +107,6 @@ export default function NavigationBuilder() {
       externalLink: menu.externalLink || "",
       parentId: menu.parentId || "",
       isActive: menu.isActive,
-      status: "Published",
     });
   };
 
@@ -131,7 +119,7 @@ export default function NavigationBuilder() {
       isCircularMove(editingId, formData.parentId, flatMenus)
     ) {
       return toast.error(
-        "Kesalahan Hirarki: Menu tidak bisa diletakkan di dalam anak menunya sendiri.",
+        "Struktur Ilegal: Menu tidak bisa diletakkan di dalam cabangnya sendiri.",
       );
     }
 
@@ -139,7 +127,7 @@ export default function NavigationBuilder() {
       formData.type === "folder" ? null : formData.parentId || null;
 
     setIsSaving(true);
-    const toastId = toast.loading("Sedang menyimpan perubahan menu...");
+    const toastId = toast.loading("Mempublikasikan navigasi...");
 
     try {
       const payload: Record<string, unknown> = {
@@ -150,20 +138,18 @@ export default function NavigationBuilder() {
         pageId: formData.type === "page" ? formData.pageId || null : null,
         externalLink:
           formData.type === "external" ? formData.externalLink || null : null,
-        status: "Published",
       };
 
       if (editingId) await api.put(`/menus/${editingId}`, payload);
       else await api.post("/menus", payload);
 
-      toast.success("Menu berhasil diubah!", { id: toastId });
+      toast.success("Menu berhasil dipublikasikan!", { id: toastId });
       resetForm();
-
       refreshData();
     } catch (error: unknown) {
       const err = error as { response?: { data?: { message?: string } } };
       toast.error(
-        err.response?.data?.message || "Gagal menyimpan konfigurasi menu.",
+        err.response?.data?.message || "Gagal mempublikasikan menu.",
         { id: toastId },
       );
     } finally {
@@ -172,11 +158,14 @@ export default function NavigationBuilder() {
   };
 
   const handleDelete = async (id: string, title: string) => {
-    if (!confirm(`Hapus "${title}"?`)) return;
-    const toastId = toast.loading("Menghapus...");
+    if (
+      !confirm(`Tindakan ini akan menghapus "${title}" secara live. Lanjutkan?`)
+    )
+      return;
+    const toastId = toast.loading("Menghapus secara live...");
     try {
       await api.delete(`/menus/${id}`);
-      toast.success("Menu berhasil dihapus.", { id: toastId });
+      toast.success("Menu berhasil dihapus dari website.", { id: toastId });
       refreshData();
       if (editingId === id) resetForm();
     } catch {
@@ -184,7 +173,7 @@ export default function NavigationBuilder() {
     }
   };
 
-  // DRAG LOGIC
+  // DRAG LOGIC (Tetap sama, karena secara UI sudah jalan dengan baik)
   const handleDragStart = (e: React.DragEvent, id: string) => {
     e.dataTransfer.setData("text/plain", id);
     setDraggedMenuId(id);
@@ -210,14 +199,14 @@ export default function NavigationBuilder() {
     if (sourceMenu?.type === "folder" && newParentId !== null) {
       setDraggedMenuId(null);
       return toast.error(
-        "Menu Folder hanya bisa diletakkan di posisi paling luar (Menu Utama).",
+        "Menu Folder hanya bisa diletakkan di posisi paling luar (Root).",
       );
     }
 
     if (isCircularMove(sourceId, newParentId, flatMenus)) {
       setDraggedMenuId(null);
       return toast.error(
-        "Kesalahan struktur: Menu tidak bisa digeser ke dalam cabangnya sendiri.",
+        "Struktur Ilegal: Menu tidak bisa digeser ke dalam cabangnya sendiri.",
       );
     }
 
@@ -227,11 +216,11 @@ export default function NavigationBuilder() {
     if (newTargetDepth + movingSubtreeDepth > MAX_ALLOWED_DEPTH) {
       setDraggedMenuId(null);
       return toast.error(
-        `Struktur terlalu dalam. Maksimal sub-menu adalah ${MAX_ALLOWED_DEPTH} tingkat.`,
+        `Maksimal kedalaman sub-menu adalah ${MAX_ALLOWED_DEPTH} tingkat.`,
       );
     }
 
-    const toastId = toast.loading("Sedang mengatur ulang urutan menu...");
+    const toastId = toast.loading("Menyimpan urutan live...");
     try {
       if (!sourceMenu) throw new Error("Source missing.");
       const siblings = flatMenus
@@ -257,11 +246,10 @@ export default function NavigationBuilder() {
         orderIndex: i,
       }));
       await api.put("/menus/reorder", { updatedMenus: updatedPayload });
-      toast.success("Permintaan urutan berhasil diajukan.", { id: toastId });
+      toast.success("Urutan menu diperbarui secara live!", { id: toastId });
       refreshData();
     } catch (error) {
-      toast.error("Gagal mengatur ulang urutan.");
-      console.error("Error: ", error);
+      toast.error("Gagal menyimpan urutan.", { id: toastId });
     } finally {
       setDraggedMenuId(null);
     }
@@ -271,11 +259,9 @@ export default function NavigationBuilder() {
     return flatMenus.filter((m) => {
       if (!editingId)
         return getCurrentDepth(m.id, flatMenus) < MAX_ALLOWED_DEPTH + 1;
-
       const movingMenu = flatMenus.find((f) => f.id === editingId);
       const movingMenuSubtreeDepth = movingMenu ? getMaxDepth(movingMenu) : 0;
       const targetDepth = getCurrentDepth(m.id, flatMenus);
-
       return (
         m.id !== editingId &&
         !isCircularMove(editingId, m.id, flatMenus) &&
@@ -299,10 +285,7 @@ export default function NavigationBuilder() {
 
         <div
           draggable
-          onDragStart={(e) => {
-            e.dataTransfer.setData("text/plain", menu.id);
-            setDraggedMenuId(menu.id);
-          }}
+          onDragStart={(e) => handleDragStart(e, menu.id)}
           onDragEnd={() => {
             setDraggedMenuId(null);
             setDragOverMenuId(null);
@@ -321,16 +304,16 @@ export default function NavigationBuilder() {
           <div className="flex items-center gap-4">
             <GripVertical className="w-4 h-4 text-slate-300 cursor-grab active:cursor-grabbing group-hover:text-slate-400" />
             <div
-              className={`w-10 h-10 rounded-xl flex items-center justify-center ${menu.type === "page" ? "bg-blue-50 text-blue-500" : menu.type === "folder" ? "bg-daw-green/10 text-daw-green" : "bg-amber-50 text-amber-500"}`}>
+              className={`w-10 h-10 rounded-xl flex items-center justify-center ${menu.type === "page" ? "bg-blue-50 text-blue-500" : menu.type === "folder" ? "bg-emerald-50 text-emerald-500" : "bg-amber-50 text-amber-500"}`}>
               {menu.type === "page" && <FileText className="w-5 h-5" />}
               {menu.type === "external" && <LinkIcon className="w-5 h-5" />}
               {menu.type === "folder" && (
-                <Folder className="w-5 h-5 fill-daw-green/20" />
+                <Folder className="w-5 h-5 fill-emerald-500/20" />
               )}
             </div>
             <div>
               <h4
-                className={`text-sm font-bold ${!menu.isActive && "line-through opacity-50"}`}>
+                className={`text-sm font-bold ${!menu.isActive && "line-through text-slate-400"}`}>
                 {menu.label}
               </h4>
               <span className="text-[9px] font-black uppercase px-1.5 py-0.5 rounded bg-slate-100 text-slate-500">
@@ -345,17 +328,20 @@ export default function NavigationBuilder() {
                 setEditingId(null);
                 setFormData({ ...formData, parentId: menu.id });
               }}
-              className="p-2 text-slate-400 hover:text-daw-green hover:bg-daw-green/10 rounded-lg">
+              className="p-2 text-slate-400 hover:text-emerald-500 hover:bg-emerald-50 rounded-lg"
+              title="Tambah Sub-menu">
               <Plus className="w-4 h-4" />
             </button>
             <button
               onClick={() => handleEdit(menu)}
-              className="p-2 text-slate-400 hover:text-blue-500 hover:bg-blue-50 rounded-lg">
+              className="p-2 text-slate-400 hover:text-blue-500 hover:bg-blue-50 rounded-lg"
+              title="Edit Live">
               <Edit2 className="w-4 h-4" />
             </button>
             <button
               onClick={() => handleDelete(menu.id, menu.label)}
-              className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg">
+              className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg"
+              title="Hapus Live">
               <Trash2 className="w-4 h-4" />
             </button>
           </div>
@@ -380,7 +366,7 @@ export default function NavigationBuilder() {
               Navigation Architect
             </h2>
             <p className="text-xs text-slate-500 font-medium mt-1">
-              Kelola susunan dan hirarki menu navigasi situs Anda.
+              Kelola struktur menu secara <b>Live</b> (Tanpa Approval).
             </p>
           </div>
           <div className="flex gap-2">
@@ -392,7 +378,7 @@ export default function NavigationBuilder() {
 
         {isLoading ? (
           <div className="p-20 text-center">
-            <div className="w-12 h-12 border-4 border-t-daw-green rounded-full animate-spin mx-auto mb-4" />
+            <div className="w-12 h-12 border-4 border-t-emerald-500 rounded-full animate-spin mx-auto mb-4" />
           </div>
         ) : (
           <div className="space-y-1 pb-20">{renderMenuTree(menus)}</div>
@@ -409,18 +395,16 @@ export default function NavigationBuilder() {
               </div>
               <div>
                 <h3 className="text-lg font-bold text-slate-900 leading-none">
-                  {editingId ? "Detail Item Menu" : "Navigasi Menu Baru"}
+                  {editingId ? "Edit Menu Live" : "Navigasi Menu Baru"}
                 </h3>
                 <p className="text-[10px] text-slate-400 uppercase font-black tracking-widest mt-1">
-                  {editingId
-                    ? "Perbarui detail menu yang ada"
-                    : "Membuat menu baru"}
+                  Perubahan langsung tampil di website
                 </p>
               </div>
             </div>
           </div>
 
-          <form className="p-8 space-y-6">
+          <form onSubmit={handleSubmit} className="p-8 space-y-6">
             <div className="space-y-2">
               <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">
                 Nama Label
@@ -432,7 +416,7 @@ export default function NavigationBuilder() {
                 onChange={(e) =>
                   setFormData({ ...formData, label: e.target.value })
                 }
-                className="w-full px-5 py-4 rounded-2xl bg-slate-50 border border-slate-100 focus:bg-white focus:border-daw-green outline-none transition-all font-bold text-slate-700"
+                className="w-full px-5 py-4 rounded-2xl bg-slate-50 border border-slate-100 focus:bg-white focus:border-emerald-500 outline-none transition-all font-bold text-slate-700"
                 placeholder="e.g. Services / Layanan"
               />
             </div>
@@ -483,12 +467,12 @@ export default function NavigationBuilder() {
                   })
                 }
                 className={`p-3 rounded-xl border-2 flex flex-col items-center gap-1.5 transition-all text-center
-                    ${formData.type === "folder" ? "border-daw-green bg-daw-green/5" : "border-slate-100 hover:border-slate-200"}`}>
+                    ${formData.type === "folder" ? "border-emerald-500 bg-emerald-50/30" : "border-slate-100 hover:border-slate-200"}`}>
                 <Folder
-                  className={`w-5 h-5 ${formData.type === "folder" ? "text-daw-green fill-daw-green/20" : "text-slate-400"}`}
+                  className={`w-5 h-5 ${formData.type === "folder" ? "text-emerald-500 fill-emerald-500/20" : "text-slate-400"}`}
                 />
                 <span
-                  className={`text-[9px] font-black uppercase ${formData.type === "folder" ? "text-daw-green" : "text-slate-400"}`}>
+                  className={`text-[9px] font-black uppercase ${formData.type === "folder" ? "text-emerald-700" : "text-slate-400"}`}>
                   Dropdown Folder
                 </span>
               </button>
@@ -539,11 +523,10 @@ export default function NavigationBuilder() {
             )}
 
             {formData.type === "folder" && (
-              <div className="p-4 bg-daw-green/5 border border-daw-green/20 rounded-2xl animate-in fade-in">
-                <p className="text-xs text-daw-green font-medium leading-relaxed">
-                  💡 <strong>Info:</strong> Menu tipe Folder tidak dapat diklik
-                  oleh pengunjung. Tipe ini hanya berfungsi sebagai wadah
-                  (Dropdown) untuk membuka sub-menu di bawahnya.
+              <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-2xl animate-in fade-in">
+                <p className="text-xs text-emerald-700 font-medium leading-relaxed">
+                  💡 <strong>Info:</strong> Menu Folder berfungsi sebagai wadah
+                  untuk sub-menu.
                 </p>
               </div>
             )}
@@ -568,19 +551,19 @@ export default function NavigationBuilder() {
               </select>
             </div>
 
-            {/* ACTION BUTTONS: Sederhana & Tegas */}
+            {/* ACTION BUTTONS (Sovereign Style) */}
             <div className="pt-4 flex flex-col gap-3">
               <div className="flex gap-2">
                 <button
                   type="submit"
                   disabled={isSaving}
-                  className="flex-1 bg-daw-green hover:bg-[#003b1c] text-white py-4 rounded-2xl font-bold shadow-lg shadow-daw-green/20 transition-all flex items-center justify-center gap-2 disabled:opacity-50">
+                  className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white py-4 rounded-2xl font-bold shadow-lg shadow-emerald-600/20 transition-all flex items-center justify-center gap-2 disabled:opacity-50">
                   {editingId ? (
                     <Edit2 className="w-5 h-5" />
                   ) : (
                     <Plus className="w-5 h-5" />
                   )}
-                  {editingId ? "Simpan Perubahan" : "Tambahkan ke Menu"}
+                  {editingId ? "Simpan & Publish" : "Publish Menu Baru"}
                 </button>
 
                 {editingId && (

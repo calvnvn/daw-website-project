@@ -1,7 +1,6 @@
 import { useState, useEffect, useRef, useMemo } from "react";
 import { useParams, Link } from "react-router-dom";
 import { Share2, ChevronRight, AlertTriangle, RefreshCw } from "lucide-react";
-import { Helmet } from "react-helmet-async";
 import DOMPurify from "dompurify";
 import api, { API_URL } from "@/lib/api";
 import ScrollReveal from "@/components/ScrollReveal";

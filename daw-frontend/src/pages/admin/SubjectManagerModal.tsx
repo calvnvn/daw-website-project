@@ -340,15 +340,13 @@ export default function SubjectManagerModal({
                         <div className="flex items-center gap-2">
                           {/* Ikon penanda visual di tabel */}
                           {s.is_redirect ? (
-                            <LinkIcon
-                              className="w-3 h-3 text-blue-500"
-                              title="Redirect Link"
-                            />
+                            <span title="Redirect Link">
+                              <LinkIcon className="w-3 h-3 text-blue-500" />
+                            </span>
                           ) : (
-                            <Mail
-                              className="w-3 h-3 text-emerald-500"
-                              title="Email Routing"
-                            />
+                            <span title="Email Routing">
+                              <Mail className="w-3 h-3 text-emerald-500" />
+                            </span>
                           )}
                           {s.name}
                         </div>
@@ -379,7 +377,7 @@ export default function SubjectManagerModal({
                           Edit
                         </button>
                         <button
-                          onClick={() => handleDelete(s.id)}
+                          onClick={() => handleDelete(s.id, s.name)}
                           className="text-red-500 font-medium hover:underline text-xs">
                           Delete
                         </button>

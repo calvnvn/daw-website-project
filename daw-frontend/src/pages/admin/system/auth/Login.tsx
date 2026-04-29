@@ -5,7 +5,6 @@ import { toast } from "sonner";
 import logoDaw from "@/assets/logo-daw.png";
 import bgImage from "@/assets/hero-bg.jpg";
 import api from "@/lib/api";
-import { Link } from "react-router-dom";
 import { useSettings } from "@/contexts/SettingsContext";
 import { getCleanImageUrl } from "@/lib/utils";
 import { useAuth } from "@/contexts/AuthContext";

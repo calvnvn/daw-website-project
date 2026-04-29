@@ -540,7 +540,7 @@ export default function ProjectManagement() {
                           {isNeedsRevision && project.lock_ticket && (
                             <button
                               onClick={() =>
-                                handleDiscard(project.lock_ticket!)
+                                handleDiscard(project.lock_ticket!, project.id)
                               }
                               className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all"
                               title="Abaikan & Bersihkan Notifikasi Ini">

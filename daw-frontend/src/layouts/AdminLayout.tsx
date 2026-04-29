@@ -19,7 +19,6 @@ import {
   MessageSquare,
   Building2,
   FileText,
-  Key,
   ClipboardCheck,
   ArrowRight,
 } from "lucide-react";
