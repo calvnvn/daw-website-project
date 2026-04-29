@@ -10,7 +10,6 @@ import {
   ShieldAlert,
   LayoutTemplate,
   Code2,
-  RotateCcw,
   Search,
   ChevronRight,
   AlertTriangle,
