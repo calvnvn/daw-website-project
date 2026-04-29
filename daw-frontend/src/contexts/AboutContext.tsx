@@ -8,22 +8,31 @@ import {
   type ReactNode,
 } from "react";
 import api from "@/lib/api";
+import { toast } from "sonner";
 
-export interface PhilosophyPillar {
-  id: string;
+export interface PhilosophyPillar extends Lockable {
+  id: number;
+  iconId: string;
   title: string;
   text: string;
+  orderIndex: number;
 }
 
 export interface Lockable {
   is_locked: boolean;
   lock_ticket?: string | null;
+  hasRejected?: boolean;
 }
 
 export interface AboutData extends Lockable {
+  id?: number;
   spiritText: string;
   missionText: string;
   visionText: string;
+}
+
+export interface PhilosophyData extends Lockable {
+  id?: number;
   philosophyTitle: string;
   philosophyPillars: PhilosophyPillar[];
 }
@@ -46,6 +55,8 @@ export interface ManagementItem extends Lockable {
 
 interface AboutContextType {
   aboutData: AboutData | null;
+  philosophyData: PhilosophyData | null;
+  philosophyPillars: PhilosophyPillar[];
   companyHistory: HistoryItem[];
   managementTeam: ManagementItem[];
   isLoading: boolean;
@@ -54,6 +65,8 @@ interface AboutContextType {
 
 export const AboutContext = createContext<AboutContextType>({
   aboutData: null,
+  philosophyData: null,
+  philosophyPillars: [],
   companyHistory: [],
   managementTeam: [],
   isLoading: true,
@@ -62,37 +75,73 @@ export const AboutContext = createContext<AboutContextType>({
 
 export function AboutProvider({ children }: { children: ReactNode }) {
   const [aboutData, setAboutData] = useState<AboutData | null>(null);
+  const [philosophyData, setPhilosophyData] = useState<PhilosophyData | null>(
+    null,
+  );
+  const [philosophyPillars, setPhilosophyPillars] = useState<
+    PhilosophyPillar[]
+  >([]);
   const [companyHistory, setCompanyHistory] = useState<HistoryItem[]>([]);
   const [managementTeam, setManagementTeam] = useState<ManagementItem[]>([]);
+
   const [isLoading, setIsLoading] = useState(true);
 
   const fetchData = useCallback(async (signal?: AbortSignal) => {
+    setIsLoading(true);
     try {
-      const [resAbout, resHistory, resManagement] = await Promise.allSettled([
-        api.get("/about", { signal }),
-        api.get("/history", { signal }),
-        api.get("/management", { signal }),
-      ]);
+      const [resAbout, resPhilosophy, resPillars, resHistory, resManagement] =
+        await Promise.allSettled([
+          api.get("/about", { signal }),
+          api.get("/philosophy", { signal }),
+          api.get("/philosophy-pillars", { signal }),
+          api.get("/history", { signal }),
+          api.get("/management", { signal }),
+        ]);
 
+      // 1. Process About Info (Visi Misi)
       if (resAbout.status === "fulfilled") {
         setAboutData(resAbout.value.data);
       } else if (resAbout.reason.name !== "CanceledError") {
         console.error("❌ About Data Fetch Failed");
+        toast.error("Gagal memuat Informasi Perusahaan.");
       }
 
+      // 2. Process Philosophy Singleton (Title)
+      if (resPhilosophy.status === "fulfilled") {
+        setPhilosophyData(resPhilosophy.value.data);
+      } else if (resPhilosophy.reason.name !== "CanceledError") {
+        console.error("❌ Philosophy Fetch Failed");
+        toast.error("Gagal memuat Judul Filosofi.");
+      }
+
+      // 3. Process Philosophy Pillars Collection (Granular Rows) 🆕
+      if (resPillars.status === "fulfilled") {
+        setPhilosophyPillars(
+          resPillars.value.data.data || resPillars.value.data,
+        );
+      } else if (resPillars.reason.name !== "CanceledError") {
+        console.error("❌ Philosophy Pillars Fetch Failed");
+        toast.error("Gagal memuat Pilar-pilar Filosofi.");
+      }
+
+      // 4. Process History
       if (resHistory.status === "fulfilled") {
         setCompanyHistory(resHistory.value.data);
       } else if (resHistory.reason.name !== "CanceledError") {
         console.error("❌ History Fetch Failed");
+        toast.error("Gagal memuat Sejarah Perusahaan.");
       }
 
+      // 5. Process Management
       if (resManagement.status === "fulfilled") {
         setManagementTeam(resManagement.value.data);
       } else if (resManagement.reason.name !== "CanceledError") {
         console.error("❌ Management Fetch Failed");
+        toast.error("Gagal memuat Data Manajemen.");
       }
     } catch (err) {
       console.error("🚨 Critical Fetch Error:", err);
+      toast.error("Kesalahan sinkronisasi data kritis.");
     } finally {
       setIsLoading(false);
     }
@@ -116,6 +165,8 @@ export function AboutProvider({ children }: { children: ReactNode }) {
     <AboutContext.Provider
       value={{
         aboutData,
+        philosophyData,
+        philosophyPillars,
         companyHistory,
         managementTeam,
         isLoading,

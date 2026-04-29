@@ -26,7 +26,7 @@ const ProjectManagement = lazy(() => import("./pages/admin/ProjectManagement"));
 const GlobalSettings = lazy(
   () => import("./pages/admin/system/GlobalSettings"),
 );
-const AboutUsManager = lazy(() => import("./pages/admin/AboutUsManager"));
+const AboutUsManager = lazy(() => import("./pages/admin/about/AboutUsManager"));
 const Inbox = lazy(() => import("./pages/admin/Inbox"));
 const HomepageManager = lazy(() => import("./pages/admin/HomePageManager"));
 const UserManagement = lazy(

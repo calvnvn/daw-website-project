@@ -12,11 +12,6 @@ const AboutInfo = sequelize.define(
     spiritText: { type: DataTypes.TEXT },
     missionText: { type: DataTypes.TEXT },
     visionText: { type: DataTypes.TEXT },
-    philosophyTitle: { type: DataTypes.STRING(255) },
-    philosophyPillars: {
-      type: DataTypes.JSON,
-      allowNull: true,
-    },
     is_locked: {
       type: DataTypes.BOOLEAN,
       defaultValue: false,
@@ -25,7 +20,7 @@ const AboutInfo = sequelize.define(
     lock_ticket: {
       type: DataTypes.STRING,
       allowNull: true,
-      comment: "Menyimpan No. Tiket dari OWL yang sedang mengunci data ini",
+      comment: "Menyimpan No. Tiket dari OWL",
     },
   },
   {

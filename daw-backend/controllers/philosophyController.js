@@ -1,30 +1,27 @@
 const sequelize = require("../config/database");
-const AboutInfo = require("../models/AboutInfo");
+const Philosophy = require("../models/Philosophy");
 const ApprovalDraft = require("../models/ApprovalDraft");
 const ErpApprovalService = require("../services/erpApprovalService");
 const { generateNotrans } = require("../utils/notransGenerator");
 
-const MODULE_NAME = "AboutInfo";
-const NOTRANS_PREFIX = "ABT";
+const MODULE_NAME = "Philosophy";
+const NOTRANS_PREFIX = "PHL";
 
-const processAboutPayload = async (req, existingData = {}) => {
-  const { spiritText, missionText, visionText } = req.body;
+const processPhilosophyPayload = async (req, existingData = {}) => {
+  const { philosophyTitle } = req.body;
   return {
     payload: {
-      spiritText:
-        (spiritText !== undefined ? spiritText : existingData.spiritText) || "",
-      missionText:
-        (missionText !== undefined ? missionText : existingData.missionText) ||
-        "",
-      visionText:
-        (visionText !== undefined ? visionText : existingData.visionText) || "",
+      philosophyTitle:
+        (philosophyTitle !== undefined
+          ? philosophyTitle
+          : existingData.philosophyTitle) || "",
     },
   };
 };
 
-exports.getAboutInfo = async (req, res) => {
+exports.getPhilosophy = async (req, res) => {
   try {
-    const info = await AboutInfo.findOne({
+    const data = await Philosophy.findOne({
       where: { id: 1 },
       attributes: {
         include: [
@@ -43,19 +40,18 @@ exports.getAboutInfo = async (req, res) => {
       },
     });
 
-    if (!info) return res.status(404).json({ message: "About info not found" });
+    if (!data)
+      return res.status(404).json({ message: "Philosophy data not found" });
 
-    const formattedInfo = info.toJSON();
-    formattedInfo.hasRejected = !!formattedInfo.hasRejected;
-
-    res.status(200).json(formattedInfo);
+    const formatted = data.toJSON();
+    formatted.hasRejected = !!formatted.hasRejected;
+    res.status(200).json(formatted);
   } catch (error) {
-    console.error("🚨 [GET ABOUT ERROR]:", error.message);
-    res.status(500).json({ message: "Failed to fetch about info" });
+    res.status(500).json({ message: error.message });
   }
 };
 
-exports.updateAboutInfo = async (req, res) => {
+exports.updatePhilosophy = async (req, res) => {
   const t = await sequelize.transaction();
   try {
     const userRole = req.userRole?.toLowerCase().trim();
@@ -64,20 +60,21 @@ exports.updateAboutInfo = async (req, res) => {
       .toLowerCase();
     const { status, previous_notrans } = req.body;
 
-    let info = await AboutInfo.findByPk(1, {
+    let info = await Philosophy.findByPk(1, {
       transaction: t,
       lock: t.LOCK.UPDATE,
     });
-    if (!info) info = await AboutInfo.create({ id: 1 }, { transaction: t });
+    if (!info) info = await Philosophy.create({ id: 1 }, { transaction: t });
 
     if (info.is_locked && userRole === "editor") {
       await t.rollback();
-      return res
-        .status(423)
-        .json({ message: "Data sedang dikunci.", ticket: info.lock_ticket });
+      return res.status(423).json({
+        message: "Philosophy sedang dikunci.",
+        ticket: info.lock_ticket,
+      });
     }
 
-    const { payload } = await processAboutPayload(req, info);
+    const { payload } = await processPhilosophyPayload(req, info);
 
     if (userRole === "editor" && status === "Published") {
       const notrans = await generateNotrans(NOTRANS_PREFIX);
@@ -146,7 +143,7 @@ exports.updateAboutInfo = async (req, res) => {
 
     res
       .status(200)
-      .json({ success: true, message: "About Info updated live." });
+      .json({ success: true, message: "Philosophy updated live." });
   } catch (error) {
     if (t && !t.finished) await t.rollback();
     res.status(500).json({ message: error.message });

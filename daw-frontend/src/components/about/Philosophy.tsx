@@ -3,47 +3,60 @@ import ScrollReveal from "../ScrollReveal";
 import {
   Heart,
   Briefcase,
-  Users,
   Zap,
   Lightbulb,
   CheckCircle,
+  Globe, // Tambahan ikon dari admin
+  Shield, // Tambahan ikon dari admin
+  Star, // Tambahan ikon dari admin
+  Leaf, // Tambahan ikon dari admin
 } from "lucide-react";
 import { useAbout } from "@/contexts/AboutContext";
 
 export default function Philosophy() {
   const { t } = useTranslation();
-  const { aboutData, isLoading } = useAbout();
 
-  // Map Icon
-  const getIconForPillar = (id: string) => {
-    switch (id.toLowerCase()) {
+  // 🚀 REFACTOR: Ambil dari State Terpisah (Blueprint 3.1 & Phase 3)
+  const { philosophyData, philosophyPillars, isLoading } = useAbout();
+
+  // 🚀 REFACTOR: Mapping Icon sekarang berdasarkan iconId, BUKAN id
+  const getIconForPillar = (iconId: string) => {
+    if (!iconId) return <CheckCircle className="w-6 h-6" />;
+
+    switch (iconId.toLowerCase()) {
       case "human":
         return <Heart className="w-6 h-6" />;
       case "ethics":
         return <Briefcase className="w-6 h-6" />;
       case "unity":
-        return <Users className="w-6 h-6" />;
+        return <Globe className="w-6 h-6" />; // Di admin kita pakai Globe, sesuaikan agar konsisten
       case "speed":
         return <Zap className="w-6 h-6" />;
       case "smart":
         return <Lightbulb className="w-6 h-6" />;
+      case "shield":
+        return <Shield className="w-6 h-6" />;
+      case "star":
+        return <Star className="w-6 h-6" />;
+      case "leaf":
+        return <Leaf className="w-6 h-6" />;
       default:
-        return <CheckCircle className="w-6 h-6" />; // Fallback icon jika admin buat id baru
+        return <CheckCircle className="w-6 h-6" />; // Fallback icon jika admin buat iconId baru yang blm kedaftar
     }
   };
 
   if (isLoading)
     return <div className="animate-pulse h-64 bg-slate-100 rounded-xl"></div>;
 
-  const pillarsToRender = aboutData?.philosophyPillars?.length
-    ? aboutData.philosophyPillars
-    : [];
+  // 🚀 REFACTOR: Gunakan state Collection baru
+  const pillarsToRender = philosophyPillars?.length ? philosophyPillars : [];
 
   return (
     <div>
       <ScrollReveal direction="up" delay={0}>
         <h2 className="font-serif text-4xl text-slate-900 mb-10">
-          {aboutData?.philosophyTitle || t("about.philosophy.title")}
+          {/* 🚀 REFACTOR: Gunakan data singleton baru */}
+          {philosophyData?.philosophyTitle || t("about.philosophy.title")}
         </h2>
       </ScrollReveal>
 
@@ -52,10 +65,10 @@ export default function Philosophy() {
           {pillarsToRender.map((pillar) => (
             <div
               key={pillar.id}
-              className="p-8 border border-slate-100 bg-slate-50/50 rounded-2xl hover:shadow-[0_8px_30px_rgba(0,0,0,0.04)] hover:border-daw-green/20 hover:bg-white transition-all duration-500 h-full"
-            >
-              <div className="w-12 h-12 flex items-center justify-center rounded-full bg-daw-green/10 text-daw-green mb-6">
-                {getIconForPillar(pillar.id)}
+              className="p-8 border border-slate-100 bg-slate-50/50 rounded-2xl hover:shadow-[0_8px_30px_rgba(0,0,0,0.04)] hover:border-daw-green/20 hover:bg-white transition-all duration-500 h-full flex flex-col">
+              <div className="w-12 h-12 flex items-center justify-center rounded-full bg-daw-green/10 text-daw-green mb-6 shrink-0">
+                {/* 🚀 REFACTOR: Kirim iconId ke function renderer */}
+                {getIconForPillar(pillar.iconId)}
               </div>
               <h3 className="font-serif text-xl font-bold text-slate-900 mb-4">
                 {pillar.title}

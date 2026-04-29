@@ -20,18 +20,29 @@ const History = sequelize.define(
     is_locked: {
       type: DataTypes.BOOLEAN,
       defaultValue: false,
-      comment: "Status apakah data sedang dalam proses approval",
     },
     lock_ticket: {
       type: DataTypes.STRING,
       allowNull: true,
-      comment: "Menyimpan No. Tiket dari OWL yang sedang mengunci data ini",
     },
   },
   {
     tableName: "Histories",
     freezeTableName: true,
     timestamps: true,
+    hooks: {
+      beforeBulkUpdate: (options) => {
+        if (options.where && options.where.id === "ALL_TIMELINE") {
+          console.log(
+            "🚀 [HISTORY HOOK] Intercepting 'ALL_TIMELINE' lock request...",
+          );
+
+          options.where = {};
+
+          options.limit = null;
+        }
+      },
+    },
   },
 );
 

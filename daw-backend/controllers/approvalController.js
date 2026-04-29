@@ -10,7 +10,8 @@ const MapCategory = require("../models/MapCategory");
 const BusinessSection = require("../models/BusinessSection");
 const BusinessMapMarker = require("../models/BusinessMapMarker");
 const ApprovalDraft = require("../models/ApprovalDraft");
-
+const Philosophy = require("../models/Philosophy");
+const PhilosophyPillar = require("../models/PhilosophyPillar");
 const HeroSlides = require("../models/HeroSlides");
 const History = require("../models/History");
 const HomeSettings = require("../models/HomeSettings");
@@ -473,6 +474,8 @@ const MODEL_MAPPING = {
   InvestmentSettings,
   Settings,
   AboutInfo,
+  Philosophy,
+  PhilosophyPillar,
 };
 
 function getModelByModuleName(moduleName) {

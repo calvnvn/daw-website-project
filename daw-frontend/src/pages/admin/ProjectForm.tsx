@@ -790,7 +790,7 @@ export default function ProjectForm() {
           {isEditor && !shouldLockUI && !isSaving && (
             <p className="text-[10px] text-blue-500 font-bold mt-1 flex items-center gap-1 animate-in slide-in-from-top-1">
               <span className="w-1.5 h-1.5 bg-blue-500 rounded-full animate-pulse"></span>
-              Pembaruan harus disetujui Manajer.
+              Pembaruan harus disetujui.
             </p>
           )}
         </div>

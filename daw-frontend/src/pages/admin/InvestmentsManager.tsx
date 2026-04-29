@@ -605,8 +605,8 @@ export default function InvestmentsManager() {
               Akses Dibatasi
             </h4>
             <p className="text-xs text-blue-700 leading-relaxed mt-0.5">
-              Data pada halaman ini sedang ditinjau oleh Manajer. Anda tidak
-              dapat melakukan perubahan hingga proses selesai.
+              Data pada halaman ini sedang ditinjau. Anda tidak dapat melakukan
+              perubahan hingga proses selesai.
             </p>
           </div>
         </div>

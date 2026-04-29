@@ -1,111 +1,144 @@
 const sequelize = require("../config/database");
-const { ErpApprovalService } = require("../services/erpApprovalService");
+const ErpApprovalService = require("../services/erpApprovalService");
 const History = require("../models/History");
 const ApprovalDraft = require("../models/ApprovalDraft");
 const { invalidateOldDrafts } = require("../utils/draftCleanup");
+const { generateNotrans } = require("../utils/notransGenerator");
 
-// Memastikan mapping data dari frontend aman sebelum masuk transaksi.
-const processHistoryPayload = async (req) => {
+const MODULE_NAME = "History";
+const NOTRANS_PREFIX = "HIS";
+const TARGET_ID = "ALL_TIMELINE";
+
+const processHistoryPayload = (req) => {
   const { histories } = req.body;
 
-  const cleanHistories = Array.isArray(histories)
-    ? histories.map((item) => ({
-        year: item.year,
-        description: item.text || item.description || "",
-      }))
-    : [];
+  if (!Array.isArray(histories)) return { histories: [] };
 
-  return {
-    payload: { histories: cleanHistories },
-    filesToDelete: [],
-  };
+  const cleanHistories = histories.map((item) => ({
+    year: String(item.year || "").trim(),
+    description: (item.text || item.description || "").trim(),
+  }));
+
+  return { histories: cleanHistories };
 };
 
-// GET: Fetch all history milestones
 exports.getHistories = async (req, res) => {
   try {
     const histories = await History.findAll({
-      attributes: ["id", "year", "description", "is_locked", "lock_ticket"],
+      attributes: {
+        include: [
+          [
+            sequelize.literal(`(
+              SELECT COUNT(*) > 0 
+              FROM ApprovalDrafts 
+              WHERE target_id = '${TARGET_ID}' COLLATE utf8mb4_unicode_ci 
+              AND module_name = '${MODULE_NAME}' 
+              AND status = 'Rejected'
+            )`),
+            "hasRejected",
+          ],
+        ],
+      },
       order: [["year", "ASC"]],
     });
-    res.status(200).json(histories);
+
+    const formatted = histories.map((h) => {
+      const item = h.toJSON();
+      item.hasRejected = !!item.hasRejected;
+      return item;
+    });
+
+    res.status(200).json(formatted);
   } catch (error) {
-    console.error("🚨 [GET HISTORY ERROR]:", error.message);
-    res
-      .status(500)
-      .json({ message: "Gagal mengambil data sejarah perusahaan." });
+    res.status(500).json({ message: "Gagal memuat timeline sejarah." });
   }
 };
 
-// MAIN FUNCTION: Bulk Update Timeline
 exports.updateHistories = async (req, res) => {
   const t = await sequelize.transaction();
   try {
+    const actorId = String(req.owl_username || req.karyawanId || "")
+      .trim()
+      .toLowerCase();
     const userRole = req.userRole?.toLowerCase().trim();
-    const { status, previous_notrans } = req.body;
+    const { status } = req.body;
 
-    // Memakai t.LOCK.UPDATE agar 2 Editor tidak bentrok saat mengeklik bersamaan
-    const lockedMilestone = await History.findOne({
+    const lockedRow = await History.findOne({
       where: { is_locked: true },
       transaction: t,
       lock: t.LOCK.UPDATE,
     });
 
-    if (lockedMilestone && userRole === "editor") {
+    if (lockedRow && userRole === "editor") {
       await t.rollback();
       return res.status(423).json({
-        message: "Timeline sedang dalam peninjauan OWL dan tidak dapat diubah.",
-        ticket: lockedMilestone.lock_ticket,
+        message: "Timeline sedang dikunci oleh proses approval aktif.",
+        ticket: lockedRow.lock_ticket,
       });
     }
 
-    // B. PROCESSING: Jalankan Helper
-    const { payload } = await processHistoryPayload(req);
+    const payload = processHistoryPayload(req);
 
+    // JALUR 1: EDITOR (Birokrasi / Baton Pass)
     if (userRole === "editor" && status === "Published") {
-      if (previous_notrans) {
-        await ApprovalDraft.update(
-          { status: "Replaced" },
-          { where: { notrans: previous_notrans }, transaction: t },
-        );
-      }
+      const notrans = await generateNotrans(NOTRANS_PREFIX);
 
-      const result = await ErpApprovalService.initiateApproval({
-        moduleName: "History",
-        model: History,
-        targetId: "ALL_TIMELINE",
-        action: "BULK_UPDATE",
-        payload: { ...payload, status: "Published" },
-        userId: req.userId,
-        owlUsername: req.owl_username,
-        karyawanId: req.karyawanId,
-        token: req.owl_token,
-        transaction: t,
-      });
+      await invalidateOldDrafts(TARGET_ID, MODULE_NAME, t);
+
+      await ApprovalDraft.create(
+        {
+          notrans,
+          module_name: MODULE_NAME,
+          target_id: TARGET_ID,
+          action: "UPDATE",
+          payload,
+          created_by: actorId,
+          status: "Pending",
+        },
+        { transaction: t },
+      );
 
       await History.update(
-        { is_locked: true, lock_ticket: result.notrans },
+        { is_locked: true, lock_ticket: notrans },
         { where: {}, transaction: t },
       );
 
       await t.commit();
-      return res.status(202).json({
-        message: "Draf revisi timeline berhasil diajukan.",
-        ticket: result.notrans,
-      });
+
+      try {
+        await ErpApprovalService.initiateApproval({
+          notrans,
+          moduleName: MODULE_NAME,
+          karyawanId: req.karyawanId,
+          token: req.headers["authorization"]?.split(" ")[1] || req.owl_token,
+        });
+      } catch (e) {
+        console.error(
+          `[SYNC WARNING] Ticket ${notrans} registered locally but ERP sync failed.`,
+        );
+      }
+
+      return res.status(202).json({ success: true, ticket: notrans });
     }
 
-    // JALUR 2: SUPERADMIN / ADMIN (Direct Execution)
-    if (userRole === "superadmin" || userRole === "admin") {
-      await invalidateOldDrafts("History", "ALL_TIMELINE", t);
-    }
+    // ADMIN (Direct Commit / Bypass)
+    await ApprovalDraft.update(
+      { status: "Obsolete" },
+      {
+        where: {
+          module_name: MODULE_NAME,
+          target_id: TARGET_ID,
+          status: ["Pending", "Rejected"],
+        },
+        transaction: t,
+      },
+    );
 
     await History.destroy({ where: {}, transaction: t });
 
     if (payload.histories.length > 0) {
-      const historyData = payload.histories.map((item) => ({
-        year: item.year,
-        description: item.description,
+      const historyData = payload.histories.map((h) => ({
+        ...h,
         is_locked: false,
         lock_ticket: null,
       }));
@@ -113,14 +146,11 @@ exports.updateHistories = async (req, res) => {
     }
 
     await t.commit();
-    res.status(200).json({
-      message: "Timeline perusahaan berhasil diperbarui secara permanen!",
-    });
+    return res
+      .status(200)
+      .json({ success: true, message: "Timeline diperbarui secara live." });
   } catch (error) {
     if (t && !t.finished) await t.rollback();
-    console.error("🚨 [UPDATE HISTORY ERROR]:", error.message);
-    res
-      .status(500)
-      .json({ message: "Terjadi kesalahan sistem.", error: error.message });
+    res.status(500).json({ message: error.message });
   }
 };

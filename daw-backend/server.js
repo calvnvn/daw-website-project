@@ -29,6 +29,8 @@ const menuRoutes = require("./routes/menuRoutes");
 const sitemapRoutes = require("./routes/sitemapRoutes");
 const mapCategoryRoutes = require("./routes/mapCategoryRoutes");
 const approvalRoutes = require("./routes/approvalRoutes");
+const philosophyRoutes = require("./routes/philosophyRoutes");
+const philosophyPillarRoutes = require("./routes/philosophyPillarRoutes");
 
 // 3. MODELS IMPORT
 const User = require("./models/User");
@@ -118,6 +120,8 @@ app.use("/api/map-categories", mapCategoryRoutes);
 app.use("/api/pages", pageRoutes);
 app.use("/api/menus", menuRoutes);
 app.use("/api/approval", approvalRoutes);
+app.use("/api/philosophy", philosophyRoutes);
+app.use("/api/philosophy-pillars", philosophyPillarRoutes);
 app.use("/", sitemapRoutes);
 
 // Base Health Check Route
