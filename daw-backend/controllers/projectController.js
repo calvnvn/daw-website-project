@@ -497,6 +497,7 @@ exports.getPublicProjects = async (req, res) => {
   try {
     const projects = await Project.findAll({
       where: { status: "Published" },
+      attributes: ["id", "title", "slug", "excerpt", "category", "cover_image"],
       order: [["createdAt", "DESC"]],
     });
     res.status(200).json(projects);
