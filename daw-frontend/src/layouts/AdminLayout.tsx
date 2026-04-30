@@ -157,8 +157,17 @@ export default function AdminLayout() {
   const isParamId = (path: string) => path.length > 20 || !isNaN(Number(path));
 
   useEffect(() => {
-    // 1. Fungsi fetcher yang bisa dipanggil berulang kali
+    setIsNotifOpen(false);
+    setIsMobileMenuOpen(false);
+  }, [location.pathname]); // Hanya bergantung pada rute
+
+  // 2. LOGIKA POLLING: Hanya dijalankan sekali saat komponen di-mount
+  useEffect(() => {
+    // Pastikan user sudah login sebelum memanggil API
+    if (!user) return;
+
     const fetchNotifications = async () => {
+      // Gunakan try-catch per-block agar jika salah satu gagal, yang lain tetap jalan
       if (can("manage_inbox")) {
         try {
           const response = await api.get("/inquiries");
@@ -169,7 +178,7 @@ export default function AdminLayout() {
             setUnreadInquiries(unread);
           }
         } catch (error) {
-          console.error("Failed to fetch notifications:", error);
+          console.error("Failed to fetch inbox notifications:", error);
         }
       }
 
@@ -179,31 +188,21 @@ export default function AdminLayout() {
           const rows = response.data?.data?.rows || [];
           setUnreadApprovals(rows);
         } catch (error) {
-          console.error("Approval fetch failed", error);
+          console.error("Failed to fetch approval notifications:", error);
         }
       }
     };
 
-    setIsNotifOpen(false);
-    setIsMobileMenuOpen(false);
+    // Panggil langsung saat komponen pertama kali dimuat
     fetchNotifications();
 
-    const interval = setInterval(
-      () => {
-        fetchNotifications();
-      },
-      1000 * 60 * 2,
-    ); // 2 menit
+    // Set interval setiap 2 menit, tidak peduli user pindah halaman atau tidak
+    const interval = setInterval(fetchNotifications, 1000 * 60 * 2);
 
-    // 5. CLEANUP FUNCTION (Sangat Penting!)
     return () => clearInterval(interval);
-  }, [location.pathname, user, can]);
-
-  // const userData = JSON.parse(localStorage.getItem("daw_user") || "{}");
+  }, [user, can]); // Hanya bergantung pada identitas user dan permission
 
   const executeLogout = () => {
-    // localStorage.removeItem("daw_token");
-    // localStorage.removeItem("daw_user");
     setIsLogoutModalOpen(false);
     logout();
   };

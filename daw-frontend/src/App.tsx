@@ -2,14 +2,12 @@ import { Routes, Route } from "react-router-dom";
 import { lazy, Suspense } from "react";
 import { Toaster } from "sonner";
 import { AuthProvider } from "./contexts/AuthContext";
-import { ContentProvider } from "@/contexts/ContentContext";
-
-import MainLayout from "./layouts/MainLayout";
-import AdminLayout from "./layouts/AdminLayout";
 import ProtectedRoute from "./components/ProtectedRoute";
-import ApprovalCenter from "./pages/admin/approvals/ApprovalCenter";
 
-// Lazy Import Public Frontend
+const MainLayout = lazy(() => import("./layouts/MainLayout"));
+const AdminLayout = lazy(() => import("./layouts/AdminLayout"));
+
+// --- Lazy Import Public Frontend ---
 const Home = lazy(() => import("./pages/public/Home"));
 const AboutUs = lazy(() => import("./pages/public/AboutUs"));
 const OurBusinesses = lazy(() => import("./pages/public/OurBusinesses"));
@@ -18,10 +16,10 @@ const ProjectDetail = lazy(() => import("./pages/public/ProjectDetail"));
 const DynamicPage = lazy(() => import("./pages/public/DynamicPage"));
 const NotFound = lazy(() => import("./pages/public/NotFound"));
 
-// Lazy Import Auth
+// --- Lazy Import Auth ---
 const Login = lazy(() => import("./pages/admin/system/auth/Login"));
 
-// Lazy Import Admin Dashboard
+// --- Lazy Import Admin Dashboard ---
 const Dashboard = lazy(() => import("./pages/admin/Dashboard"));
 const ProjectManagement = lazy(() => import("./pages/admin/ProjectManagement"));
 const GlobalSettings = lazy(
@@ -39,13 +37,28 @@ const InvestmentsManager = lazy(
 const ManageBusinesses = lazy(
   () => import("./pages/admin/business/ManageBusinesses"),
 );
-const ContentManager = lazy(
-  () => import("./pages/admin/content/ContentManager"),
-);
 const ProjectForm = lazy(() => import("./pages/admin/ProjectForm"));
 const RoleManagement = lazy(
   () => import("./pages/admin/system/RoleManagement"),
 );
+const ApprovalCenter = lazy(
+  () => import("./pages/admin/approvals/ApprovalCenter"),
+);
+
+const ContentManagerWrapper = lazy(async () => {
+  const [ContentContextModule, ContentManagerModule] = await Promise.all([
+    import("@/contexts/ContentContext"),
+    import("./pages/admin/content/ContentManager"),
+  ]);
+
+  return {
+    default: () => (
+      <ContentContextModule.ContentProvider>
+        <ContentManagerModule.default />
+      </ContentContextModule.ContentProvider>
+    ),
+  };
+});
 
 const PageLoader = () => (
   <div className="flex h-screen w-full items-center justify-center bg-slate-50">
@@ -57,9 +70,10 @@ function App() {
   return (
     <AuthProvider>
       <Toaster position="top-center" richColors />
+      {/* Suspense utama untuk Layout Level */}
       <Suspense fallback={<PageLoader />}>
         <Routes>
-          {/* Public Routes */}
+          {/* PUBLIC ROUTES (Ringan & Cepat) */}
           <Route element={<MainLayout />}>
             <Route path="/" element={<Home />} />
             <Route path="/about" element={<AboutUs />} />
@@ -70,10 +84,10 @@ function App() {
             <Route path="*" element={<NotFound />} />
           </Route>
 
-          {/* Authentication Route (SSO OWL) */}
+          {/* AUTH ROUTES */}
           <Route path="/admin/login" element={<Login />} />
 
-          {/* Admin Routes (Protected) */}
+          {/* ADMIN ROUTES */}
           <Route element={<ProtectedRoute />}>
             <Route path="/admin" element={<AdminLayout />}>
               <Route index element={<Dashboard />} />
@@ -85,14 +99,7 @@ function App() {
               </Route>
 
               <Route element={<ProtectedRoute permission="manage_content" />}>
-                <Route
-                  path="content"
-                  element={
-                    <ContentProvider>
-                      <ContentManager />
-                    </ContentProvider>
-                  }
-                />
+                <Route path="content" element={<ContentManagerWrapper />} />
               </Route>
 
               <Route element={<ProtectedRoute permission="manage_settings" />}>

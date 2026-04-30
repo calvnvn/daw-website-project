@@ -115,11 +115,13 @@ export default function DynamicNavbar() {
           <Link to="/" onClick={closeMenu} className="flex items-center gap-3">
             <img
               src={displayLogo}
-              alt={settings?.companyName || "DAW Logo"}
+              alt={settings?.companyName || "PT Dharma Agung Wijaya"}
+              width="180"
+              height="56"
+              fetchPriority="high"
+              loading="eager"
               className={`w-auto transition-all duration-300 object-contain ${
-                isScrolled
-                  ? "h-12 lg:h-14" // SAAT SCROLL (Sangat Ramping)
-                  : "h-12 lg:h-14" // SAAT DI ATAS (Proporsional)
+                isScrolled ? "h-12 lg:h-14" : "h-12 lg:h-14"
               } ${isTransparent ? "brightness-0 invert" : ""}`}
             />
           </Link>
