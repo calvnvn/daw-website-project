@@ -72,10 +72,24 @@ export default function ProjectDetail() {
   // 6. CONTENT NORMALIZATION
   const cleanContent = useMemo(() => {
     if (!project?.content) return "";
-    return project.content.replace(
-      /src="https?:\/\/(localhost:5000|localhost:5550|172\.30\.1\.20:5550)\/uploads\//g,
-      'src="/uploads/',
-    );
+
+    // 🚀 Trik: Ambil origin backend saja (tanpa /api)
+    // Jika VITE_API_URL adalah http://localhost:5550/api
+    // Kita hanya butuh http://localhost:5550
+    const apiUrl = import.meta.env.VITE_API_URL || "http://localhost:5550";
+    const baseHost = apiUrl.replace(/\/api$/, "");
+
+    return project.content
+      .replace(/src="[^"]*\\uploads\\/g, `src="${baseHost}/uploads/`)
+
+      .replace(/src="\/uploads\//g, `src="${baseHost}/uploads/`)
+
+      .replace(/src="\/api\/uploads\//g, `src="${baseHost}/uploads/`)
+
+      .replace(
+        /src="https?:\/\/(localhost:5000|localhost:5550|172\.30\.1\.20:5550)\/(api\/)?uploads\//g,
+        `src="${baseHost}/uploads/`,
+      );
   }, [project?.content]);
 
   // SCROLL EVENT LISTENERS
