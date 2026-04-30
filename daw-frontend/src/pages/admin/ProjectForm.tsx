@@ -13,12 +13,10 @@ import {
   Send,
   X,
   Link as LinkIcon,
-  Plus,
   AlertTriangle,
   LockIcon,
   Loader2,
   AlertCircle,
-  Clock,
   RotateCcw,
 } from "lucide-react";
 import { useDropzone } from "react-dropzone";

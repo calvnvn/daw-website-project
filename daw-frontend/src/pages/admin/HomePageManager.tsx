@@ -5,7 +5,6 @@ import {
   BarChart3,
   Lock,
   AlertTriangle,
-  ShieldCheck,
 } from "lucide-react";
 import { useHome } from "@/contexts/HomeContext";
 import { useAuth } from "@/contexts/AuthContext";
