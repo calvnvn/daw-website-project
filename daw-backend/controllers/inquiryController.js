@@ -1,6 +1,6 @@
 const Inquiry = require("../models/Inquiry");
 const InquirySubject = require("../models/InquirySubject");
-const transporter = require("../utils/mailer");
+const { transporter } = require("../utils/mailer");
 const Settings = require("../models/Settings");
 
 exports.submitInquiry = async (req, res) => {
