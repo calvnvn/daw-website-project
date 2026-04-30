@@ -658,11 +658,10 @@ export default function ProjectForm() {
   }
 
   return (
-    <div className="max-w-7xl mx-auto animate-in fade-in duration-500">
-      {/* ⚠️ 1. SOVEREIGN BYPASS BANNER (Khusus Superadmin) */}
-      {/* Menandakan bahwa Admin sedang melihat data yang sedang dikunci oleh antrean Editor, dan memberikan otoritas untuk membatalkannya. */}
+    <div className="max-w-7xl mx-auto animate-in fade-in duration-500 pb-24">
+      {/* ⚠️ 1. SOVEREIGN BYPASS BANNER */}
       {isOverrideMode && (
-        <div className="mb-6 bg-amber-50 border border-amber-200 p-4 rounded-xl flex items-center gap-4 animate-in slide-in-from-top-4 shadow-sm">
+        <div className="mb-6 bg-amber-50 border border-amber-200 p-4 rounded-xl flex items-center gap-4 shadow-sm">
           <div className="bg-amber-100 p-2 rounded-full text-amber-600 shrink-0">
             <AlertTriangle className="w-5 h-5" />
           </div>
@@ -681,14 +680,13 @@ export default function ProjectForm() {
         </div>
       )}
 
-      {/* 2. LOCKED BANNER (Khusus Editor) */}
-      {/* Jika data terkunci, Editor akan melihat peringatan dan seluruh input di bawahnya akan dinonaktifkan. */}
+      {/* 🔒 2. LOCKED BANNER */}
       {shouldLockUI && (
         <div
           className={`mb-6 p-4 rounded-xl flex items-center gap-4 shadow-sm ${
             formData.lock_ticket?.includes("DEL")
-              ? "bg-rose-50 border border-rose-200 animate-pulse" // Merah redup kalau mau dihapus
-              : "bg-blue-50 border border-blue-200" // Biru kalau update biasa
+              ? "bg-rose-50 border border-rose-200 animate-pulse"
+              : "bg-blue-50 border border-blue-200"
           }`}>
           <div
             className={`p-2 rounded-full shrink-0 ${formData.lock_ticket?.includes("DEL") ? "bg-rose-100 text-rose-600" : "bg-blue-100 text-blue-600"}`}>
@@ -711,190 +709,153 @@ export default function ProjectForm() {
         </div>
       )}
 
-      {/* --- TOOLBAR HEADER --- */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white p-6 rounded-xl border border-slate-200 shadow-sm top-0 z-20 mb-6">
-        {/* Kiri: Navigasi & Judul */}
+      {/* ⚠️ 3. RECOVERY BANNER */}
+      {showDraftBanner && rejectedDraft && (
+        <div className="mb-6 bg-amber-50 border border-amber-200 rounded-2xl p-5 flex flex-col md:flex-row items-start md:items-center justify-between gap-4 shadow-sm">
+          <div className="flex items-start gap-4">
+            <div className="p-3 bg-amber-100 rounded-xl text-amber-600 shrink-0">
+              <AlertTriangle className="w-6 h-6" />
+            </div>
+            <div>
+              <h4 className="text-sm font-bold text-amber-900 mb-1">
+                ⚠️ Catatan Peninjau
+              </h4>
+              <p className="text-xs text-amber-700 leading-relaxed font-bold italic">
+                "
+                {rejectedDraft.rejection_reason ||
+                  "Revisi Anda memerlukan perbaikan lanjutan."}
+                "
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            {rejectedDraft.action !== "DELETE" && (
+              <button
+                type="button"
+                onClick={handleRestoreDraft}
+                disabled={isRestoring || shouldLockUI}
+                className="flex items-center justify-center gap-2 bg-amber-600 hover:bg-amber-700 text-white px-5 py-2.5 rounded-xl text-xs font-bold transition-all shadow-sm">
+                <RotateCcw
+                  className={`w-4 h-4 ${isRestoring ? "animate-spin" : ""}`}
+                />
+                Pulihkan Data
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={handleDiscardDraft}
+              className="flex items-center justify-center gap-2 bg-white border border-amber-200 text-amber-600 hover:bg-amber-100 px-4 py-2.5 rounded-xl text-xs font-bold transition-all shadow-sm">
+              <X className="w-4 h-4" /> Abaikan
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* --- STICKY TOOLBAR HEADER --- */}
+      <div className="sticky top-4 z-40 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white/90 backdrop-blur-xl p-5 rounded-2xl border border-slate-200 shadow-sm mb-8 transition-all">
         <div className="flex items-center gap-4">
           <button
             onClick={() => navigate("/admin/projects")}
-            className="p-2 hover:bg-slate-50 rounded-lg transition-all border border-transparent hover:border-slate-200 shadow-sm">
-            <ArrowLeft className="w-5 h-5 text-slate-500" />
+            className="p-2 bg-slate-50 hover:bg-slate-100 text-slate-500 rounded-lg transition-all border border-slate-200 shadow-sm">
+            <ArrowLeft className="w-5 h-5" />
           </button>
           <div>
-            <h1 className="text-xl font-serif font-bold text-slate-900">
-              {isEditMode ? "Edit Proyek" : "Buat Proyek Baru"}
+            <h1 className="text-lg font-bold text-slate-900 leading-none">
+              {isEditMode ? "Edit Dokumen Proyek" : "Dokumen Proyek Baru"}
             </h1>
-            {/* Slug Intelligence: Menampilkan pratinjau URL yang ramah SEO secara real-time berdasarkan judul. */}
             {formData.title && (
-              <p className="text-[10px] font-mono text-slate-400 uppercase tracking-tighter mt-1 flex items-center gap-1">
-                <LinkIcon className="w-2.5 h-2.5" /> daw.co.id/page/
+              <p className="text-[11px] font-mono text-slate-400 mt-1 flex items-center gap-1">
+                <LinkIcon className="w-3 h-3" /> daw.co.id/projects/
                 {generatedSlug}
               </p>
             )}
           </div>
         </div>
 
-        {/* Kanan: ACTION BUTTONS (Dynamic Labeling) */}
-        <div className="flex flex-col items-end gap-1 w-full sm:w-auto">
-          <div className="flex gap-3 w-full sm:w-auto">
-            <button
-              type="button"
-              onClick={() => handleSave("Draft")}
-              disabled={isSaving || shouldLockUI || !can("manage_projects")}
-              className="px-5 py-2 bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 rounded-lg font-bold text-sm shadow-sm transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center">
-              <Save className="w-4 h-4 mr-2 text-slate-400" />
-              Simpan Draf Lokal
-            </button>
+        <div className="flex gap-3 w-full sm:w-auto">
+          <button
+            type="button"
+            onClick={() => handleSave("Draft")}
+            disabled={isSaving || shouldLockUI || !can("manage_projects")}
+            className="px-5 py-2.5 bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 hover:border-slate-300 rounded-xl font-bold text-[13px] shadow-sm transition-all disabled:opacity-50 flex items-center gap-2">
+            <Save className="w-4 h-4 text-slate-400" /> Simpan Draf
+          </button>
 
-            {/* Tombol Utama berubah warna dan label sesuai konteks Otoritas (Admin vs Editor) */}
-            <button
-              type="button"
-              onClick={() => handleSave("Published")}
-              disabled={isSaving || shouldLockUI || !can("manage_projects")}
-              className={`px-5 py-2 text-white rounded-lg font-bold text-sm transition-all shadow-sm active:scale-95 disabled:cursor-not-allowed flex items-center justify-center gap-2 ${
-                isSaving
-                  ? "bg-slate-300 text-slate-700"
-                  : shouldLockUI
-                    ? "bg-slate-200 text-slate-500"
-                    : isOverrideMode
-                      ? "bg-amber-600 hover:bg-amber-700" // Warna khusus untuk peringatan Bypass Admin
-                      : isSuperadmin
-                        ? "bg-daw-green hover:bg-[#003b1c]"
-                        : "bg-blue-600 hover:bg-blue-700" // Warna khusus untuk Editor (Request Approval)
-              }`}>
-              {isSaving ? (
-                <>
-                  <Loader2 className="w-4 h-4 animate-spin" /> Memproses...
-                </>
-              ) : shouldLockUI ? (
-                <>
-                  <LockIcon className="w-4 h-4" /> Akses Terbatas
-                </>
-              ) : isOverrideMode ? (
-                <>
-                  <AlertCircle className="w-4 h-4" /> Override & Publish
-                </>
-              ) : isSuperadmin ? (
-                <>
-                  <Save className="w-4 h-4" /> Publish Live
-                </>
-              ) : (
-                <>
-                  <Send className="w-4 h-4" /> Request Approval
-                </>
-              )}
-            </button>
-          </div>
+          <button
+            type="button"
+            onClick={() => handleSave("Published")}
+            disabled={isSaving || shouldLockUI || !can("manage_projects")}
+            className={`px-6 py-2.5 text-white rounded-xl font-bold text-[13px] transition-all shadow-sm flex items-center gap-2 ${
+              isSaving
+                ? "bg-slate-300"
+                : shouldLockUI
+                  ? "bg-slate-200 text-slate-500"
+                  : isOverrideMode
+                    ? "bg-amber-600 hover:bg-amber-700"
+                    : isSuperadmin
+                      ? "bg-daw-green hover:bg-[#003b1c]"
+                      : "bg-blue-600 hover:bg-blue-700"
+            }`}>
+            {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
+            {!isSaving && shouldLockUI && <LockIcon className="w-4 h-4" />}
+            {!isSaving && !shouldLockUI && isOverrideMode && (
+              <AlertCircle className="w-4 h-4" />
+            )}
+            {!isSaving && !shouldLockUI && !isOverrideMode && isSuperadmin && (
+              <Send className="w-4 h-4" />
+            )}
+            {!isSaving && !shouldLockUI && !isOverrideMode && !isSuperadmin && (
+              <Send className="w-4 h-4" />
+            )}
 
-          {/* Hint visual untuk Editor agar tahu bahwa tombol biru tidak akan mempublikasikan data secara instan */}
-          {isEditor && !shouldLockUI && !isSaving && (
-            <p className="text-[10px] text-blue-500 font-bold mt-1 flex items-center gap-1 animate-in slide-in-from-top-1">
-              <span className="w-1.5 h-1.5 bg-blue-500 rounded-full animate-pulse"></span>
-              Pembaruan harus disetujui.
-            </p>
-          )}
+            {isSaving
+              ? "Memproses..."
+              : shouldLockUI
+                ? "Terkunci"
+                : isOverrideMode
+                  ? "Override & Publish"
+                  : isSuperadmin
+                    ? "Publikasikan"
+                    : "Ajukan Persetujuan"}
+          </button>
         </div>
       </div>
 
-      {/* ⚠️ 3. RECOVERY BANNER (DRAF DITOLAK) */}
-      {/* Banner ini dipicu jika Backend mengembalikan object 'rejectedDraft' yang valid */}
-      {showDraftBanner && rejectedDraft && (
-        <div className="mb-8 animate-in fade-in slide-in-from-top-4 duration-500">
-          <div className="bg-amber-50 border border-amber-200 rounded-2xl overflow-hidden shadow-sm">
-            <div className="p-5 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
-              <div className="flex items-start gap-4">
-                <div className="p-3 bg-amber-100 rounded-xl text-amber-600 shrink-0">
-                  <AlertTriangle className="w-6 h-6" />
-                </div>
-                <div>
-                  <h4 className="text-sm font-bold text-amber-900 mb-1">
-                    ⚠️ Catatan Peninjau
-                  </h4>
-                  <p className="text-xs text-amber-700 leading-relaxed max-w-2xl font-bold italic">
-                    "
-                    {rejectedDraft.rejection_reason ||
-                      "Revisi Anda memerlukan perbaikan lanjutan."}
-                    "
-                  </p>
-                  <div className="mt-2 flex items-center gap-2 text-[10px] text-amber-500 font-medium">
-                    <Clock className="w-3 h-3" />
-                    Ditolak pada{" "}
-                    {new Date(rejectedDraft.updatedAt).toLocaleString("id-ID", {
-                      day: "numeric",
-                      month: "long",
-                      hour: "2-digit",
-                      minute: "2-digit",
-                    })}
-                  </div>
-                </div>
-              </div>
-
-              {/* RECOVERY ACTIONS */}
-              <div className="flex items-center gap-2 w-full md:w-auto shrink-0">
-                {/* Opsi 1: Restoration Logic - Memuat ulang payload JSON ke dalam form */}
-                {rejectedDraft.action !== "DELETE" && (
-                  <button
-                    type="button"
-                    onClick={handleRestoreDraft}
-                    disabled={isRestoring || shouldLockUI}
-                    className="flex items-center justify-center gap-2 bg-amber-600 hover:bg-amber-700 text-white px-5 py-2.5 rounded-xl text-xs font-bold transition-all active:scale-95 shadow-sm shadow-amber-200 disabled:opacity-50 disabled:grayscale">
-                    <RotateCcw
-                      className={`w-4 h-4 ${isRestoring ? "animate-spin" : ""}`}
-                    />
-                    Pulihkan Data
-                  </button>
-                )}
-                {/* Opsi 2: Discard Logic - Memanggil fungsi handleDiscardDraft untuk menghapus notifikasi dari ERP */}
-                <button
-                  type="button"
-                  onClick={handleDiscardDraft}
-                  className="flex items-center justify-center gap-2 bg-white border border-amber-200 text-amber-600 hover:bg-amber-100 px-4 py-2.5 rounded-xl text-xs font-bold transition-all shadow-sm active:scale-95">
-                  <X className="w-4 h-4" />
-                  Abaikan Notifikasi
-                </button>
-              </div>
-            </div>
-            <div className="h-1 bg-amber-200 w-full overflow-hidden">
-              <div className="h-full bg-amber-500 w-1/3 animate-pulse"></div>
-            </div>
-          </div>
-        </div>
-      )}
-
       {/* --- MAIN FORM GRID --- */}
-      {/* lockStyles di sini akan mematikan pointer-events dan memberikan efek grayscale pada keseluruhan form jika status is_locked bernilai true */}
       <div
-        className={`mt-4 grid grid-cols-1 lg:grid-cols-3 gap-8 items-start transition-all duration-500 ${lockStyles}`}>
-        {/* KOLOM KIRI: CONTENT AREA */}
-        <div className="lg:col-span-2 space-y-6">
-          <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden flex flex-col p-0 md:p-8 space-y-8">
-            <input
-              type="text"
-              placeholder="Masukkan judul proyek yang menarik..."
+        className={`grid grid-cols-1 lg:grid-cols-12 gap-8 items-start transition-all duration-500 ${lockStyles}`}>
+        {/* KOLOM KIRI: EDITORIAL CANVAS (span 8) */}
+        <div className="lg:col-span-8 space-y-8">
+          {/* THE CANVAS */}
+          <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden flex flex-col pt-12 pb-8 px-8 md:px-14">
+            {/* Seamless Title Input */}
+            <textarea
+              placeholder="Ketik Judul Proyek..."
               disabled={shouldLockUI}
-              className="w-full px-6 pt-6 pb-4 text-3xl font-serif font-bold border-b border-slate-100 focus:outline-none placeholder:text-slate-300 disabled:bg-transparent disabled:text-slate-500"
+              rows={1}
+              className="w-full text-4xl md:text-5xl lg:text-[52px] font-serif font-bold text-slate-900 placeholder:text-slate-200 outline-none resize-none leading-[1.15] bg-transparent disabled:text-slate-400 overflow-hidden"
               value={formData.title}
-              onChange={(e) =>
-                setFormData({ ...formData, title: e.target.value })
-              }
+              onChange={(e) => {
+                setFormData({ ...formData, title: e.target.value });
+                e.target.style.height = "auto";
+                e.target.style.height = e.target.scrollHeight + "px";
+              }}
             />
 
-            <div className="px-6 space-y-2">
-              <label className="flex justify-between text-[10px] font-black text-slate-400 uppercase tracking-widest">
-                <span>Ringkasan Konten</span>
-                <span
-                  className={
-                    formData.excerpt.length >= 145 ? "text-red-500" : ""
-                  }>
-                  {formData.excerpt.length}/150
-                </span>
-              </label>
+            {/* Subtle Divider */}
+            <div className="w-16 h-1 bg-daw-green rounded-full my-8"></div>
+
+            {/* Editorial Excerpt */}
+            <div className="relative mb-8 group">
+              <span
+                className={`absolute -left-4 top-1 text-[10px] font-mono tracking-widest -rotate-90 origin-bottom-left uppercase opacity-0 group-hover:opacity-100 transition-opacity ${formData.excerpt.length >= 145 ? "text-red-500" : "text-slate-300"}`}>
+                Lead Paragraph ({formData.excerpt.length}/150)
+              </span>
               <textarea
-                placeholder="Tulis ringkasan singkat untuk tampilan beranda..."
+                placeholder="Tulis ringkasan singkat atau pengantar artikel di sini..."
                 maxLength={150}
-                disabled={shouldLockUI} // 🔒 Guard Lapisan 1
-                rows={2}
-                className="w-full p-4 bg-slate-50 border border-slate-100 rounded-xl outline-none text-slate-600 text-sm h-[80px] resize-none focus:ring-2 focus:ring-daw-green/10 disabled:bg-slate-100 disabled:text-slate-500"
+                disabled={shouldLockUI}
+                className="w-full text-lg md:text-xl font-light leading-relaxed text-slate-600 placeholder:text-slate-300 border-l-4 border-slate-100 focus:border-daw-green bg-transparent pl-5 outline-none resize-none h-[90px] transition-colors disabled:text-slate-400"
                 value={formData.excerpt}
                 onChange={(e) =>
                   setFormData({ ...formData, excerpt: e.target.value })
@@ -902,159 +863,167 @@ export default function ProjectForm() {
               />
             </div>
 
-            <div className="px-6 pb-6 space-y-2 flex-1 flex flex-col">
-              <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
-                Isi Artikel Utama
-              </label>
-              <div
-                className={`min-h-[400px] border border-slate-100 rounded-xl overflow-hidden shadow-inner flex flex-col bg-white ${shouldLockUI ? "bg-slate-50 opacity-80" : ""}`}>
-                <ReactQuill
-                  ref={quillRef}
-                  theme="snow"
-                  modules={modules}
-                  readOnly={shouldLockUI} // 🔒 Strict ReadOnly Integration untuk mencegah manipulasi DOM Quill
-                  value={formData.content}
-                  onChange={(v) => setFormData({ ...formData, content: v })}
-                  className="min-h-[300px]"
-                />
-              </div>
+            {/* Quill Editor - Modernized via Tailwind Arbitrary Variants */}
+            <div
+              className={`editor-container min-h-[400px] 
+              [&_.ql-toolbar]:border-none [&_.ql-toolbar]:border-y [&_.ql-toolbar]:border-slate-100 [&_.ql-toolbar]:py-3 [&_.ql-toolbar]:px-0
+              [&_.ql-container]:border-none [&_.ql-container]:text-lg [&_.ql-editor]:px-0 [&_.ql-editor]:py-8
+              [&_.ql-editor_p]:text-slate-700 [&_.ql-editor_p]:leading-loose [&_.ql-editor_p]:mb-6
+              [&_.ql-editor_h1]:font-serif [&_.ql-editor_h2]:font-serif [&_.ql-editor_h2]:text-2xl [&_.ql-editor_h2]:mb-4
+              [&_.ql-editor_h3]:font-bold [&_.ql-editor_h3]:text-xl [&_.ql-editor_h3]:mb-3
+              [&_.ql-editor_strong]:font-semibold [&_.ql-editor_strong]:text-slate-900
+              [&_.ql-editor_img]:rounded-xl [&_.ql-editor_img]:my-8 [&_.ql-editor_img]:shadow-sm
+              ${shouldLockUI ? "opacity-80" : ""}
+            `}>
+              <ReactQuill
+                ref={quillRef}
+                theme="snow"
+                modules={modules}
+                readOnly={shouldLockUI}
+                value={formData.content}
+                onChange={(v) => setFormData({ ...formData, content: v })}
+                placeholder="Mulai menulis cerita proyek di sini..."
+              />
             </div>
           </div>
 
-          {/* SEO ENGINE & PREVIEW */}
-          <div className="bg-slate-50/50 rounded-2xl border border-slate-200 p-8 space-y-6 shadow-inner">
-            <h3 className="text-xs font-black uppercase tracking-widest flex items-center gap-2 text-slate-800">
-              <Search className="w-4 h-4 text-blue-500" /> Pengaturan Pencarian
-              (SEO)
+          {/* EXACT GOOGLE SERP PREVIEW ENGINE */}
+          <div className="bg-white rounded-3xl border border-slate-200 p-8 md:p-10 shadow-sm">
+            <h3 className="text-xs font-black uppercase tracking-widest text-slate-800 mb-6 flex items-center gap-2">
+              <Search className="w-4 h-4 text-daw-green" /> Pengoptimalan Mesin
+              Pencari (SEO)
             </h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-              <div className="space-y-4">
-                <input
-                  type="text"
-                  placeholder="Judul Khusus Tampilan Google"
-                  disabled={shouldLockUI}
-                  className="w-full p-3 bg-white border border-slate-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-500/20 disabled:bg-slate-100 disabled:text-slate-500"
-                  value={formData.seo_title}
-                  onChange={(e) =>
-                    setFormData({ ...formData, seo_title: e.target.value })
-                  }
-                />
-                <textarea
-                  placeholder="Deskripsi SEO (Disarankan < 160 karakter)"
-                  disabled={shouldLockUI}
-                  className="w-full p-3 bg-white border border-slate-200 rounded-xl text-sm h-24 resize-none outline-none focus:ring-2 focus:ring-blue-500/20 disabled:bg-slate-100 disabled:text-slate-500"
-                  value={formData.meta_description}
-                  onChange={(e) =>
-                    setFormData({
-                      ...formData,
-                      meta_description: e.target.value,
-                    })
-                  }
-                />
+
+            <div className="grid grid-cols-1 xl:grid-cols-2 gap-10 items-start">
+              <div className="space-y-5">
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-widest mb-2">
+                    SEO Title
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="Judul Khusus untuk Google..."
+                    disabled={shouldLockUI}
+                    className="w-full p-4 bg-slate-50 border border-slate-200 rounded-xl text-sm font-medium outline-none focus:bg-white focus:border-daw-green focus:ring-4 focus:ring-daw-green/10 transition-all disabled:text-slate-400"
+                    value={formData.seo_title}
+                    onChange={(e) =>
+                      setFormData({ ...formData, seo_title: e.target.value })
+                    }
+                  />
+                </div>
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-widest mb-2">
+                    Meta Description
+                  </label>
+                  <textarea
+                    placeholder="Tulis deskripsi memikat maksimal 160 karakter..."
+                    disabled={shouldLockUI}
+                    maxLength={160}
+                    className="w-full p-4 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none resize-none h-[120px] focus:bg-white focus:border-daw-green focus:ring-4 focus:ring-daw-green/10 transition-all disabled:text-slate-400"
+                    value={formData.meta_description}
+                    onChange={(e) =>
+                      setFormData({
+                        ...formData,
+                        meta_description: e.target.value,
+                      })
+                    }
+                  />
+                </div>
               </div>
 
-              {/* Google Search Simulation: Real-time visual feedback */}
-              <div className="bg-white p-5 rounded-xl border border-slate-100 shadow-sm flex flex-col justify-center">
-                <p className="text-[10px] font-black text-slate-300 uppercase mb-3">
-                  Pratinjau Tampilan Google
-                </p>
-                <p className="text-[#1a0dab] text-lg font-medium truncate">
-                  {/* Metadata Sync: Fallback ke judul utama jika SEO title kosong */}
-                  {formData.seo_title || formData.title || "Untitled Project"}
-                </p>
-                <p className="text-[#006621] text-xs truncate mb-1 font-mono">
-                  daw.co.id/page/{generatedSlug}
-                </p>
-                <p className="text-[#545454] text-xs line-clamp-2 leading-relaxed">
+              {/* Real Google SERP UI Clone */}
+              <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-[0_4px_20px_rgba(0,0,0,0.03)] flex flex-col justify-center">
+                <div className="flex items-center gap-3 mb-2">
+                  <div className="w-8 h-8 bg-slate-100 rounded-full flex items-center justify-center p-1.5 border border-slate-200">
+                    <img
+                      src="/favicon.png"
+                      alt="Icon"
+                      className="w-full h-full object-contain opacity-80"
+                    />
+                  </div>
+                  <div className="flex flex-col">
+                    <span className="text-[14px] text-[#202124] font-normal leading-tight">
+                      PT Dharma Agung Wijaya
+                    </span>
+                    <span className="text-[12px] text-[#4d5156] leading-tight">
+                      daw.co.id &gt; projects &gt; {generatedSlug}
+                    </span>
+                  </div>
+                </div>
+                <h3 className="text-[20px] text-[#1a0dab] font-normal leading-[1.3] hover:underline cursor-pointer mb-1">
+                  {formData.seo_title ||
+                    formData.title ||
+                    "Judul Proyek DAW Group"}
+                </h3>
+                <p className="text-[14px] text-[#4d5156] line-clamp-2 leading-[1.58]">
                   {formData.meta_description ||
                     formData.excerpt ||
-                    "Masukkan deskripsi untuk membantu performa pencarian Google."}
+                    "Masukkan ringkasan atau meta deskripsi proyek di sini agar Google dapat menampilkannya dengan sempurna di hasil pencarian."}
                 </p>
               </div>
             </div>
           </div>
         </div>
 
-        {/* KOLOM KANAN: SIDEBAR ASSET & CATEGORY */}
-        <div className="space-y-6">
-          {/* 1. KATEGORI PROYEK */}
-          <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm">
-            <h3 className="text-xs font-black uppercase tracking-widest text-slate-800 mb-4">
-              Kategori Proyek
+        {/* KOLOM KANAN: ASSETS & METADATA (span 4) */}
+        <div className="lg:col-span-4 space-y-6">
+          {/* CATEGORY SELECTOR */}
+          <div className="bg-white rounded-3xl border border-slate-200 p-6 shadow-sm">
+            <h3 className="text-[11px] font-black uppercase tracking-widest text-slate-400 mb-4">
+              Sektor Bisnis
             </h3>
-
-            {isLoading || sections.length === 0 ? (
-              <div className="p-4 border-2 border-dashed border-slate-200 rounded-xl text-center bg-slate-50">
-                <p className="text-sm font-bold text-slate-500">
-                  Belum ada sektor aktif
+            {sections.length === 0 ? (
+              <div className="p-4 border border-dashed border-slate-200 rounded-xl text-center bg-slate-50">
+                <p className="text-xs text-slate-500 mb-2">
+                  Sektor belum dikonfigurasi
                 </p>
                 <Link
                   to="/admin/businesses"
                   className="text-xs font-bold text-daw-green hover:underline">
-                  &rarr; Kelola Sektor
+                  Kelola Sektor &rarr;
                 </Link>
               </div>
             ) : (
-              <>
-                <select
-                  disabled={shouldLockUI} // 🔒 Guard Kategori
-                  className={`w-full p-3 bg-slate-50 border rounded-xl font-bold outline-none transition-all disabled:bg-slate-100 disabled:text-slate-500 disabled:cursor-not-allowed ${
-                    formData.category && !validSectorIds.has(formData.category)
-                      ? "border-red-500 text-red-600 ring-2 ring-red-100"
-                      : "border-slate-100 text-slate-700 focus:ring-2 focus:ring-daw-green/20"
-                  }`}
-                  value={formData.category}
-                  onChange={(e) =>
-                    setFormData({ ...formData, category: e.target.value })
-                  }>
-                  {formData.category &&
-                    !validSectorIds.has(formData.category) && (
-                      <option
-                        value={formData.category}
-                        disabled
-                        className="text-red-500 font-bold">
-                        ⚠️ Sektor Terhapus
-                      </option>
-                    )}
-                  {sections.map((sec) => (
-                    <option
-                      key={sec.id}
-                      value={sec.id}
-                      className="text-slate-700">
-                      {sec.category}
-                    </option>
-                  ))}
-                </select>
-                {formData.category &&
-                  !validSectorIds.has(formData.category) && (
-                    <p className="text-[10px] text-red-500 font-bold mt-2 leading-tight">
-                      Sektor asal telah dihapus. Anda wajib memilih sektor baru.
-                    </p>
-                  )}
-              </>
+              <select
+                disabled={shouldLockUI}
+                className={`w-full p-3.5 bg-slate-50 border rounded-xl text-sm font-bold outline-none cursor-pointer hover:bg-slate-100 transition-colors focus:ring-4 focus:ring-daw-green/10 disabled:opacity-70 disabled:cursor-not-allowed ${
+                  formData.category && !validSectorIds.has(formData.category)
+                    ? "border-red-300 text-red-600"
+                    : "border-slate-200 text-slate-700"
+                }`}
+                value={formData.category}
+                onChange={(e) =>
+                  setFormData({ ...formData, category: e.target.value })
+                }>
+                {sections.map((sec) => (
+                  <option key={sec.id} value={sec.id}>
+                    {sec.category}
+                  </option>
+                ))}
+              </select>
             )}
           </div>
 
-          {/* 2. GAMBAR SAMPUL (COVER ASSET) */}
-          <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm">
-            <h3 className="text-xs font-black uppercase tracking-widest mb-4 flex items-center gap-2">
-              <ImageIcon className="w-4 h-4 text-daw-green" /> Gambar Sampul
+          {/* COVER IMAGE HERO */}
+          <div className="bg-white rounded-3xl border border-slate-200 p-6 shadow-sm">
+            <h3 className="text-[11px] font-black uppercase tracking-widest mb-4 flex items-center justify-between text-slate-400">
+              <span>Gambar Utama</span>
+              <span className="text-slate-300 font-normal">Wajib</span>
             </h3>
 
             <div
               {...getRootCoverProps()}
-              className={`aspect-video rounded-xl flex items-center justify-center transition-all relative overflow-hidden
-                ${shouldLockUI ? "border-2 border-slate-200 bg-slate-100 opacity-80 cursor-not-allowed" : "border-2 border-dashed cursor-pointer hover:bg-slate-50"}
-                ${isCoverDragActive && !shouldLockUI ? "border-daw-green bg-green-50" : "border-slate-200"}
+              className={`aspect-[4/3] rounded-2xl flex flex-col items-center justify-center transition-all relative overflow-hidden group
+                ${shouldLockUI ? "border-2 border-slate-100 bg-slate-50 cursor-not-allowed" : "border-2 border-dashed border-slate-200 hover:border-daw-green/50 hover:bg-daw-green/5 cursor-pointer"}
+                ${isCoverDragActive && !shouldLockUI ? "border-daw-green bg-green-50" : ""}
               `}>
-              {/* 🔒 Menonaktifkan input file jika UI dikunci */}
               {!shouldLockUI && <input {...getInputCoverProps()} />}
 
               {coverPreview ? (
                 <img
                   src={coverPreview}
                   className="w-full h-full object-cover"
-                  alt="New Upload"
+                  alt="New Cover"
                 />
               ) : formData.cover_image ? (
                 <>
@@ -1064,52 +1033,52 @@ export default function ProjectForm() {
                         ? formData.cover_image
                         : `${BASE_UPLOAD_URL}/${formData.cover_image}`
                     }
-                    className="w-full h-full object-cover"
+                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                     alt="Cover Data"
                   />
-                  {rejectedDraft && !coverPreview && (
-                    <div className="absolute top-2 left-2 bg-amber-500 text-white text-[8px] font-black px-2 py-1 rounded uppercase tracking-widest shadow-lg animate-in slide-in-from-top-1">
-                      Restored from Draft
+                  {!shouldLockUI && (
+                    <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                      <span className="text-white text-xs font-bold uppercase tracking-widest bg-daw-green px-4 py-2 rounded-full">
+                        Ubah Cover
+                      </span>
                     </div>
                   )}
                 </>
               ) : (
-                <div className="text-center p-4">
-                  <ImageIcon className="w-8 h-8 text-slate-200 mx-auto mb-2" />
-                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-tighter">
-                    Upload Cover
+                <div className="text-center p-6">
+                  <div className="w-12 h-12 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-3 group-hover:scale-110 group-hover:bg-daw-green/10 transition-all">
+                    <ImageIcon className="w-5 h-5 text-slate-400 group-hover:text-daw-green" />
+                  </div>
+                  <p className="text-xs font-bold text-slate-600 mb-1">
+                    Tarik & Lepas Gambar
+                  </p>
+                  <p className="text-[10px] text-slate-400">
+                    Maks. 10MB (JPG, PNG, WEBP)
                   </p>
                 </div>
               )}
             </div>
           </div>
 
-          {/* 3. GALERI FISIK (MULTIPLE ASSETS) */}
-          <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm">
-            <h3 className="text-xs font-black uppercase tracking-widest mb-4 flex items-center gap-2">
-              <Images className="w-4 h-4 text-daw-green" /> Galeri
+          {/* PROJECT GALLERY */}
+          <div className="bg-white rounded-3xl border border-slate-200 p-6 shadow-sm">
+            <h3 className="text-[11px] font-black uppercase tracking-widest mb-4 flex items-center justify-between text-slate-400">
+              <span>Galeri Proyek</span>
+              <span className="text-slate-300 font-normal">Opsional</span>
             </h3>
 
             {(galleryFiles.length > 0 || parsedGallery.length > 0) && (
-              <div className="grid grid-cols-3 gap-2 mb-4">
-                {/* Me-render Gambar Tersimpan (Parsed Gallery) */}
+              <div className="grid grid-cols-3 gap-3 mb-4">
                 {isEditMode &&
                   parsedGallery.map((imgName: string, idx: number) => (
                     <div
                       key={`old-${idx}`}
-                      className="relative aspect-square group rounded-xl overflow-hidden border border-slate-100 shadow-sm">
+                      className="relative aspect-square group rounded-xl overflow-hidden border border-slate-200 bg-slate-50">
                       <img
                         src={`${BASE_UPLOAD_URL}/${imgName}`}
                         className="w-full h-full object-cover"
                         alt="Saved"
                       />
-                      <div className="absolute inset-0 bg-black/10 group-hover:bg-black/20 flex items-center justify-center pointer-events-none">
-                        <span className="text-[9px] text-white font-black uppercase bg-daw-green/80 px-2 py-0.5 rounded-full shadow-sm tracking-tighter">
-                          Saved
-                        </span>
-                      </div>
-
-                      {/* 🔒 Layer 2 Guarding: Menghilangkan tombol hapus (X) jika terkunci */}
                       {!shouldLockUI && (
                         <button
                           type="button"
@@ -1117,19 +1086,17 @@ export default function ProjectForm() {
                             e.stopPropagation();
                             removeOldGalleryImage(idx);
                           }}
-                          className="absolute top-1.5 right-1.5 bg-red-500 hover:bg-red-600 text-white rounded-full p-1.5 shadow-lg opacity-0 group-hover:opacity-100 transition-all transform hover:scale-110 z-30">
-                          <X className="w-3 h-3" />
+                          className="absolute inset-0 w-full h-full bg-black/50 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-all backdrop-blur-sm z-30">
+                          <X className="w-6 h-6 text-white" />
                         </button>
                       )}
                     </div>
                   ))}
-
-                {/* Me-render File Baru yang belum dikirim ke server */}
                 {galleryFiles.map((file, idx) => (
                   <GalleryPreviewItem
                     key={`new-${idx}`}
                     file={file}
-                    disabled={shouldLockUI} // 🔒 Mengunci komponen anak agar tombol hapus dimatikan
+                    disabled={shouldLockUI}
                     onRemove={() =>
                       setGalleryFiles((prev) =>
                         prev.filter((_, i) => i !== idx),
@@ -1140,27 +1107,22 @@ export default function ProjectForm() {
               </div>
             )}
 
-            {/* 🔒 Layer 1 Guarding: Menyembunyikan Dropzone Tambah Galeri jika terkunci */}
             {!shouldLockUI && (
               <div
                 {...getRootGalleryProps()}
-                className={`p-6 border-2 border-dashed rounded-lg text-center cursor-pointer transition-all ${
+                className={`p-6 border-2 border-dashed rounded-xl text-center cursor-pointer transition-all group ${
                   isGalleryDragActive
                     ? "border-daw-green bg-green-50"
-                    : "border-slate-200 hover:bg-slate-50"
+                    : "border-slate-200 hover:border-daw-green/50 hover:bg-daw-green/5"
                 }`}>
                 <input {...getInputGalleryProps()} />
-                <Plus
-                  className={`w-6 h-6 mx-auto mb-2 transition-transform ${
-                    isGalleryDragActive
-                      ? "scale-150 text-daw-green"
-                      : "text-slate-300"
-                  }`}
-                />
+                <div className="w-10 h-10 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-3 group-hover:scale-110 group-hover:bg-daw-green/10 transition-all">
+                  <Images className="w-4 h-4 text-slate-400 group-hover:text-daw-green" />
+                </div>
                 <p className="text-[11px] font-bold text-slate-600 uppercase tracking-tight">
                   {isGalleryDragActive
-                    ? "Lepaskan gambar!"
-                    : "Tambah Foto Galeri"}
+                    ? "Lepaskan di sini!"
+                    : "Tambah Foto Ekstra"}
                 </p>
               </div>
             )}

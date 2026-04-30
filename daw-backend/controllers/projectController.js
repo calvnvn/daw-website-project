@@ -67,15 +67,25 @@ const processProjectPayload = async (req, project) => {
     existing_gallery,
     seo_title,
     meta_description,
+    author,
   } = req.body;
+  // LOGIKA AUTHOR DIPERBAIKI:
+  // 1. Jika dikirim spesifik dari req.body (oleh admin), pakai itu.
+  // 2. Jika project sudah punya author (sedang di-update), pertahankan author asli.
+  // 3. Jika baru dibuat, gunakan identitas login saat ini.
+  const authorIdentity =
+    author ||
+    project.author ||
+    req.owl_username ||
+    req.karyawanId ||
+    "System Admin";
 
-  const authorIdentity = req.owl_username || req.karyawanId || "System Admin";
   let finalGallery = [];
   let filesToDelete = [];
   let coverImageName = project?.cover_image || null;
   let oldCoverToDelete = null;
 
-  const cleanContent = content || project.content || "";
+  const cleanContent = content ?? project.content ?? "";
 
   if (project.content) {
     const oldHtmlImages = extractImagesFromHtml(project.content);
@@ -86,7 +96,7 @@ const processProjectPayload = async (req, project) => {
     filesToDelete = [...filesToDelete, ...deletedHtmlImages];
   }
 
-  // 1. Process Gallery
+  // Process Gallery
   if (existing_gallery) {
     try {
       const remainingGallery =
@@ -113,13 +123,13 @@ const processProjectPayload = async (req, project) => {
     finalGallery = [...finalGallery, ...newImages];
   }
 
-  // 2. Process Cover
+  // Process Cover
   if (req.files && req.files["cover_image"]) {
     oldCoverToDelete = project.cover_image;
     coverImageName = req.files["cover_image"][0].filename;
   }
 
-  // 3. Process Slug
+  // Process Slug
   let finalSlug = project.slug;
   if (slug && slug !== project.slug) {
     finalSlug = await generateUniqueProjectSlug(slug, project.id);
@@ -132,17 +142,17 @@ const processProjectPayload = async (req, project) => {
 
   return {
     payload: {
-      title: title || project.title,
+      title: title ?? project.title,
       slug: finalSlug,
-      excerpt: excerpt !== undefined ? excerpt : project.excerpt,
-      content: content || project.content,
-      category: category || project.category,
-      status: status || project.status,
+      excerpt: excerpt ?? project.excerpt,
+      content: cleanContent,
+      category: category ?? project.category,
+      status: status ?? project.status,
       cover_image: coverImageName,
       gallery: finalGallery,
-      seo_title: seo_title || project.seo_title,
-      meta_description: meta_description || project.meta_description,
-      author: project.author || authorIdentity,
+      seo_title: seo_title ?? project.seo_title,
+      meta_description: meta_description ?? project.meta_description,
+      author: authorIdentity,
       _filesToDelete: allFilesToTrash,
     },
     filesToDelete,
@@ -520,7 +530,11 @@ exports.getPublicProjectBySlug = async (req, res) => {
   try {
     const project = await Project.findOne({
       where: { slug: req.params.slug, status: "Published" },
+      include: [
+        { model: BusinessSection, as: "sectorData", attributes: ["category"] },
+      ],
     });
+
     if (!project)
       return res
         .status(404)

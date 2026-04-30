@@ -269,7 +269,7 @@ export default function ProjectDetail() {
         <div className="container mx-auto px-6 max-w-7xl">
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 lg:gap-16 items-start">
             {/* MAIN COLUMN */}
-            <div className="lg:col-span-8 space-y-10">
+            <div className="lg:col-span-8 space-y-8 md:space-y-12">
               <ScrollReveal direction="up" delay={0}>
                 <button
                   onClick={() => navigate("/businesses")}
@@ -278,18 +278,39 @@ export default function ProjectDetail() {
                   Back to Directory
                 </button>
 
-                <h1 className="text-3xl md:text-5xl lg:text-[52px] font-serif text-slate-900 leading-[1.15] mb-8">
+                <h1 className="text-3xl md:text-5xl lg:text-[52px] font-serif text-slate-900 leading-[1.15] mb-6">
                   {project.title}
                 </h1>
+
+                {/* 🚀 PERBAIKAN 1: EXCERPT RENDERER
+                    Menampilkan excerpt sebagai Lead Paragraph bergaya majalah editorial.
+                    Garis vertikal hijau memberikan aksen korporat yang kuat.
+                */}
+                {project.excerpt && (
+                  <p className="text-lg md:text-xl font-light leading-relaxed text-slate-500 border-l-4 border-daw-green pl-6 py-1 my-8">
+                    {project.excerpt}
+                  </p>
+                )}
               </ScrollReveal>
 
               <ScrollReveal direction="up" delay={150}>
+                {/* 🚀 PERBAIKAN 2: TYPOGRAPHY RESTORATION ENGINE
+                    1. Dihapus: cleanContent.replace(/&nbsp;.../) agar spasi asli dari Quill tetap aman.
+                    2. Ditambahkan: Selektor CSS khusus [&>p], [&_strong] untuk menimpa CSS Reset Tailwind,
+                       sehingga paragraf, bold, dan list dari Quill dirender dengan jarak yang proporsional.
+                */}
                 <div
-                  className="daw-editorial-content max-w-none text-slate-600 leading-relaxed text-lg md:text-[1.125rem] tracking-[-0.01em]"
+                  className="daw-editorial-content max-w-none text-slate-700 leading-loose text-base md:text-lg 
+                    [&>p]:mb-6 last:[&>p]:mb-0 
+                    [&_strong]:font-semibold [&_strong]:text-slate-900 
+                    [&>ul]:list-disc [&>ul]:pl-6 [&>ul]:mb-6 [&>ul>li]:mb-2
+                    [&>ol]:list-decimal [&>ol]:pl-6 [&>ol]:mb-6 [&>ol>li]:mb-2
+                    [&>h2]:text-2xl [&>h2]:font-serif [&>h2]:text-slate-900 [&>h2]:mb-4 [&>h2]:mt-10
+                    [&>h3]:text-xl [&>h3]:font-bold [&>h3]:text-slate-800 [&>h3]:mb-3 [&>h3]:mt-8
+                    [&_a]:text-daw-green [&_a]:underline [&_a]:underline-offset-4
+                  "
                   dangerouslySetInnerHTML={{
-                    __html: DOMPurify.sanitize(
-                      cleanContent.replace(/&nbsp;|\u00A0/g, " "),
-                    ),
+                    __html: DOMPurify.sanitize(cleanContent),
                   }}
                 />
               </ScrollReveal>
@@ -297,7 +318,7 @@ export default function ProjectDetail() {
               {/* IMAGE GALLERY */}
               {galleryUrls.length > 0 && (
                 <ScrollReveal direction="up" delay={300}>
-                  <div className="pt-12 mt-12 border-t border-slate-100">
+                  <div className="pt-10 mt-10 border-t border-slate-200">
                     <h4 className="font-serif text-2xl text-slate-900 mb-6">
                       Project Gallery
                     </h4>
@@ -306,11 +327,11 @@ export default function ProjectDetail() {
                         <div
                           key={idx}
                           onClick={() => setSelectedImageIndex(idx)}
-                          className="aspect-[4/3] rounded-xl overflow-hidden bg-slate-100 border border-slate-100 cursor-pointer group relative shadow-sm hover:shadow-lg transition-all duration-300">
+                          className="aspect-[4/3] rounded-xl overflow-hidden bg-slate-100 border border-slate-100 cursor-pointer group relative shadow-sm hover:shadow-md transition-all duration-300">
                           <img
                             src={imgUrl}
                             alt={`Gallery ${idx + 1}`}
-                            className="w-full h-full object-cover transform transition-transform duration-700 group-hover:scale-110"
+                            className="w-full h-full object-cover transform transition-transform duration-700 group-hover:scale-105"
                           />
                           <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors duration-300 flex items-center justify-center">
                             <span className="text-white opacity-0 group-hover:opacity-100 transition-opacity duration-300 bg-daw-green/90 px-4 py-1.5 rounded-full text-xs font-bold tracking-[0.15em] uppercase shadow-sm">
