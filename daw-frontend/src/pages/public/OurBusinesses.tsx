@@ -185,8 +185,7 @@ export default function OurBusinesses() {
                     activeSection === item.id
                       ? "text-daw-green"
                       : "text-slate-400 hover:text-slate-800"
-                  }`}
-                >
+                  }`}>
                   {/* Intelligent i18n Fallback Mechanism */}
                   {t(`businessesPage.nav.${item.id}`, item.label)}
 
@@ -199,7 +198,7 @@ export default function OurBusinesses() {
           </div>
 
           {/* --- SECTIONS CONTAINER --- */}
-          <div className="flex flex-col relative">
+          <div className="flex flex-col relative overflow-x-clip">
             {/* Dekorasi Background */}
             <div className="absolute top-40 right-0 w-[500px] h-[500px] bg-daw-green/[0.03] rounded-full blur-[120px] -z-10 pointer-events-none" />
 
@@ -233,8 +232,7 @@ export default function OurBusinesses() {
                 <section
                   key={sectionData.id}
                   id={sectionData.id}
-                  className="bg-transparent scroll-mt-32 relative"
-                >
+                  className="bg-transparent scroll-mt-32 relative">
                   <DynamicBusinessSection data={sectionData} />
                 </section>
               ))

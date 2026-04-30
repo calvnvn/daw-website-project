@@ -750,7 +750,7 @@ export default function ProjectForm() {
       )}
 
       {/* --- STICKY TOOLBAR HEADER --- */}
-      <div className="sticky top-4 z-40 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white/90 backdrop-blur-xl p-5 rounded-2xl border border-slate-200 shadow-sm mb-8 transition-all">
+      <div className="top-4 z-40 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white/90 backdrop-blur-xl p-5 rounded-2xl border border-slate-200 shadow-sm mb-8 transition-all">
         <div className="flex items-center gap-4">
           <button
             onClick={() => navigate("/admin/projects")}
@@ -825,35 +825,46 @@ export default function ProjectForm() {
         {/* KOLOM KIRI: EDITORIAL CANVAS (span 8) */}
         <div className="lg:col-span-8 space-y-8">
           {/* THE CANVAS */}
-          <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden flex flex-col pt-12 pb-8 px-8 md:px-14">
-            {/* Seamless Title Input */}
-            <textarea
-              placeholder="Ketik Judul Proyek..."
-              disabled={shouldLockUI}
-              rows={1}
-              className="w-full text-4xl md:text-5xl lg:text-[52px] font-serif font-bold text-slate-900 placeholder:text-slate-200 outline-none resize-none leading-[1.15] bg-transparent disabled:text-slate-400 overflow-hidden"
-              value={formData.title}
-              onChange={(e) => {
-                setFormData({ ...formData, title: e.target.value });
-                e.target.style.height = "auto";
-                e.target.style.height = e.target.scrollHeight + "px";
-              }}
-            />
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 md:p-8 flex flex-col gap-8">
+            {/* 1. Title Input (Clean & Functional) */}
+            <div>
+              <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">
+                Judul Proyek
+              </label>
+              <textarea
+                placeholder="Masukkan judul proyek..."
+                disabled={shouldLockUI}
+                rows={1}
+                className="w-full text-2xl md:text-3xl font-bold text-slate-900 placeholder:text-slate-300 outline-none resize-none bg-transparent disabled:text-slate-400 border-b border-slate-200 focus:border-daw-green transition-colors pb-2 overflow-hidden"
+                value={formData.title}
+                onChange={(e) => {
+                  setFormData({ ...formData, title: e.target.value });
+                  e.target.style.height = "auto";
+                  e.target.style.height = e.target.scrollHeight + "px";
+                }}
+              />
+            </div>
 
-            {/* Subtle Divider */}
-            <div className="w-16 h-1 bg-daw-green rounded-full my-8"></div>
-
-            {/* Editorial Excerpt */}
-            <div className="relative mb-8 group">
-              <span
-                className={`absolute -left-4 top-1 text-[10px] font-mono tracking-widest -rotate-90 origin-bottom-left uppercase opacity-0 group-hover:opacity-100 transition-opacity ${formData.excerpt.length >= 145 ? "text-red-500" : "text-slate-300"}`}>
-                Lead Paragraph ({formData.excerpt.length}/150)
-              </span>
+            {/* 2. Editorial Excerpt (Standardized Form Input) */}
+            <div>
+              <div className="flex justify-between items-end mb-2">
+                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider">
+                  Lead Paragraph (Excerpt)
+                </label>
+                <span
+                  className={`text-xs font-bold ${
+                    formData.excerpt.length >= 145
+                      ? "text-red-500"
+                      : "text-slate-400"
+                  }`}>
+                  {formData.excerpt.length} / 150
+                </span>
+              </div>
               <textarea
                 placeholder="Tulis ringkasan singkat atau pengantar artikel di sini..."
                 maxLength={150}
                 disabled={shouldLockUI}
-                className="w-full text-lg md:text-xl font-light leading-relaxed text-slate-600 placeholder:text-slate-300 border-l-4 border-slate-100 focus:border-daw-green bg-transparent pl-5 outline-none resize-none h-[90px] transition-colors disabled:text-slate-400"
+                className="w-full p-4 text-sm leading-relaxed text-slate-700 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:border-daw-green focus:ring-4 focus:ring-daw-green/10 outline-none resize-none h-[100px] transition-all disabled:text-slate-400 disabled:bg-slate-100/50"
                 value={formData.excerpt}
                 onChange={(e) =>
                   setFormData({ ...formData, excerpt: e.target.value })
@@ -861,38 +872,45 @@ export default function ProjectForm() {
               />
             </div>
 
-            {/* Quill Editor - Modernized via Tailwind Arbitrary Variants */}
-            <div
-              className={`editor-container min-h-[400px] 
-              [&_.ql-toolbar]:border-none [&_.ql-toolbar]:border-y [&_.ql-toolbar]:border-slate-100 [&_.ql-toolbar]:py-3 [&_.ql-toolbar]:px-0
-              [&_.ql-container]:border-none [&_.ql-container]:text-lg [&_.ql-editor]:px-0 [&_.ql-editor]:py-8
-              [&_.ql-editor_p]:text-slate-700 [&_.ql-editor_p]:leading-loose [&_.ql-editor_p]:mb-6
-              [&_.ql-editor_h1]:font-serif [&_.ql-editor_h2]:font-serif [&_.ql-editor_h2]:text-2xl [&_.ql-editor_h2]:mb-4
-              [&_.ql-editor_h3]:font-bold [&_.ql-editor_h3]:text-xl [&_.ql-editor_h3]:mb-3
-              [&_.ql-editor_strong]:font-semibold [&_.ql-editor_strong]:text-slate-900
-              [&_.ql-editor_img]:rounded-xl [&_.ql-editor_img]:my-8 [&_.ql-editor_img]:shadow-sm
-              ${shouldLockUI ? "opacity-80" : ""}
-            `}>
-              <ReactQuill
-                ref={quillRef}
-                theme="snow"
-                modules={modules}
-                readOnly={shouldLockUI}
-                value={formData.content}
-                onChange={(v) => setFormData({ ...formData, content: v })}
-                placeholder="Mulai menulis cerita proyek di sini..."
-              />
+            {/* 3. Quill Editor (Containerized & Bounded) */}
+            <div>
+              <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">
+                Konten Proyek
+              </label>
+              <div
+                className={`editor-container rounded-xl border transition-all overflow-hidden ${
+                  shouldLockUI
+                    ? "border-slate-200 bg-slate-50 opacity-80"
+                    : "border-slate-200 focus-within:border-daw-green focus-within:ring-4 focus-within:ring-daw-green/10 bg-white"
+                }
+                [&_.ql-toolbar]:border-none [&_.ql-toolbar]:border-b [&_.ql-toolbar]:border-slate-200 [&_.ql-toolbar]:bg-slate-50/50
+                [&_.ql-container]:border-none [&_.ql-editor]:min-h-[350px] [&_.ql-editor]:text-base
+                [&_.ql-editor_p]:text-slate-700 [&_.ql-editor_p]:leading-relaxed [&_.ql-editor_p]:mb-4
+                [&_.ql-editor_h2]:font-serif [&_.ql-editor_h2]:text-2xl [&_.ql-editor_h2]:mb-3 [&_.ql-editor_h2]:mt-6
+                [&_.ql-editor_h3]:font-bold [&_.ql-editor_h3]:text-lg [&_.ql-editor_h3]:mb-2 [&_.ql-editor_h3]:mt-4
+                [&_.ql-editor_img]:rounded-lg [&_.ql-editor_img]:my-6 [&_.ql-editor_img]:border [&_.ql-editor_img]:border-slate-200
+                `}>
+                <ReactQuill
+                  ref={quillRef}
+                  theme="snow"
+                  modules={modules}
+                  readOnly={shouldLockUI}
+                  value={formData.content}
+                  onChange={(v) => setFormData({ ...formData, content: v })}
+                  placeholder="Mulai menulis detail proyek di sini..."
+                />
+              </div>
             </div>
           </div>
 
           {/* EXACT GOOGLE SERP PREVIEW ENGINE */}
-          <div className="bg-white rounded-3xl border border-slate-200 p-8 md:p-10 shadow-sm">
+          <div className="bg-white rounded-2xl border border-slate-200 p-6 md:p-8 shadow-sm">
             <h3 className="text-xs font-black uppercase tracking-widest text-slate-800 mb-6 flex items-center gap-2">
               <Search className="w-4 h-4 text-daw-green" /> Pengoptimalan Mesin
               Pencari (SEO)
             </h3>
 
-            <div className="grid grid-cols-1 xl:grid-cols-2 gap-10 items-start">
+            <div className="grid grid-cols-1 xl:grid-cols-2 gap-8 items-start">
               <div className="space-y-5">
                 <div>
                   <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-widest mb-2">
@@ -902,7 +920,7 @@ export default function ProjectForm() {
                     type="text"
                     placeholder="Judul Khusus untuk Google..."
                     disabled={shouldLockUI}
-                    className="w-full p-4 bg-slate-50 border border-slate-200 rounded-xl text-sm font-medium outline-none focus:bg-white focus:border-daw-green focus:ring-4 focus:ring-daw-green/10 transition-all disabled:text-slate-400"
+                    className="w-full p-3.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-medium outline-none focus:bg-white focus:border-daw-green focus:ring-4 focus:ring-daw-green/10 transition-all disabled:text-slate-400"
                     value={formData.seo_title}
                     onChange={(e) =>
                       setFormData({ ...formData, seo_title: e.target.value })
@@ -917,7 +935,7 @@ export default function ProjectForm() {
                     placeholder="Tulis deskripsi memikat maksimal 160 karakter..."
                     disabled={shouldLockUI}
                     maxLength={160}
-                    className="w-full p-4 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none resize-none h-[120px] focus:bg-white focus:border-daw-green focus:ring-4 focus:ring-daw-green/10 transition-all disabled:text-slate-400"
+                    className="w-full p-3.5 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none resize-none h-[110px] focus:bg-white focus:border-daw-green focus:ring-4 focus:ring-daw-green/10 transition-all disabled:text-slate-400"
                     value={formData.meta_description}
                     onChange={(e) =>
                       setFormData({
@@ -930,25 +948,25 @@ export default function ProjectForm() {
               </div>
 
               {/* Real Google SERP UI Clone */}
-              <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-[0_4px_20px_rgba(0,0,0,0.03)] flex flex-col justify-center">
-                <div className="flex items-center gap-3 mb-2">
-                  <div className="w-8 h-8 bg-slate-100 rounded-full flex items-center justify-center p-1.5 border border-slate-200">
+              <div className="bg-white p-5 rounded-2xl border border-slate-100 shadow-[0_4px_20px_rgba(0,0,0,0.04)] flex flex-col justify-center">
+                <div className="flex items-center gap-3 mb-3">
+                  <div className="w-8 h-8 bg-slate-100 rounded-full flex items-center justify-center p-1.5 border border-slate-200 shrink-0">
                     <img
                       src="/favicon.png"
                       alt="Icon"
                       className="w-full h-full object-contain opacity-80"
                     />
                   </div>
-                  <div className="flex flex-col">
-                    <span className="text-[14px] text-[#202124] font-normal leading-tight">
+                  <div className="flex flex-col truncate">
+                    <span className="text-[14px] text-[#202124] font-normal leading-tight truncate">
                       PT Dharma Agung Wijaya
                     </span>
-                    <span className="text-[12px] text-[#4d5156] leading-tight">
-                      daw.co.id &gt; projects &gt; {generatedSlug}
+                    <span className="text-[12px] text-[#4d5156] leading-tight truncate">
+                      daw.co.id &gt; projects &gt; {generatedSlug || "..."}
                     </span>
                   </div>
                 </div>
-                <h3 className="text-[20px] text-[#1a0dab] font-normal leading-[1.3] hover:underline cursor-pointer mb-1">
+                <h3 className="text-[20px] text-[#1a0dab] font-normal leading-[1.3] hover:underline cursor-pointer mb-1 line-clamp-2">
                   {formData.seo_title ||
                     formData.title ||
                     "Judul Proyek DAW Group"}
@@ -966,8 +984,8 @@ export default function ProjectForm() {
         {/* KOLOM KANAN: ASSETS & METADATA (span 4) */}
         <div className="lg:col-span-4 space-y-6">
           {/* CATEGORY SELECTOR */}
-          <div className="bg-white rounded-3xl border border-slate-200 p-6 shadow-sm">
-            <h3 className="text-[11px] font-black uppercase tracking-widest text-slate-400 mb-4">
+          <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm">
+            <h3 className="text-[11px] font-black uppercase tracking-widest text-slate-500 mb-3">
               Sektor Bisnis
             </h3>
             {sections.length === 0 ? (
@@ -984,7 +1002,7 @@ export default function ProjectForm() {
             ) : (
               <select
                 disabled={shouldLockUI}
-                className={`w-full p-3.5 bg-slate-50 border rounded-xl text-sm font-bold outline-none cursor-pointer hover:bg-slate-100 transition-colors focus:ring-4 focus:ring-daw-green/10 disabled:opacity-70 disabled:cursor-not-allowed ${
+                className={`w-full p-3 bg-slate-50 border rounded-xl text-sm font-bold outline-none cursor-pointer hover:bg-slate-100 transition-colors focus:ring-4 focus:ring-daw-green/10 disabled:opacity-70 disabled:cursor-not-allowed ${
                   formData.category && !validSectorIds.has(formData.category)
                     ? "border-red-300 text-red-600"
                     : "border-slate-200 text-slate-700"
@@ -1003,16 +1021,20 @@ export default function ProjectForm() {
           </div>
 
           {/* COVER IMAGE HERO */}
-          <div className="bg-white rounded-3xl border border-slate-200 p-6 shadow-sm">
-            <h3 className="text-[11px] font-black uppercase tracking-widest mb-4 flex items-center justify-between text-slate-400">
+          <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm">
+            <h3 className="text-[11px] font-black uppercase tracking-widest mb-3 flex items-center justify-between text-slate-500">
               <span>Gambar Utama</span>
-              <span className="text-slate-300 font-normal">Wajib</span>
+              <span className="text-slate-400 font-normal">Wajib</span>
             </h3>
 
             <div
               {...getRootCoverProps()}
-              className={`aspect-[4/3] rounded-2xl flex flex-col items-center justify-center transition-all relative overflow-hidden group
-                ${shouldLockUI ? "border-2 border-slate-100 bg-slate-50 cursor-not-allowed" : "border-2 border-dashed border-slate-200 hover:border-daw-green/50 hover:bg-daw-green/5 cursor-pointer"}
+              className={`aspect-[4/3] rounded-xl flex flex-col items-center justify-center transition-all relative overflow-hidden group
+                ${
+                  shouldLockUI
+                    ? "border-2 border-slate-100 bg-slate-50 cursor-not-allowed"
+                    : "border-2 border-dashed border-slate-200 hover:border-daw-green/50 hover:bg-daw-green/5 cursor-pointer"
+                }
                 ${isCoverDragActive && !shouldLockUI ? "border-daw-green bg-green-50" : ""}
               `}>
               {!shouldLockUI && <input {...getInputCoverProps()} />}
@@ -1036,7 +1058,7 @@ export default function ProjectForm() {
                   />
                   {!shouldLockUI && (
                     <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                      <span className="text-white text-xs font-bold uppercase tracking-widest bg-daw-green px-4 py-2 rounded-full">
+                      <span className="text-white text-xs font-bold uppercase tracking-widest bg-daw-green px-4 py-2 rounded-full shadow-lg">
                         Ubah Cover
                       </span>
                     </div>
@@ -1059,10 +1081,10 @@ export default function ProjectForm() {
           </div>
 
           {/* PROJECT GALLERY */}
-          <div className="bg-white rounded-3xl border border-slate-200 p-6 shadow-sm">
-            <h3 className="text-[11px] font-black uppercase tracking-widest mb-4 flex items-center justify-between text-slate-400">
+          <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm">
+            <h3 className="text-[11px] font-black uppercase tracking-widest mb-3 flex items-center justify-between text-slate-500">
               <span>Galeri Proyek</span>
-              <span className="text-slate-300 font-normal">Opsional</span>
+              <span className="text-slate-400 font-normal">Opsional</span>
             </h3>
 
             {(galleryFiles.length > 0 || parsedGallery.length > 0) && (
@@ -1071,7 +1093,7 @@ export default function ProjectForm() {
                   parsedGallery.map((imgName: string, idx: number) => (
                     <div
                       key={`old-${idx}`}
-                      className="relative aspect-square group rounded-xl overflow-hidden border border-slate-200 bg-slate-50">
+                      className="relative aspect-square group rounded-lg overflow-hidden border border-slate-200 bg-slate-50">
                       <img
                         src={`${BASE_UPLOAD_URL}/${imgName}`}
                         className="w-full h-full object-cover"
@@ -1084,7 +1106,7 @@ export default function ProjectForm() {
                             e.stopPropagation();
                             removeOldGalleryImage(idx);
                           }}
-                          className="absolute inset-0 w-full h-full bg-black/50 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-all backdrop-blur-sm z-30">
+                          className="absolute inset-0 w-full h-full bg-black/50 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-all z-30">
                           <X className="w-6 h-6 text-white" />
                         </button>
                       )}
@@ -1108,13 +1130,13 @@ export default function ProjectForm() {
             {!shouldLockUI && (
               <div
                 {...getRootGalleryProps()}
-                className={`p-6 border-2 border-dashed rounded-xl text-center cursor-pointer transition-all group ${
+                className={`p-5 border-2 border-dashed rounded-xl text-center cursor-pointer transition-all group ${
                   isGalleryDragActive
                     ? "border-daw-green bg-green-50"
                     : "border-slate-200 hover:border-daw-green/50 hover:bg-daw-green/5"
                 }`}>
                 <input {...getInputGalleryProps()} />
-                <div className="w-10 h-10 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-3 group-hover:scale-110 group-hover:bg-daw-green/10 transition-all">
+                <div className="w-10 h-10 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-2 group-hover:scale-110 group-hover:bg-daw-green/10 transition-all">
                   <Images className="w-4 h-4 text-slate-400 group-hover:text-daw-green" />
                 </div>
                 <p className="text-[11px] font-bold text-slate-600 uppercase tracking-tight">

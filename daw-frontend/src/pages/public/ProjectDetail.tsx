@@ -282,46 +282,63 @@ export default function ProjectDetail() {
         {/* CONTENT LAYOUT */}
         <div className="container mx-auto px-6 max-w-7xl">
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 lg:gap-16 items-start">
-            {/* MAIN COLUMN */}
-            <div className="lg:col-span-8 space-y-8 md:space-y-12">
+            {/* MAIN COLUMN (Artikel Utama) */}
+            <div className="lg:col-span-8 space-y-8 md:space-y-10 xl:pr-8">
               <ScrollReveal direction="up" delay={0}>
                 <button
                   onClick={() => navigate("/businesses")}
-                  className="group flex items-center gap-2 text-slate-400 hover:text-daw-green font-bold text-[11px] uppercase tracking-[0.2em] mb-8 transition-all">
-                  <ArrowLeft className="w-4 h-4 group-hover:-translate-x-1.5 transition-transform" />
-                  Back to Directory
+                  className="group flex items-center gap-2 text-slate-500 hover:text-daw-green font-bold text-xs uppercase tracking-[0.2em] mb-10 transition-all">
+                  <ArrowLeft className="w-4 h-4 group-hover:-translate-x-2 transition-transform duration-300" />
+                  Back To Directory
                 </button>
 
-                <h1 className="text-3xl md:text-5xl lg:text-[52px] font-serif text-slate-900 leading-[1.15] mb-6">
+                <h1 className="text-3xl md:text-5xl lg:text-[54px] font-serif font-bold text-slate-900 leading-[1.15] tracking-tight mb-8">
                   {project.title}
                 </h1>
 
-                {/* 🚀 PERBAIKAN 1: EXCERPT RENDERER
-                    Menampilkan excerpt sebagai Lead Paragraph bergaya majalah editorial.
-                    Garis vertikal hijau memberikan aksen korporat yang kuat.
+                {/* LEAD PARAGRAPH (Excerpt)
+                    Gaya Editorial Premium: Font lebih besar, tipis, dengan line-height lega.
                 */}
                 {project.excerpt && (
-                  <p className="text-lg md:text-xl font-light leading-relaxed text-slate-500 border-l-4 border-daw-green pl-6 py-1 my-8">
-                    {project.excerpt}
-                  </p>
+                  <div className="relative my-10">
+                    <div className="absolute left-0 top-0 bottom-0 w-1.5 bg-daw-green rounded-full"></div>
+                    <p className="text-xl md:text-2xl font-light leading-[1.7] text-slate-600 pl-8 py-2">
+                      {project.excerpt}
+                    </p>
+                  </div>
                 )}
               </ScrollReveal>
 
               <ScrollReveal direction="up" delay={150}>
-                {/* 🚀 PERBAIKAN 2: TYPOGRAPHY RESTORATION ENGINE
-                    1. Dihapus: cleanContent.replace(/&nbsp;.../) agar spasi asli dari Quill tetap aman.
-                    2. Ditambahkan: Selektor CSS khusus [&>p], [&_strong] untuk menimpa CSS Reset Tailwind,
-                       sehingga paragraf, bold, dan list dari Quill dirender dengan jarak yang proporsional.
+                {/* 🚀 TYPOGRAPHY RESTORATION ENGINE (Prose Clone)
+                    Diperbaiki: Menggunakan `[&_element]` agar menembus nested div bawaan Quill.
+                    Ditambahkan: Jarak baca standar jurnalisme (leading-loose, margin proporsional).
                 */}
                 <div
-                  className="daw-editorial-content max-w-none text-slate-700 leading-loose text-base md:text-lg 
-                    [&>p]:mb-6 last:[&>p]:mb-0 
-                    [&_strong]:font-semibold [&_strong]:text-slate-900 
-                    [&>ul]:list-disc [&>ul]:pl-6 [&>ul]:mb-6 [&>ul>li]:mb-2
-                    [&>ol]:list-decimal [&>ol]:pl-6 [&>ol]:mb-6 [&>ol>li]:mb-2
-                    [&>h2]:text-2xl [&>h2]:font-serif [&>h2]:text-slate-900 [&>h2]:mb-4 [&>h2]:mt-10
-                    [&>h3]:text-xl [&>h3]:font-bold [&>h3]:text-slate-800 [&>h3]:mb-3 [&>h3]:mt-8
-                    [&_a]:text-daw-green [&_a]:underline [&_a]:underline-offset-4
+                  className="daw-editorial-content max-w-none text-slate-700 text-base md:text-[18px] leading-[1.85]
+                    /* Paragraf & Basmi Enter Kosong (Penting!) */
+                    [&_p]:mb-6 last:[&_p]:mb-0 [&_p:empty]:hidden [&_p:has(br):empty]:hidden
+                    [&_p:has(+_ul)]:mb-1 [&_p:has(+_ol)]:mb-1
+                    
+                    /* Bold & Italic */
+                    [&_strong]:font-bold [&_strong]:text-slate-900
+                    [&_em]:italic [&_em]:text-slate-600
+                    
+                    /* Link */
+                    [&_a]:text-daw-green [&_a]:underline [&_a]:underline-offset-[6px] [&_a]:decoration-daw-green/40 hover:[&_a]:decoration-daw-green hover:[&_a]:text-[#003b1c] transition-all
+                    
+                    /* Headings (Dibuatkan jarak bawah lebih rapat ke elemen selanjutnya) */
+                    [&_h2]:text-2xl md:[&_h2]:text-3xl [&_h2]:font-serif [&_h2]:font-bold [&_h2]:text-slate-900 [&_h2]:mt-12 [&_h2]:mb-3 [&_h2]:leading-snug
+                    [&_h3]:text-xl md:[&_h3]:text-2xl [&_h3]:font-bold [&_h3]:text-slate-800 [&_h3]:mt-10 [&_h3]:mb-2 [&_h3]:leading-snug
+                    
+                    [&_ul]:list-disc [&_ul]:pl-2 [&_ul]:mt-1 [&_ul]:mb-1 [&_ul_li]:mb-2 [&_ul_li]:pl-1
+                    [&_ol]:list-decimal [&_ol]:pl-2 [&_ol]:mt-1 [&_ol]:mb-8 [&_ol_li]:mb-2 [&_ol_li]:pl-1
+                    
+                    /* Blockquote */
+                    [&_blockquote]:border-l-4 [&_blockquote]:border-daw-green [&_blockquote]:pl-6 [&_blockquote]:py-2 [&_blockquote]:my-10 [&_blockquote]:italic [&_blockquote]:text-xl [&_blockquote]:text-slate-600 [&_blockquote]:bg-slate-50/50 [&_blockquote]:rounded-r-2xl
+                    
+                    /* Images */
+                    [&_img]:w-full [&_img]:h-auto [&_img]:rounded-2xl [&_img]:shadow-md [&_img]:my-10 [&_img]:border [&_img]:border-slate-100
                   "
                   dangerouslySetInnerHTML={{
                     __html: DOMPurify.sanitize(cleanContent),
@@ -329,27 +346,27 @@ export default function ProjectDetail() {
                 />
               </ScrollReveal>
 
-              {/* IMAGE GALLERY */}
+              {/* IMAGE GALLERY (Disesuaikan Spacing-nya) */}
               {galleryUrls.length > 0 && (
                 <ScrollReveal direction="up" delay={300}>
-                  <div className="pt-10 mt-10 border-t border-slate-200">
-                    <h4 className="font-serif text-2xl text-slate-900 mb-6">
-                      Project Gallery
+                  <div className="pt-12 mt-16 border-t border-slate-200">
+                    <h4 className="font-serif text-3xl font-bold text-slate-900 mb-8">
+                      Galeri Proyek
                     </h4>
                     <div className="grid grid-cols-2 md:grid-cols-3 gap-4 md:gap-6">
                       {galleryUrls.map((imgUrl, idx) => (
                         <div
                           key={idx}
                           onClick={() => setSelectedImageIndex(idx)}
-                          className="aspect-[4/3] rounded-xl overflow-hidden bg-slate-100 border border-slate-100 cursor-pointer group relative shadow-sm hover:shadow-md transition-all duration-300">
+                          className="aspect-[4/3] rounded-2xl overflow-hidden bg-slate-100 border border-slate-100 cursor-pointer group relative shadow-sm hover:shadow-lg transition-all duration-300">
                           <img
                             src={imgUrl}
                             alt={`Gallery ${idx + 1}`}
                             className="w-full h-full object-cover transform transition-transform duration-700 group-hover:scale-105"
                           />
-                          <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors duration-300 flex items-center justify-center">
-                            <span className="text-white opacity-0 group-hover:opacity-100 transition-opacity duration-300 bg-daw-green/90 px-4 py-1.5 rounded-full text-xs font-bold tracking-[0.15em] uppercase shadow-sm">
-                              Enlarge
+                          <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-colors duration-300 flex items-center justify-center backdrop-blur-[2px] opacity-0 group-hover:opacity-100">
+                            <span className="text-white bg-daw-green/90 px-5 py-2 rounded-full text-xs font-bold tracking-widest uppercase shadow-md transform translate-y-4 group-hover:translate-y-0 transition-all duration-300">
+                              Perbesar
                             </span>
                           </div>
                         </div>
@@ -360,41 +377,48 @@ export default function ProjectDetail() {
               )}
             </div>
 
-            {/* KOLOM KANAN: SIDEBAR */}
-            <div className="lg:col-span-4 lg:sticky lg:top-32 space-y-8">
+            {/* KOLOM KANAN: SIDEBAR (Related Projects) */}
+            <div className="lg:col-span-4 lg:sticky lg:top-32 space-y-8 pb-12">
               <ScrollReveal direction="left" delay={200}>
-                <div className="bg-slate-50 border border-slate-100 rounded-[2rem] p-8 shadow-sm hover:shadow-md transition-shadow duration-300">
-                  <h3 className="font-serif text-2xl text-slate-900 mb-6 border-b border-slate-200 pb-4">
-                    Our Projects
+                <div className="bg-white border border-slate-200 rounded-[2rem] p-8 shadow-sm hover:shadow-md transition-shadow duration-300">
+                  <h3 className="font-serif text-2xl font-bold text-slate-900 mb-6 border-b border-slate-100 pb-5">
+                    Proyek Terkait
                   </h3>
-                  <div className="space-y-6">
-                    {relatedProjects.map((other) => (
-                      <Link
-                        key={other.id}
-                        to={`/projects/${other.slug || other.id}`}
-                        className="group flex gap-4 items-center">
-                        <div className="w-16 h-16 md:w-20 md:h-20 rounded-xl overflow-hidden shrink-0 bg-white border border-slate-100 shadow-sm flex items-center justify-center relative">
-                          {other.cover_image ? (
-                            <img
-                              src={getCleanImageUrl(other.cover_image)}
-                              alt={other.title}
-                              className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
-                            />
-                          ) : (
-                            <ImageIcon className="w-6 h-6 text-slate-300" />
-                          )}
-                        </div>
-                        <div className="flex-1">
-                          <h4 className="font-serif text-[15px] md:text-[16px] text-slate-800 group-hover:text-daw-green transition-colors leading-snug line-clamp-2">
-                            {other.title}
-                          </h4>
-                          <span className="text-[10px] uppercase tracking-[0.15em] font-bold text-slate-400 mt-1.5 block">
-                            {sectorLookup[other.category] || other.category}
-                          </span>
-                        </div>
-                      </Link>
-                    ))}
-                  </div>
+
+                  {relatedProjects.length > 0 ? (
+                    <div className="space-y-6">
+                      {relatedProjects.map((other) => (
+                        <Link
+                          key={other.id}
+                          to={`/projects/${other.slug || other.id}`}
+                          className="group flex gap-5 items-start">
+                          <div className="w-20 h-20 rounded-2xl overflow-hidden shrink-0 bg-slate-50 border border-slate-100 shadow-sm flex items-center justify-center relative">
+                            {other.cover_image ? (
+                              <img
+                                src={getCleanImageUrl(other.cover_image)}
+                                alt={other.title}
+                                className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
+                              />
+                            ) : (
+                              <ImageIcon className="w-6 h-6 text-slate-300" />
+                            )}
+                          </div>
+                          <div className="flex-1 pt-1">
+                            <span className="text-[10px] uppercase tracking-[0.15em] font-bold text-daw-green mb-1.5 block">
+                              {sectorLookup[other.category] || other.category}
+                            </span>
+                            <h4 className="font-serif text-base text-slate-800 group-hover:text-daw-green transition-colors leading-snug line-clamp-2">
+                              {other.title}
+                            </h4>
+                          </div>
+                        </Link>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-sm text-slate-500 italic">
+                      Belum ada proyek lain di sektor ini.
+                    </p>
+                  )}
                 </div>
               </ScrollReveal>
             </div>
