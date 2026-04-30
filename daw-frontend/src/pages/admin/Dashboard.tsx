@@ -118,7 +118,7 @@ export default function Dashboard() {
             Welcome back, {firstName}!
           </h1>
           <p className="text-sm text-slate-500 mt-1">
-            Berikut adalah ringkasan operasional PT Dharma Agung Wijaya hari
+            Berikut adalah ringkasan operasional PT Dharma Agung Wijaya saat
             ini.
           </p>
         </div>
