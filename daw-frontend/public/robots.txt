@@ -1,20 +1,10 @@
-# Aturan untuk semua bot
+# Strategi SEO Frontend DAW Group
 User-agent: *
-
-# Area Terlarang (Security & SEO Cleanup)
-Disallow: /admin
-Disallow: /admin/
-Disallow: /admin/*
-Disallow: /force-change-password
-Disallow: /forgot-password
-Disallow: /reset-password/
-Disallow: /api/
-
-# Area yang Boleh Diindeks
 Allow: /
-Allow: /about
-Allow: /businesses
-Allow: /projects/
 
-# Tautan ke Dynamic Sitemap (Ubah saat ganti domain ke daw.co.id)
-Sitemap: https://dev-web.daw.co.id/sitemap.xml
+# Jangan indeks area administratif dan login
+Disallow: /admin/
+Disallow: /login
+
+# Berikan koordinat peta situs untuk bot
+Sitemap: https://daw.co.id/sitemap.xml

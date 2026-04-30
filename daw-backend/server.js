@@ -60,7 +60,7 @@ const { startCleanupTask } = require("./utils/cleanupWorker");
 const app = express();
 
 // MIDDLEWARE PIPELINE
-// 1. Global Security & Body Parser Middleware
+// Global Security & Body Parser Middleware
 app.use(cors());
 app.use(express.json({ limit: "50mb" }));
 app.use(express.urlencoded({ limit: "50mb", extended: true }));
@@ -78,29 +78,39 @@ if (!fs.existsSync(uploadPath)) {
   console.log("SUCCESS: Folder uploads terhubung di:", uploadPath);
 }
 
-// 3. Custom Interceptor Middleware (HARUS di atas express.static)
-// Mengatasi masalah file .jpeg yang tersimpan sebagai .jpg atau sebaliknya
+// Custom Interceptor Middleware (
 app.use("/uploads", (req, res, next) => {
   if (req.url.toLocaleLowerCase().endsWith(".jpeg")) {
     const altPath = req.url.replace(/\.jpeg$/i, ".jpg");
     if (fs.existsSync(path.join(uploadPath, altPath))) {
-      return res.redirect(3.01, `/uploads${altPath}`);
+      return res.redirect(301, `/uploads${altPath}`);
     }
   }
   next();
 });
 
-// 4. Static File Server (Hanya melayani file jika file-nya ada)
+// 4. Static File Server
 app.use(
   "/uploads",
   express.static(uploadPath, {
-    maxAge: "30d", // Menyuruh browser menyimpan cache selama 30 hari
-    immutable: true, // Memberitahu browser bahwa file ini tidak akan berubah
+    maxAge: "30d",
+    immutable: true,
     setHeaders: (res) => {
       res.setHeader("Access-Control-Allow-Origin", "*");
     },
   }),
 );
+
+app.get("/robots.txt", (req, res) => {
+  const robotsPath = path.join(process.cwd(), "public", "robots.txt");
+  if (fs.existsSync(robotsPath)) {
+    res.type("text/plain");
+    res.sendFile(robotsPath);
+  } else {
+    res.type("text/plain");
+    res.send("User-agent: *\nDisallow: /");
+  }
+});
 
 // ROUTER REGISTRATION
 app.use("/api/auth", authRoutes);
@@ -122,6 +132,7 @@ app.use("/api/menus", menuRoutes);
 app.use("/api/approval", approvalRoutes);
 app.use("/api/philosophy", philosophyRoutes);
 app.use("/api/philosophy-pillars", philosophyPillarRoutes);
+
 app.use("/", sitemapRoutes);
 
 // Base Health Check Route

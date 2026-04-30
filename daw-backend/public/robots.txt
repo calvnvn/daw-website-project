@@ -1,0 +1,15 @@
+# Strategi Keamanan API DAW Group
+User-agent: *
+
+# Larang bot untuk merayapi endpoint API mentah
+Disallow: /api/
+
+# Larang indeks folder internal (tapi izinkan file di dalamnya jika dipanggil)
+Disallow: /uploads/
+
+# Pastikan bot bisa membaca file penunjuk SEO
+Allow: /robots.txt
+Allow: /sitemap.xml
+
+# Tetap arahkan ke domain utama untuk sitemap
+Sitemap: https://daw.co.id/sitemap.xml

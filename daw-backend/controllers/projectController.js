@@ -530,8 +530,28 @@ exports.getPublicProjectBySlug = async (req, res) => {
   try {
     const project = await Project.findOne({
       where: { slug: req.params.slug, status: "Published" },
+      attributes: [
+        "id",
+        "title",
+        "slug",
+        "excerpt",
+        "content",
+        "category",
+        "cover_image",
+        "gallery",
+        "author",
+        "views",
+        "createdAt",
+        "updatedAt",
+        "seo_title",
+        "meta_description",
+      ],
       include: [
-        { model: BusinessSection, as: "sectorData", attributes: ["category"] },
+        {
+          model: BusinessSection,
+          as: "sectorData",
+          attributes: ["category"],
+        },
       ],
     });
 

@@ -3,65 +3,66 @@ const Project = require("../models/Project");
 
 exports.generateSitemap = async (req, res) => {
   try {
-    // Ambil domain dari .env, jika tidak ada pakai dev-web
-    const baseUrl = process.env.FRONTEND_URL || "https://dev-web.daw.co.id";
+    const rawBaseUrl =
+      process.env.FRONTEND_URL || "[https://daw.co.id](https://daw.co.id)";
+    const baseUrl = rawBaseUrl.replace(/\/$/, "");
 
-    // 1. Ambil semua Page (Slug)
     const pages = await Page.findAll({
       attributes: ["slug", "updatedAt"],
     });
 
-    // 2. Ambil semua Project yang 'Published'
     const projects = await Project.findAll({
       where: { status: "Published" },
-      attributes: ["id", "updatedAt"], // Pakai id sesuai frontend kamu saat ini
+      attributes: ["slug", "updatedAt"],
     });
 
-    // 3. Daftar Route Statis (Halaman yang pasti ada)
     const staticRoutes = [
       { url: "/", priority: "1.0", changefreq: "daily" },
+      { url: "/businesses", priority: "0.9", changefreq: "weekly" },
       { url: "/about", priority: "0.8", changefreq: "weekly" },
-      { url: "/businesses", priority: "0.8", changefreq: "weekly" },
       { url: "/contact-us", priority: "0.7", changefreq: "monthly" },
     ];
 
-    // 4. Bangun XML String
-    let xml = `<?xml version="1.0" encoding="UTF-8"?>`;
-    xml += `<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">`;
+    let xml = `<?xml version="1.0" encoding="UTF-8"?>\n`;
+    xml += `<urlset xmlns="[http://www.sitemaps.org/schemas/sitemap/0.9](http://www.sitemaps.org/schemas/sitemap/0.9)">\n`;
 
-    // Tambahkan Static Routes
+    const today = new Date().toISOString().split("T")[0];
+
     staticRoutes.forEach((route) => {
-      xml += `
-  <url>
-    <loc>${baseUrl}${route.url}</loc>
-    <changefreq>${route.changefreq}</changefreq>
-    <priority>${route.priority}</priority>
-  </url>`;
+      xml += `  <url>\n`;
+      xml += `    <loc>${baseUrl}${route.url}</loc>\n`;
+      xml += `    <lastmod>${today}</lastmod>\n`;
+      xml += `    <changefreq>${route.changefreq}</changefreq>\n`;
+      xml += `    <priority>${route.priority}</priority>\n`;
+      xml += `  </url>\n`;
     });
 
-    // Tambahkan Dynamic Pages (Halaman dari Page Builder)
     pages.forEach((page) => {
-      xml += `
-  <url>
-    <loc>${baseUrl}/page/${page.slug}</loc>
-    <lastmod>${page.updatedAt.toISOString().split("T")[0]}</lastmod>
-    <priority>0.6</priority>
-  </url>`;
+      const lastModDate = page.updatedAt
+        ? page.updatedAt.toISOString().split("T")[0]
+        : today;
+      xml += `  <url>\n`;
+      xml += `    <loc>${baseUrl}/page/${page.slug}</loc>\n`;
+      xml += `    <lastmod>${lastModDate}</lastmod>\n`;
+      xml += `    <changefreq>weekly</changefreq>\n`;
+      xml += `    <priority>0.7</priority>\n`;
+      xml += `  </url>\n`;
     });
 
-    // Tambahkan Dynamic Projects
     projects.forEach((project) => {
-      xml += `
-  <url>
-    <loc>${baseUrl}/projects/${project.id}</loc>
-    <lastmod>${project.updatedAt.toISOString().split("T")[0]}</lastmod>
-    <priority>0.6</priority>
-  </url>`;
+      const lastModDate = project.updatedAt
+        ? project.updatedAt.toISOString().split("T")[0]
+        : today;
+      xml += `  <url>\n`;
+      xml += `    <loc>${baseUrl}/projects/${project.slug}</loc>\n`;
+      xml += `    <lastmod>${lastModDate}</lastmod>\n`;
+      xml += `    <changefreq>weekly</changefreq>\n`;
+      xml += `    <priority>0.8</priority>\n`;
+      xml += `  </url>\n`;
     });
 
-    xml += `\n</urlset>`;
+    xml += `</urlset>`;
 
-    // Kirim sebagai XML
     res.header("Content-Type", "application/xml");
     res.status(200).send(xml);
   } catch (error) {
