@@ -66,11 +66,6 @@ export default function HomepageManager() {
             Kelola identitas visual dan narasi utama beranda secara terpusat.
           </p>
         </div>
-        {isSuperadmin && (
-          <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 bg-amber-50 border border-amber-100 rounded-full text-amber-700 text-[10px] font-black uppercase tracking-widest">
-            <ShieldCheck className="w-3 h-3" /> Sovereign Access
-          </div>
-        )}
       </div>
 
       {/* TABS NAVIGATION DENGAN MATRIX INDICATOR */}
