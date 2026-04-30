@@ -15,10 +15,6 @@ import DOMPurify from "dompurify";
 import SEO from "@/components/SEO";
 import { useBusiness } from "@/contexts/BusinessContext";
 
-/**
- * @interface ProjectData
- * Defines the strict structure for project entities returned from the API.
- */
 interface ProjectData {
   excerpt: string;
   id: string;
@@ -32,6 +28,8 @@ interface ProjectData {
   createdAt: string;
   updatedAt: string;
   views: number;
+  seo_title?: string | null;
+  meta_description?: string | null;
 }
 
 export default function ProjectDetail() {
@@ -39,11 +37,9 @@ export default function ProjectDetail() {
   const navigate = useNavigate();
 
   // 1. GLOBAL CONTEXT CONSUMPTION
-  // Injecting global business data to avoid redundant API calls and enable slug-to-name mapping.
   const { sections, publicProjects } = useBusiness();
 
   // 2. CORE STATE DECLARATIONS
-  // Declared before useMemo to prevent "Cannot access before initialization" errors.
   const [project, setProject] = useState<ProjectData | null>(null);
   const [galleryUrls, setGalleryUrls] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -57,7 +53,6 @@ export default function ProjectDetail() {
   const [offsetY, setOffsetY] = useState(0);
 
   // 4. CATEGORY LOOKUP MAP
-  // Translates technical slug IDs (e.g., 'energy-division') into editorial names (e.g., 'Energy Division').
   const sectorLookup = useMemo(() => {
     const map: Record<string, string> = {};
     sections.forEach((s) => (map[s.id] = s.category));
@@ -65,7 +60,6 @@ export default function ProjectDetail() {
   }, [sections]);
 
   // 5. SMART RELATED PROJECTS ENGINE
-  // Filters projects from global memory that share the same category, excluding current project.
   const relatedProjects = useMemo(() => {
     if (!project) return [];
     return publicProjects
@@ -76,7 +70,6 @@ export default function ProjectDetail() {
   }, [publicProjects, project, slug]);
 
   // 6. CONTENT NORMALIZATION
-  // Sanitizes and fixes local/development image paths within the HTML content.
   const cleanContent = useMemo(() => {
     if (!project?.content) return "";
     return project.content.replace(
@@ -109,13 +102,10 @@ export default function ProjectDetail() {
 
     const fetchData = async () => {
       try {
-        // Optimized: Only fetching the current project.
-        // List for 'Related Projects' is already provided by BusinessContext.
         const projectRes = await api.get(`/projects/public/s/${slug}`);
         const data: ProjectData = projectRes.data;
         setProject(data);
 
-        // Gallery parsing logic
         if (data.gallery) {
           let parsedGallery: string[] = [];
           if (Array.isArray(data.gallery)) {
@@ -172,8 +162,7 @@ export default function ProjectDetail() {
         </h2>
         <button
           onClick={() => navigate("/businesses")}
-          className="text-daw-green hover:underline"
-        >
+          className="text-daw-green hover:underline">
           Return to Our Businesses
         </button>
       </div>
@@ -185,7 +174,9 @@ export default function ProjectDetail() {
     <>
       <SEO
         title={`${project.title} | ${sectorLookup[project.category] || "Project"}`}
+        seoTitle={project.seo_title || undefined}
         description={
+          project.meta_description ||
           project.excerpt ||
           `Detailed portfolio of ${project.title} under ${sectorLookup[project.category]} division.`
         }
@@ -195,6 +186,9 @@ export default function ProjectDetail() {
             : undefined
         }
         type="article"
+        author={project.author}
+        publishedAt={project.createdAt}
+        updatedAt={project.updatedAt}
       />
 
       {/* GLOBAL SCROLL PROGRESS BAR */}
@@ -203,17 +197,14 @@ export default function ProjectDetail() {
         style={{ width: `${scrollProgress}%` }}
       />
       <div className="min-h-screen bg-white pb-20 selection:bg-daw-green selection:text-white">
-        {/* --- HERO BANNER --- */}
+        {/* HERO BANNER */}
         <section className="relative h-[85vh] min-h-[600px] flex items-center justify-center overflow-hidden bg-slate-900">
-          {/* Layer 1: Parallax Wrapper */}
           <div
             className="absolute inset-0 w-full h-full"
             style={{
               transform: `translateY(${offsetY * 0.4}px)`,
               willChange: "transform",
-            }}
-          >
-            {/* Layer 2: Slow Zoom Image */}
+            }}>
             {heroImage && (
               <div
                 className="absolute inset-0 w-full h-[110%] -top-[5%] bg-cover bg-center transition-transform duration-[15000ms] ease-out scale-110"
@@ -247,7 +238,7 @@ export default function ProjectDetail() {
           </div>
         </section>
 
-        {/* --- DYNAMIC BREADCRUMBS --- */}
+        {/* DYNAMIC BREADCRUMBS */}
         <div className="bg-slate-50 border-b border-slate-100 py-4 mb-10">
           <div className="container mx-auto px-6 max-w-7xl">
             <div className="flex items-center gap-2 text-[12px] font-bold tracking-widest uppercase text-slate-400">
@@ -257,16 +248,13 @@ export default function ProjectDetail() {
               <ChevronRight className="w-3 h-3" />
               <Link
                 to="/businesses"
-                className="hover:text-daw-green transition-colors"
-              >
+                className="hover:text-daw-green transition-colors">
                 Our Businesses
               </Link>
               <ChevronRight className="w-3 h-3" />
-              {/* Sector Deep Link */}
               <Link
                 to={`/businesses#${project.category}`}
-                className="hover:text-daw-green transition-colors"
-              >
+                className="hover:text-daw-green transition-colors">
                 {sectorLookup[project.category] || "Sector"}
               </Link>
               <ChevronRight className="w-3 h-3" />
@@ -276,7 +264,8 @@ export default function ProjectDetail() {
             </div>
           </div>
         </div>
-        {/* --- CONTENT LAYOUT --- */}
+
+        {/* CONTENT LAYOUT */}
         <div className="container mx-auto px-6 max-w-7xl">
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 lg:gap-16 items-start">
             {/* MAIN COLUMN */}
@@ -284,8 +273,7 @@ export default function ProjectDetail() {
               <ScrollReveal direction="up" delay={0}>
                 <button
                   onClick={() => navigate("/businesses")}
-                  className="group flex items-center gap-2 text-slate-400 hover:text-daw-green font-bold text-[11px] uppercase tracking-[0.2em] mb-8 transition-all"
-                >
+                  className="group flex items-center gap-2 text-slate-400 hover:text-daw-green font-bold text-[11px] uppercase tracking-[0.2em] mb-8 transition-all">
                   <ArrowLeft className="w-4 h-4 group-hover:-translate-x-1.5 transition-transform" />
                   Back to Directory
                 </button>
@@ -294,18 +282,19 @@ export default function ProjectDetail() {
                   {project.title}
                 </h1>
               </ScrollReveal>
+
               <ScrollReveal direction="up" delay={150}>
                 <div
                   className="daw-editorial-content max-w-none text-slate-600 leading-relaxed text-lg md:text-[1.125rem] tracking-[-0.01em]"
                   dangerouslySetInnerHTML={{
-                    //  WAJIB PAKAI DOMPURIFY DI PRODUCTION!
                     __html: DOMPurify.sanitize(
                       cleanContent.replace(/&nbsp;|\u00A0/g, " "),
                     ),
                   }}
                 />
               </ScrollReveal>
-              {/* IMAGE GALLERY DENGAN ONCLICK LIGHTBOX */}
+
+              {/* IMAGE GALLERY */}
               {galleryUrls.length > 0 && (
                 <ScrollReveal direction="up" delay={300}>
                   <div className="pt-12 mt-12 border-t border-slate-100">
@@ -317,8 +306,7 @@ export default function ProjectDetail() {
                         <div
                           key={idx}
                           onClick={() => setSelectedImageIndex(idx)}
-                          className="aspect-[4/3] rounded-xl overflow-hidden bg-slate-100 border border-slate-100 cursor-pointer group relative shadow-sm hover:shadow-lg transition-all duration-300"
-                        >
+                          className="aspect-[4/3] rounded-xl overflow-hidden bg-slate-100 border border-slate-100 cursor-pointer group relative shadow-sm hover:shadow-lg transition-all duration-300">
                           <img
                             src={imgUrl}
                             alt={`Gallery ${idx + 1}`}
@@ -349,8 +337,7 @@ export default function ProjectDetail() {
                       <Link
                         key={other.id}
                         to={`/projects/${other.slug || other.id}`}
-                        className="group flex gap-4 items-center"
-                      >
+                        className="group flex gap-4 items-center">
                         <div className="w-16 h-16 md:w-20 md:h-20 rounded-xl overflow-hidden shrink-0 bg-white border border-slate-100 shadow-sm flex items-center justify-center relative">
                           {other.cover_image ? (
                             <img
@@ -380,24 +367,21 @@ export default function ProjectDetail() {
         </div>
       </div>
 
-      {/* --- LIGHTBOX MODAL --- */}
+      {/* LIGHTBOX MODAL */}
       {selectedImageIndex !== null && galleryUrls.length > 0 && (
         <div
           className="fixed inset-0 z-[100] flex items-center justify-center bg-black/95 p-4 backdrop-blur-sm transition-opacity"
-          onClick={closeLightbox}
-        >
+          onClick={closeLightbox}>
           <button
             className="absolute top-6 right-6 text-white/50 hover:text-white bg-white/10 hover:bg-white/20 rounded-full p-2.5 transition-all"
-            onClick={closeLightbox}
-          >
+            onClick={closeLightbox}>
             <X className="w-6 h-6" />
           </button>
 
           {galleryUrls.length > 1 && (
             <button
               className="absolute left-4 md:left-8 text-white/50 hover:text-white bg-white/10 hover:bg-white/20 rounded-full p-3 transition-all"
-              onClick={prevImage}
-            >
+              onClick={prevImage}>
               <ChevronLeft className="w-8 h-8 md:w-10 md:h-10" />
             </button>
           )}
@@ -412,8 +396,7 @@ export default function ProjectDetail() {
           {galleryUrls.length > 1 && (
             <button
               className="absolute right-4 md:right-8 text-white/50 hover:text-white bg-white/10 hover:bg-white/20 rounded-full p-3 transition-all"
-              onClick={nextImage}
-            >
+              onClick={nextImage}>
               <ChevronRight className="w-8 h-8 md:w-10 md:h-10" />
             </button>
           )}

@@ -4,6 +4,7 @@ import { getCleanImageUrl } from "@/lib/utils";
 
 interface SEOProps {
   title: string;
+  seoTitle?: string; // Menambahkan dukungan eksplisit untuk kolom seo_title dari database
   description?: string;
   image?: string;
   url?: string;
@@ -16,85 +17,107 @@ interface SEOProps {
 
 export default function SEO({
   title,
+  seoTitle,
   description,
   image,
-  url = typeof window !== "undefined"
-    ? window.location.href
-    : "https://daw.co.id",
+  url,
   type = "website",
   author,
   publishedAt,
   updatedAt,
   preloadImage,
 }: SEOProps) {
-  // 1. AMBIL DATA DARI CONTEXT (Hasil inputan Admin tadi)
   const { settings } = useSettings();
 
-  // Fallback values jika database kosong
-  const siteName = settings?.companyName || "Dharma Agung Wijaya";
+  // 1. SINGLE SOURCE OF TRUTH UNTUK DOMAIN
+  // Fetching VITE_SITE_URL dari .env, dengan fallback ke origin browser.
+  const envSiteUrl = import.meta.env.VITE_SITE_URL;
+  const SITE_URL = envSiteUrl
+    ? envSiteUrl.replace(/\/$/, "")
+    : typeof window !== "undefined"
+      ? window.location.origin
+      : "https://daw.co.id";
+
+  // 2. SANITASI CANONICAL URL
+  // Avoid window.location.href dan hanya mengambil pathname murni untuk memastikan tidak ada Duplicate Content.
+  const cleanPath =
+    typeof window !== "undefined" ? window.location.pathname : "";
+  const canonicalUrl = url || `${SITE_URL}${cleanPath}`;
+
+  // 3. FALLBACK DATA
+  const siteName = settings?.companyName || "PT Dharma Agung Wijaya";
   const defaultDesc =
     "PT Dharma Agung Wijaya (DAW Group) is an operating holding company focusing on Renewable Energy and Natural Resources.";
   const metaDesc = description || defaultDesc;
 
-  // 2. LOGO & FAVICON DINAMIS
-  // Favicon: Hanya ikon (buat di tab)
+  // 4. ASSET
   const dynamicFavicon = settings?.faviconUrl
     ? getCleanImageUrl(settings.faviconUrl)
     : "/favicon.png";
 
-  // Logo: Buat sharing sosmed & JSON-LD
   const dynamicLogo = settings?.logoUrl
     ? getCleanImageUrl(settings.logoUrl)
     : "/logo-daw.png";
 
-  // Base URL buat sosmed (WA/LinkedIn butuh full URL https://...)
-  const baseUrl = window.location.origin;
+  const absoluteLogo = dynamicLogo.startsWith("http")
+    ? dynamicLogo
+    : `${SITE_URL}${dynamicLogo.startsWith("/") ? "" : "/"}${dynamicLogo}`;
 
-  // 3. SMART TITLE LOGIC
+  // 5. PRIORITY ENGINE UNTUK TITLE
+  const activeTitle = seoTitle || title;
   const pageTitle =
-    title.includes("DAW") || title.includes(siteName)
-      ? title
-      : `${title} | ${siteName}`;
+    activeTitle.includes("DAW") ||
+    activeTitle.includes(siteName) ||
+    activeTitle.includes("Dharma Agung Wijaya")
+      ? activeTitle
+      : `${activeTitle} | ${siteName}`;
 
-  // Assembly Absolute Image URL (Penting buat preview WA)
-  const shareImage = image || dynamicLogo;
+  // 6. ABSOLUTE IMAGE URL UNTUK OPEN GRAPH
+  const shareImage = image ? getCleanImageUrl(image) : dynamicLogo;
   const absoluteImage = shareImage.startsWith("http")
     ? shareImage
-    : `${baseUrl}${shareImage}`;
+    : `${SITE_URL}${shareImage.startsWith("/") ? "" : "/"}${shareImage}`;
 
-  // 4. JSON-LD (Dinamis sesuai data Admin)
+  // 7. STRUCTURED DATA (JSON-LD)
   const structuredData = {
     "@context": "https://schema.org",
     "@type": type === "article" ? "Article" : "Organization",
     ...(type === "article"
       ? {
-          headline: title,
+          mainEntityOfPage: {
+            "@type": "WebPage",
+            "@id": canonicalUrl,
+          },
+          headline: activeTitle,
           description: metaDesc,
           image: absoluteImage,
           author: { "@type": "Organization", name: author || siteName },
           publisher: {
             "@type": "Organization",
             name: siteName,
-            logo: { "@type": "ImageObject", url: `${baseUrl}${dynamicLogo}` },
+            logo: { "@type": "ImageObject", url: absoluteLogo },
           },
           datePublished: publishedAt || new Date().toISOString(),
           dateModified: updatedAt || new Date().toISOString(),
         }
       : {
           name: siteName,
-          url: baseUrl,
-          logo: `${baseUrl}${dynamicLogo}`,
+          url: SITE_URL,
+          logo: absoluteLogo,
           description: metaDesc,
           address: {
             "@type": "PostalAddress",
             streetAddress: settings?.address || "Jakarta, Indonesia",
           },
-          contactPoint: {
-            "@type": "ContactPoint",
-            telephone: settings?.phone,
-            email: settings?.email,
-            contactType: "customer service",
-          },
+          contactPoint:
+            settings?.phone || settings?.email
+              ? {
+                  "@type": "ContactPoint",
+                  telephone: settings?.phone || "",
+                  email: settings?.email || "",
+                  contactType: "customer service",
+                }
+              : undefined,
         }),
   };
 
@@ -104,34 +127,30 @@ export default function SEO({
         <link
           rel="preload"
           as="image"
-          href={preloadImage}
+          href={getCleanImageUrl(preloadImage)}
           fetchPriority="high"
         />
       )}
-      {/* --- DYNAMIC FAVICON (Ini yang bikin logo tab berubah) --- */}
+
       <link rel="icon" type="image/png" href={dynamicFavicon} />
       <link rel="apple-touch-icon" href={dynamicFavicon} />
 
-      {/* --- STANDARD BROWSER SEO --- */}
       <title>{pageTitle}</title>
       <meta name="description" content={metaDesc} />
-      <link rel="canonical" href={url} />
+      <link rel="canonical" href={canonicalUrl} />
 
-      {/* --- OPEN GRAPH (WA, LinkedIn, FB) --- */}
       <meta property="og:site_name" content={siteName} />
       <meta property="og:title" content={pageTitle} />
       <meta property="og:description" content={metaDesc} />
       <meta property="og:type" content={type} />
-      <meta property="og:url" content={url} />
+      <meta property="og:url" content={canonicalUrl} />
       <meta property="og:image" content={absoluteImage} />
 
-      {/* --- TWITTER --- */}
       <meta name="twitter:card" content="summary_large_image" />
       <meta name="twitter:title" content={pageTitle} />
       <meta name="twitter:description" content={metaDesc} />
       <meta name="twitter:image" content={absoluteImage} />
 
-      {/* --- JSON-LD --- */}
       <script type="application/ld+json">
         {JSON.stringify(structuredData)}
       </script>

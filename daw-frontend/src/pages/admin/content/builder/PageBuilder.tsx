@@ -727,13 +727,6 @@ export default function PageBuilder() {
                 <h2 className="text-xl font-bold text-slate-900 tracking-tight">
                   {editingId ? "Edit Document" : "Create Document"}
                 </h2>
-                <div className="flex items-center gap-2 mt-0.5">
-                  <span
-                    className={`text-[10px] font-black uppercase tracking-widest px-2 py-0.5 rounded
-                    ${isSuperadmin ? "bg-amber-100 text-amber-700" : "bg-slate-100 text-slate-500"}`}>
-                    {isSuperadmin ? "Sovereign Mode" : "Restrictive Mode"}
-                  </span>
-                </div>
               </div>
             </div>
 
@@ -1331,9 +1324,7 @@ export default function PageBuilder() {
             </div>
           </div>
 
-          {/* ============================================================ */}
-          {/* 🛡️ BLUEPRINT: MASTER ACTION FOOTER (Baton Pass Logic)        */}
-          {/* ============================================================ */}
+          {/* BLUEPRINT: MASTER ACTION FOOTER (Baton Pass Logic)        */}
           <div className="px-8 py-6 bg-slate-900 flex flex-col sm:flex-row justify-between items-center mt-4 gap-4">
             <div>
               <p className="text-[11px] text-slate-400 font-bold uppercase tracking-widest">

@@ -1,4 +1,4 @@
-import { Routes, Route, Navigate } from "react-router-dom";
+import { Routes, Route } from "react-router-dom";
 import { lazy, Suspense } from "react";
 import { Toaster } from "sonner";
 import { AuthProvider } from "./contexts/AuthContext";
@@ -16,6 +16,7 @@ const OurBusinesses = lazy(() => import("./pages/public/OurBusinesses"));
 const ContactUs = lazy(() => import("./pages/public/ContactUs"));
 const ProjectDetail = lazy(() => import("./pages/public/ProjectDetail"));
 const DynamicPage = lazy(() => import("./pages/public/DynamicPage"));
+const NotFound = lazy(() => import("./pages/public/NotFound"));
 
 // Lazy Import Auth
 const Login = lazy(() => import("./pages/admin/system/auth/Login"));
@@ -58,7 +59,7 @@ function App() {
       <Toaster position="top-center" richColors />
       <Suspense fallback={<PageLoader />}>
         <Routes>
-          {/* 1. Public Routes */}
+          {/* Public Routes */}
           <Route element={<MainLayout />}>
             <Route path="/" element={<Home />} />
             <Route path="/about" element={<AboutUs />} />
@@ -66,26 +67,23 @@ function App() {
             <Route path="/contact-us" element={<ContactUs />} />
             <Route path="/projects/:slug" element={<ProjectDetail />} />
             <Route path="page/:slug" element={<DynamicPage />} />
+            <Route path="*" element={<NotFound />} />
           </Route>
 
-          {/* 2. Authentication Route (SSO OWL) */}
+          {/* Authentication Route (SSO OWL) */}
           <Route path="/admin/login" element={<Login />} />
-          {/* Note: Password management routes commented out as per OWL integration */}
 
-          {/* 3. Admin Routes (Protected) */}
+          {/* Admin Routes (Protected) */}
           <Route element={<ProtectedRoute />}>
             <Route path="/admin" element={<AdminLayout />}>
-              {/* Dashboard - Terbuka untuk semua Authenticated User */}
               <Route index element={<Dashboard />} />
 
-              {/* Projects - Relative Paths */}
               <Route path="projects">
                 <Route index element={<ProjectManagement />} />
                 <Route path="create" element={<ProjectForm />} />
                 <Route path="edit/:id" element={<ProjectForm />} />
               </Route>
 
-              {/* Module-Specific Permissions */}
               <Route element={<ProtectedRoute permission="manage_content" />}>
                 <Route
                   path="content"
@@ -127,14 +125,12 @@ function App() {
                 <Route path="users" element={<UserManagement />} />
                 <Route path="roles" element={<RoleManagement />} />
               </Route>
+
               <Route element={<ProtectedRoute permission="manage_approvals" />}>
                 <Route path="approvals" element={<ApprovalCenter />} />
               </Route>
             </Route>
           </Route>
-
-          {/* 4. Catch-all 404 Route */}
-          <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </Suspense>
     </AuthProvider>
