@@ -19,10 +19,6 @@ const cleanDawUrl = DAW_API_URL.endsWith("/")
 // URL untuk akses file assets
 export const BASE_UPLOAD_URL = API_URL.replace("/api", "") + "/uploads";
 
-/**
- * 🚀 AXIOS INSTANCES
- */
-
 // Instance 1: Untuk CMS internal
 const api = axios.create({
   baseURL: API_URL,
