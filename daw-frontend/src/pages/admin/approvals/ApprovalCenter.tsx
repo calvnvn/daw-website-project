@@ -765,19 +765,19 @@ export default function ApprovalCenter() {
     }
   };
 
-  const handleDiscard = async (notrans: string) => {
-    const toastId = toast.loading("Membersihkan notifikasi draf...");
-    try {
-      await api.patch(`/approval/discard/${notrans}`);
-      toast.success("Notifikasi draf berhasil diabaikan.", { id: toastId });
-      fetchApprovals(); // Refresh UI
-    } catch (error: any) {
-      toast.error("Gagal mengabaikan draf", {
-        description: error.response?.data?.message || "Kesalahan server.",
-        id: toastId,
-      });
-    }
-  };
+  // const handleDiscard = async (notrans: string) => {
+  //   const toastId = toast.loading("Membersihkan notifikasi draf...");
+  //   try {
+  //     await api.patch(`/approval/discard/${notrans}`);
+  //     toast.success("Notifikasi draf berhasil diabaikan.", { id: toastId });
+  //     fetchApprovals(); // Refresh UI
+  //   } catch (error: any) {
+  //     toast.error("Gagal mengabaikan draf", {
+  //       description: error.response?.data?.message || "Kesalahan server.",
+  //       id: toastId,
+  //     });
+  //   }
+  // };
 
   const handleBulkApprove = async () => {
     if (selectedTickets.size === 0) return;
@@ -1130,7 +1130,7 @@ export default function ApprovalCenter() {
                   <tbody className="divide-y divide-slate-100">
                     {moduleDrafts.map((draft) => {
                       const isGhost = draft._isGhost;
-                      const isRejected = draft.status === "Rejected";
+                      // const isRejected = draft.status === "Rejected";
                       const isSelected = selectedTickets.has(draft.notrans);
                       const isActionable =
                         draft.isMyQueue &&

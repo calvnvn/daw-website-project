@@ -197,25 +197,41 @@ export default function PhilosophyTab({
     };
     return JSON.stringify(current) !== pillarForm.originalSnapshot;
   }, [pillarForm, editingPillarId]);
+  const handleRestoreTitleData = () => {
+    if (!rejectedTitleDraft?.payload) return;
+    try {
+      const payload =
+        typeof rejectedTitleDraft.payload === "string"
+          ? JSON.parse(rejectedTitleDraft.payload)
+          : rejectedTitleDraft.payload;
 
+      setTitleForm(payload?.philosophyTitle || titleForm);
+      toast.success("Draf headline dipulihkan!");
+    } catch (err) {
+      toast.error("Gagal memulihkan data draf.");
+    }
+  };
   const handleRestorePillarData = () => {
     if (!rejectedPillarDraft?.payload) return;
+    try {
+      const payload =
+        typeof rejectedPillarDraft.payload === "string"
+          ? JSON.parse(rejectedPillarDraft.payload)
+          : rejectedPillarDraft.payload;
 
-    // Pastikan jika payload dalam bentuk string (JSON), kita parse dulu
-    const payload =
-      typeof rejectedPillarDraft.payload === "string"
-        ? JSON.parse(rejectedPillarDraft.payload)
-        : rejectedPillarDraft.payload;
-
-    setPillarForm((prev) => ({
-      ...prev,
-      iconId: payload.iconId ?? prev.iconId,
-      title: payload.title ?? prev.title,
-      text: payload.text ?? prev.text,
-      orderIndex: payload.orderIndex ?? prev.orderIndex,
-    }));
-    toast.success("Data draf berhasil dipulihkan ke form!");
+      setPillarForm((prev) => ({
+        ...prev,
+        iconId: payload.iconId ?? prev.iconId,
+        title: payload.title ?? prev.title,
+        text: payload.text ?? prev.text,
+        orderIndex: payload.orderIndex ?? prev.orderIndex,
+      }));
+      toast.success("Data draf berhasil dipulihkan!");
+    } catch {
+      toast.error("Format data draf tidak valid.");
+    }
   };
+
   const handleDiscardPillarDraft = async () => {
     if (!rejectedPillarDraft?.notrans) return;
     const loadingToast = toast.loading("Membersihkan notifikasi pilar...");
@@ -336,20 +352,7 @@ export default function PhilosophyTab({
 
                 <div className="pt-2 flex flex-col sm:flex-row sm:items-center gap-3">
                   <button
-                    onClick={() => {
-                      // 🚀 SAFE PARSING INLINE
-                      try {
-                        const payload =
-                          typeof rejectedTitleDraft.payload === "string"
-                            ? JSON.parse(rejectedTitleDraft.payload)
-                            : rejectedTitleDraft.payload;
-
-                        setTitleForm(payload?.philosophyTitle || titleForm);
-                        toast.success("Draf headline dipulihkan!");
-                      } catch (err) {
-                        toast.error("Gagal memulihkan data draf.");
-                      }
-                    }}
+                    onClick={handleRestoreTitleData}
                     disabled={!isEditing}
                     className="flex items-center justify-center gap-2 bg-red-600 hover:bg-red-700 disabled:bg-red-300 disabled:cursor-not-allowed text-white px-5 py-2.5 rounded-lg text-xs font-bold transition-all shadow-sm active:scale-95">
                     <RotateCcw
@@ -416,7 +419,7 @@ export default function PhilosophyTab({
 
       {/* ==========================================
           SECTION 2: PILLARS COLLECTION (GRANULAR)
-          ========================================== */}
+           */}
       <div>
         <div className="flex items-center justify-between mb-6">
           <div>
@@ -504,9 +507,7 @@ export default function PhilosophyTab({
         </div>
       </div>
 
-      {/* ==========================================
-          MODAL: CREATE / EDIT PILLAR
-          ========================================== */}
+      {/* MODAL: CREATE / EDIT PILLAR */}
       {isModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200 max-h-[90vh] flex flex-col">
@@ -544,27 +545,7 @@ export default function PhilosophyTab({
                     <div className="flex flex-wrap items-center gap-2">
                       {rejectedPillarDraft.action !== "DELETE" && (
                         <button
-                          onClick={() => {
-                            // 🚀 SAFE PARSING INLINE
-                            try {
-                              const payload =
-                                typeof rejectedPillarDraft.payload === "string"
-                                  ? JSON.parse(rejectedPillarDraft.payload)
-                                  : rejectedPillarDraft.payload;
-
-                              setPillarForm({
-                                ...pillarForm,
-                                iconId: payload?.iconId ?? pillarForm.iconId,
-                                title: payload?.title ?? pillarForm.title,
-                                text: payload?.text ?? pillarForm.text,
-                                orderIndex:
-                                  payload?.orderIndex ?? pillarForm.orderIndex,
-                              });
-                              toast.success("Data pilar dipulihkan dari draf!");
-                            } catch (err) {
-                              toast.error("Gagal memulihkan data draf.");
-                            }
-                          }}
+                          onClick={handleRestorePillarData}
                           type="button"
                           className="text-[10px] font-black bg-red-600 hover:bg-red-700 text-white px-3 py-1.5 rounded flex items-center gap-1.5 transition-colors shadow-sm active:scale-95 uppercase tracking-widest">
                           <RotateCcw className="w-3 h-3" /> PULIHKAN DATA

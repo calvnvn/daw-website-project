@@ -211,7 +211,7 @@ export default function DynamicNavbar() {
 
                       {/* Dropdown Desktop */}
                       <div className="absolute top-full left-0 mt-2 w-56 bg-white shadow-xl border border-slate-100 border-t-2 border-t-daw-green rounded-b-md opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-300 transform translate-y-2 group-hover:translate-y-0 flex flex-col overflow-hidden">
-                        {menu.children.map((child) => {
+                        {menu.children.map((child: any) => {
                           const childLink = resolveLink(child);
                           const isChildExternal = child.type === "external";
 
@@ -435,7 +435,7 @@ export default function DynamicNavbar() {
                       {/* Dropdown / Accordion Anak Mobile */}
                       <div
                         className={`flex flex-col pl-4 border-l-2 border-slate-100 overflow-hidden transition-all duration-500 ease-in-out ${isOpen ? "max-h-[1000px] mt-2" : "max-h-0"}`}>
-                        {menu.children.map((child) => {
+                        {menu.children.map((child: any) => {
                           const childLink = resolveLink(child);
                           const isChildExternal = child.type === "external";
 

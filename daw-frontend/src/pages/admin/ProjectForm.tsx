@@ -91,10 +91,10 @@ export default function ProjectForm() {
 
   const { user, can } = useAuth();
   const isSuperadmin = user?.role === "superadmin" || user?.role === "admin";
-  const isEditor = !isSuperadmin;
+  // const isEditor = !isSuperadmin;
   const { sections } = useBusiness();
 
-  const [isLoading, setIsLoading] = useState(false);
+  // const [isLoading, setIsLoading] = useState(false);
   const [isFetching, setIsFetching] = useState(isEditMode);
   const [isSaving, setIsSaving] = useState(false);
 

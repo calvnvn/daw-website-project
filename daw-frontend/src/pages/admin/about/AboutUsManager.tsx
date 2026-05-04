@@ -33,7 +33,7 @@ export default function AboutUsManager() {
     "info" | "history" | "philosophy" | "management"
   >("info");
   const [isEditing, setIsEditing] = useState(false);
-  const [hideDraftBanner, setHideDraftBanner] = useState(false);
+  // const [hideDraftBanner, setHideDraftBanner] = useState(false);
 
   const isSuperadmin =
     user?.role?.toLowerCase() === "superadmin" ||
@@ -100,10 +100,10 @@ export default function AboutUsManager() {
     (currentTabState.isLocked || currentTabState.hasPartialLock);
 
   // ACTION: CLEAN DISCARD
-  const handleDiscardDraft = async () => {
-    setHideDraftBanner(true);
-    toast.info("Notifikasi penolakan disembunyikan dari layar.");
-  };
+  // const handleDiscardDraft = async () => {
+  //   setHideDraftBanner(true);
+  //   toast.info("Notifikasi penolakan disembunyikan dari layar.");
+  // };
 
   return (
     <div className="max-w-6xl mx-auto space-y-6 animate-in fade-in duration-500 pb-12">

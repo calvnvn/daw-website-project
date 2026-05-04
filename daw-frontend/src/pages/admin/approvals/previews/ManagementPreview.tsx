@@ -11,7 +11,7 @@ export default function ManagementPreview({ data }: { data: any }) {
   };
 
   const isChairman = data.level === "chairman";
-  const isDirector = data.level === "director";
+  // const isDirector = data.level === "director";
 
   return (
     <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200">

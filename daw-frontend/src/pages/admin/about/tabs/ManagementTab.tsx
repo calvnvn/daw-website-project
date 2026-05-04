@@ -37,7 +37,7 @@ export default function ManagementTab({
 
   // THE DRAFT & SYSTEM STATES
   const [isSaving, setIsSaving] = useState(false);
-  const [isDiscarding, setIsDiscarding] = useState(false);
+  const [, setIsDiscarding] = useState(false);
   const [rejectedDraft, setRejectedDraft] = useState<any | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -190,7 +190,7 @@ export default function ManagementTab({
       }));
 
       toast.success("Data teks dipulihkan dari draf!");
-    } catch (err) {
+    } catch {
       toast.error("Gagal membaca struktur draf.");
     }
   };
@@ -211,7 +211,7 @@ export default function ManagementTab({
       await refreshData();
       toast.success("Notifikasi berhasil dibersihkan.", { id: loadingToast });
       setIsPersonModalOpen(false); // Tutup modal setelah dibuang
-    } catch (error) {
+    } catch {
       toast.error("Gagal membersihkan notifikasi.", { id: loadingToast });
     } finally {
       setIsDiscarding(false);

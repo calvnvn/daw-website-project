@@ -24,7 +24,7 @@ interface BusinessEditorProps {
 }
 
 export default function BusinessEditor({
-  activeTab,
+  // activeTab,
   formData,
   setFormData,
   isEditing,

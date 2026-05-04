@@ -130,9 +130,7 @@ export default function InvestmentsManager() {
   const [originalContent, setOriginalContent] = useState(pageContent);
 
   const [localCompanies, setLocalCompanies] = useState<LocalAffiliate[]>([]);
-  const [originalCompanies, setOriginalCompanies] = useState<LocalAffiliate[]>(
-    [],
-  );
+  const [, setOriginalCompanies] = useState<LocalAffiliate[]>([]);
   const [rejectedAffiliates, setRejectedAffiliates] = useState<
     Record<string, any>
   >({});

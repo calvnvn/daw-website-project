@@ -340,8 +340,8 @@ export default function ProjectManagement() {
                 </tr>
               ) : filteredProjects.length > 0 ? (
                 filteredProjects.map((project) => {
-                  const isRejected = project.has_rejected;
-                  const isLocked = project.is_locked;
+                  // const isRejected = project.has_rejected;
+                  // const isLocked = project.is_locked;
                   // isNeedsRevision: Prioritas #1 (Urgensi Tinggi)
                   const isNeedsRevision = project.has_rejected;
 
