@@ -127,9 +127,9 @@ export function ContentProvider({ children }: { children: ReactNode }) {
     refreshData();
 
     const handleDataUpdate = () => {
-      console.log(
-        "🔄 [ContentContext] Sinyal pembaruan diterima, menyinkronkan ulang...",
-      );
+      // console.log(
+      //   "🔄 [ContentContext] Sinyal pembaruan diterima, menyinkronkan ulang...",
+      // );
       refreshData();
     };
 

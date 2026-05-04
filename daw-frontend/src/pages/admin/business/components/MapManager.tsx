@@ -36,11 +36,11 @@ export default function MapManager({
   updateMarker,
   removeMarker,
 }: MapManagerProps) {
-  console.log(">>> [MAP DEBUG] Categories Received:", categories);
-  console.log(
-    ">>> [MAP DEBUG] First Marker CategoryID:",
-    formData.mapMarkers[0]?.categoryId,
-  );
+  // console.log(">>> [MAP DEBUG] Categories Received:", categories);
+  // console.log(
+  //   ">>> [MAP DEBUG] First Marker CategoryID:",
+  //   formData.mapMarkers[0]?.categoryId,
+  // );
   const isLocked = !isEditing;
   const itemLockStyles = isLocked
     ? "opacity-75 grayscale-[0.3] select-none"

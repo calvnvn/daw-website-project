@@ -605,10 +605,10 @@ export default function ApprovalCenter() {
     setIsLoading(true);
     try {
       const response = await api.get("/approval/list");
-      console.log(
-        ">>> [DEBUG FRONTEND] Raw Drafts from Server:",
-        response.data,
-      );
+      // console.log(
+      //   ">>> [DEBUG FRONTEND] Raw Drafts from Server:",
+      //   response.data,
+      // );
       const data = response.data;
       setDrafts(Array.isArray(data) ? data : []);
     } catch {

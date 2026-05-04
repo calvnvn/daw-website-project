@@ -157,7 +157,7 @@ export function AboutProvider({ children }: { children: ReactNode }) {
 
     return () => {
       controller.abort();
-      console.log("🧠 AboutContext: Fetch Aborted on Unmount.");
+      // console.log("🧠 AboutContext: Fetch Aborted on Unmount.");
     };
   }, [fetchData]);
 

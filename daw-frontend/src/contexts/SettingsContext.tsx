@@ -79,7 +79,7 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
         setSettings(liveData);
 
         if (res.has_rejected || res.hasRejected) {
-          console.log("🎯 Radar Detected Rejection via Main Ledger");
+          // console.log("🎯 Radar Detected Rejection via Main Ledger");
           finalRejectedData = res.rejected_data || res.rejectedData;
         }
       }
@@ -89,7 +89,7 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
         if (resRadar.has_rejected || resRadar.hasRejected || resRadar.success) {
           const draftData = resRadar.rejected_data || resRadar.data;
           if (draftData) {
-            console.log("📡 Radar Detected Rejection via Secondary Vault Scan");
+            // console.log("📡 Radar Detected Rejection via Secondary Vault Scan");
             finalRejectedData = draftData;
           }
         }

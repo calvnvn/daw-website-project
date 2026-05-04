@@ -84,7 +84,7 @@ const GalleryPreviewItem = ({
 export default function ProjectForm() {
   const navigate = useNavigate();
   const { id } = useParams();
-  console.log("Current ID from URL:", id);
+  // console.log("Current ID from URL:", id);
 
   const isEditMode = !!id;
   const quillRef = useRef<ReactQuill>(null);
@@ -197,7 +197,7 @@ export default function ProjectForm() {
       setIsFetching(true);
 
       try {
-        console.log("Hitting API with ID:", id);
+        // console.log("Hitting API with ID:", id);
         const [projectRes, draftRes] = await Promise.allSettled([
           api.get(`/projects/${id}`, { signal: controller.signal }),
           api.get(`/approval/rejected/${id}?module=Project`, {

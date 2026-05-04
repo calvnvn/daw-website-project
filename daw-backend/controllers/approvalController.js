@@ -363,9 +363,9 @@ exports.getRejectedDraftByTarget = async (req, res) => {
     });
 
     if (!draft) {
-      console.log(
-        `🔍 [RECOVERY] Not found for ID: ${id}. Checked identities: ${username}, ${karyawanId}`,
-      );
+      // console.log(
+      //   `🔍 [RECOVERY] Not found for ID: ${id}. Checked identities: ${username}, ${karyawanId}`,
+      // );
       return res.status(200).json({
         message: "Tidak ada draf tertunda.",
         hasRejected: false,

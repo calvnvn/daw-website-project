@@ -76,9 +76,9 @@ export default function HeroManager() {
       slides.forEach((slide) => {
         if (slide.previewUrl) {
           URL.revokeObjectURL(slide.previewUrl);
-          console.log(
-            `🧠 [Memory Safety]: Preview image for slide ${slide.id} revoked.`,
-          );
+          // console.log(
+          //   `🧠 [Memory Safety]: Preview image for slide ${slide.id} revoked.`,
+          // );
         }
       });
     };

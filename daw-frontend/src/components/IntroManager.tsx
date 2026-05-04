@@ -25,10 +25,10 @@ export default function IntroManager() {
 
   // 🚀 Global Intelligence: Tarik rejectedIntro dari Context v1.2
   const { settings: initialSettings, rejectedIntro, refreshData } = useHome();
-  console.log("🔍 DEBUG INTRO MANAGER:");
-  console.log("- User Role:", user?.role);
-  console.log("- is_locked from Server:", initialSettings?.is_locked);
-  console.log("- Rejected Draft Found:", rejectedIntro);
+  // console.log("🔍 DEBUG INTRO MANAGER:");
+  // console.log("- User Role:", user?.role);
+  // console.log("- is_locked from Server:", initialSettings?.is_locked);
+  // console.log("- Rejected Draft Found:", rejectedIntro);
 
   // --- State Utama Form ---
   const [settings, setSettings] = useState({
