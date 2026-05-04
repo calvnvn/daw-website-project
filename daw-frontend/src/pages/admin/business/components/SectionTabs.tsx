@@ -36,7 +36,7 @@ const SectionTabs = memo(function SectionTabs({
   onAddClick,
 }: SectionTabsProps) {
   return (
-    <div className="flex items-end overflow-x-auto border border-slate-200 border-b-0 shadow-sm bg-white rounded-t-xl px-2 pt-2 hide-scrollbar sticky top-0 z-30">
+    <div className="flex items-end overflow-x-auto border border-slate-200 border-b-0 shadow-sm bg-white rounded-t-xl px-2 pt-2 hide-scrollbar top-0 z-30">
       {/* DYNAMIC DATABASE TABS */}
       {sections.map((section) => {
         const isActive = activeTab === section.id;
