@@ -9,7 +9,7 @@ export default function MapMarkerPreview({ data }: { data: any }) {
 
   return (
     <div className="p-2 space-y-4">
-      {/* 🗺️ MINI MAP CANVAS */}
+      {/*  MINI MAP CANVAS */}
       <div className="relative w-full aspect-[16/9] bg-slate-100 rounded-2xl border border-slate-200 overflow-hidden shadow-inner">
         <img
           src={mapBase}

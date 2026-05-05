@@ -418,18 +418,18 @@ export default function DynamicPage() {
                     [&>*:first-child]:mt-0
                     /* 2. PROSE CORE */ 
                     prose prose-slate prose-lg md:prose-xl max-w-none
-                    prose-p:leading-[1.8] prose-p:text-slate-600 prose-p:mb-10 
+                    prose-p:leading-[1.8] prose-p:text-slate-600 prose-p:mb-5 
                     prose-p:text-[1.125rem] md:prose-p:text-[1.2rem]
                     prose-headings:font-serif prose-headings:text-slate-900 prose-headings:scroll-mt-32 
                     
                     /* 3. HEADINGS - Serif Elegance */
-                    prose-h2:text-3xl md:prose-h2:text-5xl prose-h2:mt-20 prose-h2:mb-8
+                    prose-h2:text-3xl md:prose-h2:text-5xl prose-h2:mt-10 prose-h2:mb-8
                     prose-headings:tracking-tight prose-headings:font-bold
-                    prose-h3:text-2xl md:prose-h3:text-3xl prose-h3:mt-12
+                    prose-h3:text-2xl md:prose-h3:text-3xl prose-h3:mt-10
                     
                     /* 4. MEDIA - Round & Polished */
-                    [&_img]:rounded-[2rem] [&_img]:my-16
-                    [&_iframe]:rounded-[1.5rem] [&_iframe]:shadow-2xl [&_iframe]:my-12
+                    [&_img]:rounded-[2rem] [&_img]:my-5
+                    [&_iframe]:rounded-[1.5rem] [&_iframe]:shadow-2xl [&_iframe]:my-5
                     
                     /* 5. DROP CAP - The "Vogue" Style */
                     ${

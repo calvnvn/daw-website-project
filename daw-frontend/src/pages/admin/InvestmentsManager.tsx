@@ -121,7 +121,7 @@ export default function InvestmentsManager() {
   const { settings, companies, rejectedSettings, refreshData } =
     useInvestments();
 
-  // --- STATES & SNAPSHOTS (DIFF ENGINE) ---
+  // STATES & SNAPSHOTS (DIFF ENGINE)
   const [pageContent, setPageContent] = useState({
     teaserHeadline: "",
     teaserBody: "",
@@ -486,7 +486,7 @@ export default function InvestmentsManager() {
     }
   };
 
-  // --- ARRAY MUTATION HANDLERS ---
+  // ARRAY MUTATION HANDLERS
   const addCompany = () => {
     setLocalCompanies([
       {
@@ -630,7 +630,7 @@ export default function InvestmentsManager() {
                 "
               </p>
 
-              {/* --- ACTION BUTTONS CONTAINER --- */}
+              {/* ACTION BUTTONS CONTAINER */}
               <div className="pt-2 flex flex-col sm:flex-row sm:items-center gap-3">
                 {/* ACTION 1: PULIHKAN DATA (Primary Action) */}
                 <button
@@ -1002,7 +1002,7 @@ export default function InvestmentsManager() {
                       </div>
                     )}
                     <div className="flex gap-4 items-start w-full">
-                      {/* --- LOGO UPLOAD & INDICATOR BADGES --- */}
+                      {/* LOGO UPLOAD & INDICATOR BADGES */}
                       <div className="w-24 shrink-0 relative">
                         <div className="absolute -top-3 -right-3 z-20 flex flex-col gap-1.5">
                           {isDeleting && (
@@ -1073,7 +1073,7 @@ export default function InvestmentsManager() {
                           )}
                       </div>
 
-                      {/* --- COMPANY DETAILS FORM --- */}
+                      {/* COMPANY DETAILS FORM */}
                       <fieldset
                         disabled={
                           !isEditing ||
@@ -1145,7 +1145,7 @@ export default function InvestmentsManager() {
                         />
                       </fieldset>
 
-                      {/* --- ACTION BUTTONS --- */}
+                      {/* ACTION BUTTONS */}
                       {isEditing &&
                         !isLockedForEditor &&
                         !isDeleting &&
@@ -1163,7 +1163,7 @@ export default function InvestmentsManager() {
               })}
             </div>
 
-            {/* --- EMPTY STATE (Blueprint Part 5) --- */}
+            {/* EMPTY STATE (Blueprint Part 5) */}
             {localCompanies.length === 0 && (
               <div className="col-span-full py-16 text-center text-slate-500 flex flex-col items-center gap-3 bg-slate-50 rounded-xl border border-slate-200 border-dashed">
                 <Building className="w-10 h-10 text-slate-300" />
