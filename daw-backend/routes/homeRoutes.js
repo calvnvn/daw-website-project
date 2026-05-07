@@ -5,9 +5,10 @@ const { upload, optimizeImage } = require("../middleware/upload");
 const { verifyToken, checkPermission } = require("../middleware/authJwt");
 
 // --- 1. Public Site ---
-router.get("/", [verifyToken], homeController.getHomepageData);
-
-// --- 2. Home Intro Settings (Singleton) ---
+router.get("/public", homeController.getPublicHomepageData);
+// --- 2. Admin Site ---
+router.get("/admin", [verifyToken], homeController.getAdminHomepageData);
+// --- 3. Home Intro Settings (Singleton) ---
 router.put(
   "/settings",
   [verifyToken, checkPermission("manage_homepage")],
@@ -15,7 +16,7 @@ router.put(
   homeController.updateSettings,
 );
 
-// --- 3. Hero Slides (Collection with Assets) ---
+// --- 4. Hero Slides (Collection with Assets) ---
 router.post(
   "/hero",
   [verifyToken, checkPermission("manage_homepage")],

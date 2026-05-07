@@ -9,8 +9,9 @@ import {
   type ReactNode,
 } from "react";
 import api from "@/lib/api";
+import { useAuth } from "./AuthContext"; // 1. Import useAuth
 
-// 1. TYPE DEFINITIONS
+// TYPE DEFINITIONS (Tetap Sama)
 export interface HeroSlides {
   id: number | string;
   title: string;
@@ -53,23 +54,17 @@ export interface RejectionDraft {
 }
 
 interface HomeContextType {
-  // Data Ledger (Live)
   slides: HeroSlides[];
   stats: ImpactStats[];
   settings: HomeSettings | null;
-
-  // Data Vault (Rejection Radar)
   rejectedIntro: RejectionDraft | null;
   rejectedSlidesMap: Record<string, RejectionDraft>;
   rejectedStatsMap: Record<string, RejectionDraft>;
-
-  // Lifecycle
   isLoading: boolean;
   refreshData: () => Promise<void>;
   refreshSettings: () => Promise<void>;
 }
 
-// 2. CONTEXT INITIALIZATION
 export const HomeContext = createContext<HomeContextType>({
   slides: [],
   stats: [],
@@ -83,44 +78,76 @@ export const HomeContext = createContext<HomeContextType>({
 });
 
 export function HomeProvider({ children }: { children: ReactNode }) {
-  // Data States
+  const { user } = useAuth(); // 2. Ambil state user
+
   const [slides, setSlides] = useState<HeroSlides[]>([]);
   const [stats, setStats] = useState<ImpactStats[]>([]);
   const [settings, setSettings] = useState<HomeSettings | null>(null);
-
-  // Raw Radar State
   const [rawRejectionRadar, setRawRejectionRadar] = useState<RejectionDraft[]>(
     [],
   );
-
-  // Loading State
   const [isLoading, setIsLoading] = useState(true);
 
-  //FETCHING
-  const fetchData = useCallback(async (signal?: AbortSignal) => {
-    setIsLoading(true);
-    try {
-      const response = await api.get("/homepage", { signal });
-      const payload = response.data?.data || response.data;
+  // 3. REFACTORED FETCH DATA (Dual-Fetching & Fallback)
+  const fetchData = useCallback(
+    async (signal?: AbortSignal) => {
+      // Tahan fetch jika token ada tapi user profile belum selesai di-load
+      const token = localStorage.getItem("daw_token");
+      if (token && user === null) return;
 
-      setSlides(payload.slides || []);
-      setStats(payload.stats || []);
-      setSettings(payload.settings || null);
+      // Cek Otoritas
+      const canAccessAdmin = [
+        "superadmin",
+        "admin",
+        "editor",
+        "approver",
+      ].includes(user?.role?.toLowerCase() || "");
 
-      setRawRejectionRadar(payload.rejectionRadar || []);
-    } catch (error: any) {
-      if (error.name !== "CanceledError") {
-        console.error("🚨 [HomeContext] Gagal menarik data:", error.message);
-        setSlides([]);
-        setStats([]);
-        setRawRejectionRadar([]);
+      setIsLoading(true);
+      try {
+        let payload;
+
+        if (canAccessAdmin) {
+          try {
+            // Tembak jalur Admin
+            const response = await api.get("/homepage/admin", { signal });
+            payload = response.data?.data || response.data;
+          } catch (adminError: any) {
+            if (adminError.name === "CanceledError") return;
+            console.warn(
+              "⚠️ [RETRY] Admin fetch failed, falling back to public data...",
+            );
+
+            // Banting setir ke jalur publik jika token expired/bermasalah
+            const fallback = await api.get("/homepage/public", { signal });
+            payload = fallback.data?.data || fallback.data;
+          }
+        } else {
+          // Tembak jalur Publik langsung untuk pengunjung biasa
+          const response = await api.get("/homepage/public", { signal });
+          payload = response.data?.data || response.data;
+        }
+
+        setSlides(payload?.slides || []);
+        setStats(payload?.stats || []);
+        setSettings(payload?.settings || null);
+
+        // Radar hanya diisi jika payload memiliki data rejectionRadar (biasanya dari admin)
+        setRawRejectionRadar(payload?.rejectionRadar || []);
+      } catch (error: any) {
+        if (error.name !== "CanceledError") {
+          console.error("🚨 [FATAL] Gagal menarik data Home:", error.message);
+          setSlides([]);
+          setStats([]);
+          setRawRejectionRadar([]);
+        }
+      } finally {
+        setIsLoading(false);
       }
-    } finally {
-      setIsLoading(false);
-    }
-  }, []);
+    },
+    [user],
+  ); // Dependensi ditambahkan ke user
 
-  // ABORT CONTROLLER LIFECYCLE
   useEffect(() => {
     const controller = new AbortController();
     fetchData(controller.signal);
@@ -130,7 +157,7 @@ export function HomeProvider({ children }: { children: ReactNode }) {
     };
   }, [fetchData]);
 
-  // DERIVED STATES
+  // DERIVED STATES (Tetap Sama)
   const rejectedIntro = useMemo(() => {
     return (
       rawRejectionRadar.find((d) => d.module_name === "HomeSettings") || null
@@ -161,7 +188,6 @@ export function HomeProvider({ children }: { children: ReactNode }) {
       );
   }, [rawRejectionRadar]);
 
-  // CONTEXT VALUE MEMOIZATION
   const contextValue = useMemo(
     () => ({
       slides,
@@ -191,7 +217,6 @@ export function HomeProvider({ children }: { children: ReactNode }) {
   );
 }
 
-// HOOK EXPORT
 export function useHome() {
   const context = useContext(HomeContext);
   if (!context) {

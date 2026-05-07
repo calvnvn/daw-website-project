@@ -297,9 +297,9 @@ export default function NavigationBuilder() {
           onDragLeave={() => setDragOverMenuId(null)}
           onDrop={(e) => handleDrop(e, menu, "child")}
           className={`group relative flex items-center justify-between p-4 rounded-2xl border transition-all duration-300
-            ${dragOverMenuId === `${menu.id}-child` ? "border-emerald-500 bg-emerald-50/50 shadow-inner" : "border-slate-200 bg-white shadow-sm hover:shadow-md"}
-            ${draggedMenuId === menu.id ? "opacity-30 scale-95" : "opacity-100"}
-          `}
+              ${dragOverMenuId === `${menu.id}-child` ? "border-emerald-500 bg-emerald-50/50 shadow-inner" : "border-slate-200 bg-white shadow-sm hover:shadow-md"}
+              ${draggedMenuId === menu.id ? "opacity-30 scale-95" : "opacity-100"}
+            `}
           style={{ marginLeft: `${depth * 1.5}rem` }}>
           <div className="flex items-center gap-4">
             <GripVertical className="w-4 h-4 text-slate-300 cursor-grab active:cursor-grabbing group-hover:text-slate-400" />
@@ -429,7 +429,7 @@ export default function NavigationBuilder() {
                   setFormData({ ...formData, type: "page", externalLink: "" })
                 }
                 className={`p-3 rounded-xl border-2 flex flex-col items-center gap-1.5 transition-all text-center
-                    ${formData.type === "page" ? "border-blue-500 bg-blue-50/30" : "border-slate-100 hover:border-slate-200"}`}>
+                      ${formData.type === "page" ? "border-blue-500 bg-blue-50/30" : "border-slate-100 hover:border-slate-200"}`}>
                 <FileText
                   className={`w-5 h-5 ${formData.type === "page" ? "text-blue-500" : "text-slate-400"}`}
                 />
@@ -445,7 +445,7 @@ export default function NavigationBuilder() {
                   setFormData({ ...formData, type: "external", pageId: "" })
                 }
                 className={`p-3 rounded-xl border-2 flex flex-col items-center gap-1.5 transition-all text-center
-                    ${formData.type === "external" ? "border-amber-500 bg-amber-50/30" : "border-slate-100 hover:border-slate-200"}`}>
+                      ${formData.type === "external" ? "border-amber-500 bg-amber-50/30" : "border-slate-100 hover:border-slate-200"}`}>
                 <Globe
                   className={`w-5 h-5 ${formData.type === "external" ? "text-amber-500" : "text-slate-400"}`}
                 />
@@ -467,7 +467,7 @@ export default function NavigationBuilder() {
                   })
                 }
                 className={`p-3 rounded-xl border-2 flex flex-col items-center gap-1.5 transition-all text-center
-                    ${formData.type === "folder" ? "border-emerald-500 bg-emerald-50/30" : "border-slate-100 hover:border-slate-200"}`}>
+                      ${formData.type === "folder" ? "border-emerald-500 bg-emerald-50/30" : "border-slate-100 hover:border-slate-200"}`}>
                 <Folder
                   className={`w-5 h-5 ${formData.type === "folder" ? "text-emerald-500 fill-emerald-500/20" : "text-slate-400"}`}
                 />

@@ -58,74 +58,83 @@ export function InvestmentProvider({ children }: { children: ReactNode }) {
   const fetchData = useCallback(
     async (signal?: AbortSignal) => {
       const token = localStorage.getItem("daw_token");
-      if (token && user === null) return;
 
-      const canAccessAdmin = [
-        "superadmin",
-        "admin",
-        "editor",
-        "approver",
-      ].includes(user?.role || "");
+      const hasPhysicalToken = !!token;
+      const canAccessAdmin =
+        hasPhysicalToken &&
+        ["superadmin", "admin", "editor", "approver"].includes(
+          user?.role?.toLowerCase() || "",
+        );
+
+      setIsLoading(true);
 
       try {
+        let payload;
         const promises: Promise<any>[] = [];
 
         if (canAccessAdmin) {
-          promises.push(api.get("/investments/admin", { signal }));
-          promises.push(
-            api.get("/approval/rejected/1?module=InvestmentSettings", {
-              signal,
-            }),
-          );
-        } else {
-          promises.push(api.get("/investments/public", { signal }));
-        }
+          try {
+            promises.push(api.get("/investments/admin", { signal }));
+            promises.push(
+              api.get("/approval/rejected/1?module=InvestmentSettings", {
+                signal,
+              }),
+            );
 
-        const results = await Promise.allSettled(promises);
+            const results = await Promise.allSettled(promises);
+            const dataRes = results[0];
 
-        const dataRes = results[0];
-        if (dataRes.status === "fulfilled") {
-          setSettings(dataRes.value.data.settings || null);
-          setCompanies(dataRes.value.data.companies || []);
-        } else {
-          const error = dataRes.reason;
-          if (
-            error?.name !== "CanceledError" &&
-            error?.code !== "ERR_CANCELED"
-          ) {
-            console.error("🚨 [FETCH_INVESTMENT_FAILED]:", error);
+            if (dataRes.status === "fulfilled") {
+              payload = dataRes.value.data?.data || dataRes.value.data;
 
-            if (canAccessAdmin) {
-              console.warn("⚠️ Falling back to public investment data...");
-              try {
-                const fallback = await api.get("/investments/public", {
-                  signal,
-                });
-                setSettings(fallback.data.settings || null);
-                setCompanies(fallback.data.companies || []);
-              } catch {
-                console.error("🚨 Fatal Fallback Error.");
+              const rejectedRes = results[1];
+              if (
+                rejectedRes.status === "fulfilled" &&
+                rejectedRes.value.data?.data?.hasRejected
+              ) {
+                setRejectedSettings(rejectedRes.value.data.data.data);
+              } else {
+                setRejectedSettings(null);
               }
+            } else {
+              throw dataRes.reason;
             }
-          }
-        }
+          } catch (adminError: any) {
+            if (
+              adminError.name === "CanceledError" ||
+              adminError.code === "ERR_CANCELED"
+            ) {
+              return;
+            }
 
-        // HANDLE REJECTED DRAFT (Hanya jika Admin/Editor)
-        if (canAccessAdmin && results[1]) {
-          const rejectedRes = results[1];
-          if (
-            rejectedRes.status === "fulfilled" &&
-            rejectedRes.value.data.hasRejected
-          ) {
-            setRejectedSettings(rejectedRes.value.data.data);
-          } else {
+            console.warn(
+              "⚠️ [RETRY] Admin fetch failed (401), falling back to public data...",
+            );
+
+            const fallback = await api.get("/investments/public", { signal });
+            payload = fallback.data?.data || fallback.data;
             setRejectedSettings(null);
           }
         } else {
+          // Public Site
+          const response = await api.get("/investments/public", { signal });
+          payload = response.data?.data || response.data;
           setRejectedSettings(null);
         }
-      } catch (error) {
-        console.error("❌ Global Fetch Execution Error:", error);
+
+        setSettings(payload?.settings || null);
+        setCompanies(payload?.companies || []);
+      } catch (error: any) {
+        if (error.name !== "CanceledError" && error.code !== "ERR_CANCELED") {
+          console.error("🚨 [FATAL] Global Investment Fetch Error:", {
+            message: error.message,
+            status: error.response?.status,
+            data: error.response?.data,
+          });
+          setSettings(null);
+          setCompanies([]);
+          setRejectedSettings(null);
+        }
       } finally {
         setIsLoading(false);
       }

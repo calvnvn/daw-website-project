@@ -53,8 +53,44 @@ const applyTempPrefix = (fileObj) => {
   }
 };
 
-// GET ALL HOMEPAGE DATA (Discovery & Rejection Radar)
-exports.getHomepageData = async (req, res) => {
+exports.getPublicHomepageData = async (req, res) => {
+  try {
+    const results = await Promise.allSettled([
+      HeroSlides.findAll({ order: [["order", "ASC"]] }),
+      ImpactStats.findAll({ order: [["order", "ASC"]] }),
+      HomeSettings.findByPk(1),
+    ]);
+
+    const slides = results[0].status === "fulfilled" ? results[0].value : [];
+    const stats = results[1].status === "fulfilled" ? results[1].value : [];
+    let settings = results[2].status === "fulfilled" ? results[2].value : null;
+
+    // Fallback jka settings belum ada sama sekali di DB
+    if (!settings && results[2].status === "fulfilled") {
+      settings = await HomeSettings.create({
+        id: 1,
+        introHeadline: "A Transformation Company.",
+        introBody: "Welcome to DAW.",
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      data: {
+        slides,
+        stats,
+        settings,
+      },
+    });
+  } catch (error) {
+    console.error("🚨 [PUBLIC DISCOVERY ERROR]:", error.message);
+    res
+      .status(500)
+      .json({ success: false, message: "Gagal memuat data publik beranda." });
+  }
+};
+
+exports.getAdminHomepageData = async (req, res) => {
   try {
     const lockAttributes = ["is_locked", "lock_ticket"];
 
@@ -75,7 +111,6 @@ exports.getHomepageData = async (req, res) => {
       }),
       HomeSettings.findByPk(1, { attributes: { include: lockAttributes } }),
 
-      // 🚀 FIX 3 Robust Query (Case-Insensitive & Collation Safe)
       ApprovalDraft.findAll({
         where: {
           module_name: [
@@ -101,7 +136,6 @@ exports.getHomepageData = async (req, res) => {
     const rejections =
       results[3].status === "fulfilled" ? results[3].value : [];
 
-    // Diagnostic Log
     console.log(`📡 [RADAR RESULT] Found ${rejections.length} rejected items.`);
 
     if (!settings && results[2].status === "fulfilled") {
@@ -122,10 +156,10 @@ exports.getHomepageData = async (req, res) => {
       },
     });
   } catch (error) {
-    console.error("🚨 [DISCOVERY ERROR]:", error.message);
+    console.error("🚨 [ADMIN DISCOVERY ERROR]:", error.message);
     res
       .status(500)
-      .json({ success: false, message: "Gagal memuat data beranda." });
+      .json({ success: false, message: "Gagal memuat data admin beranda." });
   }
 };
 
