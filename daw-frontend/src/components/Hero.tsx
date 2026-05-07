@@ -8,7 +8,6 @@ import { useHome } from "@/contexts/HomeContext";
 import fallbackSlide from "@/assets/hero-slide-1.jpg";
 import ScrollReveal from "./ScrollReveal";
 //  1. Import helper sakti kita
-import { getCleanImageUrl } from "@/lib/utils";
 import { BASE_UPLOAD_URL } from "@/lib/api";
 
 export default function Hero() {

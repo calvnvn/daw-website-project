@@ -697,14 +697,42 @@ export default function HeroManager() {
               {/* CONTENT AREA (TEXT) */}
               <div
                 className={`flex-1 flex flex-col gap-4 mt-${(rejectedDraft || isLocked) && !isSuperadmin ? "6" : isOverrideRow ? "6" : "0"}`}>
-                <div className="flex justify-between items-center">
-                  <span className="bg-slate-100 text-slate-500 font-bold px-2 py-0.5 rounded text-[9px] uppercase tracking-widest">
-                    Slide #{index + 1}
-                  </span>
+                {/* 💡 REFACTORED: Header Slide & Awareness Badges */}
+                <div className="flex justify-between items-start">
+                  <div className="flex flex-col gap-1 items-start">
+                    <span className="bg-slate-100 text-slate-500 font-bold px-2 py-0.5 rounded text-[9px] uppercase tracking-widest">
+                      Slide #{index + 1}
+                    </span>
+
+                    {/* THE AWARENESS BADGE LOGIC */}
+                    <div className="flex flex-wrap gap-1 mt-1">
+                      {index === 0 && (
+                        <span className="bg-daw-green/10 text-daw-green font-semibold text-[8px] px-1.5 py-0.5 rounded uppercase tracking-wider">
+                          🌐 Hero Beranda
+                        </span>
+                      )}
+                      {index === 1 && (
+                        <span className="bg-blue-50 text-blue-600 font-semibold text-[8px] px-1.5 py-0.5 rounded uppercase tracking-wider">
+                          🏢 About Us
+                        </span>
+                      )}
+                      {index === 2 && (
+                        <span className="bg-amber-50 text-amber-600 font-semibold text-[8px] px-1.5 py-0.5 rounded uppercase tracking-wider">
+                          💼 Our Businesses
+                        </span>
+                      )}
+                      {index === 3 && (
+                        <span className="bg-purple-50 text-purple-600 font-semibold text-[8px] px-1.5 py-0.5 rounded uppercase tracking-wider">
+                          📞 Contact Us
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
                   {isEditing && !shouldLockRowUI && (
                     <button
                       onClick={() => removeSlide(slide.id)}
-                      className="text-slate-300 hover:text-red-500 transition-colors p-1">
+                      className="text-slate-300 hover:text-red-500 transition-colors p-1 mt-0.5">
                       <Trash2 className="w-4 h-4" />
                     </button>
                   )}

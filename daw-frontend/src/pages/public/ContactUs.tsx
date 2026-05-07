@@ -7,7 +7,6 @@ import {
   ArrowRight,
   CheckCircle2,
   ChevronDown,
-  ChevronRight,
   Mail,
   Info,
   LinkIcon,
@@ -22,6 +21,7 @@ import { useSettings } from "@/contexts/SettingsContext";
 import api from "@/lib/api";
 import { toast } from "sonner";
 import SEO from "@/components/SEO";
+import GlobalHeroBanner from "@/components/ui/GlobalHeroBanner";
 
 export default function ContactUs() {
   const { t } = useTranslation();
@@ -151,43 +151,12 @@ export default function ContactUs() {
           className="fixed top-0 left-0 h-1.5 bg-gradient-to-r from-daw-green via-emerald-400 to-daw-green z-[100] transition-all duration-150 ease-out shadow-[0_0_10px_rgba(16,185,129,0.5)]"
           style={{ width: `${scrollProgress}%` }}
         />
-        {/* --- BANNER SECTION --- */}
-        <section className="relative h-[85vh] flex items-center justify-center overflow-hidden">
-          {/* Background Image with Slow Zoom Animation */}
-          <div
-            className="absolute inset-0 bg-cover bg-center transition-transform duration-700 hover:scale-105"
-            style={{
-              backgroundImage: `url(${bannerImg})`,
-              backgroundAttachment: "fixed", // Menambahkan efek parallax
-            }}
-          />
-          {/* DAW Green Overlay (Multiply for rich color blending) */}
-          <div className="absolute inset-0 bg-daw-green/70 mix-blend-multiply" />
-          {/* Gradient Overlay untuk keterbacaan teks */}
-          <div className="absolute inset-0 bg-gradient-to-b from-slate-900/60 via-slate-900/40 to-slate-900/80" />{" "}
-          {/* Text Content */}
-          <div className="relative z-10 text-center px-6 max-w-5xl mt-16 animate-in fade-in slide-in-from-bottom-12 duration-1000">
-            <ScrollReveal direction="up" delay={0}>
-              <h1 className="text-5xl md:text-7xl lg:text-8xl font-serif font-bold text-white mb-10 leading-[1.1] tracking-tight drop-shadow-lg">
-                {t("contactPage.title", "Get in Touch")}
-              </h1>
-            </ScrollReveal>
-            <ScrollReveal direction="up" delay={200}>
-              {/* Dekorasi Garis (Mirip di Dynamic Page) */}
-              <div className="flex items-center justify-center gap-8">
-                <div className="h-px w-16 bg-white/30" />
-                <div className="w-3 h-3 border-2 border-daw-yellow rotate-45" />
-                <div className="h-px w-16 bg-white/30" />
-              </div>
-            </ScrollReveal>
-          </div>
-          <div className="absolute bottom-12 left-1/2 -translate-x-1/2 flex flex-col items-center gap-2 text-white/50 animate-bounce">
-            <span className="text-[10px] font-bold tracking-widest uppercase">
-              Scroll to Explore
-            </span>
-            <ChevronRight className="rotate-90 w-4 h-4" />
-          </div>
-        </section>
+
+        <GlobalHeroBanner
+          title={t("contactPage.title", "Get in Touch")}
+          targetIndex={0}
+          localFallback={bannerImg}
+        />
 
         {/* --- MAIN SPLIT LAYOUT --- */}
         <section className="py-20 bg-[#F8F9FA]">
@@ -217,8 +186,7 @@ export default function ContactUs() {
                         allowFullScreen
                         loading="lazy"
                         referrerPolicy="no-referrer-when-downgrade"
-                        title="DAW Headquarters Location"
-                      ></iframe>
+                        title="DAW Headquarters Location"></iframe>
                     </div>
 
                     <div className="space-y-8">
@@ -246,8 +214,7 @@ export default function ContactUs() {
                           </h4>
                           <a
                             href={`tel:${settings?.phone ? settings.phone.replace(/\s+/g, "") : ""}`}
-                            className="font-sans text-slate-600 text-sm hover:text-daw-green transition-colors"
-                          >
+                            className="font-sans text-slate-600 text-sm hover:text-daw-green transition-colors">
                             {settings?.phone || "+62 21 2966 1956"}
                           </a>
                         </div>
@@ -269,8 +236,7 @@ export default function ContactUs() {
                             }
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="font-sans text-slate-600 text-sm hover:text-daw-green transition-colors"
-                          >
+                            className="font-sans text-slate-600 text-sm hover:text-daw-green transition-colors">
                             {settings?.website || "www.daw.co.id"}
                           </a>
                         </div>
@@ -285,8 +251,7 @@ export default function ContactUs() {
                           </h4>
                           <a
                             href={`mailto:${settings?.email || "info@daw.co.id"}`}
-                            className="font-sans text-slate-600 text-sm hover:text-daw-green transition-colors"
-                          >
+                            className="font-sans text-slate-600 text-sm hover:text-daw-green transition-colors">
                             {settings?.email || "info@daw.co.id"}
                           </a>
                         </div>
@@ -311,8 +276,7 @@ export default function ContactUs() {
 
                     <form
                       onSubmit={handleSubmit(onSubmit)}
-                      className="space-y-6"
-                    >
+                      className="space-y-6">
                       {/* --- BAGIAN 1: SUBJECT (Trigger Utama) --- */}
                       <div className="space-y-2 relative z-20">
                         <label className="text-xs font-bold text-slate-500 uppercase tracking-widest">
@@ -329,8 +293,7 @@ export default function ContactUs() {
                               errors.subject
                                 ? "border-red-400 focus:ring-2 focus:ring-red-100"
                                 : "border-slate-200 focus:ring-2 focus:ring-daw-green/20 focus:border-daw-green"
-                            }`}
-                          >
+                            }`}>
                             <option value="" disabled>
                               {isLoadingSubjects
                                 ? "Loading subjects..."
@@ -432,8 +395,7 @@ export default function ContactUs() {
                           isRedirectActive
                             ? "max-h-0 opacity-0 pointer-events-none translate-y-4"
                             : "max-h-[500px] opacity-100 translate-y-0"
-                        }`}
-                      >
+                        }`}>
                         <div className="space-y-6">
                           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-1">
                             <div className="space-y-2">
@@ -498,8 +460,7 @@ export default function ContactUs() {
                                 errors.message
                                   ? "border-red-400 focus:ring-2 focus:ring-red-100"
                                   : "border-slate-200 focus:ring-2 focus:ring-daw-green/20 focus:border-daw-green"
-                              }`}
-                            ></textarea>
+                              }`}></textarea>
                             {errors.message && (
                               <p className="text-red-500 text-xs mt-1">
                                 {errors.message?.message}
@@ -527,8 +488,7 @@ export default function ContactUs() {
                         <button
                           type="button"
                           onClick={() => window.open(redirectUrl, "_blank")}
-                          className="group w-full inline-flex items-center justify-center gap-3 bg-daw-green hover:bg-daw-yellow text-white px-8 py-4 rounded-xl font-bold uppercase tracking-widest text-sm transition-all duration-300 shadow-[0_4px_14px_rgba(16,185,129,0.3)] hover:shadow-[0_6px_20px_rgba(16,185,129,0.4)]"
-                        >
+                          className="group w-full inline-flex items-center justify-center gap-3 bg-daw-green hover:bg-daw-yellow text-white px-8 py-4 rounded-xl font-bold uppercase tracking-widest text-sm transition-all duration-300 shadow-[0_4px_14px_rgba(16,185,129,0.3)] hover:shadow-[0_6px_20px_rgba(16,185,129,0.4)]">
                           <span>More about {selectedSubjectName}</span>
                           <LinkIcon className="w-4 h-4 group-hover:translate-x-1 group-hover:-translate-y-1 transition-transform" />
                         </button>
@@ -536,8 +496,7 @@ export default function ContactUs() {
                         <button
                           type="submit"
                           disabled={isSubmitting}
-                          className="group w-full inline-flex items-center justify-center gap-3 bg-[#081C15] hover:bg-slate-800 disabled:bg-slate-400 disabled:cursor-not-allowed text-white px-8 py-4 rounded-xl font-bold uppercase tracking-widest text-sm transition-all duration-300 shadow-md hover:shadow-lg"
-                        >
+                          className="group w-full inline-flex items-center justify-center gap-3 bg-[#081C15] hover:bg-slate-800 disabled:bg-slate-400 disabled:cursor-not-allowed text-white px-8 py-4 rounded-xl font-bold uppercase tracking-widest text-sm transition-all duration-300 shadow-md hover:shadow-lg">
                           {isSubmitting ? (
                             <>
                               <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>

@@ -6,16 +6,14 @@ import History from "@/components/about/History";
 import Philosophy from "@/components/about/Philosophy";
 import Management from "@/components/about/Management";
 import ScrollReveal from "@/components/ScrollReveal";
-import { ChevronRight } from "lucide-react"; // Tambahkan icon ini
 import bannerImg from "@/assets/about-banner.jpg";
 import SEO from "@/components/SEO";
+import GlobalHeroBanner from "@/components/ui/GlobalHeroBanner";
 
 export default function AboutUs() {
   const { t } = useTranslation();
   const [searchParams, setSearchParams] = useSearchParams();
   const activeTab = searchParams.get("tab") || "company";
-
-  // Scroll Progress Logic
   const [scrollProgress, setScrollProgress] = useState(0);
 
   const getTabLabel = () => {
@@ -84,46 +82,12 @@ export default function AboutUs() {
           className="fixed top-0 left-0 h-1.5 bg-gradient-to-r from-daw-green via-emerald-400 to-daw-green z-[100] transition-all duration-150 ease-out shadow-[0_0_10px_rgba(16,185,129,0.5)]"
           style={{ width: `${scrollProgress}%` }}
         />
-        {/* --- BANNER SECTION --- */}
-        <section className="relative h-[85vh] flex items-center justify-center overflow-hidden">
-          {/* Background Image with Slow Zoom Animation */}
-          <div
-            className="absolute inset-0 bg-cover bg-center transition-transform duration-700 hover:scale-105"
-            style={{
-              backgroundImage: `url(${bannerImg})`,
-              backgroundAttachment: "fixed", // Menambahkan efek parallax
-            }}
-          />
-          {/* DAW Green Overlay (Multiply for rich color blending) */}
-          <div className="absolute inset-0 bg-daw-green/70 mix-blend-multiply" />
-          {/* Gradient Overlay untuk keterbacaan teks */}
-          <div className="absolute inset-0 bg-gradient-to-b from-slate-900/60 via-slate-900/40 to-slate-900/80" />{" "}
-          {/* Text Content */}
-          <div className="relative z-10 text-center px-6 max-w-5xl mt-16 animate-in fade-in slide-in-from-bottom-12 duration-1000">
-            <ScrollReveal direction="up" delay={0}>
-              {/* Judul yang lebih besar */}
-              <h1 className="text-5xl md:text-7xl lg:text-8xl font-serif font-bold text-white mb-10 leading-[1.1] tracking-tight drop-shadow-lg">
-                {t("about.title", "About Us")}
-              </h1>
-            </ScrollReveal>
-            <ScrollReveal direction="up" delay={200}>
-              {/* Dekorasi Garis (Mirip di Dynamic Page) */}
-              <div className="flex items-center justify-center gap-8">
-                <div className="h-px w-16 bg-white/30" />
-                <div className="w-3 h-3 border-2 border-daw-yellow rotate-45" />
-                <div className="h-px w-16 bg-white/30" />
-              </div>
-            </ScrollReveal>
-          </div>
-          <div className="absolute bottom-12 left-1/2 -translate-x-1/2 flex flex-col items-center gap-2 text-white/50 animate-bounce">
-            <span className="text-[10px] font-bold tracking-widest uppercase">
-              Scroll to Explore
-            </span>
-            <ChevronRight className="rotate-90 w-4 h-4" />
-          </div>
-        </section>
-        {/* --- END BANNER SECTION --- */}
 
+        <GlobalHeroBanner
+          title={t("about.title", "About Us")}
+          targetIndex={1}
+          localFallback={bannerImg}
+        />
         {/* --- MAIN CONTENT SECTION --- */}
         {/* Tambahkan padding top yang lebih besar agar lega (py-24) */}
         <section ref={contentRef} className="py-10 relative overflow-hidden">
@@ -150,8 +114,7 @@ export default function AboutUs() {
                           activeTab === tab.id
                             ? "border-daw-green text-daw-green font-bold md:bg-slate-50/80 rounded-r-xl" // Tambah rounded biar nyambung
                             : "border-transparent text-slate-500 hover:text-slate-900 hover:border-slate-200"
-                        }`}
-                        >
+                        }`}>
                           {tab.label}
                         </button>
                       ))}
