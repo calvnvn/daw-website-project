@@ -1,12 +1,3 @@
-// const {
-//   Project,
-//   Management,
-//   AboutInfo,
-//   History,
-//   Page,
-//   BusinessSection,
-// } = require("../models");
-
 const AboutInfo = require("../models/AboutInfo");
 const BusinessSection = require("../models/BusinessSection");
 const History = require("../models/History");
@@ -15,29 +6,29 @@ const Page = require("../models/Page");
 const Project = require("../models/Project");
 
 /**
- * Middleware untuk mengecek status gembok (is_locked)
- * @param {Object} Model - Model Sequelize yang akan dicek (misal: Project)
+ * Higher-order middleware for pessimistic concurrency control based on record state.
+ * Validates resource availability before allowing mutative operations in the controller.
  */
 const checkLock = (Model) => {
   return async (req, res, next) => {
     try {
       const { id } = req.params;
-      const userRole = req.userRole; // Diambil dari middleware authJwt
+      const userRole = req.userRole;
 
-      // IF  superadmin, langsung kasih jalan
+      // Implement administrative override to bypass synchronization locks
       if (userRole === "superadmin") {
         return next();
       }
 
-      // Cara data
+      // Retrieve production record metadata to verify current lock status
       const record = await Model.findByPk(id);
 
-      // Jika data tidak ketemu, controller handle 404
+      // Delegate non-existent record handling (404) to the primary controller
       if (!record) {
         return next();
       }
 
-      // Cek apakah data sedang locked
+      // Validate data availability; prevents concurrent modifications during active approval cycles
       if (record.is_locked) {
         return res.status(423).json({
           message: "Data sedang dikunci (Locked).",
@@ -46,7 +37,7 @@ const checkLock = (Model) => {
         });
       }
 
-      // Jika tidak locked, lanjut ke controller
+      // Proceed to the next middleware or controller if the resource is unlocked
       next();
     } catch (error) {
       console.error("🚨 Error pada checkLock Middleware:", error.message);

@@ -1,14 +1,17 @@
 const axios = require("axios");
 
+// Initialize application code and authenticated API instance
 const CMS_CODE = process.env.CMS_APPROVAL_CODE;
-
 const dawApi = axios.create({
   baseURL: process.env.DAW_NODE_URL,
   timeout: 10000,
 });
 
+/**
+ * Orchestrates technical integration between CMS and ERP Node workflows
+ */
 class ErpApprovalService {
-  // Centralized Error Handling
+  // Map external API errors to local exceptions for transaction rollbacks
   static _handleError(error, context) {
     const status = error.response?.status || "NETWORK_ERROR";
     const erpMessage = error.response?.data?.message || error.message;
@@ -18,14 +21,13 @@ class ErpApprovalService {
       error.response?.data || error.message,
     );
 
-    // Throwing error to Controller: Supaya bisa t.rollback() MySQL-nya
     const newError = new Error(`ERP DAW Error (${context}): ${erpMessage}`);
     newError.statusCode = status;
     newError.originalError = error;
     throw newError;
   }
 
-  // FASE 1: Discovery (Cek Setup)
+  // Validate approval configuration (POST /node/approval/setup/cekSetup)
   static async _cekSetup(notrans, token) {
     try {
       const payload = {
@@ -46,11 +48,8 @@ class ErpApprovalService {
     }
   }
 
-  // FASE 2: Inisiasi (Registration) - Pure API (POST /node/approval/trans/add)
+  // Register transaction to ERP workflow (POST /node/approval/trans/add)
   static async initiateApproval({ notrans, karyawanId, token }) {
-    console.log(
-      `>>> [ERP COURIER] 1. Discovery: Checking setup for ${notrans}...`,
-    );
     const approverRows = await this._cekSetup(notrans, token);
 
     if (!approverRows || approverRows.length === 0) {
@@ -60,12 +59,9 @@ class ErpApprovalService {
     }
 
     try {
-      console.log(
-        `>>> [ERP COURIER] 2. Injection: Registering ${notrans} to OWL...`,
-      );
-
+      // Normalize approver data structure for ERP ingestion
       const cleanApproverRows = approverRows.map((row) => ({
-        kodeapp: String(row.kodeapp), // Menggunakan ID Blueprint saat ADD
+        kodeapp: String(row.kodeapp),
         level: Number(row.level),
         karyawanid: String(row.karyawanid),
         jenispersetujuan: row.jenispersetujuan || CMS_CODE,
@@ -100,7 +96,7 @@ class ErpApprovalService {
     }
   }
 
-  // FASE 3: Listing Pending Approval (POST /node/approval/trans/getData)
+  // Retrieve pending tasks for specific employee (POST /node/approval/trans/getData)
   static async getPendingList({ karyawanid, token, limit = 100 }) {
     try {
       const payload = {
@@ -134,14 +130,14 @@ class ErpApprovalService {
     }
   }
 
-  // FASE 4: Decision (POST /node/approval/trans/submitApp)
+  // Submit approval/rejection state update (POST /node/approval/trans/submitApp)
   static async submitDecision({
     nourut,
     notrans,
-    level, // "Current Level + 1" DARI CONTROLLER
+    level, // "Current Level + 1" from controller
     status,
     komentar,
-    nextApp, // NIK target atau String Kosong "" jika Final
+    nextApp, // NIK target or empty string "" if there is no next approver
     token,
     karyawanid,
   }) {

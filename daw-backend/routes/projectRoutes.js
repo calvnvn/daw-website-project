@@ -4,25 +4,29 @@ const projectController = require("../controllers/projectController");
 const { verifyToken, checkPermission } = require("../middleware/authJwt");
 const multer = require("multer");
 const { upload, optimizeImage } = require("../middleware/upload");
-
-// --- IMPORT BARU ---
 const checkLock = require("../middleware/checkLock");
 const Project = require("../models/Project");
-// -------------------
 
-// Public Routes (Without Login)
+// PUBLIC
+// Fetch project portfolio for public display
 router.get("/public", projectController.getPublicProjects);
+
+// Fetch project details by ID
 router.get("/public/:id", projectController.getPublicProjectById);
+
+// Fetch project details by URL slug
 router.get("/public/s/:slug", projectController.getPublicProjectBySlug);
 
-// Protected Routes (Need Login)
+// ADMINISTRATIVE
 router.use(verifyToken);
 
-/** READ-ONLY: Semua user yang login biasanya boleh melihat daftar data. */
+// Fetch comprehensive project registry
 router.get("/", projectController.getAllProjects);
+
+// Fetch internal project record by ID
 router.get("/:id", projectController.getProjectById);
 
-// Create Project (Tidak butuh checkLock karena data baru belum ada gemboknya)
+/// Initialize new project with multi-asset handling and validation/ Create Project
 router.post(
   "/",
   checkPermission("manage_projects"),
@@ -53,11 +57,11 @@ router.post(
   projectController.createProject,
 );
 
-// Update Project (DILINDUNGI checkLock)
+// Mutate project data and assets with pessimistic lock validation
 router.put(
   "/:id",
   checkPermission("manage_projects"),
-  checkLock(Project), // 🔒 Cek gembok SEBELUM proses upload file
+  checkLock(Project),
   upload.fields([
     { name: "cover_image", maxCount: 1 },
     { name: "gallery", maxCount: 10 },
@@ -66,20 +70,18 @@ router.put(
   projectController.updateProject,
 );
 
-// Delete Project (DILINDUNGI checkLock)
+// Terminate project record and associated assets with lock validation
 router.delete(
   "/:id",
   checkPermission("manage_projects"),
-  checkLock(Project), // 🔒 Cek gembok sebelum hapus
+  checkLock(Project),
   projectController.deleteProject,
 );
 
-// Upload Image dalam Editor
+// Execute editor asset upload and optimization pipeline
 router.post(
   "/upload-inline",
   checkPermission("manage_projects"),
-  // Note: Untuk inline image biasanya tidak perlu checkLock per ID
-  // karena ini hanya upload asset baru ke server
   upload.single("inline_image"),
   optimizeImage,
   projectController.uploadInlineImage,

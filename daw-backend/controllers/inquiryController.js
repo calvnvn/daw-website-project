@@ -3,14 +3,15 @@ const InquirySubject = require("../models/InquirySubject");
 const { transporter } = require("../utils/mailer");
 const Settings = require("../models/Settings");
 
+// Public: Process contact form submission and dispatch email
 exports.submitInquiry = async (req, res) => {
   try {
     const { name, email, phone, company, subject, message } = req.body;
 
-    // Verifikasi Master Data Subject
+    // Validate active subject and fetch global settings
     const [activeSubject, companySettings] = await Promise.all([
       InquirySubject.findOne({ where: { name: subject, isActive: true } }),
-      Settings.findOne(), // Ambil baris pertama settings
+      Settings.findOne(),
     ]);
 
     if (!activeSubject) {
@@ -24,7 +25,7 @@ exports.submitInquiry = async (req, res) => {
       ? `${process.env.BASE_URL}/uploads/${companySettings.companyLogo}`
       : null;
 
-    // Blokir jika Redirect
+    // Reject submission if subject is strictly for external redirection
     if (activeSubject.is_redirect) {
       return res.status(403).json({
         success: false,
@@ -34,7 +35,7 @@ exports.submitInquiry = async (req, res) => {
       });
     }
 
-    // Simpan ke Database
+    // Persist message to database
     const newInquiry = await Inquiry.create({
       name,
       email,
@@ -44,10 +45,10 @@ exports.submitInquiry = async (req, res) => {
       message,
     });
 
-    // Smart Routing Logic. Menentukan kemana email akan dikirm
+    // Smart Routing: Determine target email based on subject configuration
     const targetEmail = activeSubject.recipient_email || process.env.SMTP_USER;
 
-    // Kirim Notifikasi Email (Berjalan di background)
+    // Prepare HTML email template
     const mailOptions = {
       from: `"DAW Website Portal" <${process.env.SMTP_USER}>`,
       to: targetEmail,
@@ -132,10 +133,9 @@ exports.submitInquiry = async (req, res) => {
       `,
     };
 
+    // Send email asynchronously without blocking response
     transporter.sendMail(mailOptions).catch((err) => {
       console.error("[MAILER ERROR]:", err.message);
-      // Note: Kita tidak throw error ke user jika email gagal terkirim (karena SMTP kadang delay),
-      // selama data sudah tersimpan di database, proses dianggap sukses.
     });
 
     res.status(201).json({ success: true, data: newInquiry });
@@ -145,6 +145,7 @@ exports.submitInquiry = async (req, res) => {
   }
 };
 
+// Admin: Retrieve all incoming messages
 exports.getAllInquiries = async (req, res) => {
   try {
     const inquiries = await Inquiry.findAll({ order: [["createdAt", "DESC"]] });
@@ -154,6 +155,7 @@ exports.getAllInquiries = async (req, res) => {
   }
 };
 
+// Admin: Toggle message read status
 exports.markAsRead = async (req, res) => {
   try {
     const inquiry = await Inquiry.findByPk(req.params.id);
@@ -165,6 +167,7 @@ exports.markAsRead = async (req, res) => {
   }
 };
 
+// Admin: Hard delete specific message
 exports.deleteInquiry = async (req, res) => {
   try {
     const inquiry = await Inquiry.findByPk(req.params.id);
@@ -176,8 +179,9 @@ exports.deleteInquiry = async (req, res) => {
   }
 };
 
-// --- MASTER INQUIRY SUBJECT LOGIC ---
-// 1. PUBLIC: Ambil subjek yang aktif saja (Untuk Form Contact Us)
+// ================= MASTER INQUIRY SUBJECT LOGIC =================
+
+// Public: Fetch active subjects for frontend dropdown
 exports.getActiveSubjects = async (req, res) => {
   try {
     const subjects = await InquirySubject.findAll({
@@ -190,7 +194,7 @@ exports.getActiveSubjects = async (req, res) => {
   }
 };
 
-// 2. ADMIN: Ambil semua subjek termasuk yang tidak aktif (Untuk Table Admin)
+// Admin: Fetch all subjects (Active & Inactive) for management table
 exports.getAllSubjects = async (req, res) => {
   try {
     const subjects = await InquirySubject.findAll({ order: [["id", "ASC"]] });
@@ -200,7 +204,7 @@ exports.getAllSubjects = async (req, res) => {
   }
 };
 
-// 3. ADMIN: Tambah subjek baru
+// Admin: Register new inquiry category
 exports.createSubject = async (req, res) => {
   try {
     const { name, isActive, recipient_email, is_redirect, redirect_url } =
@@ -218,7 +222,7 @@ exports.createSubject = async (req, res) => {
   }
 };
 
-// 4. ADMIN: Update subjek
+// Admin: Modify existing subject routing/settings
 exports.updateSubject = async (req, res) => {
   try {
     const { name, isActive, recipient_email, is_redirect, redirect_url } =
@@ -239,6 +243,7 @@ exports.updateSubject = async (req, res) => {
   }
 };
 
+// Admin: Prevent deletion of subjects currently tied to existing messages
 exports.deleteSubject = async (req, res) => {
   try {
     const { id } = req.params;
@@ -247,6 +252,7 @@ exports.deleteSubject = async (req, res) => {
       return res.status(404).json({ message: "Subject not found" });
     }
 
+    // Referential integrity check
     const usageCount = await Inquiry.count({
       where: { subject: subject.name },
     });

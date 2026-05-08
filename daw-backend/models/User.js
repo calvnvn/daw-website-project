@@ -27,7 +27,7 @@ const User = sequelize.define(
     },
     password: {
       type: DataTypes.STRING,
-      allowNull: true, // Nullable karena login via OWL
+      allowNull: true,
     },
     status: {
       type: DataTypes.ENUM("Active", "Suspended"),

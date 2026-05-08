@@ -4,11 +4,15 @@ const homeController = require("../controllers/homeController");
 const { upload, optimizeImage } = require("../middleware/upload");
 const { verifyToken, checkPermission } = require("../middleware/authJwt");
 
-// --- 1. Public Site ---
+// PUBLIC
+// Fetch aggregated homepage metadata
 router.get("/public", homeController.getPublicHomepageData);
-// --- 2. Admin Site ---
+
+// ADMINISTRATIVE
+// Fetch comprehensive admin dashboard data
 router.get("/admin", [verifyToken], homeController.getAdminHomepageData);
-// --- 3. Home Intro Settings (Singleton) ---
+
+// Mutate singleton homepage configuration
 router.put(
   "/settings",
   [verifyToken, checkPermission("manage_homepage")],
@@ -16,7 +20,7 @@ router.put(
   homeController.updateSettings,
 );
 
-// --- 4. Hero Slides (Collection with Assets) ---
+// Initialize hero slide with asset optimization
 router.post(
   "/hero",
   [verifyToken, checkPermission("manage_homepage")],
@@ -25,6 +29,7 @@ router.post(
   homeController.createHeroSlide,
 );
 
+// Mutate hero slide data and assets
 router.put(
   "/hero/:id",
   [verifyToken, checkPermission("manage_homepage")],
@@ -33,13 +38,14 @@ router.put(
   homeController.updateHeroSlide,
 );
 
+// Terminate hero slide record
 router.delete(
   "/hero/:id",
   [verifyToken, checkPermission("manage_homepage")],
   homeController.deleteHeroSlide,
 );
 
-// --- 4. Impact Stats (Collection - Text Only) ---
+// Initialize impact statistic record
 router.post(
   "/stats",
   [verifyToken, checkPermission("manage_homepage")],
@@ -47,6 +53,7 @@ router.post(
   homeController.createStat,
 );
 
+// Mutate impact statistic data
 router.put(
   "/stats/:id",
   [verifyToken, checkPermission("manage_homepage")],
@@ -54,6 +61,7 @@ router.put(
   homeController.updateStat,
 );
 
+// Terminate impact statistic record
 router.delete(
   "/stats/:id",
   [verifyToken, checkPermission("manage_homepage")],

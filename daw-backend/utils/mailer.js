@@ -2,6 +2,12 @@ const nodemailer = require("nodemailer");
 const Settings = require("../models/Settings");
 const path = require("path");
 
+/**
+ * UTILITY: Automated Approval Notifier
+ * Facilitates multi-state email dispatch for the internal CMS bureaucracy workflow.
+ */
+
+// Initialize SMTP transport layer with environment-secured credentials
 const transporter = nodemailer.createTransport({
   host: process.env.SMTP_HOST,
   port: process.env.SMTP_PORT,
@@ -12,15 +18,6 @@ const transporter = nodemailer.createTransport({
   },
 });
 
-/**
- * Fungsi cerdas untuk mengirim notifikasi persetujuan birokrasi.
- * @param {Object} params
- * @param {string} params.toEmail - Email penerima.
- * @param {string} params.recipientName - Nama panggilan penerima (Biar sopan).
- * @param {string} params.type - 'NEW_REQUEST' | 'REJECTED' | 'APPROVED'
- * @param {Object} params.draftInfo - Data draf (notrans, module_name, action, created_by).
- * @param {string} params.reason - (Opsional) Alasan penolakan.
- */
 const sendApprovalNotification = async ({
   toEmail,
   recipientName,
@@ -29,14 +26,14 @@ const sendApprovalNotification = async ({
   reason = "",
 }) => {
   try {
-    const frontendUrl = process.env.FRONTEND_URL || "http://localhost:5173";
+    // INITIALIZATION
+    // Initialize notification context, branding assets, and UI theme constants
+    const frontendUrl = process.env.FRONTEND_URL;
     const sender =
       process.env.SYSTEM_EMAIL_FROM || '"DAW Group" <noreply@daw.co.id>';
-
     const logoPath = path.join(__dirname, "..", "public", "logo-daw.png");
     const logoUrl = "cid:logo-daw";
 
-    // 🎨 Identitas Warna DAW Group
     const DAW_GREEN = "#004b23";
     const DAW_YELLOW = "#e29504";
     const DAW_GREEN_HOVER = "#003619";
@@ -50,19 +47,17 @@ const sendApprovalNotification = async ({
     let actionUrl = `${frontendUrl}/admin/approvals?ticket=${draftInfo.notrans}`;
     let statusPillHtml = "";
 
-    // 🧠 LOGIKA TEMA & SUBJEK (Executive Mapping)
+    // REFERENCE GATHERING
+    // Map notification metadata and visual themes based on workflow state and urgency
     if (type === "NEW_REQUEST") {
       const isUrgent = draftInfo.action === "DELETE";
       subject = isUrgent
         ? `[URGENT REVIEW] Permintaan Hapus Modul: ${draftInfo.module_name}`
         : `[APPROVAL REQUIRED] Draf Baru Diajukan: ${draftInfo.module_name}`;
       headline = "Dokumen Menunggu Persetujuan";
-
-      // Tema Kuning DAW untuk Urgent/Delete (Teks hijau gelap biar elegan & kontras)
       bannerBgColor = isUrgent ? DAW_YELLOW : DAW_GREEN;
       bannerTextColor = isUrgent ? DAW_GREEN_HOVER : "#ffffff";
       actionText = "Tinjau Dokumen Sekarang";
-
       statusPillHtml = `<span style="background-color: ${isUrgent ? "#fef3c7" : "#dcfce7"}; color: ${isUrgent ? "#b45309" : "#166534"}; padding: 4px 10px; border-radius: 4px; font-size: 11px; font-weight: bold; letter-spacing: 1px;">ACTION REQUIRED</span>`;
     } else if (type === "REJECTED") {
       subject = `[REVISION REQUIRED] Draf Ditolak: ${draftInfo.module_name} (${draftInfo.notrans})`;
@@ -80,7 +75,8 @@ const sendApprovalNotification = async ({
       statusPillHtml = `<span style="background-color: #dcfce7; color: #166534; padding: 4px 10px; border-radius: 4px; font-size: 11px; font-weight: bold; letter-spacing: 1px;">PUBLISHED</span>`;
     }
 
-    // 🏛️ THE EXECUTIVE HTML TEMPLATE
+    // EXECUTION
+    // Construct responsive executive email template
     const htmlTemplate = `
       <!DOCTYPE html>
       <html lang="id">
@@ -216,7 +212,7 @@ const sendApprovalNotification = async ({
       </html>
     `;
 
-    // Eksekusi Pengiriman
+    // Execute asynchronous mail dispatch with embedded branding assets
     await transporter.sendMail({
       from: sender,
       to: toEmail,

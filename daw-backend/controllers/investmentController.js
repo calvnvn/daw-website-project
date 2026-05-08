@@ -6,10 +6,14 @@ const { invalidateOldDrafts } = require("../utils/draftCleanup");
 const { deleteSingleFile } = require("../utils/fileRemover");
 const { generateNotrans } = require("../utils/notransGenerator");
 const ErpApprovalService = require("../services/erpApprovalService");
-
 const JENIS_APP_CMS = process.env.CMS_APPROVAL_CODE;
 
-// Helper: standarisasi teks global investasi
+/**
+ * Manages the investment portfolio and affiliate entities,
+ * integrating local persistence with external ERP approval workflows.
+ */
+
+// Normalize global investment textual data
 const processInvestmentPayload = async (req, existingData = {}) => {
   const { teaserHeadline, teaserBody, sectionIntro } = req.body;
 
@@ -23,20 +27,16 @@ const processInvestmentPayload = async (req, existingData = {}) => {
   };
 };
 
-// Helper 2: untuk menangani transformasi data Affiliates
+// Transform affiliate data and manage asset (logo) lifecycle logic
 const processAffiliatePayload = async (req, existingData = {}) => {
   const { name, desc, category, websiteUrl, removePhoto } = req.body;
   let filesToDelete = [];
   let finalLogoUrl = existingData.logoUrl || null;
 
-  // 1. Logika Penggantian Logo (Multer)
   if (req.file) {
-    // Jika ada logo baru, tandai logo lama untuk dihapus fisik nanti
     if (existingData.logoUrl) filesToDelete.push(existingData.logoUrl);
     finalLogoUrl = req.file.filename;
-  }
-  // 2. Logika Penghapusan Logo Manual
-  else if (removePhoto === "true" || removePhoto === true) {
+  } else if (removePhoto === "true" || removePhoto === true) {
     if (existingData.logoUrl) filesToDelete.push(existingData.logoUrl);
     finalLogoUrl = null;
   }
@@ -54,6 +54,7 @@ const processAffiliatePayload = async (req, existingData = {}) => {
   };
 };
 
+// Retrieve public-facing investment settings and active affiliates
 exports.getPublicInvestmentData = async (req, res) => {
   try {
     let settings = await InvestmentSettings.findByPk(1);
@@ -84,6 +85,7 @@ exports.getPublicInvestmentData = async (req, res) => {
   }
 };
 
+// Fetch admin-level data with rejection status tracking via cross-collation subqueries
 exports.getAdminInvestmentData = async (req, res) => {
   try {
     let settings = await InvestmentSettings.findByPk(1);
@@ -105,8 +107,7 @@ exports.getAdminInvestmentData = async (req, res) => {
       attributes: {
         include: [
           [
-            // 🔵 SENIOR FIX: Menambahkan COLLATE utf8mb4_unicode_ci
-            // Memaksa hasil CAST memiliki "bahasa" yang sama dengan tabel ApprovalDrafts
+            // Force collation matching to prevent cross-system encoding errors
             sequelize.literal(`(
               SELECT COUNT(*)
               FROM ApprovalDrafts AS ad
@@ -147,7 +148,6 @@ exports.getAdminInvestmentData = async (req, res) => {
   }
 };
 
-// 1. GET Data Investasi
 exports.getInvestmentData = async (req, res) => {
   try {
     let settings = await InvestmentSettings.findOne();
@@ -180,7 +180,7 @@ exports.getInvestmentData = async (req, res) => {
   }
 };
 
-// 2. PUT Global Text (Shared Transaction Standard)
+// Update global investment text via ERP staging or direct override
 exports.updateSettings = async (req, res) => {
   const t = await sequelize.transaction();
   try {
@@ -208,7 +208,6 @@ exports.updateSettings = async (req, res) => {
 
     const { payload } = await processInvestmentPayload(req, settings);
 
-    // EDITOR (Approval Flow)
     if (userRole === "editor" && status === "Published") {
       const notrans = await generateNotrans("INV_SET");
 
@@ -260,7 +259,6 @@ exports.updateSettings = async (req, res) => {
       });
     }
 
-    // SUPERADMIN (Direct Override)
     await invalidateOldDrafts("InvestmentSettings", "1", t);
 
     await settings.update(
@@ -280,7 +278,8 @@ exports.updateSettings = async (req, res) => {
     res.status(500).json({ success: false, message: error.message });
   }
 };
-// POST: Create Affiliate (Shared Transaction Standard)
+
+// Register new affiliate with conditional ERP staging based on user role
 exports.createAffiliate = async (req, res) => {
   const t = await sequelize.transaction();
   try {
@@ -290,14 +289,12 @@ exports.createAffiliate = async (req, res) => {
 
     const { payload } = await processAffiliatePayload(req, {});
 
-    // Buat data baseline di DB Lokal
     const isEditor = userRole === "editor";
     const newCompany = await Affiliate.create(
       { ...payload, is_locked: isEditor },
       { transaction: t },
     );
 
-    // EDITOR (Approval Flow)
     if (isEditor && status === "Published") {
       const notrans = await generateNotrans("AFF");
 
@@ -324,7 +321,6 @@ exports.createAffiliate = async (req, res) => {
           moduleName: "Affiliate",
           karyawanId: req.karyawanId,
           token: req.owl_token,
-          // HAPUS transaction: t dari parameter ini!
         });
       } catch (erpError) {
         console.error(
@@ -340,7 +336,6 @@ exports.createAffiliate = async (req, res) => {
       });
     }
 
-    // SUPERADMIN (Direct Execution)
     await t.commit();
     return res.status(201).json({
       success: true,
@@ -354,7 +349,7 @@ exports.createAffiliate = async (req, res) => {
   }
 };
 
-// PUT: Update Affiliate (Shared Transaction Standard)
+// Mutate affiliate record with diff-checking and pessimistic locking logic
 exports.updateAffiliate = async (req, res) => {
   const t = await sequelize.transaction();
   try {
@@ -406,7 +401,6 @@ exports.updateAffiliate = async (req, res) => {
       });
     }
 
-    // EDITOR (Approval Flow)
     if (userRole === "editor" && status === "Published") {
       const notrans = await generateNotrans("AFF");
 
@@ -458,7 +452,6 @@ exports.updateAffiliate = async (req, res) => {
       });
     }
 
-    // SUPERADMIN (Direct Override)
     await invalidateOldDrafts("Affiliate", String(id), t);
 
     await company.update(
@@ -468,7 +461,6 @@ exports.updateAffiliate = async (req, res) => {
 
     await t.commit();
 
-    // Hapus file LAMA setelah transaksi sukses 100%
     if (filesToDelete.length > 0) {
       filesToDelete.forEach((file) => deleteSingleFile(file));
     }
@@ -485,7 +477,7 @@ exports.updateAffiliate = async (req, res) => {
   }
 };
 
-// DELETE: Delete Affiliate (Shared Transaction Standard)
+// Execute record deletion with relational and lock validation
 exports.deleteAffiliate = async (req, res) => {
   const t = await sequelize.transaction();
   try {
@@ -505,7 +497,6 @@ exports.deleteAffiliate = async (req, res) => {
         .json({ success: false, message: "Data tidak ditemukan" });
     }
 
-    // 🚨 Lock Guard
     if (company.is_locked && userRole === "editor") {
       await t.rollback();
       return res.status(423).json({
@@ -518,7 +509,6 @@ exports.deleteAffiliate = async (req, res) => {
 
     const logoToDelete = company.logoUrl;
 
-    // EDITOR (Approval Flow)
     if (userRole === "editor") {
       const notrans = await generateNotrans("AFF_DEL");
 
@@ -565,7 +555,6 @@ exports.deleteAffiliate = async (req, res) => {
       });
     }
 
-    // SUPERADMIN (Direct Execution)
     await invalidateOldDrafts("Affiliate", String(id), t);
     await company.destroy({ transaction: t });
 

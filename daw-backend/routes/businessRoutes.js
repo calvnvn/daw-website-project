@@ -4,37 +4,45 @@ const businessController = require("../controllers/businessController");
 const { verifyToken, checkPermission } = require("../middleware/authJwt");
 const { upload, optimizeImage } = require("../middleware/upload");
 
-// 1. PUBLIC ENDPOINT
+// PUBLIC
+// Fetch business data and map coordinates for public access
 router.get("/public", businessController.getPublicBusinessData);
 
-// 2. ADMIN ENDPOINTS (The Ledger & Vault)
+// ADMINISTRATIVE
+// Retrieve comprehensive business registry
 router.get(
   "/admin",
-  [verifyToken], // Cukup verifyToken, atau tambahkan checkPermission('view_admin_data') jika ada
+  [verifyToken],
   businessController.getAdminBusinessSections,
 );
 
+// Initialize new business section
 router.post(
   "/admin",
   [verifyToken, checkPermission("manage_businesses")],
   businessController.createBusinessSection,
 );
 
+// Mutate business data and markers
 router.put(
   "/admin/:id",
   [verifyToken, checkPermission("manage_businesses")],
   businessController.updateBusinessSection,
 );
+
+// Terminate business record and validate constraints
 router.delete(
   "/admin/:id",
   [verifyToken, checkPermission("manage_businesses")],
   businessController.deleteSection,
 );
 
+// Execute image upload and optimization pipeline
 router.post(
   "/admin/upload-image",
   upload.single("image"),
   optimizeImage,
   businessController.uploadBusinessImage,
 );
+
 module.exports = router;

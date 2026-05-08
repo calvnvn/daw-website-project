@@ -3,8 +3,8 @@ const router = express.Router();
 const approvalController = require("../controllers/approvalController");
 const { verifyToken, checkPermission } = require("../middleware/authJwt");
 
-// APPROVER ROUTES (Hanya untuk Superadmin & Approver)
-// Mengambil antrean gabungan ERP + MySQL
+// APPROVER
+// Fetch consolidated transaction queue
 router.get(
   "/list",
   verifyToken,
@@ -12,7 +12,7 @@ router.get(
   approvalController.getPendingApprovals,
 );
 
-// Eksekusi Keputusan (Approve/Reject) - The Decision Engine
+// Execute approval or rejection logic
 router.post(
   "/decide",
   verifyToken,
@@ -20,6 +20,7 @@ router.post(
   approvalController.executeDecision,
 );
 
+// Purge orphaned transaction tickets
 router.post(
   "/force-purge",
   verifyToken,
@@ -27,7 +28,7 @@ router.post(
   approvalController.forcePurgeGhostTicket,
 );
 
-// Mengambil data asli untuk pembanding (Diff Viewer)
+// Retrieve baseline data for state comparison
 router.get(
   "/original-data",
   verifyToken,
@@ -35,15 +36,15 @@ router.get(
   approvalController.getOriginalData,
 );
 
-// EDITOR ROUTES (Untuk Pembuat Draf/User Biasa)
-// Menarik draf yang ditolak untuk proses REVISI
+// EDITOR
+// Fetch rejected draft metadata
 router.get(
   "/rejected/:id",
   verifyToken,
   approvalController.getRejectedDraftByTarget,
 );
 
-// Menghapus/Mengabaikan banner notifikasi merah di UI (Phase 4 UX)
+// Dismiss rejection status and notifications
 router.patch("/discard/:notrans", verifyToken, approvalController.discardDraft);
 
 module.exports = router;

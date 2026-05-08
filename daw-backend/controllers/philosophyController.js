@@ -7,6 +7,7 @@ const { generateNotrans } = require("../utils/notransGenerator");
 const MODULE_NAME = "Philosophy";
 const NOTRANS_PREFIX = "PHL";
 
+// Normalize incoming payload for the singleton philosophy record
 const processPhilosophyPayload = async (req, existingData = {}) => {
   const { philosophyTitle } = req.body;
   return {
@@ -19,6 +20,7 @@ const processPhilosophyPayload = async (req, existingData = {}) => {
   };
 };
 
+// Retrieve singleton record with a rejection radar subquery
 exports.getPhilosophy = async (req, res) => {
   try {
     const data = await Philosophy.findOne({
@@ -26,7 +28,7 @@ exports.getPhilosophy = async (req, res) => {
       attributes: {
         include: [
           [
-            // 🛡️ Blueprint 2.C: Collation Guard ditambahkan
+            // Collation Guard: Forces charset match to prevent DB cross-collation errors
             sequelize.literal(`(
               SELECT COUNT(*) > 0 
               FROM ApprovalDrafts 
@@ -51,6 +53,7 @@ exports.getPhilosophy = async (req, res) => {
   }
 };
 
+// Orchestrate update logic (Editor staging vs Admin direct commit)
 exports.updatePhilosophy = async (req, res) => {
   const t = await sequelize.transaction();
   try {
@@ -60,12 +63,14 @@ exports.updatePhilosophy = async (req, res) => {
       .toLowerCase();
     const { status, previous_notrans } = req.body;
 
+    // Acquire pessimistic row lock to prevent concurrent modification
     let info = await Philosophy.findByPk(1, {
       transaction: t,
       lock: t.LOCK.UPDATE,
     });
     if (!info) info = await Philosophy.create({ id: 1 }, { transaction: t });
 
+    // Guard: Prevent editors from overriding active approval processes
     if (info.is_locked && userRole === "editor") {
       await t.rollback();
       return res.status(423).json({
@@ -76,10 +81,12 @@ exports.updatePhilosophy = async (req, res) => {
 
     const { payload } = await processPhilosophyPayload(req, info);
 
+    // Flow 1: Editor initiates staging and ERP sync
     if (userRole === "editor" && status === "Published") {
       const notrans = await generateNotrans(NOTRANS_PREFIX);
       const ticketToClear = previous_notrans || info.lock_ticket;
 
+      // Invalidate replaced draft if resubmitting
       if (ticketToClear) {
         await ApprovalDraft.update(
           { status: "Replaced" },
@@ -90,6 +97,7 @@ exports.updatePhilosophy = async (req, res) => {
         );
       }
 
+      // Stage mutation payload
       await ApprovalDraft.create(
         {
           notrans,
@@ -103,12 +111,14 @@ exports.updatePhilosophy = async (req, res) => {
         { transaction: t },
       );
 
+      // Lock live record
       await info.update(
         { is_locked: true, lock_ticket: notrans },
         { transaction: t },
       );
       await t.commit();
 
+      // Dispatch to external ERP engine
       try {
         await ErpApprovalService.initiateApproval({
           notrans,
@@ -123,7 +133,7 @@ exports.updatePhilosophy = async (req, res) => {
       return res.status(202).json({ success: true, ticket: notrans });
     }
 
-    // ADMIN PATH
+    // Flow 2: Admin overrides staging and performs direct live commit
     await ApprovalDraft.update(
       { status: "Obsolete" },
       {
@@ -135,6 +145,8 @@ exports.updatePhilosophy = async (req, res) => {
         transaction: t,
       },
     );
+
+    // Release locks and save live data
     await info.update(
       { ...payload, is_locked: false, lock_ticket: null },
       { transaction: t },

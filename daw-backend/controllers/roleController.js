@@ -1,12 +1,7 @@
-/**
- * MODULE: Role Controller (Slim Edition)
- * PURPOSE: Managing Role names and descriptions for User Assignment.
- * NOTE: Permissions are hardcoded in authController mapping.
- */
 const Role = require("../models/Role");
 const User = require("../models/User");
 
-// Get All Roles (dengan list permission-nya)
+// Retrieve all available roles
 exports.getAllRoles = async (req, res) => {
   try {
     const roles = await Role.findAll({
@@ -24,7 +19,7 @@ exports.getAllRoles = async (req, res) => {
   }
 };
 
-// Create Role
+// Create a new role definition
 exports.createRole = async (req, res) => {
   try {
     const { name, description } = req.body;
@@ -46,7 +41,7 @@ exports.createRole = async (req, res) => {
   }
 };
 
-// Update Role
+// Update role details with system hierarchy protection
 exports.updateRole = async (req, res) => {
   try {
     const { id } = req.params;
@@ -56,7 +51,7 @@ exports.updateRole = async (req, res) => {
     if (!role)
       return res.status(404).json({ message: "Role tidak ditemukan." });
 
-    // 🛡️ Hierarchy Protection: Jangan biarkan user mengubah nama superadmin via API
+    // Guard: Prevent renaming the core 'superadmin' identity
     if (role.name === "superadmin" && name !== "superadmin") {
       return res
         .status(403)
@@ -73,7 +68,7 @@ exports.updateRole = async (req, res) => {
   }
 };
 
-// Delete Role
+// Delete role with strict system and referential integrity guards
 exports.deleteRole = async (req, res) => {
   try {
     const { id } = req.params;
@@ -82,14 +77,14 @@ exports.deleteRole = async (req, res) => {
     if (!role)
       return res.status(404).json({ message: "Role tidak ditemukan." });
 
-    // 🛡️ System Protection: Role krusial DAW CMS nggak boleh dihapus
+    // Guard 1: Protect core system roles from deletion
     if (["superadmin", "Editor", "Approver"].includes(role.name)) {
       return res.status(403).json({
         message: `Role sistem '${role.name}' dilindungi dan tidak dapat dihapus.`,
       });
     }
 
-    // 🛡️ Integrity Check: Pastikan nggak ada user yang lagi pake role ini
+   // Guard 2: Prevent deletion if users are currently assigned to this role (Referential Integrity)
     const userCount = await User.count({ where: { roleId: id } });
     if (userCount > 0) {
       return res.status(400).json({

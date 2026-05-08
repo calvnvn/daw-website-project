@@ -1,7 +1,11 @@
 const jwt = require("jsonwebtoken");
 
+/**
+ * Middleware to authenticate requests via JWT verification and payload normalization.
+ */
 const verifyToken = (req, res, next) => {
   try {
+    // Extract credentials from standard Authorization or legacy x-access-token headers
     const authHeader =
       req.headers["authorization"] || req.headers["x-access-token"];
 
@@ -11,6 +15,7 @@ const verifyToken = (req, res, next) => {
         .json({ message: "Unauthorized! Token is missing." });
     }
 
+    // Sanitize and strip 'Bearer ' prefix from the authorization string
     let token = authHeader;
     if (authHeader.toLowerCase().startsWith("bearer ")) {
       token = authHeader.substring(7).trim();
@@ -22,6 +27,7 @@ const verifyToken = (req, res, next) => {
         .json({ message: "Unauthorized! Invalid token format." });
     }
 
+    // Validate token signature and expiration against the system JWT_SECRET
     jwt.verify(token, process.env.JWT_SECRET, (err, decoded) => {
       if (err) {
         console.error(
@@ -38,12 +44,14 @@ const verifyToken = (req, res, next) => {
           .json({ message: "Unauthorized Access! Invalid token signature." });
       }
 
+      // Normalize role strings and map 'admin' to internal 'superadmin' level
       const rawRole = decoded.role
         ? String(decoded.role).toLowerCase().trim()
         : "";
 
       const normalizedRole = rawRole === "admin" ? "superadmin" : rawRole;
 
+      // Populate request object with decoded identity and permission metadata for downstream use
       req.userId = decoded.id;
       req.owl_username = decoded.owl_username || decoded.username;
 
@@ -71,17 +79,21 @@ const verifyToken = (req, res, next) => {
 };
 
 /**
- * Middleware untuk mengecek hak akses spesifik
+ * Higher-order middleware for granular Role-Based Access Control (RBAC).
  */
 const checkPermission = (requiredPermission) => {
   return (req, res, next) => {
+    // Implement administrative override for superadmin and admin roles
     if (req.userRole === "superadmin" || req.userRole === "admin") {
       return next();
     }
 
+    // Grant implicit read-only access (GET) to editor roles
     if (req.userRole === "editor" && req.method === "GET") {
       return next();
     }
+
+    // Validate presence of required permission string within user metadata
     const permissions = req.userPermissions || [];
     if (!permissions.includes(requiredPermission)) {
       console.warn(

@@ -10,7 +10,7 @@ const { generateNotrans } = require("../utils/notransGenerator");
 
 const JENIS_APP_CMS = process.env.CMS_APPROVAL_CODE;
 
-//Mencari URL gambar di dalam string HTML untuk kebutuhan cleanup
+// Utility: Parses HTML content to identify and collect uploaded image paths for subsequent garbage collection.
 const extractImagesFromHtml = (html) => {
   if (!html) return [];
   const images = [];
@@ -22,7 +22,7 @@ const extractImagesFromHtml = (html) => {
   return images;
 };
 
-// HELPER FUNCTIONS (Clean Code Architecture)
+// Orchestrates the generation of a unique URL slug, checking both live production data and pending ERP drafts to prevent collisions.
 const generateUniqueProjectSlug = async (title, id = null) => {
   let baseSlug = title
     .toLowerCase()
@@ -32,13 +32,11 @@ const generateUniqueProjectSlug = async (title, id = null) => {
   let counter = 1;
 
   while (true) {
-    // Check live table
     const whereClause = id
       ? { slug: finalSlug, id: { [Op.ne]: id } }
       : { slug: finalSlug };
     const existingLive = await Project.findOne({ where: whereClause });
 
-    // Cek di dalam Brankas ApprovalDraft supaya tidak collision
     const existingDraft = await ApprovalDraft.findOne({
       where: {
         module_name: "Project",
@@ -55,7 +53,7 @@ const generateUniqueProjectSlug = async (title, id = null) => {
   return finalSlug;
 };
 
-// Ekstraksi logika pemrosesan gambar dan payload agar Controller utama bersih
+// Consolidates payload parsing, image diffing (for cleanup), and slug generation to keep the main controller logic clean.
 const processProjectPayload = async (req, project) => {
   const {
     title,
@@ -69,10 +67,8 @@ const processProjectPayload = async (req, project) => {
     meta_description,
     author,
   } = req.body;
-  // LOGIKA AUTHOR DIPERBAIKI:
-  // 1. Jika dikirim spesifik dari req.body (oleh admin), pakai itu.
-  // 2. Jika project sudah punya author (sedang di-update), pertahankan author asli.
-  // 3. Jika baru dibuat, gunakan identitas login saat ini.
+
+  // Resolves the definitive author identity, prioritizing admin input, then existing record, then current user context.
   const authorIdentity =
     author ||
     project.author ||
@@ -87,6 +83,7 @@ const processProjectPayload = async (req, project) => {
 
   const cleanContent = content ?? project.content ?? "";
 
+  // Compares previous vs. incoming HTML content to flag removed images for deletion.
   if (project.content) {
     const oldHtmlImages = extractImagesFromHtml(project.content);
     const newHtmlImages = extractImagesFromHtml(cleanContent);
@@ -96,7 +93,7 @@ const processProjectPayload = async (req, project) => {
     filesToDelete = [...filesToDelete, ...deletedHtmlImages];
   }
 
-  // Process Gallery
+  // Merges retained legacy gallery images with newly uploaded assets.
   if (existing_gallery) {
     try {
       const remainingGallery =
@@ -123,13 +120,12 @@ const processProjectPayload = async (req, project) => {
     finalGallery = [...finalGallery, ...newImages];
   }
 
-  // Process Cover
+  // Stages old cover image for deletion if a replacement is provided.
   if (req.files && req.files["cover_image"]) {
     oldCoverToDelete = project.cover_image;
     coverImageName = req.files["cover_image"][0].filename;
   }
 
-  // Process Slug
   let finalSlug = project.slug;
   if (slug && slug !== project.slug) {
     finalSlug = await generateUniqueProjectSlug(slug, project.id);
@@ -160,12 +156,12 @@ const processProjectPayload = async (req, project) => {
   };
 };
 
+// Retrieves all projects for the admin dashboard, appending a dynamic rejection flag via a raw SQL subquery.
 exports.getAllProjects = async (req, res) => {
   try {
     const projects = await Project.findAll({
       attributes: {
         include: [
-          // Subquery untuk cek status rejected di Vault
           [
             sequelize.literal(`(
               SELECT COUNT(*)
@@ -184,7 +180,6 @@ exports.getAllProjects = async (req, res) => {
       order: [["createdAt", "DESC"]],
     });
 
-    // Map agar has_rejected jadi boolean yang mudah dibaca Frontend
     const result = projects.map((p) => {
       const data = p.get({ plain: true });
       data.has_rejected = data.has_rejected_count > 0;
@@ -197,6 +192,7 @@ exports.getAllProjects = async (req, res) => {
   }
 };
 
+// Fetches a specific project by ID for the admin editor interface.
 exports.getProjectById = async (req, res) => {
   try {
     const project = await Project.findByPk(req.params.id, {
@@ -212,6 +208,7 @@ exports.getProjectById = async (req, res) => {
   }
 };
 
+// Initializes a new project record, routing the operation based on the user's role and publication intent.
 exports.createProject = async (req, res) => {
   const t = await sequelize.transaction();
   try {
@@ -219,7 +216,6 @@ exports.createProject = async (req, res) => {
     const userRole = req.userRole?.toLowerCase();
     const actorId = String(req.owl_username || req.karyawanId);
 
-    // 1. Bersihkan Payload
     const { payload } = await processProjectPayload(req, {
       title: "",
       slug: "",
@@ -227,12 +223,10 @@ exports.createProject = async (req, res) => {
       cover_image: null,
     });
 
-    // EDITOR: Ajukan Publish (Approval ERP)
+    // Branch A: Editor initiates a publication request, locking the new record and syncing with ERP.
     if (userRole === "editor" && requestStatus === "Published") {
-      // Dapatkan Kunci Antrean
       const notrans = await generateNotrans("Projects");
 
-      // Invalidate Draf Lama (Jika ada resubmission)
       if (previous_notrans) {
         await ApprovalDraft.update(
           { status: "Replaced" },
@@ -240,7 +234,6 @@ exports.createProject = async (req, res) => {
         );
       }
 
-      // Buat Data Asli (Langsung Digembok)
       const newProject = await Project.create(
         { ...payload, status: "Draft", is_locked: true, lock_ticket: notrans },
         { transaction: t },
@@ -259,7 +252,6 @@ exports.createProject = async (req, res) => {
         { transaction: t },
       );
 
-      // e. THE HANDSHAKE: Lapor ke ERP
       await ErpApprovalService.initiateApproval({
         notrans,
         karyawanId: actorId,
@@ -273,7 +265,7 @@ exports.createProject = async (req, res) => {
       });
     }
 
-    // ADMIN: LIVE OR LOCAL DRAFT (Editor Save as Draft)
+    // Branch B: Admin publishes directly, or Editor explicitly saves as a local Draft without ERP involvement.
     const finalStatus = requestStatus === "Published" ? "Published" : "Draft";
     const newProject = await Project.create(
       { ...payload, status: finalStatus, is_locked: false },
@@ -297,6 +289,7 @@ exports.createProject = async (req, res) => {
   }
 };
 
+// Modifies an existing project, handling pessimistic locks and staging logic for Editors versus direct commits for Admins.
 exports.updateProject = async (req, res) => {
   const t = await sequelize.transaction();
   try {
@@ -314,6 +307,7 @@ exports.updateProject = async (req, res) => {
       return res.status(404).json({ message: "Project not found" });
     }
 
+    // Enforces concurrency control, preventing Editors from modifying actively reviewed records. Admins bypass this.
     if (project.is_locked) {
       if (userRole === "editor") {
         await t.rollback();
@@ -328,7 +322,7 @@ exports.updateProject = async (req, res) => {
     const { payload, filesToDelete, oldCoverToDelete } =
       await processProjectPayload(req, project);
 
-    // EDITOR: Ajukan Revisi
+    // Branch A: Editor requests publication of changes, staging them in the Vault and notifying the ERP.
     if (userRole === "editor" && status === "Published") {
       const notrans = await generateNotrans("Projects");
 
@@ -352,13 +346,11 @@ exports.updateProject = async (req, res) => {
         { transaction: t },
       );
 
-      // Pasang Gembok di Live Data
       await project.update(
         { is_locked: true, lock_ticket: notrans },
         { transaction: t },
       );
 
-      // Handshake
       await ErpApprovalService.initiateApproval({
         notrans,
         karyawanId: actorId,
@@ -372,7 +364,7 @@ exports.updateProject = async (req, res) => {
       });
     }
 
-    // ADMIN / DRAFT LOKAL
+    // Branch B: Admin executes a live update, automatically invalidating any conflicting legacy drafts.
     if (userRole === "superadmin" || userRole === "admin") {
       await invalidateOldDrafts("Project", id, t);
     }
@@ -383,6 +375,7 @@ exports.updateProject = async (req, res) => {
     );
     await t.commit();
 
+    // Safely purges physical files only after the database transaction succeeds.
     if (
       userRole === "superadmin" ||
       (userRole === "editor" && status === "Draft")
@@ -401,6 +394,7 @@ exports.updateProject = async (req, res) => {
   }
 };
 
+// Manages the deletion lifecycle, routing Editors through ERP approval while allowing Admins to perform immediate, cascading physical deletes.
 exports.deleteProject = async (req, res) => {
   const t = await sequelize.transaction();
   try {
@@ -423,11 +417,10 @@ exports.deleteProject = async (req, res) => {
       });
     }
 
-    // EDITOR: Ajukan Penghapusan
+    // Branch A: Editor stages a deletion request, locking the record without actually destroying it.
     if (userRole === "editor") {
       const notrans = await generateNotrans("Projects");
 
-      // Bikin draf "Minta Hapus"
       await ApprovalDraft.create(
         {
           notrans,
@@ -441,7 +434,6 @@ exports.deleteProject = async (req, res) => {
         { transaction: t },
       );
 
-      // Gembok doang, JANGAN DI-DESTROY!
       await project.update(
         { is_locked: true, lock_ticket: notrans },
         { transaction: t },
@@ -459,7 +451,7 @@ exports.deleteProject = async (req, res) => {
         .json({ message: "Permintaan hapus dikirim.", ticket: notrans });
     }
 
-    // ADMIN
+    // Branch B: Admin performs a hard delete, triggering physical file cleanup for cover images and gallery assets.
     await invalidateOldDrafts("Project", id, t);
     await project.destroy({ transaction: t });
     await t.commit();
@@ -479,7 +471,9 @@ exports.deleteProject = async (req, res) => {
   }
 };
 
-// PUBLIC CONTROLLERS (Tidak pakai transaksi karena cuma READ)
+// PUBLIC READ-ONLY ENDPOINTS
+
+// Facilitates asynchronous image uploads from the rich text editor before standard form submission.
 exports.uploadInlineImage = async (req, res) => {
   try {
     if (!req.file)
@@ -493,6 +487,7 @@ exports.uploadInlineImage = async (req, res) => {
   }
 };
 
+// Serves the public project gallery, filtering strictly for 'Published' records.
 exports.getPublicProjects = async (req, res) => {
   try {
     const projects = await Project.findAll({
@@ -509,6 +504,7 @@ exports.getPublicProjects = async (req, res) => {
   }
 };
 
+// Retrieves project details for viewing by internal ID, silently incrementing view counts.
 exports.getPublicProjectById = async (req, res) => {
   try {
     const project = await Project.findOne({
@@ -527,6 +523,7 @@ exports.getPublicProjectById = async (req, res) => {
   }
 };
 
+// Retrieves project details for front-end routing by SEO-friendly slug, executing silent view tracking.
 exports.getPublicProjectBySlug = async (req, res) => {
   try {
     const project = await Project.findOne({
@@ -569,6 +566,7 @@ exports.getPublicProjectBySlug = async (req, res) => {
   }
 };
 
+// Provides an isolated endpoint to manually increment view statistics without transmitting the full payload.
 exports.incrementProjectView = async (req, res) => {
   try {
     const project = await Project.findByPk(req.params.id);

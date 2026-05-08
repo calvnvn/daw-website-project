@@ -4,25 +4,26 @@ const investmentController = require("../controllers/investmentController");
 const { upload, optimizeImage } = require("../middleware/upload");
 const { verifyToken, checkPermission } = require("../middleware/authJwt");
 
-// 1. PUBLIC ENDPOINTS (No Auth Required)
+// PUBLIC
+// Fetch public investment portfolio and affiliate data
 router.get("/public", investmentController.getPublicInvestmentData);
 
-// 2. ADMIN ENDPOINTS (Auth Required)
+// ADMINISTRATIVE
+// Retrieve comprehensive investment registry and audit metadata
 router.get(
   "/admin",
   [verifyToken],
   investmentController.getAdminInvestmentData,
 );
 
+// Mutate global investment textual configuration
 router.put(
   "/settings",
   [verifyToken, checkPermission("manage_investments")],
   investmentController.updateSettings,
 );
 
-// 3. AFFILIATES MANAGEMENT
-
-// CREATE
+// Initialize new affiliate record with asset optimization
 router.post(
   "/affiliates",
   [verifyToken, checkPermission("manage_investments")],
@@ -31,7 +32,7 @@ router.post(
   investmentController.createAffiliate,
 );
 
-// UPDATE
+// Mutate affiliate profile and logo assets
 router.put(
   "/affiliates/:id",
   [verifyToken, checkPermission("manage_investments")],
@@ -40,7 +41,7 @@ router.put(
   investmentController.updateAffiliate,
 );
 
-// DELETE
+// Terminate affiliate record and validate dependencies
 router.delete(
   "/affiliates/:id",
   [verifyToken, checkPermission("manage_investments")],

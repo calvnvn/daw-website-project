@@ -8,10 +8,15 @@ const { generateNotrans } = require("../utils/notransGenerator");
 
 const MODULE_NAME = "Management";
 const NOTRANS_PREFIX = "MGT";
+/**
+ * Controller: Management (Direksi)
+ * Manages organizational hierarchy records with a hybrid staging-to-live workflow.
+ */
 
 const getRole = (req) =>
   req.userRole ? req.userRole.toLowerCase().trim() : "";
 
+// Map incoming payload and manage physical photo asset lifecycle
 const processManagementPayload = async (req, existingData = {}) => {
   const { name, role, description, level, order, removePhoto } = req.body;
   let filesToDelete = [];
@@ -44,6 +49,7 @@ const processManagementPayload = async (req, existingData = {}) => {
   };
 };
 
+// Retrieve all records with dynamic rejection flags via subquery
 exports.getAllManagements = async (req, res) => {
   try {
     const managements = await Management.findAll({
@@ -80,6 +86,7 @@ exports.getAllManagements = async (req, res) => {
   }
 };
 
+// Handle record creation with conditional staging for Editor roles
 exports.createManagement = async (req, res) => {
   const t = await sequelize.transaction();
   try {
@@ -97,7 +104,7 @@ exports.createManagement = async (req, res) => {
       { transaction: t },
     );
 
-    // EDITOR
+    // Flow Editor: Lock record and stage for ERP approval
     if (isEditor) {
       const notrans = await generateNotrans(NOTRANS_PREFIX);
 
@@ -117,8 +124,6 @@ exports.createManagement = async (req, res) => {
       await newRecord.update({ lock_ticket: notrans }, { transaction: t });
 
       await t.commit();
-
-      // EXTERNAL HANDSHAKE
       try {
         await ErpApprovalService.initiateApproval({
           notrans,
@@ -140,7 +145,7 @@ exports.createManagement = async (req, res) => {
       });
     }
 
-    // SUPERADMIN
+    // Flow Admin: Direct commit
     await t.commit();
     return res.status(201).json({
       success: true,
@@ -159,7 +164,7 @@ exports.createManagement = async (req, res) => {
   }
 };
 
-// PUT
+// Handle record updates with concurrency locking and staging logic
 exports.updateManagement = async (req, res) => {
   const t = await sequelize.transaction();
   try {
@@ -194,7 +199,7 @@ exports.updateManagement = async (req, res) => {
     );
     const isEditor = userRole === "editor" && status === "Published";
 
-    // EDITOR
+    // Flow Editor: Generate draft and assert record lock
     if (isEditor) {
       const notrans = await generateNotrans(NOTRANS_PREFIX);
       const ticketToClear = previous_notrans || person.lock_ticket;
@@ -222,15 +227,12 @@ exports.updateManagement = async (req, res) => {
         { transaction: t },
       );
 
-      // Gembok Ledger Live
       await person.update(
         { is_locked: true, lock_ticket: notrans },
         { transaction: t },
       );
 
       await t.commit();
-
-      // EXTERNAL HANDSHAKE
       try {
         await ErpApprovalService.initiateApproval({
           notrans,
@@ -252,7 +254,7 @@ exports.updateManagement = async (req, res) => {
       });
     }
 
-    // SUPERADMIN
+    // Flow Admin: Invalidate drafts and direct update
     await ApprovalDraft.update(
       { status: "Obsolete" },
       {
@@ -291,7 +293,7 @@ exports.updateManagement = async (req, res) => {
   }
 };
 
-// DELETE
+// Handle record deletion with conditional staging or direct purging
 exports.deleteManagement = async (req, res) => {
   const t = await sequelize.transaction();
   try {
@@ -321,7 +323,7 @@ exports.deleteManagement = async (req, res) => {
 
     const photoToDelete = person.photoUrl;
 
-    // EDITOR
+    // Flow Editor: Stage deletion request and lock record
     if (userRole === "editor") {
       const notrans = await generateNotrans(NOTRANS_PREFIX);
 
@@ -380,16 +382,13 @@ exports.deleteManagement = async (req, res) => {
       });
     }
 
-    // SUPERADMIN
+    // Flow Admin: Direct purge and physical asset deletion
     await invalidateOldDrafts(MODULE_NAME, id, t);
     await person.destroy({ transaction: t });
-
     await t.commit();
-
     if (photoToDelete) {
       deleteSingleFile(photoToDelete);
     }
-
     res.status(200).json({
       success: true,
       message: "Data berhasil dihapus secara permanen.",

@@ -1,9 +1,9 @@
 const User = require("../models/User");
 const Role = require("../models/Role");
 
+// Retrieve sanitized user registry with associated role metadata
 exports.getAllUsers = async (req, res) => {
   try {
-    // Fetch all users w/o send it to frontend
     const users = await User.findAll({
       attributes: { exclude: ["password"] },
       include: [
@@ -22,12 +22,12 @@ exports.getAllUsers = async (req, res) => {
   }
 };
 
-// --- 1. CREATE USER (Sync with Lowercase Middleware) ---
+// Whitelist external SSO identities for subsequent system synchronization
 exports.createUser = async (req, res) => {
   try {
     const { email, roleId, owl_username } = req.body;
 
-    // 🚀 FIX: Gunakan lowercase 'superadmin' sesuai output middleware
+    // Validate administrative privilege level for identity registration
     if (req.userRole !== "superadmin") {
       return res.status(403).json({
         message:
@@ -35,12 +35,14 @@ exports.createUser = async (req, res) => {
       });
     }
 
+    // Verify presence of unique external handle for SSO mapping
     if (!owl_username) {
       return res
         .status(400)
         .json({ message: "OWL Username wajib diisi untuk sinkronisasi SSO." });
     }
 
+    // Assert non-existence of identity in local registry to prevent collisions
     const existingUser = await User.findOne({ where: { owl_username } });
     if (existingUser) {
       return res
@@ -48,6 +50,7 @@ exports.createUser = async (req, res) => {
         .json({ message: `Username OWL '${owl_username}' sudah terdaftar.` });
     }
 
+    // Initialize unauthenticated placeholder record for external credential bridging
     await User.create({
       name: "Menunggu Sync Login...",
       email: email && email.trim() !== "" ? email : null,
@@ -67,13 +70,13 @@ exports.createUser = async (req, res) => {
   }
 };
 
-// --- 2. UPDATE USER (Hierarchy & Case Guard) ---
+// Execute scoped profile mutations with privilege escalation guards
 exports.updateUser = async (req, res) => {
   try {
     const { id } = req.params;
     const { name, email, roleId, status } = req.body;
     const requesterId = req.userId;
-    const requesterRole = req.userRole; // Pasti lowercase dari middleware
+    const requesterRole = req.userRole;
 
     const user = await User.findByPk(id, {
       include: [{ model: Role, as: "roleData" }],
@@ -83,6 +86,8 @@ exports.updateUser = async (req, res) => {
 
     const targetRoleName = user.roleData?.name?.toLowerCase() || "";
     const targetIsSuperadmin = targetRoleName === "superadmin";
+
+    // Enforce immutable state for Superadmin records against non-owner modifications
     const isEditingSelf = String(requesterId) === String(id);
 
     if (targetIsSuperadmin && !isEditingSelf) {
@@ -94,7 +99,7 @@ exports.updateUser = async (req, res) => {
       }
     }
 
-    // 🛡️ 2. EDITOR ACCESS RESTRICTION (Fix Case)
+    // Restrict privilege escalation and status modification for Editor roles
     if (requesterRole === "editor" && (roleId || status)) {
       return res.status(403).json({
         message:
@@ -102,7 +107,7 @@ exports.updateUser = async (req, res) => {
       });
     }
 
-    // 🛡️ 3. PARTIAL UPDATE PATTERN
+    // Map and synchronize only defined delta fields to the persistence layer
     const updatePayload = {};
     if (name !== undefined) updatePayload.name = name;
     if (email !== undefined) updatePayload.email = email;
@@ -127,7 +132,7 @@ exports.updateUser = async (req, res) => {
   }
 };
 
-// --- DELETE USER ---
+// Terminate user accounts while enforcing system stability and rank constraints
 exports.deleteUser = async (req, res) => {
   try {
     const { id } = req.params;
@@ -139,21 +144,21 @@ exports.deleteUser = async (req, res) => {
     });
     if (!user) return res.status(404).json({ message: "User not found" });
 
-    // 🛡️ GUARD 1: Anti-Self-Destruct (Cegah hapus akun sendiri)
+    // Prevent session invalidation via recursive self-deletion logic
     if (String(currentUserId) === String(id)) {
       return res.status(403).json({
         message: "Security Risk: You cannot delete your own account!",
       });
     }
 
-    // 🛡️ GUARD 2: Proteksi Sejenjang (superadmin dilarang hapus sesama superadmin)
+    // Block destruction of core system administrative accounts to maintain system integrity
     if (user.roleData?.name === "superadmin") {
       return res.status(403).json({
         message: "Hierarchy Protection: superadmin accounts are protected.",
       });
     }
 
-    // 🛡️ GUARD 3: Editor dilarang hapus siapapun (Double Check)
+    // Assert absolute administrative authority for account termination
     if (requesterRole !== "superadmin") {
       return res
         .status(403)
@@ -161,7 +166,6 @@ exports.deleteUser = async (req, res) => {
     }
 
     await user.destroy();
-
     res.json({
       success: true,
       message: `User ${user.name} has been deleted permanently.`,

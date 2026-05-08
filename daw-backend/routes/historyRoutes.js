@@ -3,10 +3,12 @@ const router = express.Router();
 const historyController = require("../controllers/historyController");
 const { verifyToken, checkPermission } = require("../middleware/authJwt");
 
-// 1. Public SIte
+// PUBLIC
+// Fetch historical timeline records
 router.get("/", historyController.getHistories);
 
-// 2. Protected Site
+// ADMINISTRATIVE
+// Mutate historical timeline data
 router.put(
   "/",
   [verifyToken, checkPermission("manage_about")],

@@ -3,24 +3,26 @@ const router = express.Router();
 const philosophyPillarController = require("../controllers/philosophyPillarController");
 const { verifyToken, checkPermission } = require("../middleware/authJwt");
 
-// 1. GET ALL PILLARS (Public/Shared)
+// PUBLIC
+// Fetch organizational philosophy pillars and core values
 router.get("/", philosophyPillarController.getPillars);
 
-// 2. CREATE NEW PILLAR (Protected)
+// ADMINISTRATIVE
+// Initialize new philosophy pillar record
 router.post(
   "/",
   [verifyToken, checkPermission("manage_about")],
   philosophyPillarController.createPillar,
 );
 
-// 3. UPDATE SPECIFIC PILLAR (Protected)
+// Mutate existing philosophy pillar data
 router.put(
   "/:id",
   [verifyToken, checkPermission("manage_about")],
   philosophyPillarController.updatePillar,
 );
 
-// 4. DELETE SPECIFIC PILLAR (Protected)
+// Terminate philosophy pillar record and validate dependencies
 router.delete(
   "/:id",
   [verifyToken, checkPermission("manage_about")],

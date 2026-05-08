@@ -1,19 +1,18 @@
 const sequelize = require("../config/database");
 
 /**
- * @desc    Fetch aggregated data for the Admin Dashboard
- * @route   GET /api/dashboard/stats
- * @access  Private (Admin)
+ * Aggregates platform-wide metrics and recent activities for the administrative dashboard.
+ * Executes read-only raw SQL queries for optimized metric calculations.
  */
 exports.getDashboardStats = async (req, res) => {
   try {
-    // 1. Hitung pesan yang belum dibaca (Unread Inquiries)
+    // Aggregate unread inquiry count
     const [inquiryResult] = await sequelize.query(
       "SELECT COUNT(*) as unreadCount FROM Inquiries WHERE isRead = false OR isRead = 0",
       { type: sequelize.QueryTypes.SELECT },
     );
 
-    // 2. Hitung jumlah project Draft dan Total Views keseluruhan
+    // Calculate global project metrics (drafts and total views)
     const [projectResult] = await sequelize.query(
       `SELECT 
         SUM(CASE WHEN status = 'Draft' THEN 1 ELSE 0 END) as draftCount,
@@ -22,6 +21,7 @@ exports.getDashboardStats = async (req, res) => {
       { type: sequelize.QueryTypes.SELECT },
     );
 
+    // Map project distribution across business categories via left join
     const projectDistribution = await sequelize.query(
       `SELECT 
         bs.category as label, 
@@ -33,7 +33,7 @@ exports.getDashboardStats = async (req, res) => {
       { type: sequelize.QueryTypes.SELECT },
     );
 
-    // 3. Ambil 4 pesan terbaru yang belum dibaca untuk ditampilkan di Dashboard
+    // Retrieve latest unread inquiries for quick access
     const recentInquiries = await sequelize.query(
       `SELECT id, name, company, subject, message, createdAt 
        FROM Inquiries 
@@ -43,12 +43,12 @@ exports.getDashboardStats = async (req, res) => {
       { type: sequelize.QueryTypes.SELECT },
     );
 
-    // 4. Parsing data agar aman (jika database kosong, kembalikan 0, bukan null)
+    // Normalize null results to zero for safe frontend consumption
     const unreadCount = parseInt(inquiryResult?.unreadCount) || 0;
     const draftCount = parseInt(projectResult?.draftCount) || 0;
     const totalViews = parseInt(projectResult?.totalViews) || 0;
 
-    // 5. Susun Response JSON
+    // Construct and transmit unified JSON payload
     res.status(200).json({
       success: true,
       data: {

@@ -1,12 +1,13 @@
 const sequelize = require("../config/database");
 const MapCategory = require("../models/MapCategory");
 const { invalidateOldDrafts } = require("../utils/draftCleanup");
-
 /**
- * @desc    Get all Map Categories
- * @route   GET /api/map-categories
- * @access  Public / Admin
+ * Controller: Map Categories
+ * Handles master data for map markers.
+ * Note: This module is strictly Admin-only (no Editor staging flow).
  */
+
+// Fetch all categories for public/admin maps
 exports.getAllCategories = async (req, res) => {
   try {
     const categories = await MapCategory.findAll({
@@ -19,13 +20,13 @@ exports.getAllCategories = async (req, res) => {
   }
 };
 
-// --- 1. CREATE (ABSOLUTE ADMIN RESTRICTION) ---
+// Admin: Create new master category (Direct Commit)
 exports.createCategory = async (req, res) => {
   const { id, name, color } = req.body;
-
   const t = await sequelize.transaction();
 
   try {
+    // Validate unique ID before creation
     const existing = await MapCategory.findByPk(id, { transaction: t });
     if (existing) {
       await t.rollback();
@@ -40,9 +41,7 @@ exports.createCategory = async (req, res) => {
       color,
       is_locked: false,
     };
-
     await MapCategory.create(categoryData, { transaction: t });
-
     await t.commit();
     res
       .status(201)
@@ -53,18 +52,17 @@ exports.createCategory = async (req, res) => {
   }
 };
 
-// --- 2. UPDATE (ABSOLUTE ADMIN RESTRAICTION) ---
+// Admin: Update master category with pessimistic locking
 exports.updateCategory = async (req, res) => {
   const { id } = req.params;
   const { name, color } = req.body;
-
   const t = await sequelize.transaction();
 
   try {
-    // 1. Bunuh draf lama (Mencegah Zombie Drafts dari sistem sebelum refactor)
+    // Invalidate legacy drafts to maintain state integrity
     await invalidateOldDrafts("MapCategory", id, t);
 
-    // 2. Pessimistic Locking
+    // Acquire pessimistic lock to prevent concurrent admin edits
     const category = await MapCategory.findByPk(id, {
       transaction: t,
       lock: t.LOCK.UPDATE,
@@ -92,10 +90,9 @@ exports.updateCategory = async (req, res) => {
   }
 };
 
-// --- 3. DELETE (ABSOLUTE ADMIN RESTRICTION) ---
+// Admin: Delete category with referential integrity check
 exports.deleteCategory = async (req, res) => {
   const { id } = req.params;
-
   const t = await sequelize.transaction();
 
   try {
@@ -114,7 +111,6 @@ exports.deleteCategory = async (req, res) => {
     }
 
     await category.destroy({ transaction: t });
-
     await t.commit();
     res
       .status(200)
@@ -122,7 +118,7 @@ exports.deleteCategory = async (req, res) => {
   } catch (error) {
     if (t) await t.rollback();
 
-    // Penanganan Foreign Key Constraint (Sangat Krusial)
+    // Catch database-level relational errors (Foreign Key Constraint)
     const msg =
       error.name === "SequelizeForeignKeyConstraintError"
         ? "Gagal hapus! Kategori ini masih digunakan oleh titik peta (markers)."

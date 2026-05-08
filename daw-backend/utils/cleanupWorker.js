@@ -6,19 +6,19 @@ const ApprovalDraft = require("../models/ApprovalDraft");
 const { deleteSingleFile } = require("./fileRemover");
 
 /**
- * THE ULTIMATE GARBAGE COLLECTOR
- * Berjalan setiap Minggu jam 00:00
+ * SCRIPT: Stale Draft Cleanup
+ * Automates the permanent removal of discarded approval records and orphaned temporary assets.
+ * Execution Frequency: Weekly (Sunday at 00:00).
  */
 const startCleanupTask = () => {
-  // Pattern: Menit Detik Jam HariBulan Bulan HariMinggu
-  // "0 0 * * 0" = Setiap hari Minggu jam 00:00
+  // Initialize cron schedule for weekly system maintenance
   cron.schedule("0 0 * * 0", async () => {
     console.log("🧹 [CRON JOB] Starting weekly database & file cleanup...");
 
     const thirtyDaysAgo = new Date(new Date() - 30 * 24 * 60 * 60 * 1000);
 
     try {
-      // 1. Cari draf yang statusnya Discarded dan sudah berumur > 30 hari
+      // Aggregate expired records matching the discard status and retention threshold
       const expiredDrafts = await ApprovalDraft.findAll({
         where: {
           status: "Discarded",
@@ -39,16 +39,15 @@ const startCleanupTask = () => {
       let deletedFilesCount = 0;
 
       for (const draft of expiredDrafts) {
-        // 2. Berburu file fisik di dalam payload (karena draf dibuang, file TEMP_ nggak akan pernah jadi permanen)
+        // Map asset references from the discarded document payload
         const payload = draft.payload || {};
-
-        // Cek file di field khusus _filesToDelete atau scan string yang depannya TEMP_
         const filesToScan = [
           ...(payload._filesToDelete || []),
           payload.cover_image,
           ...(payload.gallery || []),
         ];
 
+        // Execute physical removal of orphaned assets flagged with TEMP prefix
         filesToScan.forEach((fileName) => {
           if (
             fileName &&
@@ -60,7 +59,7 @@ const startCleanupTask = () => {
           }
         });
 
-        // 3. Hapus record dari database permanen
+        // Terminate database record post-asset cleanup
         await draft.destroy();
       }
 

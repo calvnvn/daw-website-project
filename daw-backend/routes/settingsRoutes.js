@@ -4,10 +4,12 @@ const settingsController = require("../controllers/settingsController");
 const { verifyToken, checkPermission } = require("../middleware/authJwt");
 const { upload, optimizeImage } = require("../middleware/upload");
 
-// 1. Public SIte
+// PUBLIC
+// Fetch global system configuration and branding metadata
 router.get("/", settingsController.getSettings);
 
-// 2. Protected Site (Gunakan upload.fields)
+// ADMINISTRATIVE
+// Mutate system settings and synchronize branding assets
 router.put(
   "/",
   [verifyToken, checkPermission("manage_settings")],

@@ -7,6 +7,7 @@ const { generateNotrans } = require("../utils/notransGenerator");
 const MODULE_NAME = "PhilosophyPillar";
 const NOTRANS_PREFIX = "PLR";
 
+// Normalize incoming payload with default fallbacks
 const processPillarPayload = (req) => {
   const { iconId, title, text, orderIndex } = req.body;
   return {
@@ -17,7 +18,7 @@ const processPillarPayload = (req) => {
   };
 };
 
-// 1. GET ALL (Dengan Rejection Radar O(1))
+// Fetch all pillars including dynamic rejection flags via subquery
 exports.getPillars = async (req, res) => {
   try {
     const pillars = await PhilosophyPillar.findAll({
@@ -25,7 +26,7 @@ exports.getPillars = async (req, res) => {
       attributes: {
         include: [
           [
-            // 🛡️ Collation Guard untuk mencegah Error 500
+            // Collation Guard: Forces charset match to prevent database cross-collation 500 errors
             sequelize.literal(`(
               SELECT COUNT(*) > 0 
               FROM ApprovalDrafts 
@@ -54,7 +55,7 @@ exports.getPillars = async (req, res) => {
   }
 };
 
-// 2. CREATE NEW PILLAR (Baton Pass)
+// Orchestrate new pillar creation (Editor staging vs Admin direct commit)
 exports.createPillar = async (req, res) => {
   const t = await sequelize.transaction();
   try {
@@ -65,11 +66,10 @@ exports.createPillar = async (req, res) => {
 
     const payload = processPillarPayload(req);
 
-    // JALUR EDITOR (Drafting)
+    // Editor Flow: Create locked placeholder and stage for ERP approval
     if (userRole === "editor") {
       const notrans = await generateNotrans(NOTRANS_PREFIX);
 
-      // Simpan "Placeholder" di tabel utama sebagai jangkar penguncian
       const newPillar = await PhilosophyPillar.create(
         { ...payload, is_locked: true, lock_ticket: notrans },
         { transaction: t },
@@ -88,7 +88,7 @@ exports.createPillar = async (req, res) => {
         { transaction: t },
       );
 
-      await t.commit(); // LOCAL COMMIT SEBELUM ERP HANDSHAKE
+      await t.commit();
 
       try {
         await ErpApprovalService.initiateApproval({
@@ -108,7 +108,7 @@ exports.createPillar = async (req, res) => {
       });
     }
 
-    // JALUR ADMIN (Direct Commit)
+    // Admin Flow: Direct live commit
     await PhilosophyPillar.create(
       { ...payload, is_locked: false },
       { transaction: t },
@@ -125,9 +125,7 @@ exports.createPillar = async (req, res) => {
   }
 };
 
-// ==========================================
-// 3. UPDATE PILLAR (Item-Level Lock)
-// ==========================================
+// Mutate existing pillar with pessimistic locking and role-based routing
 exports.updatePillar = async (req, res) => {
   const t = await sequelize.transaction();
   try {
@@ -138,7 +136,7 @@ exports.updatePillar = async (req, res) => {
       .toLowerCase();
     const { previous_notrans } = req.body;
 
-    // 🛡️ Row-Level Lock
+    // Acquire row-level lock to prevent concurrent modifications
     const pillar = await PhilosophyPillar.findByPk(id, {
       transaction: t,
       lock: t.LOCK.UPDATE,
@@ -155,7 +153,7 @@ exports.updatePillar = async (req, res) => {
 
     const payload = processPillarPayload(req);
 
-    // JALUR EDITOR (Drafting & Ghost Cleanup)
+    // Editor Flow: Stage updates and sync with ERP
     if (userRole === "editor") {
       const notrans = await generateNotrans(NOTRANS_PREFIX);
       const ticketToClear = previous_notrans || pillar.lock_ticket;
@@ -207,7 +205,7 @@ exports.updatePillar = async (req, res) => {
       });
     }
 
-    // JALUR ADMIN (Direct Commit)
+    // Admin Flow: Purge old drafts and execute direct update
     await ApprovalDraft.update(
       { status: "Obsolete" },
       {
@@ -234,7 +232,7 @@ exports.updatePillar = async (req, res) => {
   }
 };
 
-// 4. DELETE PILLAR (Baton Pass Delete)
+// Safely remove pillar via ERP staging or direct database purge
 exports.deletePillar = async (req, res) => {
   const t = await sequelize.transaction();
   try {
@@ -258,11 +256,11 @@ exports.deletePillar = async (req, res) => {
       });
     }
 
-    // JALUR EDITOR (Draft DELETE)
+    // Editor Flow: Stage deletion intent and lock live record
     if (userRole === "editor") {
       const notrans = await generateNotrans(NOTRANS_PREFIX);
 
-      // Payload minimalis untuk delete
+      // Minimal payload for DELETE action
       const payload = { title: pillar.title, iconId: pillar.iconId };
 
       await ApprovalDraft.create(
@@ -302,7 +300,7 @@ exports.deletePillar = async (req, res) => {
       });
     }
 
-    // JALUR ADMIN (Hard Delete)
+    // Admin Flow: Hard delete and invalidate related drafts
     await ApprovalDraft.update(
       { status: "Obsolete" },
       {

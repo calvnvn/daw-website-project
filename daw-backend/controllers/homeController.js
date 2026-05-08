@@ -14,9 +14,11 @@ const { Op } = require("sequelize");
 const MODULE_NAME = "HomeSettings";
 const NOTRANS_PREFIX = "HOME";
 
+// Extract normalized role from middleware payload
 const getRole = (req) =>
   req.userRole ? req.userRole.toLowerCase().trim() : "";
 
+// Prepend TEMP_ prefix to editor-uploaded files to prevent live leakage before approval
 const applyTempPrefix = (fileObj) => {
   if (!fileObj || !fileObj.filename) {
     console.error(
@@ -24,17 +26,13 @@ const applyTempPrefix = (fileObj) => {
     );
     return null;
   }
-
   const filename = fileObj.filename;
-
   if (filename.startsWith("TEMP_")) {
     return filename;
   }
 
   const uploadDir = path.join(__dirname, "..", "public", "uploads");
-
   const oldPath = fileObj.path || path.join(uploadDir, filename);
-
   const newFilename = `TEMP_${filename}`;
   const newPath = path.join(uploadDir, newFilename);
 
@@ -53,6 +51,7 @@ const applyTempPrefix = (fileObj) => {
   }
 };
 
+// Aggregate unified public homepage metadata (Slides, Stats, Settings)
 exports.getPublicHomepageData = async (req, res) => {
   try {
     const results = await Promise.allSettled([
@@ -65,7 +64,6 @@ exports.getPublicHomepageData = async (req, res) => {
     const stats = results[1].status === "fulfilled" ? results[1].value : [];
     let settings = results[2].status === "fulfilled" ? results[2].value : null;
 
-    // Fallback jka settings belum ada sama sekali di DB
     if (!settings && results[2].status === "fulfilled") {
       settings = await HomeSettings.create({
         id: 1,
@@ -90,10 +88,10 @@ exports.getPublicHomepageData = async (req, res) => {
   }
 };
 
+// Fetch admin payload including contextual lock statuses and active user rejections
 exports.getAdminHomepageData = async (req, res) => {
   try {
     const lockAttributes = ["is_locked", "lock_ticket"];
-
     const actorId = String(req.owl_username || req.karyawanId || "")
       .trim()
       .toLowerCase();
@@ -163,14 +161,12 @@ exports.getAdminHomepageData = async (req, res) => {
   }
 };
 
+// Orchestrate global homepage text updates (Editor Staging vs Admin Overwrite)
 exports.updateSettings = async (req, res) => {
-  console.log("🔥 [SYSTEM AUDIT] MENJALANKAN LOGIC SELECTIVE PACKING V2.0");
-  console.log("🔥 [SYSTEM AUDIT] PREFIX YANG DIGUNAKAN:", NOTRANS_PREFIX);
   const t = await sequelize.transaction();
   try {
     const userRole = String(req.userRole || "").toLowerCase();
     const { introHeadline, introBody, status, previous_notrans } = req.body;
-
     const safeHeadline = (introHeadline || "").trim();
     const safeBody = (introBody || "").trim();
 
@@ -187,6 +183,7 @@ exports.updateSettings = async (req, res) => {
       settings = await HomeSettings.create({ id: 1 }, { transaction: t });
     }
 
+    // Flow: Editor initiates ERP draft workflow
     if (userRole === "editor") {
       if (settings.is_locked) {
         await t.rollback();
@@ -261,7 +258,7 @@ exports.updateSettings = async (req, res) => {
       });
     }
 
-    // 1. Invalidate ALL old drafts for this module
+    // Flow: Admin performs direct authoritative mutation
     await ApprovalDraft.update(
       { status: "Obsolete" },
       {
@@ -272,8 +269,6 @@ exports.updateSettings = async (req, res) => {
         transaction: t,
       },
     );
-
-    // 2. Update Ledger langsung (Menggunakan variabel yang sudah di-sanitize)
     await settings.update(
       {
         introHeadline: safeHeadline,
@@ -283,7 +278,6 @@ exports.updateSettings = async (req, res) => {
       },
       { transaction: t },
     );
-
     await t.commit();
 
     return res.status(200).json({
@@ -297,7 +291,8 @@ exports.updateSettings = async (req, res) => {
   }
 };
 
-// HERO SLIDES (COLLECTION WITH ASSETS)
+// ================= HERO SLIDES =================
+// Scaffold new slide, conditionally appending TEMP prefix for editor image uploads
 exports.createHeroSlide = async (req, res) => {
   let newSlide = null;
   const userRole = getRole(req);
@@ -322,6 +317,7 @@ exports.createHeroSlide = async (req, res) => {
           : uploadedImage.filename;
     }
 
+    // Editor: Stage creation request
     if (userRole === "editor" && status === "Published") {
       const actorId = String(req.owl_username || req.karyawanId);
       const notrans = await generateNotrans("HERO");
@@ -343,18 +339,15 @@ exports.createHeroSlide = async (req, res) => {
       slideData.lock_ticket = notrans;
     }
 
-    newSlide = await HeroSlides.create(slideData, { transaction: t });
-
+    // Admin: Direct commit
+    const newSlide = await HeroSlides.create(slideData, { transaction: t });
     if (userRole === "editor" && status === "Published") {
       await ApprovalDraft.update(
         { target_id: String(newSlide.id) },
         { where: { notrans: slideData.lock_ticket }, transaction: t },
       );
     }
-
     await t.commit();
-
-    // EXTERNAL HANDSHAKE
     if (userRole === "editor" && status === "Published") {
       try {
         await ErpApprovalService.initiateApproval({
@@ -373,7 +366,6 @@ exports.createHeroSlide = async (req, res) => {
         ticket: slideData.lock_ticket,
       });
     }
-
     return res
       .status(201)
       .json({ success: true, message: "Slide created live", data: newSlide });
@@ -384,6 +376,7 @@ exports.createHeroSlide = async (req, res) => {
   }
 };
 
+// Orchestrate slide mutation, managing both text data and conditional image replacement staging
 exports.updateHeroSlide = async (req, res) => {
   const t = await sequelize.transaction();
   try {
@@ -423,7 +416,7 @@ exports.updateHeroSlide = async (req, res) => {
 
     const updatedData = { title, subtitle, order, imageUrl: newImageUrl };
 
-    //  EDITOR
+    // Editor: Request mutation approval
     if (userRole === "editor" && status === "Published") {
       const actorId = String(req.owl_username || req.karyawanId);
       const notrans = await generateNotrans("HERO");
@@ -474,9 +467,8 @@ exports.updateHeroSlide = async (req, res) => {
       });
     }
 
-    //  SUPERADMIN
+    // Admin: Bypass and finalize
     await invalidateOldDrafts(id, "HeroSlides", t);
-
     await slide.update(
       {
         ...updatedData,
@@ -485,9 +477,7 @@ exports.updateHeroSlide = async (req, res) => {
       },
       { transaction: t },
     );
-
     await t.commit();
-
     if (oldImageToDelete) deleteSingleFile(oldImageToDelete);
 
     return res
@@ -500,6 +490,7 @@ exports.updateHeroSlide = async (req, res) => {
   }
 };
 
+// Enforce safe deletion of slides, restricting editors from direct DB execution
 exports.deleteHeroSlide = async (req, res) => {
   const t = await sequelize.transaction();
   try {
@@ -527,7 +518,7 @@ exports.deleteHeroSlide = async (req, res) => {
       });
     }
 
-    //  EDITOR
+    // Editor: Stage deletion
     if (userRole === "editor") {
       const actorId = String(req.owl_username || req.karyawanId);
       const notrans = await generateNotrans("HERO_DEL");
@@ -579,14 +570,11 @@ exports.deleteHeroSlide = async (req, res) => {
         ticket: notrans,
       });
     }
-    //  SUPERADMIN
+    // Admin: Execute hard delete
     await invalidateOldDrafts(id, "HeroSlides", t);
-
     const imageToDelete = slide.imageUrl;
     await slide.destroy({ transaction: t });
-
     await t.commit();
-
     if (imageToDelete) deleteSingleFile(imageToDelete);
 
     return res
@@ -598,7 +586,9 @@ exports.deleteHeroSlide = async (req, res) => {
   }
 };
 
-// IMPACT STATS (Collection - Text Only)
+// ================= IMPACT STATS =================
+
+// Register new impact metric while enforcing strict cardinality limit (max 4)
 exports.createStat = async (req, res) => {
   let newStat = null;
   const userRole = getRole(req);
@@ -658,7 +648,6 @@ exports.createStat = async (req, res) => {
 
     await t.commit();
 
-    // EXTERNAL HANDSHAKE
     if (userRole === "editor" && status === "Published") {
       try {
         await ErpApprovalService.initiateApproval({
@@ -687,6 +676,7 @@ exports.createStat = async (req, res) => {
   }
 };
 
+// Process stat updates with workflow routing and concurrency locking
 exports.updateStat = async (req, res) => {
   const t = await sequelize.transaction();
   try {
@@ -718,7 +708,6 @@ exports.updateStat = async (req, res) => {
 
     const updatedData = { icon, value, label, desc, order };
 
-    //  EDITOR
     if (userRole === "editor" && status === "Published") {
       const actorId = String(req.owl_username || req.karyawanId);
       const notrans = await generateNotrans("STAT");
@@ -767,7 +756,6 @@ exports.updateStat = async (req, res) => {
       });
     }
 
-    // SUPERADMIN PATH (Direct Override)
     await invalidateOldDrafts("ImpactStats", String(id), t);
     await stat.update(
       { ...updatedData, is_locked: false, lock_ticket: null },
@@ -785,6 +773,7 @@ exports.updateStat = async (req, res) => {
   }
 };
 
+// Queue stat metric for permanent deletion
 exports.deleteStat = async (req, res) => {
   const t = await sequelize.transaction();
   try {
@@ -811,13 +800,11 @@ exports.deleteStat = async (req, res) => {
       });
     }
 
-    //  EDITOR
     if (userRole === "editor") {
       const actorId = String(req.owl_username || req.karyawanId);
       const notrans = await generateNotrans("STAT_DEL");
       const fullSnapshot = stat.get({ plain: true });
 
-      // 1. Simpan niat penghapusan ke Vault
       await ApprovalDraft.create(
         {
           notrans,
@@ -831,7 +818,6 @@ exports.deleteStat = async (req, res) => {
         { transaction: t },
       );
 
-      // 2. Pasang Gembok Hapus
       await stat.update(
         { is_locked: true, lock_ticket: notrans },
         { transaction: t },
@@ -839,7 +825,6 @@ exports.deleteStat = async (req, res) => {
 
       await t.commit();
 
-      // 3. External Handshake
       try {
         await ErpApprovalService.initiateApproval({
           notrans,
@@ -858,12 +843,9 @@ exports.deleteStat = async (req, res) => {
       });
     }
 
-    // SUPERADMIN
     await invalidateOldDrafts(id, "ImpactStats", t);
-
     await stat.destroy({ transaction: t });
     await t.commit();
-
     return res
       .status(200)
       .json({ success: true, message: "Statistik deleted live!" });

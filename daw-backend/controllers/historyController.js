@@ -7,8 +7,9 @@ const { generateNotrans } = require("../utils/notransGenerator");
 
 const MODULE_NAME = "History";
 const NOTRANS_PREFIX = "HIS";
-const TARGET_ID = "ALL_TIMELINE";
+const TARGET_ID = "ALL_TIMELINE"; // Treat entire timeline as single entity
 
+// Normalize and sanitize history array
 const processHistoryPayload = (req) => {
   const { histories } = req.body;
 
@@ -22,6 +23,7 @@ const processHistoryPayload = (req) => {
   return { histories: cleanHistories };
 };
 
+// Fetch timeline data with rejection flags
 exports.getHistories = async (req, res) => {
   try {
     const histories = await History.findAll({
@@ -42,6 +44,7 @@ exports.getHistories = async (req, res) => {
       order: [["year", "ASC"]],
     });
 
+    // Format boolean flag
     const formatted = histories.map((h) => {
       const item = h.toJSON();
       item.hasRejected = !!item.hasRejected;
@@ -54,6 +57,7 @@ exports.getHistories = async (req, res) => {
   }
 };
 
+// Orchestrate timeline updates (Editor Staging vs Admin Direct)
 exports.updateHistories = async (req, res) => {
   const t = await sequelize.transaction();
   try {
@@ -63,6 +67,7 @@ exports.updateHistories = async (req, res) => {
     const userRole = req.userRole?.toLowerCase().trim();
     const { status } = req.body;
 
+    // Check active locks
     const lockedRow = await History.findOne({
       where: { is_locked: true },
       transaction: t,
@@ -79,7 +84,7 @@ exports.updateHistories = async (req, res) => {
 
     const payload = processHistoryPayload(req);
 
-    // JALUR 1: EDITOR (Birokrasi / Baton Pass)
+    // Flow 1: Editor (Stage draft & Sync ERP)
     if (userRole === "editor" && status === "Published") {
       const notrans = await generateNotrans(NOTRANS_PREFIX);
 
@@ -98,6 +103,7 @@ exports.updateHistories = async (req, res) => {
         { transaction: t },
       );
 
+      // Lock all timeline records
       await History.update(
         { is_locked: true, lock_ticket: notrans },
         { where: {}, transaction: t },
@@ -121,7 +127,7 @@ exports.updateHistories = async (req, res) => {
       return res.status(202).json({ success: true, ticket: notrans });
     }
 
-    // ADMIN (Direct Commit / Bypass)
+    // Flow 2: Admin (Direct overwrite)
     await ApprovalDraft.update(
       { status: "Obsolete" },
       {
@@ -133,7 +139,7 @@ exports.updateHistories = async (req, res) => {
         transaction: t,
       },
     );
-
+    // Purge old and insert new timeline
     await History.destroy({ where: {}, transaction: t });
 
     if (payload.histories.length > 0) {

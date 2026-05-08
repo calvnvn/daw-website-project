@@ -7,10 +7,16 @@ const path = require("path");
 const swaggerUi = require("swagger-ui-express");
 const swaggerJsDoc = require("swagger-jsdoc");
 
-// 1. CONFIG & DATABASE IMPORT
-const sequelize = require("./config/database");
+/**
+ * Application Entry Point
+ * Orchestrates the Express server lifecycle, middleware pipeline, database synchronization, and API routing.
+ */
 
-// 2. ROUTES IMPORT
+// INITIALIZATION: Database & Service Configurations
+const sequelize = require("./config/database");
+const { startCleanupTask } = require("./utils/cleanupWorker");
+
+// INITIALIZATION: Route Modules
 const authRoutes = require("./routes/authRoutes");
 const settingsRoutes = require("./routes/settingsRoutes");
 const projectRoutes = require("./routes/projectRoutes");
@@ -32,12 +38,15 @@ const approvalRoutes = require("./routes/approvalRoutes");
 const philosophyRoutes = require("./routes/philosophyRoutes");
 const philosophyPillarRoutes = require("./routes/philosophyPillarRoutes");
 
-// 3. MODELS IMPORT
+// INITIALIZATION: Model Registry
 const User = require("./models/User");
 const Role = require("./models/Role");
-// const Permission = require("./models/Permission");
-// const RolePermission = require("./models/RolePermission");
 const Project = require("./models/Project");
+const BusinessSection = require("./models/BusinessSection");
+const MapCategory = require("./models/MapCategory");
+const BusinessMapMarker = require("./models/BusinessMapMarker");
+
+// Load supplementary models for schema synchronization
 require("./models/Management");
 require("./models/Settings");
 require("./models/AboutInfo");
@@ -45,9 +54,6 @@ require("./models/History");
 require("./models/HeroSlides");
 require("./models/HomeSettings");
 require("./models/ImpactStats");
-const BusinessSection = require("./models/BusinessSection");
-const MapCategory = require("./models/MapCategory");
-const BusinessMapMarker = require("./models/BusinessMapMarker");
 require("./models/Page");
 require("./models/Menu");
 require("./models/Affiliate");
@@ -55,18 +61,16 @@ require("./models/Inquiry");
 require("./models/InquirySubject");
 require("./models/InvestmentSettings");
 require("./models/ApprovalDraft");
-const { startCleanupTask } = require("./utils/cleanupWorker");
 
 const app = express();
 
-// MIDDLEWARE PIPELINE
-// Global Security & Body Parser Middleware
+// MIDDLEWARE: Security & Request Parsing
 app.use(cors());
 app.use(express.json({ limit: "50mb" }));
 app.use(express.urlencoded({ limit: "50mb", extended: true }));
 
-// 2. File Uploads Directory Setup
-// Menggunakan process.cwd() agar path selalu stabil tidak peduli dari mana script di-run
+// REFERENCE GATHERING: File System Setup
+// Resolve absolute storage paths and ensure physical directory presence
 const uploadPath = path.join(process.cwd(), "public", "uploads");
 if (!fs.existsSync(uploadPath)) {
   console.warn(
@@ -78,7 +82,8 @@ if (!fs.existsSync(uploadPath)) {
   console.log("SUCCESS: Folder uploads terhubung di:", uploadPath);
 }
 
-// Custom Interceptor Middleware (
+// EXECUTION: Interceptor & Static Assets
+// Enforce asset extension normalization for legacy compatibility
 app.use("/uploads", (req, res, next) => {
   if (req.url.toLocaleLowerCase().endsWith(".jpeg")) {
     const altPath = req.url.replace(/\.jpeg$/i, ".jpg");
@@ -89,7 +94,7 @@ app.use("/uploads", (req, res, next) => {
   next();
 });
 
-// 4. Static File Server
+// Serve optimized static assets with immutable cache headers
 app.use(
   "/uploads",
   express.static(uploadPath, {
@@ -101,6 +106,7 @@ app.use(
   }),
 );
 
+// Resolve and serve crawler instructions
 app.get("/robots.txt", (req, res) => {
   const robotsPath = path.join(process.cwd(), "public", "robots.txt");
   if (fs.existsSync(robotsPath)) {
@@ -112,7 +118,8 @@ app.get("/robots.txt", (req, res) => {
   }
 });
 
-// ROUTER REGISTRATION
+// EXECUTION: API Router Registration
+// Map logical resource domains to dedicated route handlers
 app.use("/api/auth", authRoutes);
 app.use("/api/users", userRoutes);
 app.use("/api/roles", roleRoutes);
@@ -132,10 +139,9 @@ app.use("/api/menus", menuRoutes);
 app.use("/api/approval", approvalRoutes);
 app.use("/api/philosophy", philosophyRoutes);
 app.use("/api/philosophy-pillars", philosophyPillarRoutes);
-
 app.use("/", sitemapRoutes);
 
-// Base Health Check Route
+// Mount core health check endpoint
 app.get("/", (req, res) => {
   res.status(200).json({
     message: "Welcome to DAW Group API",
@@ -145,19 +151,16 @@ app.get("/", (req, res) => {
   });
 });
 
-// Cronjob
+// Initialize scheduled background maintenance tasks
 startCleanupTask();
 console.log("🚀 [SYSTEM] Weekly Cleanup Worker has been initialized.");
 
-// SWAGGER API DOCS SETUP
+// EXECUTION: Documentation Engine
+// Parse OpenApi specifications and mount interactive Swagger UI
 try {
-  // 1. Tentukan path ke file openapi.yaml
   const yamlPath = path.join(__dirname, "./docs/openapi.yaml");
-
-  // 2. Baca dan parsing file YAML
   const swaggerDocument = yaml.load(fs.readFileSync(yamlPath, "utf8"));
 
-  // 3. Masukkan konfigurasi server dinamis (opsional, agar tetap fleksibel)
   swaggerDocument.servers = [
     {
       url:
@@ -167,13 +170,12 @@ try {
     },
   ];
 
-  // 4. Jalankan Swagger UI
   app.use(
     "/api-docs",
     swaggerUi.serve,
     swaggerUi.setup(swaggerDocument, {
       swaggerOptions: {
-        persistAuthorization: true, // Biar token OWL gak hilang saat di-refresh
+        persistAuthorization: true,
       },
       customSiteTitle: "DAW Group CMS API Documentation",
     }),
@@ -183,13 +185,12 @@ try {
 } catch (e) {
   console.error("Gagal memuat file Swagger YAML:", e.message);
 }
-// DATABASE ASSOCIATIONS (Relationships)
 
-// // 1. User & Role Relations
+// REFERENCE GATHERING: Relational Mapping
+// Define entity associations and referential integrity constraints
 Role.hasMany(User, { foreignKey: "roleId", as: "users" });
 User.belongsTo(Role, { foreignKey: "roleId", as: "roleData" });
 
-//3. Business Map Relations
 BusinessSection.hasMany(BusinessMapMarker, {
   foreignKey: "sectionId",
   sourceKey: "id",
@@ -213,19 +214,19 @@ BusinessMapMarker.belongsTo(MapCategory, {
 });
 
 BusinessSection.hasMany(Project, {
-  foreignKey: "category", // Kolom di tabel Project
-  sourceKey: "id", // Kolom id (slug) di BusinessSection
+  foreignKey: "category",
+  sourceKey: "id",
   as: "projects",
 });
 
-// Satu Proyek merujuk ke satu Sektor
 Project.belongsTo(BusinessSection, {
   foreignKey: "category",
   targetKey: "id",
-  as: "sectorData", // Alias agar rapi saat dipanggil (e.g. project.sectorData.category)
+  as: "sectorData",
 });
 
-// BOOTSTRAP SERVER & DATABASE
+// EXECUTION: Server Bootstrap
+// Synchronize schema state and initialize listener on designated port
 const PORT = process.env.PORT || 5000;
 
 sequelize

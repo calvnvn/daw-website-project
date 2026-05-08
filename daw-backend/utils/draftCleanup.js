@@ -1,11 +1,5 @@
 const ApprovalDraft = require("../models/ApprovalDraft");
 
-/**
- * Membatalkan draf pending yang ada jika superadmin melakukan bypass/update langsung.
- * @param {string} moduleName - Nama model (Project, Management, dll)
- * @param {string|number} targetId - ID baris data yang sedang di-lock
- * @param {object} transaction - Objek transaksi Sequelize (opsional)
- */
 const invalidateOldDrafts = async (
   moduleName,
   targetId,

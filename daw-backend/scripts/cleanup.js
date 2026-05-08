@@ -1,13 +1,17 @@
-// daw-backend/scripts/cleanup.js
 const fs = require("fs");
 const path = require("path");
 const sequelize = require("../config/database");
 
+/**
+ * UTILITY: Orphaned Asset Purge
+ * Synchronizes the local file system with database references to reclaim storage.
+ * Scans production tables, HTML content, and staging drafts.
+ */
 async function runCleanup() {
   try {
-    console.log("🔍 Memulai pemindaian database untuk file aktif...");
     const validFiles = new Set();
 
+    // Aggregate file references from primary project records and HTML content
     const [projects] = await sequelize.query(
       "SELECT cover_image, gallery, content FROM Projects",
     );
@@ -31,13 +35,14 @@ async function runCleanup() {
       }
     });
 
+    // Map file references from supporting administrative modules
     const extraTables = [
       { table: "Settings", cols: ["logoUrl", "faviconUrl"] },
       { table: "HeroSlides", cols: ["imageUrl"] },
       { table: "Managements", cols: ["photoUrl"] },
       { table: "Affiliates", cols: ["logoUrl"] },
-      { table: "ImpactStats", cols: ["icon"] }, // Sesuai skema lo
-      { table: "BusinessMapMarkers", cols: ["mapUrl"] }, // Sesuai skema lo
+      { table: "ImpactStats", cols: ["icon"] },
+      { table: "BusinessMapMarkers", cols: ["mapUrl"] },
     ];
 
     for (const item of extraTables) {
@@ -48,16 +53,16 @@ async function runCleanup() {
         rows.forEach((row) => {
           item.cols.forEach((col) => {
             if (row[col]) {
-              // Simpan hanya nama filenya saja
               validFiles.add(path.basename(row[col]));
             }
           });
         });
       } catch (dbErr) {
-        // Jika tabel belum dibuat, jangan hentikan seluruh script
         console.warn(`⚠️ Skip tabel ${item.table}: ${dbErr.message}`);
       }
     }
+
+    // Recursively scan draft payloads to preserve staged/pending assets
     const [drafts] = await sequelize.query(
       "SELECT payload FROM ApprovalDrafts",
     );
@@ -86,9 +91,7 @@ async function runCleanup() {
       `✅ Ditemukan ${validFiles.size} file gambar yang sedang digunakan di sistem (Termasuk Draf).`,
     );
 
-    // --- FIX PATH DI SINI ---
-    // Jika script di: daw-backend/scripts/cleanup.js
-    // Folder upload di: daw-backend/public/uploads
+    // Execute physical deletion of orphaned assets in the uploads directory
     const uploadsDir = path.join(__dirname, "..", "public", "uploads");
 
     if (!fs.existsSync(uploadsDir)) {
@@ -103,6 +106,7 @@ async function runCleanup() {
     console.log("🚀 Memulai pembersihan...");
 
     filesInDir.forEach((file) => {
+      // Preserve system-critical files and directories
       if (
         file === ".gitkeep" ||
         fs.lstatSync(path.join(uploadsDir, file)).isDirectory()
@@ -111,6 +115,7 @@ async function runCleanup() {
         return;
       }
 
+      // Terminate files not present in the consolidated reference set
       if (!validFiles.has(file)) {
         const filePath = path.join(uploadsDir, file);
         try {

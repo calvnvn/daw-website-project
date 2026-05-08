@@ -4,12 +4,15 @@ const pageController = require("../controllers/pageController");
 const { upload, optimizeImage } = require("../middleware/upload");
 const { verifyToken } = require("../middleware/authJwt");
 
-// Public Access (Nggak butuh token)
+// PUBLIC
+// Fetch single page record by URL slug
 router.get("/slug/:slug", pageController.getPageBySlug);
 
-// Protected Access (WAJIB verifyToken sebelum controller)
+// ADMINISTRATIVE
+// Fetch all page records for administrative management
 router.get("/", verifyToken, pageController.getAllPages);
 
+// Execute inline asset upload and optimization
 router.post(
   "/upload-inline",
   verifyToken,
@@ -18,6 +21,7 @@ router.post(
   pageController.uploadInlineImage,
 );
 
+// Initialize new page record with hero asset
 router.post(
   "/",
   verifyToken,
@@ -26,6 +30,7 @@ router.post(
   pageController.createPage,
 );
 
+// Mutate page record and associated hero asset
 router.put(
   "/:id",
   verifyToken,
@@ -34,6 +39,7 @@ router.put(
   pageController.updatePage,
 );
 
+// Terminate page record and purge associated assets
 router.delete("/:id", verifyToken, pageController.deletePage);
 
 module.exports = router;

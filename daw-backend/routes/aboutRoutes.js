@@ -3,10 +3,12 @@ const router = express.Router();
 const aboutController = require("../controllers/aboutController");
 const { verifyToken, checkPermission } = require("../middleware/authJwt");
 
-// 1. Public Route
+// PUBLIC
+// Fetch organizational profile information
 router.get("/", aboutController.getAboutInfo);
 
-// 2. Protected Route
+// ADMINISTRATIVE
+// Mutate organizational profile and mission data
 router.put(
   "/",
   [verifyToken, checkPermission("manage_about")],

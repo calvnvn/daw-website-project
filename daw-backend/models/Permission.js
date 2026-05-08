@@ -12,7 +12,7 @@ const Permission = sequelize.define(
     name: {
       type: DataTypes.STRING,
       allowNull: false,
-      unique: true, // Misal: "manage_projects", "manage_settings"
+      unique: true,
     },
     description: {
       type: DataTypes.STRING,

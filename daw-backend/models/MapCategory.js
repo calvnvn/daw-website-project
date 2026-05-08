@@ -5,15 +5,15 @@ const MapCategory = sequelize.define(
   "MapCategory",
   {
     id: {
-      type: DataTypes.STRING(50), // primary key, misal: 'direct'
+      type: DataTypes.STRING(50),
       primaryKey: true,
     },
     name: {
-      type: DataTypes.STRING(100), // Label: 'DAW Direct'
+      type: DataTypes.STRING(100),
       allowNull: false,
     },
     color: {
-      type: DataTypes.STRING(7), // Hex: '#004B23'
+      type: DataTypes.STRING(7),
       defaultValue: "#004B23",
     },
     is_locked: {

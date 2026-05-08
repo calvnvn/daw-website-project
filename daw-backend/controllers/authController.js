@@ -5,7 +5,7 @@ const axios = require("axios");
 const User = require("../models/User");
 const Role = require("../models/Role");
 
-// 🛠️ HELPER: Mapping Permission Berdasarkan Role
+// Map authorization permissions based on normalized role definitions
 function getPermissionsByRole(role) {
   const normalizedRole = role ? String(role).toLowerCase().trim() : "";
   const common = ["dashboard", "manage_inbox"];
@@ -29,7 +29,7 @@ function getPermissionsByRole(role) {
   return ["dashboard"];
 }
 
-// 1. LOGIN (Hybrid: Local & OWL)
+// Implement hybrid authentication merging external ERP verification with local registry checks
 exports.login = async (req, res) => {
   try {
     const { uname, password } = req.body;
@@ -41,7 +41,7 @@ exports.login = async (req, res) => {
 
     console.log(`>>> [AUTH] Verifying ${uname} via OWL...`);
 
-    // --- FASE 1: Validasi ke API Eksternal OWL ---
+    // Phase 1: Authenticate credentials against external ERP Node
     let owlResponse;
     try {
       owlResponse = await axios.post(`${baseUrl}/node/auth/login`, {
@@ -68,10 +68,9 @@ exports.login = async (req, res) => {
       });
     }
 
-    // --- FASE 2: Dekode Token Eksternal & Cari User Lokal ---
+    // Phase 2: Decode external JWT and validate user existence in local database
     const decodedOwlToken = jwt.decode(tokenDiterima) || {};
     console.log(">>> [DEBUG] Decoded Content:", decodedOwlToken);
-
     const user = await User.findOne({
       where: { owl_username: uname },
       include: [
@@ -95,7 +94,7 @@ exports.login = async (req, res) => {
       });
     }
 
-    // --- FASE 3: Sinkronisasi Identitas (OWL -> Lokal) ---
+    // Phase 3: Synchronize local profile metadata with external identity provider
     const updatedName = decodedOwlToken.name || user.name;
     const updatedEmail = decodedOwlToken.email || user.email;
     const updatePayload = { lastLogin: new Date() };
@@ -111,15 +110,13 @@ exports.login = async (req, res) => {
       updatePayload.email = updatedEmail;
     }
 
-    // Eksekusi mutasi ke database (Sequelize otomatis meng-update objek 'user' di memori)
     await user.update(updatePayload);
 
-    // --- FASE 4: Pembuatan Token CMS (JWT Lokal) ---
+    // Phase 4: Generate local JWT with injected permissions and ERP cross-reference tokens
     const actualRole = user.roleData.name;
     const normalizedRole = actualRole.toLowerCase().trim();
     const permissions = getPermissionsByRole(actualRole);
 
-    // Fallback kuat untuk NIK (jaga-jaga OWL beda penamaan)
     const nikDariOwl =
       decodedOwlToken.karyawanid ||
       decodedOwlToken.karyawanId ||
@@ -138,8 +135,8 @@ exports.login = async (req, res) => {
         owl_username: user.owl_username,
         role: normalizedRole,
         permissions: permissions,
-        owl_token: tokenDiterima, // Simpan token OWL untuk bridge API
-        karyawanid: nikDariOwl, // WAJIB ADA untuk service approval
+        owl_token: tokenDiterima,
+        karyawanid: nikDariOwl, // Required for approval service identification
       },
       process.env.JWT_SECRET,
       { expiresIn: "24h" },
@@ -160,7 +157,7 @@ exports.login = async (req, res) => {
   }
 };
 
-// 2. GET ME (Identitas Sesi)
+// Retrieve authenticated session metadata from local database
 exports.getMe = async (req, res) => {
   try {
     const user = await User.findByPk(req.userId, {

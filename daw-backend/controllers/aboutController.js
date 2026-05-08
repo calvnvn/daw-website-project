@@ -7,6 +7,7 @@ const { generateNotrans } = require("../utils/notransGenerator");
 const MODULE_NAME = "AboutInfo";
 const NOTRANS_PREFIX = "ABT";
 
+// Map incoming request body to a standardized payload structure with fallback to existing state
 const processAboutPayload = async (req, existingData = {}) => {
   const { spiritText, missionText, visionText } = req.body;
   return {
@@ -22,6 +23,7 @@ const processAboutPayload = async (req, existingData = {}) => {
   };
 };
 
+// Retrieve singleton entity and dynamically inject rejection status via correlated subquery
 exports.getAboutInfo = async (req, res) => {
   try {
     const info = await AboutInfo.findOne({
@@ -29,7 +31,6 @@ exports.getAboutInfo = async (req, res) => {
       attributes: {
         include: [
           [
-            // 🛡️ Blueprint 2.C: Collation Guard ditambahkan
             sequelize.literal(`(
               SELECT COUNT(*) > 0 
               FROM ApprovalDrafts 
@@ -55,6 +56,7 @@ exports.getAboutInfo = async (req, res) => {
   }
 };
 
+// Orchestrate conditional mutation logic enforcing Role-Based Access Control and transaction staging
 exports.updateAboutInfo = async (req, res) => {
   const t = await sequelize.transaction();
   try {

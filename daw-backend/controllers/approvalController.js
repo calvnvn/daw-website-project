@@ -24,6 +24,10 @@ const { deleteSingleFile } = require("../utils/fileRemover");
 const User = require("../models/User");
 const { sendApprovalNotification } = require("../utils/mailer");
 
+/**
+ * Orchestrates the multi-stage approval lifecycle by synchronizing internal
+ * SQL drafts with external ERP workflow states.
+ */
 exports.getPendingApprovals = async (req, res) => {
   try {
     const userRole = req.userRole ? req.userRole.toLowerCase().trim() : "";
@@ -32,7 +36,7 @@ exports.getPendingApprovals = async (req, res) => {
 
     const isApproverRole = ["superadmin", "approver"].includes(userRole);
 
-    // 1. Fetch External Data (ERP OWL)
+    // Fetch external pending task list from ERP OWL node
     const owlResponse = await ErpApprovalService.getPendingList({
       karyawanid: karyawanIdForOwl,
       token: tokenOWL,
@@ -43,6 +47,7 @@ exports.getPendingApprovals = async (req, res) => {
     const owlMap = new Map();
     const taskTicketsNormalized = [];
 
+    // Normalize and map external tickets for local correlation
     myOwlTasks.forEach((item) => {
       const ticketNo = (item.notransaksi || item.notrans || "")
         .trim()
@@ -53,7 +58,6 @@ exports.getPendingApprovals = async (req, res) => {
       }
     });
 
-    // 2. Fetch Internal Truth (MySQL)
     let detailedDrafts = [];
 
     if (isApproverRole) {
@@ -68,13 +72,14 @@ exports.getPendingApprovals = async (req, res) => {
       });
     } else {
       if (taskTicketsNormalized.length === 0) return res.status(200).json([]);
+      // Retrieve internal draft details based on user authorization levels
       detailedDrafts = await ApprovalDraft.findAll({
         where: { notrans: { [Op.in]: taskTicketsNormalized } },
         order: [["createdAt", "DESC"]],
       });
     }
 
-    // 3. The Stitching Process (Data Correlation)
+    // Correlate ERP state with local payload to determine queue priority
     const draftsWithExtraData = detailedDrafts.map((draft) => {
       const draftJson = draft.toJSON();
       const cleanDraftNo = (draft.notrans || "").trim().toLowerCase();
@@ -82,7 +87,6 @@ exports.getPendingApprovals = async (req, res) => {
 
       const owlStatusFinal = myRow ? String(myRow.status) : "9";
 
-      // Determine if the button should be active in Frontend
       const isActuallyMyTurn =
         owlStatusFinal === "0" ||
         (owlStatusFinal === "2" && draft.status === "Pending");
@@ -92,14 +96,14 @@ exports.getPendingApprovals = async (req, res) => {
         nourut: myRow ? myRow.nourut || myRow.kodeapp : null,
         level: myRow ? myRow.level : null,
         kodeapp: myRow ? myRow.kodeapp || myRow.nourut : null,
-        nextApp: "", // dynamically calculated during execution
+        nextApp: "",
         isMyQueue: isActuallyMyTurn,
         owlStatus: owlStatusFinal,
         _isSyncing: !myRow && draft.status === "Pending",
       };
     });
 
-    // Ghost Ticket Handling (ERP exists, Local DB missing)
+    // Identify orphaned ERP tickets missing corresponding local draft records
     if (isApproverRole) {
       const existingNotrans = new Set(
         draftsWithExtraData.map((d) => d.notrans.toLowerCase()),
@@ -131,7 +135,7 @@ exports.getPendingApprovals = async (req, res) => {
   }
 };
 
-// POST: Approve/Reject (THE DECISION ENGINE)
+// Execute decision logic and manage data handover (POST /node/approval/trans/submitApp)
 exports.executeDecision = async (req, res) => {
   const {
     status,
@@ -148,14 +152,14 @@ exports.executeDecision = async (req, res) => {
   const nikApprover = String(req.karyawanId);
   const currentLevel = Number(level);
 
-  // START TRANSACTION
+  // Initialize transaction to ensure atomicity across local state changes
   const t = await sequelize.transaction();
 
   try {
     if (!kodeapp)
       throw new Error("Akses Ditolak: Parameter kodeapp/nourut tidak valid.");
 
-    // VAULT VALIDATION
+    // Validate draft existence within the staging vault
     const draftData = await ApprovalDraft.findByPk(notrans, { transaction: t });
     if (!draftData) throw new Error("Draf tidak ditemukan di server lokal.");
 
@@ -166,10 +170,10 @@ exports.executeDecision = async (req, res) => {
       payload,
     } = draftData;
 
-    //  DISCOVERY
     let pureNextApp = "";
     let isFinalLocal = false;
 
+    // Discovery phase: identify subsequent approver or determine finalization state
     if (status === "1") {
       const approverRows = await ErpApprovalService._cekSetup(
         notrans,
@@ -191,7 +195,7 @@ exports.executeDecision = async (req, res) => {
       }
     }
 
-    // SEQUENCE CONTROL: Tembak ERP DULU
+    // Update external workflow state via ERP API before local commit
     await ErpApprovalService.submitDecision({
       status,
       kodeapp: nourut, // Mapping nourut to ERP's kodeapp field
@@ -204,12 +208,10 @@ exports.executeDecision = async (req, res) => {
       karyawanid: nikApprover,
     });
 
-    // LOCAL ORCHESTRATION
-    // CASE A: REJECTION
+    // Handle rejection: unlock target record and revert control to editor
     if (status === "2") {
       const Model = getModelByModuleName(moduleName);
       if (Model && targetId) {
-        // Safe Unlock: Back to Editor's hands
         await Model.update(
           { is_locked: false, lock_ticket: null },
           { where: { id: targetId }, transaction: t },
@@ -227,7 +229,7 @@ exports.executeDecision = async (req, res) => {
       });
     }
 
-    // CASE B: APPROVAL
+    // Handle approval: promote draft payload to production table upon final level
     if (status === "1") {
       if (isFinalLocal) {
         console.log(
@@ -244,8 +246,6 @@ exports.executeDecision = async (req, res) => {
         } catch (e) {
           throw new Error("Payload draf korup.");
         }
-
-        // Pembersihan metadata birokrasi
         ["id", "createdAt", "updatedAt", "is_locked", "lock_ticket"].forEach(
           (f) => delete cleanPayload[f],
         );
@@ -253,8 +253,10 @@ exports.executeDecision = async (req, res) => {
         cleanPayload.is_locked = false;
         cleanPayload.lock_ticket = null;
 
+        // Sanitize and commit temporary files to production storage
         cleanPayload = handleFileCommit(cleanPayload);
 
+        // Scrub payload against model attributes and execute CRUD operation
         const filesToTrash = await executeModelUpdate(
           moduleName,
           targetId,
@@ -296,8 +298,7 @@ exports.executeDecision = async (req, res) => {
   }
 };
 
-// VIEWERS (Diff Fetcher)
-// GET: Mengambil data asli (Live) dari database lokal untuk komparasi (Diff Viewer)
+// Retrieve live production data for comparative diff visualization
 exports.getOriginalData = async (req, res) => {
   try {
     const { module, targetId, action } = req.query;
@@ -327,6 +328,7 @@ exports.getOriginalData = async (req, res) => {
   }
 };
 
+// Identify recent rejection history for record recovery logic
 exports.getRejectedDraftByTarget = async (req, res) => {
   try {
     const { id } = req.params;
@@ -382,14 +384,13 @@ exports.getRejectedDraftByTarget = async (req, res) => {
   }
 };
 
-// PATCH: Discard Rejected Draft
+// Update draft status and release record concurrency locks (PATCH /approval/discard/:notrans)
 exports.discardDraft = async (req, res) => {
   const t = await sequelize.transaction();
   try {
     const { notrans } = req.params;
     const actorId = String(req.owl_username || req.userId);
 
-    // 1. Cari drafnya
     const draft = await ApprovalDraft.findByPk(notrans, { transaction: t });
 
     if (!draft) {
@@ -397,21 +398,18 @@ exports.discardDraft = async (req, res) => {
       return res.status(404).json({ message: "Draf tidak ditemukan." });
     }
 
-    // 2. Security Check: Hanya pembuat draf yang boleh membuang notifikasinya
     if (draft.created_by !== actorId) {
       return res.status(403).json({
         message: "Anda tidak memiliki akses untuk membuang draf ini.",
       });
     }
 
-    // 3. Status Check: Hanya draf yang sudah ditolak (Rejected) yang bisa di-discard
     if (draft.status !== "Rejected") {
       return res
         .status(400)
         .json({ message: "Hanya draf yang ditolak yang bisa diabaikan." });
     }
 
-    // 4. Eksekusi Perubahan Status
     await draft.update({ status: "Discarded" }, { transaction: t });
     const Model = getModelByModuleName(draft.module_name);
     if (Model && draft.target_id) {
@@ -441,6 +439,7 @@ exports.discardDraft = async (req, res) => {
   }
 };
 
+// Forcefully synchronize and reject orphaned ERP tickets (POST /node/approval/trans/submitApp)
 exports.forcePurgeGhostTicket = async (req, res) => {
   const { notrans, nourut, level, komentar } = req.body;
   const tokenOWL = req.owl_token;
@@ -451,15 +450,13 @@ exports.forcePurgeGhostTicket = async (req, res) => {
       `⚠️  [GHOST BUSTER] Memulai Force Purge untuk tiket: ${notrans}`,
     );
 
-    // Kita langsung tembak ERP dengan status "2" (Reject)
-    // Kenapa Reject? Karena data lokalnya udah ga ada, jadi nggak mungkin di-Approve.
     await ErpApprovalService.submitDecision({
       status: "2",
-      nourut: nourut, // Di ERP mapping ke kodeapp
+      nourut: nourut,
       notrans: notrans,
       level: Number(level),
       komentar: komentar || "SYSTEM PURGE: Local Draft Missing",
-      nextApp: "", // Kosongkan karena kita ingin mematikan tiket ini
+      nextApp: "",
       token: tokenOWL,
       karyawanid: nikApprover,
     });
@@ -481,7 +478,11 @@ exports.forcePurgeGhostTicket = async (req, res) => {
   }
 };
 
-// PRIVATE HELPERS (MAINTAINABILITY & EXECUTION ENGINE)
+/**
+ * Internal Helper Functions
+ */
+
+// Maps module string identifiers to Sequelize model definitions
 const MODEL_MAPPING = {
   Project,
   Management,
@@ -513,6 +514,7 @@ function getModelByModuleName(moduleName) {
   return MODEL_MAPPING[standardKey] || null;
 }
 
+// Dispatches asynchronous email notifications to workflow participants
 async function _notifyActor({ type, pureNextApp, draftData, reason }) {
   try {
     let targetUser = null;
@@ -555,7 +557,7 @@ async function _notifyActor({ type, pureNextApp, draftData, reason }) {
   }
 }
 
-// Recursive File Commit Engine (The Sanitizer)
+// Recursively promotes temporary file paths to production storage paths
 function handleFileCommit(payload) {
   if (Array.isArray(payload)) {
     return payload.map((item) => handleFileCommit(item));
@@ -574,7 +576,7 @@ function handleFileCommit(payload) {
   return payload;
 }
 
-// EXECUTION ENGINE (The Database Orchestrator)
+// Scrubs payload and executes final persistence logic on production tables
 async function executeModelUpdate(
   module,
   targetId,
@@ -722,7 +724,7 @@ async function executeModelUpdate(
   return filesToTrash;
 }
 
-// DIFF VIEWER DATA FETCHER
+// Retrieves current record state for comparative visualization
 async function fetchOriginalDataByModule(module, targetId) {
   const Model = getModelByModuleName(module);
 

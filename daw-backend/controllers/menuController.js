@@ -5,7 +5,10 @@ const sequelize = require("../config/database");
 
 const MODULE_NAME = "MENU";
 
-// HELPER: Anti-Loop Guard (Mencegah menu menjadi anak dari dirinya sendiri)
+/**
+ * HELPER FUNCTIONS
+ */
+// Anti-Loop Guard: Mencegah menu dijadikan anak dari sub-menunya sendiri (Circular Reference).
 const isDescendant = async (menuId, targetParentId) => {
   if (!targetParentId) return false;
   if (menuId === targetParentId) return true;
@@ -18,7 +21,7 @@ const isDescendant = async (menuId, targetParentId) => {
   return false;
 };
 
-// HELPER: Selective Packing (Anti-Pollution Guard)
+// Payload Sanitizer: Membersihkan data tidak relevan berdasarkan 'type' menu.
 const packMenuPayload = (data) => {
   let { label, parentId, type, pageId, externalLink, isActive } = data;
 
@@ -40,7 +43,11 @@ const packMenuPayload = (data) => {
   };
 };
 
-// GET: Build Tree (Untuk Tampilan Website & Navigation Builder)
+/**
+ * CONTROLLERS (Strictly Admin / Direct Live Mode)
+ */
+
+// GET (Public/UI): Format data menjadi hirarki/Tree untuk navigasi website.
 exports.getMenuTree = async (req, res) => {
   try {
     const menus = await Menu.findAll({
@@ -74,7 +81,7 @@ exports.getMenuTree = async (req, res) => {
   }
 };
 
-// GET: Flat List (Sudah dibersihkan dari Radar Rejection)
+// GET (Admin): Format data list/flat untuk tabel manajemen CMS.
 exports.getAllMenusFlat = async (req, res) => {
   try {
     const menus = await Menu.findAll({
@@ -89,6 +96,7 @@ exports.getAllMenusFlat = async (req, res) => {
   }
 };
 
+// CREATE (Admin): Eksekusi langsung. Otomatis menaruh menu di urutan (orderIndex) paling bawah.
 exports.createMenu = async (req, res) => {
   const t = await sequelize.transaction();
   try {
@@ -119,6 +127,7 @@ exports.createMenu = async (req, res) => {
   }
 };
 
+// UPDATE (Admin): Eksekusi langsung dengan perlindungan Anti-Loop.
 exports.updateMenu = async (req, res) => {
   const t = await sequelize.transaction();
   try {
@@ -131,7 +140,7 @@ exports.updateMenu = async (req, res) => {
 
     const safePayload = packMenuPayload(req.body);
 
-    // Guard: Mencegah struktur menu melingkar (Circular Loop)
+    // Guard: Blokir pemindahan parent jika menyebabkan Loop/Error silsilah
     if (safePayload.parentId && safePayload.parentId !== menu.parentId) {
       if (await isDescendant(id, safePayload.parentId)) {
         throw new Error(
@@ -140,7 +149,7 @@ exports.updateMenu = async (req, res) => {
       }
     }
 
-    // Ghost Cleanup: Bersihkan jika sebelumnya ada draf tertinggal dari sistem lama
+    // Ghost Cleanup: Hapus sisa draft lama untuk menjaga konsistensi DB
     await ApprovalDraft.update(
       { status: "Obsolete" },
       {
@@ -165,6 +174,7 @@ exports.updateMenu = async (req, res) => {
   }
 };
 
+// DELETE (Admin): Eksekusi langsung. Menghapus menu beserta seluruh anaknya (Recursive Destroy).
 exports.deleteMenu = async (req, res) => {
   const t = await sequelize.transaction();
   try {
@@ -175,11 +185,10 @@ exports.deleteMenu = async (req, res) => {
     });
     if (!menu) throw new Error("Menu tidak ditemukan");
 
-    // Hapus anak-anaknya juga secara rekursif (jika ada)
+    // Cascading Delete: Hapus anak sebelum menghapus induk
     await Menu.destroy({ where: { parentId: id }, transaction: t });
     await menu.destroy({ transaction: t });
 
-    // Ghost Cleanup
     await ApprovalDraft.update(
       { status: "Obsolete" },
       {
@@ -203,6 +212,7 @@ exports.deleteMenu = async (req, res) => {
   }
 };
 
+// BULK UPDATE (Admin): Validasi dan simpan ulang struktur menu (Drag & Drop UI Handler).
 exports.reorderMenus = async (req, res) => {
   const t = await sequelize.transaction();
   try {
@@ -219,14 +229,13 @@ exports.reorderMenus = async (req, res) => {
         {
           orderIndex: item.orderIndex,
           parentId: item.parentId || null,
-          is_locked: false, // Lepas gembok paksa (jika dulu sempat kekunci)
+          is_locked: false,
           lock_ticket: null,
         },
         { where: { id: item.id }, transaction: t },
       );
     }
 
-    // Ghost Cleanup: Obsolete draf reorder lama (jika ada)
     await ApprovalDraft.update(
       { status: "Obsolete" },
       {

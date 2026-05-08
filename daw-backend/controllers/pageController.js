@@ -16,8 +16,10 @@ const { generateNotrans } = require("../utils/notransGenerator");
 const MODULE_NAME = "PAGE";
 const NOTRANS_PREFIX = "PAGE";
 
+// Remove HTML tags for plain text extraction
 const stripHtml = (html) => html.replace(/<[^>]*>?/gm, "");
 
+// Generate collision-free slug against both live DB and pending ERP drafts
 const generateUniqueSlug = async (title, slug, id = null) => {
   let baseSlug = (slug || title)
     .toLowerCase()
@@ -52,6 +54,7 @@ const generateUniqueSlug = async (title, slug, id = null) => {
   return finalSlug;
 };
 
+// Fetch all pages with dynamic rejection radar via subquery
 exports.getAllPages = async (req, res) => {
   try {
     const pages = await Page.findAll({
@@ -89,6 +92,7 @@ exports.getAllPages = async (req, res) => {
   }
 };
 
+// Retrieve single page by URL slug
 exports.getPageBySlug = async (req, res) => {
   try {
     const { slug } = req.params;
@@ -102,6 +106,7 @@ exports.getPageBySlug = async (req, res) => {
   }
 };
 
+// Handle synchronous inline image uploads from WYSIWYG editors
 exports.uploadInlineImage = async (req, res) => {
   try {
     if (!req.file) {
@@ -119,6 +124,7 @@ exports.uploadInlineImage = async (req, res) => {
   }
 };
 
+// Create page with HTML sanitization and ERP staging
 exports.createPage = async (req, res) => {
   const t = await sequelize.transaction();
   let newPage = null;
@@ -142,6 +148,7 @@ exports.createPage = async (req, res) => {
       .toLowerCase();
     const userRole = req.userRole?.toLowerCase();
 
+    // Content sanitization and SEO prep
     const finalSlug = await generateUniqueSlug(title, slug);
     const sanitizedContent = dompurify.sanitize(content);
     const finalMetaDesc =
@@ -163,7 +170,7 @@ exports.createPage = async (req, res) => {
           : sidebarLinks || [],
     };
 
-    // PRE-INSERT: Dapatkan UUID dengan status aman
+    // Pre-insert base record (Locked if editor, Live if admin)
     const isPublishing = userRole === "editor" && status === "Published";
     newPage = await Page.create(
       {
@@ -174,7 +181,7 @@ exports.createPage = async (req, res) => {
       { transaction: t },
     );
 
-    // EDITOR PATH: BATON PASS (CREATE)
+    // Editor Flow: Stage to ERP
     if (isPublishing) {
       const notrans = await generateNotrans(NOTRANS_PREFIX);
 
@@ -225,7 +232,7 @@ exports.createPage = async (req, res) => {
       });
     }
 
-    // ADMIN PATH / SAVE DRAFT
+    // Admin Flow: Direct commit
     await t.commit();
     res.status(201).json({
       success: true,
@@ -242,6 +249,7 @@ exports.createPage = async (req, res) => {
   }
 };
 
+// Mutate page with pessimistic locking and TEMP_ asset prefixing
 exports.updatePage = async (req, res) => {
   const t = await sequelize.transaction();
   try {
@@ -264,7 +272,7 @@ exports.updatePage = async (req, res) => {
       .toLowerCase();
     const userRole = req.userRole?.toLowerCase();
 
-    // FETCH & ROW-LEVEL LOCK
+    // Acquire lock and guard against editor collisions
     const page = await Page.findByPk(id, {
       transaction: t,
       lock: t.LOCK.UPDATE,
@@ -288,6 +296,7 @@ exports.updatePage = async (req, res) => {
     let heroImageName = page.heroImage;
     let oldHeroToDelete = null;
 
+    // Apply TEMP_ prefix for unapproved editor uploads
     if (req.file) {
       oldHeroToDelete = page.heroImage;
       heroImageName = req.file.filename;
@@ -323,7 +332,7 @@ exports.updatePage = async (req, res) => {
           : sidebarLinks || [],
     };
 
-    // EDITOR PATH: BATON PASS (UPDATE)
+    // Editor Flow: Stage updates to ERP
     if (userRole === "editor" && status === "Published") {
       const notrans = await generateNotrans(NOTRANS_PREFIX);
       const ticketToClear = previous_notrans || page.lock_ticket;
@@ -376,7 +385,7 @@ exports.updatePage = async (req, res) => {
         .json({ success: true, message: "Revisi dikirim.", ticket: notrans });
     }
 
-    // ADMIN PATH: DIRECT COMMIT
+    // Admin Flow: Direct commit and draft invalidation
     await ApprovalDraft.update(
       { status: "Obsolete" },
       {
@@ -401,6 +410,7 @@ exports.updatePage = async (req, res) => {
 
     await t.commit();
 
+    // File cleanup logic
     if (oldHeroToDelete && (userRole === "superadmin" || status === "Draft")) {
       deleteSingleFile(oldHeroToDelete);
     }
@@ -418,6 +428,7 @@ exports.updatePage = async (req, res) => {
   }
 };
 
+// Execute hard delete with automatic physical file cleanup
 exports.deletePage = async (req, res) => {
   const t = await sequelize.transaction();
   try {
@@ -442,7 +453,7 @@ exports.deletePage = async (req, res) => {
       });
     }
 
-    // EDITOR PATH: BATON PASS (DELETE)
+    // Editor Flow: Stage deletion intent
     if (userRole === "editor") {
       const notrans = await generateNotrans(NOTRANS_PREFIX);
 
@@ -464,7 +475,7 @@ exports.deletePage = async (req, res) => {
           module_name: MODULE_NAME,
           target_id: String(id),
           action: "DELETE",
-          payload: { title: page.title }, // Payload minimalis untuk DELETE
+          payload: { title: page.title }, // Minimal payload for DELETE
           created_by: actorId,
           status: "Pending",
         },
@@ -498,14 +509,14 @@ exports.deletePage = async (req, res) => {
       });
     }
 
-    // ADMIN PATH: HARD DELETE
+    // Admin Flow: Hard delete
     const heroImage = page.heroImage;
     const content = page.content;
 
     await page.destroy({ transaction: t });
     await t.commit();
 
-    // Eksekusi pembersihan file fisik setelah DB commit (Anti-corruption)
+    // Post-commit physical asset cleanup (DOM parsing for inline images)
     if (heroImage) deleteSingleFile(heroImage);
     if (content) {
       const imgRegex = /src="[^"]*\/uploads\/([^"'\s>]+)"/g;

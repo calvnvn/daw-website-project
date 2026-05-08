@@ -3,7 +3,6 @@ const path = require("path");
 const Settings = require("../models/Settings");
 const ApprovalDraft = require("../models/ApprovalDraft");
 const ErpApprovalService = require("../services/erpApprovalService");
-
 const { deleteSingleFile } = require("../utils/fileRemover");
 const { invalidateOldDrafts } = require("../utils/draftCleanup");
 const sequelize = require("../config/database");
@@ -13,7 +12,12 @@ const MODULE_NAME = "Settings";
 const NOTRANS_PREFIX = "SET";
 
 const JENIS_APP_CMS = process.env.CMS_APPROVAL_CODE;
-// HELPER: Safely Rename File for Editor Drafts
+
+/**
+ * UTILITY: File Staging Protection
+ * Renames uploaded files with a TEMP_ prefix for Editor drafts
+ * to prevent them from appearing live before approval.
+ */
 const applyTempPrefix = (fileObj) => {
   if (!fileObj || !fileObj.filename) return null;
 
@@ -26,8 +30,6 @@ const applyTempPrefix = (fileObj) => {
     return filename;
   }
 
-  // 🚀 PERBAIKAN 3: Bangun ulang path secara manual
-  // Ini menyelamatkan kita kalau .path hilang ditelan middleware
   const directory = path.join(__dirname, "..", "public", "uploads");
   const oldPath = fileObj.path || path.join(directory, filename);
   const newFilename = `TEMP_${filename}`;
@@ -40,19 +42,23 @@ const applyTempPrefix = (fileObj) => {
       return newFilename;
     } else {
       console.warn(`🚨 [TEMP GUARD] File asli tidak ditemukan di: ${oldPath}`);
-      return filename; // Fallback agar DB tidak null
+      return filename;
     }
   } catch (err) {
     console.error(
       `🚨 [TEMP GUARD] Gagal me-rename file ke TEMP_: ${err.message}`,
     );
-    return filename; // Fallback agar DB tidak null
+    return filename;
   }
 };
 
+/**
+ * GET: System Settings
+ * Retrieves the singleton settings record (ID: 1) and checks
+ * for any active 'Rejected' drafts to alert the UI.
+ */
 exports.getSettings = async (req, res) => {
   try {
-    // 🚀 PERBAIKAN: Ubah nama variabel destructuring menjadi 'settingsInstance'
     const [settingsInstance, created] = await Settings.findOrCreate({
       where: { id: 1 },
       defaults: {
@@ -64,9 +70,9 @@ exports.getSettings = async (req, res) => {
     if (created)
       console.log(">>> [SETTINGS] Initialized default record (ID 1)");
 
-    // 🚀 AMAN: Ekstrak plain object dari 'settingsInstance' ke konstanta 'settings'
     const settings = settingsInstance.get({ plain: true });
 
+    // Check for recent rejections in the staging vault
     const rejectedDraft = await ApprovalDraft.findOne({
       where: {
         module_name: "Settings",
@@ -78,7 +84,7 @@ exports.getSettings = async (req, res) => {
 
     res.status(200).json({
       success: true,
-      data: settings, // Kirim object bersih
+      data: settings,
       has_rejected: !!rejectedDraft,
       rejected_data: rejectedDraft || null,
     });
@@ -90,14 +96,19 @@ exports.getSettings = async (req, res) => {
   }
 };
 
+/**
+ * PUT: Update Settings
+ * Orchestrates logic based on user role:
+ * 1. Admin: Direct authoritative commit to production.
+ * 2. Editor: Stages changes in ApprovalDraft and triggers ERP workflow.
+ */
 exports.updateSettings = async (req, res) => {
   const t = await sequelize.transaction();
-
-  // Deteksi file untuk kebutuhan cleanup jika error
   const uploadedLogo = req.files?.["logo"] ? req.files["logo"][0] : null;
   const uploadedFavicon = req.files?.["favicon"]
     ? req.files["favicon"][0]
     : null;
+
   let tempLogoPath = null;
   let tempFaviconPath = null;
 
@@ -107,12 +118,11 @@ exports.updateSettings = async (req, res) => {
     const actorId = String(req.owl_username || req.karyawanId);
     const { status, previous_notrans, ...textContent } = req.body;
 
-    // FETCH & ROW-LEVEL LOCK
+    // Acquire row-level lock for singleton consistency
     const settings = await Settings.findByPk(id, {
       transaction: t,
       lock: t.LOCK.UPDATE,
     });
-
     if (!settings) {
       await t.rollback();
       return res
@@ -120,7 +130,7 @@ exports.updateSettings = async (req, res) => {
         .json({ success: false, message: "Settings not found." });
     }
 
-    // CONCURRENCY GUARD
+    // Concurrency Guard: Prevent editors from modifying a record under review
     if (userRole === "editor" && settings.is_locked) {
       await t.rollback();
       return res.status(423).json({
@@ -139,7 +149,9 @@ exports.updateSettings = async (req, res) => {
     delete updatePayload.createdAt;
     delete updatePayload.updatedAt;
 
-    // JALUR SUPERADMIN: SOVEREIGN BYPASS (LIVE COMMIT - 200)
+    /**
+     * BRANCH 1: Admin / Superadmin (Direct Live Commit)
+     */
     if (userRole === "superadmin" || userRole === "admin") {
       console.log(">>> [SETTINGS] JALUR SUPERADMIN: BYPASSING APPROVAL <<<");
 
@@ -150,8 +162,6 @@ exports.updateSettings = async (req, res) => {
       if (uploadedFavicon) updatePayload.faviconUrl = uploadedFavicon.filename;
 
       await invalidateOldDrafts("Settings", id, t);
-
-      // Commit Update ke DB Lokal
       await settings.update(
         {
           ...updatePayload,
@@ -160,7 +170,6 @@ exports.updateSettings = async (req, res) => {
         },
         { transaction: t },
       );
-
       await t.commit();
       await settings.reload();
 
@@ -174,11 +183,12 @@ exports.updateSettings = async (req, res) => {
       });
     }
 
-    // EDITOR
+    /**
+     * BRANCH 2: Editor (Staging & ERP Sync)
+     */
     if (userRole === "editor") {
       console.log(">>> [SETTINGS] JALUR EDITOR: THE BATON PASS PROTOCOL <<<");
-
-      // File Handling (Temp Prefix)
+      // Stage files with TEMP_ prefix
       if (uploadedLogo) {
         tempLogoPath = applyTempPrefix(uploadedLogo);
         updatePayload.logoUrl = tempLogoPath;
@@ -188,7 +198,7 @@ exports.updateSettings = async (req, res) => {
         updatePayload.faviconUrl = tempFaviconPath;
       }
 
-      // Draft Resolution
+      // Link previous draft if this is a resubmission
       if (previous_notrans) {
         await ApprovalDraft.update(
           { status: "Replaced" },
@@ -199,6 +209,7 @@ exports.updateSettings = async (req, res) => {
 
       const notrans = await generateNotrans("SET");
 
+      // Persist draft and lock live record
       await ApprovalDraft.create(
         {
           notrans,
@@ -222,6 +233,7 @@ exports.updateSettings = async (req, res) => {
 
       await t.commit();
 
+      // Initiate external ERP handshake
       try {
         await ErpApprovalService.initiateApproval({
           notrans,
@@ -253,14 +265,12 @@ exports.updateSettings = async (req, res) => {
       await t.rollback();
     }
 
-    // Hapus file fisik TEMP yang terlanjur terbuat jika DB gagal commit
+    // Rollback physical files if DB operation failed
     if (tempLogoPath) deleteSingleFile(tempLogoPath);
     if (tempFaviconPath) deleteSingleFile(tempFaviconPath);
-    // Hapus file asli yang diupload Admin jika gagal
     if (uploadedLogo && !tempLogoPath) deleteSingleFile(uploadedLogo.filename);
     if (uploadedFavicon && !tempFaviconPath)
       deleteSingleFile(uploadedFavicon.filename);
-
     console.error("🚨 ERROR UPDATE SETTINGS:", error);
     res.status(500).json({
       success: false,

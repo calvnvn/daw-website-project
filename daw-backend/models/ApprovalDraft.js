@@ -18,15 +18,15 @@ const ApprovalDraft = sequelize.define(
       allowNull: false,
     },
     target_id: {
-      type: DataTypes.STRING(50), // ID baris data yang mau diubah
-      allowNull: true, // Bisa null jika modulnya Singleton (ID=1)
+      type: DataTypes.STRING(50),
+      allowNull: true,
     },
     payload: {
-      type: DataTypes.JSON, // Menyimpan seluruh data revisi
+      type: DataTypes.JSON,
       allowNull: false,
     },
     created_by: {
-      type: DataTypes.STRING(255), // NIK atau Username Editor
+      type: DataTypes.STRING(255),
       allowNull: false,
     },
     status: {

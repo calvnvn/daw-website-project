@@ -13,6 +13,7 @@ const { Op } = require("sequelize");
 
 const JENIS_APP_CMS = process.env.CMS_APPROVAL_CODE;
 
+// Configure strict HTML sanitization rules to prevent XSS and malicious inline injections
 const sanitizeOptions = {
   allowedTags: sanitizeHtml.defaults.allowedTags.concat([
     "img",
@@ -53,17 +54,15 @@ const sanitizeOptions = {
     ],
   },
 
-  // 3. The Enforcer: Ensure iframes only point to safe domains
   allowedIframeHostnames: [
     "www.youtube.com",
     "youtube.com",
     "www.youtube-nocookie.com",
-    "youtu.be", // Short link
+    "youtu.be",
   ],
 
   allowedSchemes: ["http", "https", "ftp", "mailto", "data"],
 
-  // 4. Prevent injection via inline CSS (e.g., style="background: url(javascript:...)")
   allowedStyles: {
     "*": {
       color: [
@@ -77,6 +76,7 @@ const sanitizeOptions = {
   },
 };
 
+// Transform text into URL-friendly string formats
 const slugify = (text) => {
   return text
     .toString()
@@ -87,6 +87,7 @@ const slugify = (text) => {
     .trim(); // Trim whitespace
 };
 
+// Parse HTML content to track embedded assets for automated garbage collection
 const extractImagesFromHtml = (html) => {
   if (!html) return [];
   const images = [];
@@ -98,6 +99,7 @@ const extractImagesFromHtml = (html) => {
   return images;
 };
 
+// Normalize payload, execute sanitization, and calculate asset differences for orphaned file cleanup
 const processBusinessPayload = async (req, existingData = {}) => {
   const { title, category, htmlContent, hasMap, mapMarkers } = req.body;
   let filesToDelete = [];
@@ -135,7 +137,7 @@ const processBusinessPayload = async (req, existingData = {}) => {
   };
 };
 
-// Admin Getter with Rejection Radar
+// Retrieve administrative business data with correlated subqueries for rejection tracking
 exports.getAdminBusinessSections = async (req, res) => {
   try {
     const sections = await BusinessSection.findAll({
@@ -183,6 +185,7 @@ exports.getAdminBusinessSections = async (req, res) => {
   }
 };
 
+// Retrieve active business sections and associated map coordinates for public display
 exports.getPublicBusinessData = async (req, res) => {
   try {
     const sections = await BusinessSection.findAll({
@@ -234,6 +237,7 @@ exports.uploadBusinessImage = async (req, res) => {
   }
 };
 
+// Orchestrate conditional updates, content diffing, and ERP staging for business sections
 exports.updateBusinessSection = async (req, res) => {
   const t = await sequelize.transaction();
   try {
@@ -242,6 +246,7 @@ exports.updateBusinessSection = async (req, res) => {
     const { status, previous_notrans } = req.body;
     const actorId = String(req.owl_username || req.karyawanId);
 
+    // Acquire pessimistic row lock to prevent concurrent modifications
     const section = await BusinessSection.findByPk(id, {
       transaction: t,
       lock: t.LOCK.UPDATE,
@@ -262,7 +267,6 @@ exports.updateBusinessSection = async (req, res) => {
       });
     }
 
-    // Lock Guard
     if (section.is_locked && userRole === "editor") {
       await t.rollback();
       return res.status(423).json({
@@ -276,29 +280,24 @@ exports.updateBusinessSection = async (req, res) => {
       section,
     );
 
-    // THE DIFF DETECTOR: Identifikasi jenis perubahan
-    // Trim dan hilangkan spasi ekstra untuk perbandingan yang akurat
+    // Compute content diff to isolate logic branches (e.g., bypassing ERP for map-only changes)
     const originalHtml = (section.htmlContent || "").trim();
     const incomingHtml = (payload.htmlContent || "").trim();
-
     const isContentChanged =
       payload.title !== section.title ||
       incomingHtml !== originalHtml ||
       payload.category !== section.category;
 
-    // EDITOR BYPASS (Khusus Peta)
+    // Bypass ERP staging for non-textual map coordinate updates by editors
     if (userRole === "editor" && !isContentChanged) {
       console.log(
         `>>> [HYBRID BYPASS] Editor ${actorId} memodifikasi peta tanpa mengubah teks. Direct Commit...`,
       );
-
       await section.update({ hasMap: payload.hasMap }, { transaction: t });
-
       await BusinessMapMarker.destroy({
         where: { sectionId: id },
         transaction: t,
       });
-
       if (
         payload.hasMap &&
         payload.mapMarkers &&
@@ -318,7 +317,7 @@ exports.updateBusinessSection = async (req, res) => {
       });
     }
 
-    // EDITOR NORMAL FLOW (Konten berubah -> Masuk Antrean)
+    // Stage textual modifications as Pending drafts and synchronize with ERP workflow
     if (userRole === "editor" && isContentChanged) {
       console.log(
         `>>> [APPROVAL REQUIRED] Editor ${actorId} mengubah konten teks. Memulai draf...`,
@@ -363,11 +362,10 @@ exports.updateBusinessSection = async (req, res) => {
       });
     }
 
-    // ADMIN: Direct Commit (Atomic Baton Pass) - Mengubah Semua
+    // Execute direct persistence and invalidate legacy drafts for administrative roles
     if (userRole === "superadmin" || userRole === "admin") {
       await invalidateOldDrafts("BusinessSection", id, t);
     }
-
     await section.update(
       {
         title: payload.title,
@@ -378,12 +376,10 @@ exports.updateBusinessSection = async (req, res) => {
       },
       { transaction: t },
     );
-
     await BusinessMapMarker.destroy({
       where: { sectionId: id },
       transaction: t,
     });
-
     if (payload.hasMap && payload.mapMarkers && payload.mapMarkers.length > 0) {
       const newMarkers = payload.mapMarkers.map((marker) => ({
         ...marker,
@@ -391,13 +387,10 @@ exports.updateBusinessSection = async (req, res) => {
       }));
       await BusinessMapMarker.bulkCreate(newMarkers, { transaction: t });
     }
-
     await t.commit();
-
     if (filesToDelete && filesToDelete.length > 0) {
       filesToDelete.forEach((file) => deleteSingleFile(file));
     }
-
     return res.status(200).json({
       message: "Sektor dan lokasi peta berhasil diperbarui secara permanen!",
     });
@@ -408,6 +401,7 @@ exports.updateBusinessSection = async (req, res) => {
   }
 };
 
+// Orchestrate new section creation with conditional ERP staging based on user role
 exports.createBusinessSection = async (req, res) => {
   const t = await sequelize.transaction();
   try {
@@ -440,17 +434,14 @@ exports.createBusinessSection = async (req, res) => {
       lock_ticket: null,
     };
 
-    // EDITOR: Approval Flow
     if (userRole === "editor" && status === "Published") {
       const notrans = await generateNotrans("BusinessSection");
 
-      // Buat baris baru di Live Database TAPI LANGSUNG DIGEMBOK
       await BusinessSection.create(
         { ...sectionPayload, is_locked: true, lock_ticket: notrans },
         { transaction: t },
       );
 
-      // Simpan konten aslinya ke dalam Vault
       await ApprovalDraft.create(
         {
           notrans,
@@ -478,7 +469,6 @@ exports.createBusinessSection = async (req, res) => {
       });
     }
 
-    // ADMIN: Direct Commit
     const newSection = await BusinessSection.create(sectionPayload, {
       transaction: t,
     });
@@ -494,6 +484,7 @@ exports.createBusinessSection = async (req, res) => {
   }
 };
 
+// Validate relational constraints and execute conditional physical deletion or ERP staging
 exports.deleteSection = async (req, res) => {
   const t = await sequelize.transaction();
   try {
@@ -521,6 +512,7 @@ exports.deleteSection = async (req, res) => {
       });
     }
 
+    // Validate foreign key dependencies to maintain referential integrity
     const attachedProjectsCount = await Project.count({
       where: { category: id },
       transaction: t,
@@ -541,7 +533,6 @@ exports.deleteSection = async (req, res) => {
       }
     }
 
-    // EDITOR
     if (userRole === "editor") {
       const notrans = await generateNotrans("BusinessSection");
 
@@ -551,7 +542,7 @@ exports.deleteSection = async (req, res) => {
           module_name: "BusinessSection",
           action: "DELETE",
           target_id: String(id),
-          payload: { title: section.title, reason: "Request Delete" }, // Payload minimal
+          payload: { title: section.title, reason: "Request Delete" },
           created_by: actorId,
           status: "Pending",
         },
@@ -577,7 +568,6 @@ exports.deleteSection = async (req, res) => {
       });
     }
 
-    // ADMIN (Direct Cascade Commit)
     await invalidateOldDrafts("BusinessSection", id, t);
     await BusinessMapMarker.destroy({
       where: { sectionId: id },

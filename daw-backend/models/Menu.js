@@ -18,7 +18,7 @@ const Menu = sequelize.define("Menu", {
   },
   orderIndex: {
     type: DataTypes.INTEGER,
-    defaultValue: 0, // Drag & Drop order
+    defaultValue: 0,
   },
   type: {
     type: DataTypes.ENUM("page", "external", "folder"),
@@ -26,7 +26,7 @@ const Menu = sequelize.define("Menu", {
   },
   pageId: {
     type: DataTypes.UUID,
-    allowNull: true, // Akan terisi ID dari tabel Page jika type === "page"
+    allowNull: true,
   },
   externalLink: {
     type: DataTypes.STRING,
@@ -34,7 +34,7 @@ const Menu = sequelize.define("Menu", {
   },
   isActive: {
     type: DataTypes.BOOLEAN,
-    defaultValue: true, // Fitur hide/show menu tanpa harus menghapusnya
+    defaultValue: true,
   },
   is_locked: {
     type: DataTypes.BOOLEAN,
