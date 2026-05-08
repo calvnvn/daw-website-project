@@ -35,7 +35,7 @@ export const dawApi = axios.create({
 });
 
 /**
- * Request Interceptor: Injects the authorization token globally.
+ * Request Interceptor: Injects the authorization token globally.(Exit Gate)
  */
 const injectToken = (config: InternalAxiosRequestConfig) => {
   const token = localStorage.getItem("daw_token");
@@ -47,7 +47,24 @@ const injectToken = (config: InternalAxiosRequestConfig) => {
   return config;
 };
 
+/**
+ * Response Interceptor: Auto-Logout / Clear Stale Token on 401 (Entry Gate)
+ */
+const handleAuthError = (error: any) => {
+  if (error.response?.status === 401) {
+    console.warn(
+      "⚠️ [AUTH] Token expired or invalid. Auto-cleaning storage...",
+    );
+    localStorage.removeItem("daw_token");
+    localStorage.removeItem("daw_user");
+  }
+  return Promise.reject(error);
+};
+
 api.interceptors.request.use(injectToken);
 dawApi.interceptors.request.use(injectToken);
+
+api.interceptors.response.use((res) => res, handleAuthError);
+dawApi.interceptors.response.use((res) => res, handleAuthError);
 
 export default api;
