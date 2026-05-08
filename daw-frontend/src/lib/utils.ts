@@ -2,31 +2,31 @@ import { clsx, type ClassValue } from "clsx";
 import { twMerge } from "tailwind-merge";
 import { BASE_UPLOAD_URL } from "./api";
 
+/**
+ * UTILITIES: Infrastructure Support
+ * Core helpers for style orchestration and asset path normalization.
+ */
+
+// STYLING
+// Merge and resolve Tailwind CSS class collisions intelligently
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
-/**
- * REFACTORED: getCleanImageUrl
- * @description Safely resolves image paths for local previews (blob),
- * external links (http), and server-hosted assets (uploads).
- */
+// ASSET RESOLUTION
+// Transform raw database paths into valid, absolute resource URLs
 export const getCleanImageUrl = (path: string | null | undefined): string => {
-  // 1. Fallback jika path kosong (Sangat disarankan memakai path gambar default)
   if (!path) return "";
 
-  // 2. Jika path adalah Blob URL (Hasil dari URL.createObjectURL untuk preview)
-  // atau sudah berupa Full URL (http/https), langsung kembalikan as-is.
+  // Preserve absolute protocols and local preview blobs
   if (path.startsWith("blob:") || path.startsWith("http")) {
     return path;
   }
 
-  // 3. Sanitasi path dari prefix "uploads" atau "/uploads" secara presisi menggunakan Regex
-  // Ini mencegah double "uploads/uploads" di URL akhir.
+  // Sanitize path by stripping redundant directory prefixes
   const cleanPath = path.replace(/^\/?uploads\/?/, "");
 
-  // 4. Konstruksi URL Akhir
-  // Menghapus slash di akhir BASE_UPLOAD_URL jika ada, lalu menggabungkannya dengan path bersih.
+  // Compose absolute URL from base storage configuration
   const baseUrl = BASE_UPLOAD_URL.replace(/\/$/, "");
   const normalizedPath = cleanPath.startsWith("/")
     ? cleanPath

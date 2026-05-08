@@ -2,10 +2,16 @@ import { useTranslation } from "react-i18next";
 import ScrollReveal from "../ScrollReveal";
 import { useAbout } from "@/contexts/AboutContext";
 
+/** * COMPONENT: OurCompany | Orchestrates the display of corporate identity, vision, and mission through localized content and dynamic highlighting.
+ */
 export default function OurCompany() {
+  // INITIALIZATION
+  // Initialize localization hooks and consume about data context
   const { t } = useTranslation();
   const { aboutData, isLoading } = useAbout();
 
+  // UTILITY
+  // Parse and normalize markdown-style bold text into stylized span elements
   const renderHighlightedText = (text: string) => {
     if (!text) return null;
     const parts = text.split(/(\*\*.*?\*\*)/g);
@@ -21,9 +27,13 @@ export default function OurCompany() {
     });
   };
 
+  // RENDER LOGIC
+  // Enforce skeleton state during asynchronous data resolution
   if (isLoading)
     return <div className="animate-pulse h-64 bg-slate-100 rounded-xl"></div>;
 
+  // EXECUTION
+  // Execute structured layout rendering for corporate spirit, vision, and mission segments
   return (
     <div className="space-y-16">
       <ScrollReveal direction="up" delay={0}>
@@ -49,7 +59,6 @@ export default function OurCompany() {
               {t("about.company.missionTitle")}
             </h3>
             <p className="font-serif text-2xl text-slate-900 leading-relaxed">
-              {/* Jika pakai data DB, kita proses manual. Kalau i18n, panggil biasa. */}
               {aboutData?.missionText
                 ? renderHighlightedText(aboutData.missionText)
                 : t("about.company.missionText")}

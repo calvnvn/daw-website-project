@@ -4,10 +4,16 @@ import { Toaster } from "sonner";
 import { AuthProvider } from "./contexts/AuthContext";
 import ProtectedRoute from "./components/ProtectedRoute";
 
+/**
+ * APPLICATION: Core Entry & Routing Engine
+ * Orchestrates global providers, asynchronous module resolution, and granular access control.
+ */
+
+// CORE LAYOUTS
 const MainLayout = lazy(() => import("./layouts/MainLayout"));
 const AdminLayout = lazy(() => import("./layouts/AdminLayout"));
 
-// --- Lazy Import Public Frontend ---
+// PUBLIC DOMAINS
 const Home = lazy(() => import("./pages/public/Home"));
 const AboutUs = lazy(() => import("./pages/public/AboutUs"));
 const OurBusinesses = lazy(() => import("./pages/public/OurBusinesses"));
@@ -16,10 +22,8 @@ const ProjectDetail = lazy(() => import("./pages/public/ProjectDetail"));
 const DynamicPage = lazy(() => import("./pages/public/DynamicPage"));
 const NotFound = lazy(() => import("./pages/public/NotFound"));
 
-// --- Lazy Import Auth ---
+// ADMINISTRATIVE DOMAINS
 const Login = lazy(() => import("./pages/admin/system/auth/Login"));
-
-// --- Lazy Import Admin Dashboard ---
 const Dashboard = lazy(() => import("./pages/admin/Dashboard"));
 const ProjectManagement = lazy(() => import("./pages/admin/ProjectManagement"));
 const GlobalSettings = lazy(
@@ -45,6 +49,7 @@ const ApprovalCenter = lazy(
   () => import("./pages/admin/approvals/ApprovalCenter"),
 );
 
+// Resolve specialized content management module with context injection
 const ContentManagerWrapper = lazy(async () => {
   const [ContentContextModule, ContentManagerModule] = await Promise.all([
     import("@/contexts/ContentContext"),
@@ -60,6 +65,7 @@ const ContentManagerWrapper = lazy(async () => {
   };
 });
 
+// Initialize global fallback state for network-suspended components
 const PageLoader = () => (
   <div className="flex h-screen w-full items-center justify-center bg-slate-50">
     <div className="h-10 w-10 animate-spin rounded-full border-4 border-daw-green border-t-transparent"></div>
@@ -70,10 +76,9 @@ function App() {
   return (
     <AuthProvider>
       <Toaster position="top-center" richColors />
-      {/* Suspense utama untuk Layout Level */}
       <Suspense fallback={<PageLoader />}>
         <Routes>
-          {/* PUBLIC ROUTES (Ringan & Cepat) */}
+          {/* ROUTE DEFINITION: Public Consumer Facing */}
           <Route element={<MainLayout />}>
             <Route path="/" element={<Home />} />
             <Route path="/about" element={<AboutUs />} />
@@ -84,20 +89,22 @@ function App() {
             <Route path="*" element={<NotFound />} />
           </Route>
 
-          {/* AUTH ROUTES */}
+          {/* ROUTE DEFINITION: Administrative Access Portal */}
           <Route path="/admin/login" element={<Login />} />
 
-          {/* ADMIN ROUTES */}
+          {/* ROUTE DEFINITION: Protected Administrative Workspace */}
           <Route element={<ProtectedRoute />}>
             <Route path="/admin" element={<AdminLayout />}>
               <Route index element={<Dashboard />} />
 
+              {/* Enforce modular project lifecycle management */}
               <Route path="projects">
                 <Route index element={<ProjectManagement />} />
                 <Route path="create" element={<ProjectForm />} />
                 <Route path="edit/:id" element={<ProjectForm />} />
               </Route>
 
+              {/* Enforce granular access control via permission-based guards */}
               <Route element={<ProtectedRoute permission="manage_content" />}>
                 <Route path="content" element={<ContentManagerWrapper />} />
               </Route>

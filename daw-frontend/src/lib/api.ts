@@ -1,11 +1,14 @@
 import axios, { type InternalAxiosRequestConfig } from "axios";
 
+/**
+ * GATEWAY: API Infrastructure
+ * Orchestrates service-specific clients and global security interceptors.
+ */
+
+// SYSTEM CONFIGURATION
 const DEFAULT_API_URL = "/api";
 
-/**
- * Normalizes the base URL by removing trailing slashes.
- * Falls back to the default API path if undefined or empty.
- */
+// Enforce consistent base URL formatting by stripping trailing slashes
 const normalizeBaseUrl = (url?: string): string => {
   if (!url || url.trim() === "") {
     return DEFAULT_API_URL;
@@ -13,30 +16,24 @@ const normalizeBaseUrl = (url?: string): string => {
   return url.endsWith("/") ? url.slice(0, -1) : url;
 };
 
-// Internal CMS API URL
+// Synchronize environment-specific endpoints
 export const API_URL = normalizeBaseUrl(import.meta.env.VITE_API_URL);
-
-// OWL/ERP Core API URL (Fallback to API_URL if undefined)
 export const DAW_API_URL = normalizeBaseUrl(
   import.meta.env.VITE_DAW_API_URL || import.meta.env.VITE_API_URL,
 );
-
-// Resolves the base upload directory (e.g., replaces '/api' with '/uploads')
 export const BASE_UPLOAD_URL = API_URL.replace(/\/api$/, "") + "/uploads";
 
-// Instance 1: Content Management API
+// NETWORK CLIENTS
+// Initialize dedicated instances for CMS and Enterprise Core services
 const api = axios.create({
   baseURL: API_URL,
 });
-
-// Instance 2: Core Enterprise API (Login, Approvals)
 export const dawApi = axios.create({
   baseURL: DAW_API_URL,
 });
 
-/**
- * Request Interceptor: Injects the authorization token globally.(Exit Gate)
- */
+// MIDDLEWARE PIPELINE
+// Authorize outgoing requests via Bearer token injection
 const injectToken = (config: InternalAxiosRequestConfig) => {
   const token = localStorage.getItem("daw_token");
 
@@ -47,9 +44,7 @@ const injectToken = (config: InternalAxiosRequestConfig) => {
   return config;
 };
 
-/**
- * Response Interceptor: Auto-Logout / Clear Stale Token on 401 (Entry Gate)
- */
+// Invalidate stale sessions and purge storage on 401 Unauthorized
 const handleAuthError = (error: any) => {
   if (error.response?.status === 401) {
     console.warn(
@@ -61,6 +56,7 @@ const handleAuthError = (error: any) => {
   return Promise.reject(error);
 };
 
+// Apply interceptor pipeline to all initialized client instances
 api.interceptors.request.use(injectToken);
 dawApi.interceptors.request.use(injectToken);
 
