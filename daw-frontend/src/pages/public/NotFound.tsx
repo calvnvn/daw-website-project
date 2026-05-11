@@ -74,7 +74,7 @@ export default function NotFound() {
               The page you are trying to access cannot be found.
             </p>
 
-            {/* LAYER 4: EXECUTIVE ACTION BUTTONS                              */}
+            {/* LAYER 4: EXECUTIVE ACTION BUTTONS */}
             <div className="mt-8 flex flex-col items-center justify-center gap-3 sm:mt-12 sm:flex-row sm:gap-4 md:gap-6">
               <Link
                 to="/"
