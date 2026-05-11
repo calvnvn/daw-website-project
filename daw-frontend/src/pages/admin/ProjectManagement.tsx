@@ -229,7 +229,7 @@ export default function ProjectManagement() {
           </p>
         </div>
         <Link to="/admin/projects/create">
-          <button className="flex items-center gap-2 bg-daw-green hover:bg-[#003b1c] text-white px-5 py-2.5 rounded-lg font-medium transition-colors shadow-sm shadow-daw-green/20">
+          <button className="flex items-center justify-center gap-2 bg-daw-green hover:bg-[#003b1c] text-white px-6 py-2.5 rounded-xl font-black text-[11px] uppercase tracking-widest transition-all shadow-lg shadow-daw-green/20 active:scale-95">
             <Plus className="w-5 h-5" />
             <span>Tambah Proyek Baru</span>
           </button>
@@ -297,7 +297,7 @@ export default function ProjectManagement() {
             onChange={(e) => setFilterCategory(e.target.value)}>
             <option value="All">Semua Kategori</option>
             <option value="Rejected" className="text-red-600 font-bold">
-              ⚠️ Butuh Revisi
+              Butuh Revisi
             </option>
             {sections.map((sec) => (
               <option key={sec.id} value={sec.id}>
@@ -359,12 +359,12 @@ export default function ProjectManagement() {
                   const rowStyle = isNeedsRevision
                     ? "bg-red-50/30 hover:bg-red-50/60 border-l-4 border-l-red-500 shadow-[inset_4px_0_0_0_rgba(239,68,68,1)]"
                     : isDeleting
-                      ? "bg-rose-50/40 opacity-80 grayscale-[20%] border-l-4 border-l-rose-500" // WARNA ROSE UNTUK HAPUS
+                      ? "bg-rose-50/40 opacity-80 grayscale-[30%] border-l-4 border-l-rose-500"
                       : isPending
                         ? isOverrideMode
-                          ? "bg-amber-50/40 hover:bg-amber-50/70 border-l-4 border-amber-500"
-                          : "bg-slate-50/50 opacity-70 grayscale-[20%]"
-                        : "hover:bg-slate-50/80";
+                          ? "bg-amber-50/40 hover:bg-amber-50/70 border-l-4 border-l-amber-500"
+                          : "bg-slate-50 opacity-60 grayscale-[30%] border-l-4 border-l-blue-500"
+                        : "hover:bg-slate-50 border-l-4 border-l-transparent hover:border-l-slate-300";
 
                   return (
                     <tr
@@ -399,7 +399,7 @@ export default function ProjectManagement() {
 
                               {/* BADGE SYSTEM  (Konsisten dengan Row Style) */}
                               {isDeleting ? (
-                                <span className="inline-flex items-center gap-1 text-[10px] bg-rose-600 text-white px-2 py-0.5 rounded-full font-black tracking-tighter shadow-sm animate-pulse">
+                                <span className="inline-flex items-center gap-1 text-[9px] bg-rose-100 text-rose-700 border border-rose-200 px-2 py-0.5 rounded-full font-black uppercase tracking-widest shadow-sm animate-pulse">
                                   <Trash2 className="w-2.5 h-2.5" /> PENDING
                                   DELETE
                                 </span>

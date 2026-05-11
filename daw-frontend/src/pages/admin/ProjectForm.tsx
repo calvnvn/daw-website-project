@@ -709,16 +709,16 @@ export default function ProjectForm() {
 
       {/* ⚠️ 3. RECOVERY BANNER */}
       {showDraftBanner && rejectedDraft && (
-        <div className="mb-6 bg-amber-50 border border-amber-200 rounded-2xl p-5 flex flex-col md:flex-row items-start md:items-center justify-between gap-4 shadow-sm">
+        <div className="mb-6 bg-red-50 border-l-4 border-l-red-500 border-y border-r border-red-200 rounded-xl p-5 flex flex-col md:flex-row items-start md:items-center justify-between gap-4 shadow-sm animate-in slide-in-from-top-4">
           <div className="flex items-start gap-4">
             <div className="p-3 bg-amber-100 rounded-xl text-amber-600 shrink-0">
               <AlertTriangle className="w-6 h-6" />
             </div>
             <div>
-              <h4 className="text-sm font-bold text-amber-900 mb-1">
+              <h4 className="text-sm font-black text-red-900 uppercase tracking-tighter mb-1">
                 ⚠️ Catatan Peninjau
               </h4>
-              <p className="text-xs text-amber-700 leading-relaxed font-bold italic">
+              <p className="text-xs text-red-800 leading-relaxed font-bold bg-white/60 p-2.5 rounded border border-red-200/50 shadow-inner">
                 "
                 {rejectedDraft.rejection_reason ||
                   "Revisi Anda memerlukan perbaikan lanjutan."}
@@ -732,7 +732,7 @@ export default function ProjectForm() {
                 type="button"
                 onClick={handleRestoreDraft}
                 disabled={isRestoring || shouldLockUI}
-                className="flex items-center justify-center gap-2 bg-amber-600 hover:bg-amber-700 text-white px-5 py-2.5 rounded-xl text-xs font-bold transition-all shadow-sm">
+                className="flex items-center justify-center gap-2 bg-red-600 hover:bg-red-700 text-white px-5 py-2.5 rounded-xl text-xs font-bold transition-all shadow-sm active:scale-95 disabled:bg-red-300">
                 <RotateCcw
                   className={`w-4 h-4 ${isRestoring ? "animate-spin" : ""}`}
                 />
@@ -742,7 +742,7 @@ export default function ProjectForm() {
             <button
               type="button"
               onClick={handleDiscardDraft}
-              className="flex items-center justify-center gap-2 bg-white border border-amber-200 text-amber-600 hover:bg-amber-100 px-4 py-2.5 rounded-xl text-xs font-bold transition-all shadow-sm">
+              className="flex items-center justify-center gap-2 bg-white border border-red-200 text-red-600 hover:bg-red-50 px-4 py-2.5 rounded-xl text-xs font-bold transition-all shadow-sm active:scale-95">
               <X className="w-4 h-4" /> Abaikan
             </button>
           </div>
@@ -775,7 +775,7 @@ export default function ProjectForm() {
             type="button"
             onClick={() => handleSave("Draft")}
             disabled={isSaving || shouldLockUI || !can("manage_projects")}
-            className="px-5 py-2.5 bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 hover:border-slate-300 rounded-xl font-bold text-[13px] shadow-sm transition-all disabled:opacity-50 flex items-center gap-2">
+            className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-6 py-2.5 bg-white border border-slate-200 text-slate-600 hover:bg-slate-50 hover:text-slate-900 rounded-xl font-black text-[11px] uppercase tracking-widest shadow-sm transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed">
             <Save className="w-4 h-4 text-slate-400" /> Simpan Draf
           </button>
 
@@ -783,16 +783,16 @@ export default function ProjectForm() {
             type="button"
             onClick={() => handleSave("Published")}
             disabled={isSaving || shouldLockUI || !can("manage_projects")}
-            className={`px-6 py-2.5 text-white rounded-xl font-bold text-[13px] transition-all shadow-sm flex items-center gap-2 ${
+            className={`flex-1 sm:flex-none flex items-center justify-center gap-2 px-6 py-2.5 rounded-xl font-black text-[11px] uppercase tracking-widest transition-all shadow-lg active:scale-95 disabled:cursor-not-allowed disabled:shadow-none min-w-[170px] ${
               isSaving
-                ? "bg-slate-300"
+                ? "bg-slate-300 text-slate-700"
                 : shouldLockUI
                   ? "bg-slate-200 text-slate-500"
                   : isOverrideMode
-                    ? "bg-amber-600 hover:bg-amber-700"
+                    ? "bg-amber-600 hover:bg-amber-700 text-white shadow-amber-600/20"
                     : isSuperadmin
-                      ? "bg-daw-green hover:bg-[#003b1c]"
-                      : "bg-blue-600 hover:bg-blue-700"
+                      ? "bg-daw-green hover:bg-[#003b1c] text-white shadow-daw-green/20"
+                      : "bg-blue-600 hover:bg-blue-700 text-white shadow-blue-600/20"
             }`}>
             {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
             {!isSaving && shouldLockUI && <LockIcon className="w-4 h-4" />}
