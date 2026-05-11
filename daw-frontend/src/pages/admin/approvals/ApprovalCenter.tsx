@@ -840,7 +840,7 @@ export default function ApprovalCenter() {
         komentar: "SYSTEM OVERRIDE: Purging Orphaned Ticket",
       });
 
-      toast.success("Tiket hantu berhasil dimusnahkan!", { id: toastId });
+      toast.success("Tiket berhasil dihapus!", { id: toastId });
       fetchApprovals();
     } catch (error: any) {
       toast.error("Gagal melakukan Purge", {
