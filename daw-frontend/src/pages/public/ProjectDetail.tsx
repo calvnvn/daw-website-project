@@ -73,19 +73,23 @@ export default function ProjectDetail() {
   const cleanContent = useMemo(() => {
     if (!project?.content) return "";
 
-    // 🚀 Trik: Ambil origin backend saja (tanpa /api)
-    // Jika VITE_API_URL adalah http://localhost:5550/api
-    // Kita hanya butuh http://localhost:5550
     const apiUrl = import.meta.env.VITE_API_URL || "http://localhost:5550";
     const baseHost = apiUrl.replace(/\/api$/, "");
 
-    return project.content
+    // 1. Destroy Non-Breaking Spaces (&nbsp;) to allow natural word wrapping
+    let sanitizedHtml = project.content.replace(/&nbsp;|\u00A0/g, " ");
+
+    // 2. Eradicate inline styles injected by Quill that cause visual fragmentation
+    sanitizedHtml = sanitizedHtml.replace(/style="[^"]*"/gi, "");
+
+    // 3. Forcefully remove alignment classes that override layout constraints
+    sanitizedHtml = sanitizedHtml.replace(/ql-align-justify/gi, "");
+
+    // Path normalization
+    return sanitizedHtml
       .replace(/src="[^"]*\\uploads\\/g, `src="${baseHost}/uploads/`)
-
       .replace(/src="\/uploads\//g, `src="${baseHost}/uploads/`)
-
       .replace(/src="\/api\/uploads\//g, `src="${baseHost}/uploads/`)
-
       .replace(
         /src="https?:\/\/(localhost:5000|localhost:5550|172\.30\.1\.20:5550)\/(api\/)?uploads\//g,
         `src="${baseHost}/uploads/`,
@@ -316,6 +320,9 @@ export default function ProjectDetail() {
                 */}
                 <div
                   className="daw-editorial-content max-w-none text-slate-700 text-base md:text-[18px] leading-[1.85]
+                  w-full min-w-0 text-left break-words whitespace-normal
+                  [&_p]:!text-left [&_span]:!inline [&_strong]:!inline
+                    
                     /* Paragraf & Basmi Enter Kosong (Penting!) */
                     [&_p]:mb-6 last:[&_p]:mb-0 [&_p:empty]:hidden [&_p:has(br):empty]:hidden
                     [&_p:has(+_ul)]:mb-1 [&_p:has(+_ol)]:mb-1
