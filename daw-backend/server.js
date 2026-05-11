@@ -1,4 +1,6 @@
 require("dotenv").config();
+console.log("Cek Mode:", process.env.NODE_ENV);
+
 const express = require("express");
 const cors = require("cors");
 const yaml = require("js-yaml");
