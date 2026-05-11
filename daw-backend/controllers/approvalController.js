@@ -120,6 +120,9 @@ exports.getPendingApprovals = async (req, res) => {
             isMyQueue: String(owlItem.status) === "0",
             owlStatus: String(owlItem.status),
             _isGhost: true,
+            nourut: owlItem.nourut || owlItem.kodeapp,
+            kodeapp: owlItem.kodeapp || owlItem.nourut,
+            level: owlItem.level,
           });
         }
       });
@@ -450,6 +453,28 @@ exports.forcePurgeGhostTicket = async (req, res) => {
       `⚠️  [GHOST BUSTER] Memulai Force Purge untuk tiket: ${notrans}`,
     );
 
+    // 1. DISCOVERY PHASE: Fetch live data directly from ERP Node
+    const owlResponse = await ErpApprovalService.getPendingList({
+      karyawanid: nikApprover,
+      token: tokenOWL,
+      limit: 100,
+    });
+
+    const pendingTasks = owlResponse?.data?.rows || [];
+    const targetTicket = pendingTasks.find(
+      (t) =>
+        (t.notransaksi || t.notrans || "").trim().toLowerCase() ===
+        notrans.toLowerCase(),
+    );
+
+    if (!targetTicket) {
+      console.warn(
+        `🚨 [GHOST BUSTER] Tiket ${notrans} tidak ditemukan di antrean ERP aktif.`,
+      );
+      return res
+        .status(404)
+        .json({ message: "Tiket tidak ditemukan di antrean ERP Anda." });
+    }
     await ErpApprovalService.submitDecision({
       status: "2",
       nourut: nourut,
