@@ -20,8 +20,6 @@ export default function BusinessGrid({
   const { t } = useTranslation();
 
   // 1. CONNECT TO GLOBAL CONTEXT
-  // We extract sections, publicProjects, and loading state directly from context
-  // to avoid redundant API calls per sector component.
   const {
     sections,
     publicProjects,
@@ -56,8 +54,6 @@ export default function BusinessGrid({
   }, [sections, t]);
 
   // 4. CATEGORY LOOKUP MAP
-  // O(1) lookup dictionary to translate raw slugs (e.g., 'renewable-energy')
-  // into formatted display names for the project cards.
   const sectorLookup = useMemo(() => {
     const map: Record<string, string> = {};
     sections.forEach((s) => (map[s.id] = s.category));
@@ -94,8 +90,7 @@ export default function BusinessGrid({
 
   return (
     <section
-      className={`pb-24 ${hideFilters ? "pt-0 bg-transparent" : "pt-12 bg-[#F8F9FA]"} overflow-hidden`}
-    >
+      className={`pb-24 ${hideFilters ? "pt-0 bg-transparent" : "pt-12 bg-[#F8F9FA]"} overflow-hidden`}>
       <div className="container mx-auto px-6">
         {/* --- OPTIONAL HEADER & TABS --- */}
         {!hideFilters && sections.length > 0 && (
@@ -126,8 +121,7 @@ export default function BusinessGrid({
                         activeFilter === f.value
                           ? "text-daw-green"
                           : "text-slate-400 hover:text-daw-green/60"
-                      }`}
-                    >
+                      }`}>
                       {f.label}
                     </button>
                   ))}
@@ -160,12 +154,10 @@ export default function BusinessGrid({
                   isFourItems
                     ? "lg:w-[calc(50%-16px)] lg:max-w-[500px]"
                     : "lg:w-[calc(33.333%-22px)]"
-                }`}
-              >
+                }`}>
                 <Link
                   to={`/projects/${project.slug || project.id}`}
-                  className="group bg-white rounded-[12px] border border-slate-100 shadow-[0_4px_20px_rgba(0,0,0,0.03)] hover:shadow-[0_20px_40px_rgba(0,0,0,0.08)] overflow-hidden transition-all duration-500 flex flex-col h-full hover:-translate-y-2"
-                >
+                  className="group bg-white rounded-[12px] border border-slate-100 shadow-[0_4px_20px_rgba(0,0,0,0.03)] hover:shadow-[0_20px_40px_rgba(0,0,0,0.08)] overflow-hidden transition-all duration-500 flex flex-col h-full hover:-translate-y-2">
                   <div className="relative w-full aspect-[3/2] overflow-hidden bg-slate-100">
                     {project.cover_image ? (
                       <img
