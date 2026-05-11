@@ -47,9 +47,9 @@ const injectToken = (config: InternalAxiosRequestConfig) => {
 // Invalidate stale sessions and purge storage on 401 Unauthorized
 const handleAuthError = (error: any) => {
   if (error.response?.status === 401) {
-    console.warn(
-      "⚠️ [AUTH] Token expired or invalid. Auto-cleaning storage...",
-    );
+    // console.warn(
+    //   "⚠️ [AUTH] Token expired or invalid. Auto-cleaning storage...",
+    // );
     localStorage.removeItem("daw_token");
     localStorage.removeItem("daw_user");
   }
