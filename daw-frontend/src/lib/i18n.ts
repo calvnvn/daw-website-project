@@ -11,6 +11,7 @@ i18n.use(initReactI18next).init({
   },
   lng: "en", // Bahasa default
   fallbackLng: "en", // Kalau ada teks ID yang kosong, otomatis pakai EN
+  debug: false,
   interpolation: {
     escapeValue: false,
   },

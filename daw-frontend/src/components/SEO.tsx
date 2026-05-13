@@ -123,14 +123,17 @@ export default function SEO({
 
   return (
     <Helmet>
-      {preloadImage && (
-        <link
-          rel="preload"
-          as="image"
-          href={getCleanImageUrl(preloadImage)}
-          fetchPriority="high"
-        />
-      )}
+      {preloadImage &&
+        typeof preloadImage === "string" &&
+        preloadImage.trim() !== "" && (
+          <link
+            key={`preload-${preloadImage}`}
+            rel="preload"
+            as="image"
+            href={getCleanImageUrl(preloadImage)}
+            fetchPriority="high"
+          />
+        )}
 
       <link rel="icon" type="image/png" href={dynamicFavicon} />
       <link rel="apple-touch-icon" href={dynamicFavicon} />
