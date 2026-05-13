@@ -67,19 +67,32 @@ function AnimatedNumber({ text, locale }: { text: string; locale: string }) {
 
 export default function ImpactStatistics() {
   const { i18n } = useTranslation();
-
-  // 👈 TARIK DATA DARI PIPELINE
   const { stats } = useHome();
 
-  // Jika admin belum mengisi data sama sekali, sembunyikan section ini agar tidak kosong melompong
   if (!stats || stats.length === 0) return null;
+
+  const getGridLayout = (count: number) => {
+    switch (count) {
+      case 1:
+        return "grid-cols-1 max-w-sm mx-auto";
+      case 2:
+        return "grid-cols-1 md:grid-cols-2 max-w-3xl mx-auto";
+      case 3:
+        return "grid-cols-1 md:grid-cols-3 max-w-5xl mx-auto";
+      case 4:
+      default:
+        return "grid-cols-2 md:grid-cols-2 lg:grid-cols-4";
+    }
+  };
+
+  const gridClass = getGridLayout(stats.length);
 
   return (
     <section className="pb-12 lg:pb-32 bg-white border-b border-slate-100">
       <div className="container mx-auto px-6 max-w-7xl">
-        <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-4 gap-y-12 gap-x-6 lg:gap-y-0 lg:gap-x-0 lg:divide-x divide-slate-200">
+        <div
+          className={`grid gap-y-12 gap-x-6 lg:gap-y-0 lg:gap-x-0 lg:divide-x divide-slate-200 ${gridClass}`}>
           {stats.map((stat, index) => {
-            // 👇 SULAP DARI STRING DATABASE KE KOMPONEN ICON LUCIDE
             const Icon = (Icons as any)[stat.icon] || Icons.HelpCircle;
 
             return (
@@ -89,9 +102,7 @@ export default function ImpactStatistics() {
                 delay={index * 150}
                 className={`group flex flex-col items-center text-center px-2 lg:px-8 xl:px-12 ${
                   index !== 0 ? "lg:pt-0" : ""
-                }`}
-              >
-                {/* Icon Hover Effect */}
+                }`}>
                 <Icon className="w-10 h-10 text-daw-green mb-6 stroke-[1.5px] opacity-80 transition-all duration-300 group-hover:-translate-y-1 group-hover:opacity-100 group-hover:drop-shadow-md" />
 
                 <h3 className="text-3xl lg:text-4xl font-serif text-slate-900 mb-4 tracking-tight">
