@@ -280,17 +280,6 @@ export default function Management() {
                     {selectedPerson.description}
                   </p>
                 </div>
-                <div className="mt-12 flex gap-4 animate-in fade-in duration-1000 [animation-delay:800ms] [animation-fill-mode:both]">
-                  <div className="h-10 w-[2px] bg-daw-green"></div>
-                  <div className="flex flex-col justify-between py-0.5">
-                    <span className="text-[9px] text-slate-500 uppercase tracking-widest font-bold">
-                      Executive Profile
-                    </span>
-                    <span className="text-[10px] text-emerald-500 uppercase tracking-widest">
-                      DAW Group
-                    </span>
-                  </div>
-                </div>
               </div>
             </div>
           </div>
