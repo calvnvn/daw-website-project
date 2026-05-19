@@ -70,9 +70,6 @@ const DynamicBusinessSection = memo(
                 {/* 6. MOBILE UX FIX: Base text diturunkan ke 4xl agar tidak meluber di layar iPhone SE */}
                 <h2 className="text-4xl md:text-5xl lg:text-[4.5rem] xl:text-[5rem] font-serif font-bold text-transparent bg-clip-text bg-gradient-to-br from-[#004B23] via-[#006E33] to-[#10B981] leading-[1.05] tracking-tight drop-shadow-sm pb-2">
                   {data.category}
-                  <span className="block text-3xl md:text-4xl lg:text-5xl xl:text-6xl text-slate-300 italic font-light mt-2 md:mt-3">
-                    Division
-                  </span>
                 </h2>
               </ScrollReveal>
             </div>
