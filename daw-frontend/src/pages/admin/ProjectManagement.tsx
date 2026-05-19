@@ -164,8 +164,7 @@ export default function ProjectManagement() {
 
     toast.promise(
       async () => {
-        const safeTicket = encodeURIComponent(lockTicket);
-        await api.patch(`/approval/discard/${safeTicket}`);
+        await api.patch('/approval/discard', { notrans: lockTicket });
         setProjects((prev) =>
           prev.map((p) =>
             p.id === targetId

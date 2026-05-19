@@ -142,8 +142,8 @@ exports.getPendingApprovals = async (req, res) => {
 exports.executeDecision = async (req, res) => {
   const {
     status,
-    kodeapp, // Reference to 'nourut' from ERP
-    nourut,
+    // kodeapp, // Reference to 'nourut' from ERP
+    // nourut,
     notrans: bodyNotrans,
     notransaksi,
     level,
@@ -159,8 +159,33 @@ exports.executeDecision = async (req, res) => {
   const t = await sequelize.transaction();
 
   try {
-    if (!kodeapp)
-      throw new Error("Akses Ditolak: Parameter kodeapp/nourut tidak valid.");
+    // 🛡️ 1. TAMBAHKAN JIT VERIFICATION DI SINI (Jangan sampai terlewat)
+    const owlResponse = await ErpApprovalService.getPendingList({
+      karyawanid: nikApprover,
+      token: tokenOWL,
+      limit: 100,
+    });
+
+    const myOwlTasks = owlResponse?.data?.rows || [];
+    const realErpTask = myOwlTasks.find(
+      (task) =>
+        (task.notransaksi || task.notrans || "").trim().toLowerCase() ===
+        notrans.toLowerCase(),
+    );
+
+    if (!realErpTask) {
+      throw new Error(
+        "Tiket tidak ditemukan di antrean ERP Anda yang aktif. Mungkin sudah dieksekusi.",
+      );
+    }
+
+    // Ekstrak ID Eksekusi langsung dari sumber aslinya (ERP)
+    const validExecutionId = realErpTask.nourut || realErpTask.kodeapp;
+
+    // 🛡️ 2. BARU KITA CEK VALIDASINYA
+    if (!validExecutionId) {
+      throw new Error("Akses Ditolak: Gagal mengekstrak ID eksekusi dari ERP.");
+    }
 
     // Validate draft existence within the staging vault
     const draftData = await ApprovalDraft.findByPk(notrans, { transaction: t });
@@ -201,8 +226,8 @@ exports.executeDecision = async (req, res) => {
     // Update external workflow state via ERP API before local commit
     await ErpApprovalService.submitDecision({
       status,
-      kodeapp: nourut, // Mapping nourut to ERP's kodeapp field
-      nourut: nourut,
+      kodeapp: validExecutionId, // 👈 Terjamin akurat
+      nourut: validExecutionId, // 👈 Terjamin akurat
       notrans,
       level: status === "1" ? currentLevel + 1 : currentLevel,
       komentar,
@@ -391,8 +416,14 @@ exports.getRejectedDraftByTarget = async (req, res) => {
 exports.discardDraft = async (req, res) => {
   const t = await sequelize.transaction();
   try {
-    const { notrans } = req.params;
-    const actorId = String(req.owl_username || req.userId);
+    const { notrans } = req.body;
+
+    // 🛡️ 1. KUMPULKAN SEMUA IDENTITAS YANG MUNGKIN DARI TOKEN SAAT INI
+    const currentUserIdentities = [
+      req.owl_username ? String(req.owl_username) : null,
+      req.karyawanId ? String(req.karyawanId) : null,
+      req.userId ? String(req.userId) : null,
+    ].filter(Boolean); // Membuang yang nilainya null atau undefined
 
     const draft = await ApprovalDraft.findByPk(notrans, { transaction: t });
 
@@ -401,13 +432,23 @@ exports.discardDraft = async (req, res) => {
       return res.status(404).json({ message: "Draf tidak ditemukan." });
     }
 
-    if (draft.created_by !== actorId) {
+    // 🛡️ 2. CEK APAKAH PEMBUAT DRAF ADA DI DALAM DAFTAR IDENTITAS KITA
+    if (!currentUserIdentities.includes(String(draft.created_by))) {
+      await t.rollback();
+
+      // Console log ini akan membantu kamu melihat siapa sebenarnya 'hantu' yang bikin draf ini
+      console.log(
+        `🚨 [DISCARD BLOCKED] Pembuat Draf: ${draft.created_by} | ID Kamu:`,
+        currentUserIdentities,
+      );
+
       return res.status(403).json({
         message: "Anda tidak memiliki akses untuk membuang draf ini.",
       });
     }
 
     if (draft.status !== "Rejected") {
+      await t.rollback();
       return res
         .status(400)
         .json({ message: "Hanya draf yang ditolak yang bisa diabaikan." });
@@ -436,7 +477,7 @@ exports.discardDraft = async (req, res) => {
       message: "Notifikasi draf telah diabaikan.",
     });
   } catch (error) {
-    if (t) await t.rollback();
+    if (t && !t.finished) await t.rollback();
     console.error("🚨 [DISCARD ERROR]:", error.message);
     res.status(500).json({ message: "Gagal mengabaikan draf." });
   }

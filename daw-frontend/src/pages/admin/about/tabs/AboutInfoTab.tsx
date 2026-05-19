@@ -147,9 +147,7 @@ export default function AboutInfoTab({
     setIsDiscarding(true);
     const loadingToast = toast.loading("Membersihkan notifikasi...");
     try {
-      await api.patch(
-        `/approval/discard/${encodeURIComponent(rejectedDraft.notrans)}`,
-      );
+      await api.patch('/approval/discard', { notrans: rejectedDraft.notrans });
       setRejectedDraft(null);
       await refreshData();
       toast.success("Notifikasi penolakan berhasil dibersihkan.", {

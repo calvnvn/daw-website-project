@@ -192,8 +192,7 @@ export default function ManageBusinesses() {
 
     const toastId = toast.loading("Mengabaikan notifikasi penolakan...");
     try {
-      const safeTicket = encodeURIComponent(rejectedDraft.notrans);
-      await api.patch(`/approval/discard/${safeTicket}`);
+      await api.patch('/approval/discard', { notrans: rejectedDraft.notrans });
 
       toast.success("Notifikasi revisi berhasil diabaikan.", { id: toastId });
       clearRejectedDraft();

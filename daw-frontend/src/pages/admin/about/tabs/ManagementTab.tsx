@@ -203,9 +203,7 @@ export default function ManagementTab({
 
     try {
       // PERHATIKAN: Method PATCH, bukan DELETE!
-      await api.patch(
-        `/approval/discard/${encodeURIComponent(rejectedDraft.notrans)}`,
-      );
+      await api.patch('/approval/discard', { notrans: rejectedDraft.notrans });
 
       setRejectedDraft(null);
       await refreshData();

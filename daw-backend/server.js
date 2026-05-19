@@ -69,7 +69,7 @@ const app = express();
 // MIDDLEWARE: Security & Request Parsing
 const corsOptions = {
   origin: process.env.FRONTEND_URL || "http://localhost:5173",
-  methods: "GET,POST,PUT,DELETE",
+  methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
   credentials: true,
 };
 app.use(cors(corsOptions));

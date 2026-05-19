@@ -273,8 +273,9 @@ export default function InvestmentsManager() {
 
     const toastId = toast.loading("Mengabaikan notifikasi penolakan...");
     try {
-      const safeTicket = encodeURIComponent(draft.notrans);
-      await api.patch(`/approval/discard/${safeTicket}`);
+      await api.patch(`/approval/discard`, {
+        notrans: draft.notrans,
+      });
 
       setLocalCompanies((prev) =>
         prev.map((c) =>
@@ -292,7 +293,7 @@ export default function InvestmentsManager() {
     } catch (error: any) {
       toast.error("Gagal mengabaikan draf", {
         id: toastId,
-        description: error.response?.data?.message,
+        description: error.response?.data?.message || "Kesalahan pada server.",
       });
     }
   };
@@ -346,9 +347,7 @@ export default function InvestmentsManager() {
     const toastId = toast.loading("Mengabaikan notifikasi penolakan...");
 
     try {
-      const safeTicket = encodeURIComponent(rejectedSettings.notrans);
-
-      await api.patch(`/approval/discard/${safeTicket}`);
+      await api.patch('/approval/discard', { notrans: rejectedSettings.notrans });
 
       toast.success("Notifikasi revisi berhasil diabaikan.", { id: toastId });
 

@@ -73,12 +73,28 @@ exports.getPublicInvestmentData = async (req, res) => {
     }
 
     const companies = await Affiliate.findAll({
-      where: { is_locked: false },
       order: [["id", "ASC"]],
-      attributes: ["id", "name", "desc", "category", "logoUrl", "websiteUrl"],
+      attributes: [
+        "id",
+        "name",
+        "desc",
+        "category",
+        "logoUrl",
+        "websiteUrl",
+        "is_locked",
+      ],
     });
+    const createDrafts = await ApprovalDraft.findAll({
+      where: { module_name: "Affiliate", action: "CREATE", status: "Pending" },
+    });
+    const newDraftIds = createDrafts.map((d) => String(d.target_id));
 
-    res.status(200).json({ settings, companies });
+    // 3. SEMBUNYIKAN HANYA ITEM YANG BENAR-BENAR BARU DIBUAT (Belum di-approve)
+    const filteredCompanies = companies.filter(
+      (c) => !newDraftIds.includes(String(c.id)),
+    );
+
+    res.status(200).json({ settings, companies: filteredCompanies });
   } catch (error) {
     console.error("🚨 [GET_PUBLIC_INVESTMENT_ERROR]:", error.message);
     res.status(500).json({ message: "Gagal mengambil data publik investasi." });

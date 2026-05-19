@@ -274,9 +274,7 @@ export default function ProjectForm() {
 
     const toastId = toast.loading("Mengabaikan notifikasi penolakan...");
     try {
-      // FIX: Gunakan encodeURIComponent karena notrans mengandung karakter '/'
-      const safeTicket = encodeURIComponent(rejectedDraft.notrans);
-      await api.patch(`/approval/discard/${safeTicket}`);
+      await api.patch("/approval/discard", { notrans: rejectedDraft.notrans });
 
       toast.success("Notifikasi revisi berhasil diabaikan.", { id: toastId });
 

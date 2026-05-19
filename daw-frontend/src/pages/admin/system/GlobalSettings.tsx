@@ -190,8 +190,7 @@ export default function GlobalSettings() {
 
     const toastId = toast.loading("Mengabaikan notifikasi penolakan...");
     try {
-      const safeTicket = encodeURIComponent(rejectedSettings.notrans);
-      await api.patch(`/approval/discard/${safeTicket}`);
+      await api.patch('/approval/discard', { notrans: rejectedSettings.notrans });
 
       toast.success("Notifikasi revisi berhasil diabaikan.", { id: toastId });
 

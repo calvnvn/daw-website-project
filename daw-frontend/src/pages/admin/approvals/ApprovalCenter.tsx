@@ -768,7 +768,7 @@ export default function ApprovalCenter() {
   // const handleDiscard = async (notrans: string) => {
   //   const toastId = toast.loading("Membersihkan notifikasi draf...");
   //   try {
-  //     await api.patch(`/approval/discard/${notrans}`);
+  //     await api.patch('/approval/discard', { notrans });
   //     toast.success("Notifikasi draf berhasil diabaikan.", { id: toastId });
   //     fetchApprovals(); // Refresh UI
   //   } catch (error: any) {

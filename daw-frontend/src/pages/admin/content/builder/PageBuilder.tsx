@@ -336,9 +336,7 @@ export default function PageBuilder() {
     const toastId = toast.loading("Membersihkan status birokrasi...");
 
     try {
-      await api.patch(
-        `/approval/discard/${encodeURIComponent(rejectedDraft.notrans)}`,
-      );
+      await api.patch('/approval/discard', { notrans: rejectedDraft.notrans });
 
       setRejectedDraft(null);
       refreshData();

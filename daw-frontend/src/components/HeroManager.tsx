@@ -93,7 +93,7 @@ export default function HeroManager() {
         label: "Abaikan",
         onClick: async () => {
           try {
-            await api.patch(`/approval/discard/${encodeURIComponent(notrans)}`);
+            await api.patch('/approval/discard', { notrans: notrans });
             toast.success("Notifikasi diabaikan.");
             await refreshData();
           } catch {

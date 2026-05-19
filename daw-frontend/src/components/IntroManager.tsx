@@ -135,9 +135,7 @@ export default function IntroManager() {
         onClick: async () => {
           const toastId = toast.loading("Membersihkan draf...");
           try {
-            await api.patch(
-              `/approval/discard/${encodeURIComponent(rejectedIntro.notrans)}`,
-            );
+            await api.patch('/approval/discard', { notrans: rejectedIntro.notrans });
             toast.success("Notifikasi berhasil diabaikan.", { id: toastId });
             setIsEditing(false);
             await refreshData();
