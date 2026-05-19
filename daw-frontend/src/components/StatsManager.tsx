@@ -122,7 +122,7 @@ export default function StatsManager() {
         onClick: async () => {
           const toastId = toast.loading("Membersihkan draf...");
           try {
-            await api.patch('/approval/discard', { notrans: draft.notrans });
+            await api.patch("/approval/discard", { notrans: draft.notrans });
             toast.success("Notifikasi berhasil diabaikan.", { id: toastId });
             await refreshData(); // Flush Global State
           } catch (error: any) {

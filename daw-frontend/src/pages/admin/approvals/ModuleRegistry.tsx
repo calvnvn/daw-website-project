@@ -1,4 +1,3 @@
-// src/pages/admin/approvals/ModuleRegistry.tsx
 import AboutInfoPreview from "./previews/AboutInfoPreview";
 import HeroPreview from "./previews/HeroPreview";
 import HistoryPreview from "./previews/HistoryPreview";
@@ -10,6 +9,7 @@ import AffiliatePreview from "./previews/AffiliatePreview";
 import ProjectPreview from "./previews/ProjectPreview";
 import BusinessSectionPreview from "./previews/BusinessSectionPreview";
 import MapMarkerPreview from "./previews/MapMarkerPreview";
+import PagePreview from "./previews/PagePreview";
 
 const PREVIEW_REGISTRY: Record<string, any> = {
   History: HistoryPreview,
@@ -23,6 +23,7 @@ const PREVIEW_REGISTRY: Record<string, any> = {
   Project: ProjectPreview,
   BusinessSection: BusinessSectionPreview,
   BusinessMapMarker: MapMarkerPreview,
+  PAGE: PagePreview,
 };
 
 export default PREVIEW_REGISTRY;

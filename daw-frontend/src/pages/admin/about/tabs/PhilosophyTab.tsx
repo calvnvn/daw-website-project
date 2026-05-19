@@ -72,7 +72,9 @@ export default function PhilosophyTab({
     if (!rejectedTitleDraft?.notrans) return;
     const loadingToast = toast.loading("Membersihkan notifikasi...");
     try {
-      await api.patch('/approval/discard', { notrans: rejectedPillarDraft.notrans });
+      await api.patch("/approval/discard", {
+        notrans: rejectedPillarDraft.notrans,
+      });
       setRejectedTitleDraft(null);
       await refreshData();
       toast.success("Notifikasi headline berhasil dibersihkan.", {
@@ -234,7 +236,9 @@ export default function PhilosophyTab({
     if (!rejectedPillarDraft?.notrans) return;
     const loadingToast = toast.loading("Membersihkan notifikasi pilar...");
     try {
-      await api.patch('/approval/discard', { notrans: rejectedPillarDraft.notrans });
+      await api.patch("/approval/discard", {
+        notrans: rejectedPillarDraft.notrans,
+      });
       setRejectedPillarDraft(null);
       await refreshData();
       toast.success("Notifikasi pilar dibersihkan.", { id: loadingToast });

@@ -165,7 +165,7 @@ export default function HistoryTab({
     setIsDiscarding(true);
     const loadingToast = toast.loading("Membersihkan notifikasi...");
     try {
-      await api.patch('/approval/discard', { notrans: rejectedDraft.notrans });
+      await api.patch("/approval/discard", { notrans: rejectedDraft.notrans });
       setRejectedDraft(null);
       await refreshData();
       toast.success("Notifikasi dibersihkan.", { id: loadingToast });
