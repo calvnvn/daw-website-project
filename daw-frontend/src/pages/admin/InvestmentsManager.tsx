@@ -570,6 +570,30 @@ export default function InvestmentsManager() {
     updateCompany(id, "removePhoto", false);
   };
 
+  const sortedCompanies = useMemo(() => {
+    // Buat salinan (copy) agar tidak merusak state asli React
+    return [...localCompanies].sort((a, b) => {
+      // Prioritas 1: Selalu taruh kotak "Add New" di paling atas agar mudah diedit
+      if (a.isNew && !b.isNew) return -1;
+      if (!a.isNew && b.isNew) return 1;
+
+      // Prioritas 2: Kelompokkan berdasarkan Sektor Bisnis (Biar rapi/sejajar)
+      const categoryWeight: Record<string, number> = {
+        finance: 1,
+        fnb: 2,
+        steel: 3,
+        edu: 4,
+      };
+      const weightA = categoryWeight[a.category] || 99;
+      const weightB = categoryWeight[b.category] || 99;
+
+      if (weightA !== weightB) return weightA - weightB;
+
+      // Prioritas 3: Jika sektornya sama, urutkan berdasarkan Abjad Nama (A - Z)
+      return (a.name || "").localeCompare(b.name || "");
+    });
+  }, [localCompanies]);
+
   return (
     <div className="max-w-6xl mx-auto space-y-6 animate-in fade-in duration-500 pb-12">
       {/* SOVEREIGN BANNERS (Contextual Awareness) */}
@@ -932,7 +956,7 @@ export default function InvestmentsManager() {
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              {localCompanies.map((company) => {
+              {sortedCompanies.map((company) => {
                 const isNeedsRevision = company.has_rejected === true;
                 const isPending = company.is_locked && !isNeedsRevision;
                 const isDeleting =

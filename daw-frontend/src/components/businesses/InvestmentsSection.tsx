@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
   ArrowRight,
@@ -18,7 +18,27 @@ export default function InvestmentsSection() {
   const [hoveredCategory, setHoveredCategory] = useState<string | null>(null);
   const [selectedCompany, setSelectedCompany] = useState<any | null>(null);
   const { settings, companies, isLoading } = useInvestments();
+  const sortedCompanies = useMemo(() => {
+    if (!companies) return [];
 
+    return [...companies].sort((a, b) => {
+      // Prioritas 1: Kelompokkan berdasarkan Sektor (Sesuai urutan yang kamu minta)
+      const categoryWeight: Record<string, number> = {
+        finance: 3,
+        fnb: 1,
+        steel: 2,
+        edu: 4,
+      };
+
+      const weightA = categoryWeight[a.category] || 99;
+      const weightB = categoryWeight[b.category] || 99;
+
+      if (weightA !== weightB) return weightA - weightB;
+
+      // Prioritas 2: Urutkan berdasarkan Abjad Nama (A - Z)
+      return (a.name || "").localeCompare(b.name || "");
+    });
+  }, [companies]);
   const categories = [
     { id: "fnb", icon: <Coffee className="w-5 h-5" />, key: "fnb" },
     { id: "steel", icon: <Briefcase className="w-5 h-5" />, key: "steel" },
@@ -109,7 +129,7 @@ export default function InvestmentsSection() {
         <div className="lg:col-span-7 relative">
           <ScrollReveal direction="left" delay={300}>
             <div className="grid grid-cols-2 md:grid-cols-3 gap-4 md:gap-6 p-6 md:p-8 rounded-[2.5rem] bg-white/5 border border-white/10 backdrop-blur-xl shadow-2xl">
-              {companies.map((company) => {
+              {sortedCompanies.map((company) => {
                 const isHovered = hoveredCategory === company.category;
                 const isAnyHovered = hoveredCategory !== null;
 
@@ -164,7 +184,7 @@ export default function InvestmentsSection() {
                 );
               })}
 
-              {companies.length === 0 && (
+              {sortedCompanies.length === 0 && (
                 <div className="col-span-full text-center text-slate-400 italic py-10">
                   No affiliated companies found.
                 </div>

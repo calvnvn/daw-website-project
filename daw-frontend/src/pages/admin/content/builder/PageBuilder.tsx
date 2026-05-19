@@ -517,11 +517,31 @@ export default function PageBuilder() {
     if (formData.subtitle && formData.subtitle.trim() !== "")
       return formData.subtitle;
 
-    const plainText = formData.content
-      .replace(/<[^>]*>?/gm, "")
-      .replace(/&nbsp;/g, " ")
-      .trim();
-    return plainText.slice(0, 150) + (plainText.length > 150 ? "..." : "");
+    if (!formData.content || formData.content.trim() === "") {
+      return "Mulai menulis subtitle atau konten untuk melihat deskripsi otomatis di sini.";
+    }
+
+    try {
+      const parser = new DOMParser();
+      const doc = parser.parseFromString(formData.content, "text/html");
+
+      let plainText = doc.body.textContent || "";
+
+      plainText = plainText.replace(/\s+/g, " ").trim();
+
+      if (plainText.length === 0) {
+        return "Mulai menulis subtitle atau konten untuk melihat deskripsi otomatis di sini.";
+      }
+
+      return plainText.slice(0, 150) + (plainText.length > 150 ? "..." : "");
+    } catch (e) {
+      console.error("🚨 SEO Fallback Parsing Failed:", e);
+      const plainText = formData.content
+        .replace(/<[^>]*>?/gm, "")
+        .replace(/&nbsp;|\u00A0/g, " ")
+        .trim();
+      return plainText.slice(0, 150) + (plainText.length > 150 ? "..." : "");
+    }
   };
 
   return (
