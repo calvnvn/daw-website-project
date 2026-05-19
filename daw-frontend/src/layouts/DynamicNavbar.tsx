@@ -154,7 +154,7 @@ export default function DynamicNavbar() {
                   {t("nav.philosophy", "Philosophy")}
                 </Link>
                 <Link to="/about?tab=management" className={dropdownItemClass}>
-                  {t("nav.management", "Our Management")}
+                  {t("nav.management", "Management")}
                 </Link>
               </div>
             </div>
@@ -353,7 +353,7 @@ export default function DynamicNavbar() {
                   to="/about?tab=management"
                   onClick={closeMenu}
                   className="py-2 text-[12px] tracking-wider font-bold text-slate-500 hover:text-daw-green">
-                  {t("nav.management", "Our Management")}
+                  {t("nav.management", "Management")}
                 </Link>
               </div>
             </div>

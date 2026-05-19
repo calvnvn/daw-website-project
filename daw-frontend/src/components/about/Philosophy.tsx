@@ -73,7 +73,7 @@ export default function Philosophy() {
           {pillarsToRender.map((pillar) => (
             <div
               key={pillar.id}
-              className="p-8 border border-slate-100 bg-slate-50/50 rounded-2xl hover:shadow-[0_8px_30px_rgba(0,0,0,0.04)] hover:border-daw-green/20 hover:bg-white transition-all duration-500 h-full flex flex-col">
+              className="p-6 md:p-8 border border-slate-100 bg-slate-50/50 rounded-2xl hover:shadow-[0_8px_30px_rgba(0,0,0,0.04)] hover:border-daw-green/20 hover:bg-white transition-all duration-500 h-full flex flex-col">
               <div className="w-12 h-12 flex items-center justify-center rounded-full bg-daw-green/10 text-daw-green mb-6 shrink-0">
                 {getIconForPillar(pillar.iconId)}
               </div>

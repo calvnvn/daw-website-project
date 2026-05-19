@@ -5,7 +5,7 @@
     "ourCompany": "Our Company",
     "history": "History",
     "philosophy": "Philosophy",
-    "management": "Our Management",
+    "management": "Management",
     "businesses": "Our Businesses",
     "resources": "Resources",
     "energy": "Energy",
@@ -121,7 +121,7 @@
       "company": "Our Company",
       "history": "History",
       "philosophy": "Philosophy",
-      "management": "Our Management"
+      "management": "Management"
     },
     "company": {
       "spiritTitle": "Founders' Spirit",

@@ -270,7 +270,7 @@ export default function Management() {
                 </div>
 
                 {/* Nama */}
-                <h3 className="font-serif text-5xl md:text-6xl lg:text-7xl font-bold text-white leading-[1.05] tracking-tight mb-10 animate-in fade-in slide-in-from-right-10 duration-700 [animation-delay:450ms] [animation-fill-mode:both]">
+                <h3 className="font-serif text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-bold text-white leading-[1.05] tracking-tight mb-6 md:mb-10 break-words pr-4 md:pr-0 animate-in fade-in slide-in-from-right-10 duration-700 [animation-delay:450ms] [animation-fill-mode:both]">
                   {selectedPerson.name}
                 </h3>
 
