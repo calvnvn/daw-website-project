@@ -159,7 +159,6 @@ exports.executeDecision = async (req, res) => {
   const t = await sequelize.transaction();
 
   try {
-    // 🛡️ 1. TAMBAHKAN JIT VERIFICATION DI SINI (Jangan sampai terlewat)
     const owlResponse = await ErpApprovalService.getPendingList({
       karyawanid: nikApprover,
       token: tokenOWL,
@@ -182,7 +181,6 @@ exports.executeDecision = async (req, res) => {
     // Ekstrak ID Eksekusi langsung dari sumber aslinya (ERP)
     const validExecutionId = realErpTask.nourut || realErpTask.kodeapp;
 
-    // 🛡️ 2. BARU KITA CEK VALIDASINYA
     if (!validExecutionId) {
       throw new Error("Akses Ditolak: Gagal mengekstrak ID eksekusi dari ERP.");
     }
@@ -491,7 +489,7 @@ exports.forcePurgeGhostTicket = async (req, res) => {
       `⚠️  [GHOST BUSTER] Memulai Force Purge untuk tiket: ${notrans}`,
     );
 
-    // 1. DISCOVERY PHASE: Fetch live data directly from ERP Node
+    // Fetch live data directly from ERP Node
     const owlResponse = await ErpApprovalService.getPendingList({
       karyawanid: nikApprover,
       token: tokenOWL,

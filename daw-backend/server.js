@@ -39,6 +39,7 @@ const mapCategoryRoutes = require("./routes/mapCategoryRoutes");
 const approvalRoutes = require("./routes/approvalRoutes");
 const philosophyRoutes = require("./routes/philosophyRoutes");
 const philosophyPillarRoutes = require("./routes/philosophyPillarRoutes");
+const achievementRoutes = require("./routes/achievementRoutes");
 
 // INITIALIZATION: Model Registry
 const User = require("./models/User");
@@ -63,6 +64,7 @@ require("./models/Inquiry");
 require("./models/InquirySubject");
 require("./models/InvestmentSettings");
 require("./models/ApprovalDraft");
+require("./models/Achievement");
 
 const app = express();
 
@@ -147,6 +149,7 @@ app.use("/api/approval", approvalRoutes);
 app.use("/api/philosophy", philosophyRoutes);
 app.use("/api/philosophy-pillars", philosophyPillarRoutes);
 app.use("/", sitemapRoutes);
+app.use("/api/achievements", achievementRoutes);
 
 // Mount core health check endpoint
 app.get("/", (req, res) => {
@@ -237,7 +240,7 @@ Project.belongsTo(BusinessSection, {
 const PORT = process.env.PORT || 5000;
 
 sequelize
-  .sync({ alter: false })
+  .sync({ alter: true })
   .then(async () => {
     console.log("[DATABASE] MySQL/MariaDB Connected & Tables Synced.");
 
