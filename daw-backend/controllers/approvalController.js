@@ -418,12 +418,11 @@ exports.discardDraft = async (req, res) => {
   try {
     const { notrans } = req.body;
 
-    // 🛡️ 1. KUMPULKAN SEMUA IDENTITAS YANG MUNGKIN DARI TOKEN SAAT INI
     const currentUserIdentities = [
       req.owl_username ? String(req.owl_username) : null,
       req.karyawanId ? String(req.karyawanId) : null,
       req.userId ? String(req.userId) : null,
-    ].filter(Boolean); // Membuang yang nilainya null atau undefined
+    ].filter(Boolean);
 
     const draft = await ApprovalDraft.findByPk(notrans, { transaction: t });
 
@@ -432,11 +431,9 @@ exports.discardDraft = async (req, res) => {
       return res.status(404).json({ message: "Draf tidak ditemukan." });
     }
 
-    // 🛡️ 2. CEK APAKAH PEMBUAT DRAF ADA DI DALAM DAFTAR IDENTITAS KITA
     if (!currentUserIdentities.includes(String(draft.created_by))) {
       await t.rollback();
 
-      // Console log ini akan membantu kamu melihat siapa sebenarnya 'hantu' yang bikin draf ini
       console.log(
         `🚨 [DISCARD BLOCKED] Pembuat Draf: ${draft.created_by} | ID Kamu:`,
         currentUserIdentities,
@@ -457,7 +454,7 @@ exports.discardDraft = async (req, res) => {
     await draft.update({ status: "Discarded" }, { transaction: t });
     const Model = getModelByModuleName(draft.module_name);
     if (Model && draft.target_id) {
-      const cleanId = String(draft.target_id).trim(); // Cegah spasi siluman
+      const cleanId = String(draft.target_id).trim();
 
       await Model.update(
         { is_locked: false, lock_ticket: null },
