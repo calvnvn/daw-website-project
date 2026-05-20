@@ -275,15 +275,15 @@ export default function DynamicPage() {
     return (
       <div className="min-h-screen bg-white flex flex-col items-center justify-center p-6 text-center">
         <h2 className="text-4xl font-serif font-bold text-slate-900 mb-4">
-          Halaman Tidak Ditemukan
+          Page Not Found
         </h2>
         <p className="text-slate-500 mb-8 max-w-md">
-          Maaf, konten yang Anda cari tidak tersedia.
+          Sorry, the content you are looking for is not available.
         </p>
         <Link
           to="/"
           className="px-6 py-3 bg-daw-green text-white font-bold rounded-xl hover:bg-emerald-700 transition-all">
-          Kembali ke Beranda
+          Return to Home
         </Link>
       </div>
     );
@@ -294,15 +294,15 @@ export default function DynamicPage() {
       <div className="min-h-screen bg-white flex flex-col items-center justify-center p-6 text-center">
         <AlertTriangle className="w-12 h-12 text-red-500 mb-4" />
         <h2 className="text-xl font-bold text-slate-900 mb-2">
-          Terjadi Kesalahan Jaringan
+          Network Error Occurred
         </h2>
         <p className="text-slate-500 mb-6">
-          Gagal memuat konten. Silakan periksa koneksi internet Anda.
+          Failed to load content. Please check your internet connection.
         </p>
         <button
           onClick={() => window.location.reload()}
           className="text-daw-green font-bold flex items-center gap-2">
-          <RefreshCw className="w-4 h-4" /> Coba Lagi
+          <RefreshCw className="w-4 h-4" /> Try Again
         </button>
       </div>
     );
@@ -333,9 +333,10 @@ export default function DynamicPage() {
               backgroundAttachment: "fixed",
             }}
           />
-          <div className="absolute inset-0 bg-[#004B23]/70 mix-blend-multiply" />
+          <div className="absolute inset-0 bg-daw-green/20 mix-blend-multiply" />
           <div className="absolute inset-0 bg-gradient-to-b from-slate-900/60 via-slate-900/40 to-slate-900/80" />
 
+          {/* Text Content */}
           <div className="relative z-10 text-center px-6 max-w-5xl mt-16 animate-in fade-in slide-in-from-bottom-12 duration-1000">
             <ScrollReveal direction="up" delay={0}>
               {pageData.subtitle && (
@@ -346,12 +347,24 @@ export default function DynamicPage() {
               <h1 className="text-5xl md:text-7xl lg:text-8xl font-serif font-bold text-white mb-10 leading-[1.1] tracking-tight drop-shadow-lg">
                 {pageData.title}
               </h1>
+            </ScrollReveal>
+
+            <ScrollReveal direction="up" delay={200}>
+              {/* Dekorasi Garis */}
               <div className="flex items-center justify-center gap-8">
                 <div className="h-px w-16 bg-white/30" />
                 <div className="w-3 h-3 border-2 border-daw-yellow rotate-45" />
                 <div className="h-px w-16 bg-white/30" />
               </div>
             </ScrollReveal>
+          </div>
+
+          {/* Scroll Down Indicator */}
+          <div className="absolute bottom-12 left-1/2 -translate-x-1/2 flex flex-col items-center gap-2 text-white/50 animate-bounce">
+            <span className="text-[10px] font-bold tracking-widest uppercase">
+              Scroll to Explore
+            </span>
+            <ChevronRight className="rotate-90 w-4 h-4" />
           </div>
         </section>
 

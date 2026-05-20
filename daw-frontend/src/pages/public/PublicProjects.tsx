@@ -21,7 +21,7 @@ export default function PublicProjects() {
         const response = await api.get("/projects/public");
         setProjects(response.data);
       } catch (err) {
-        console.error("Gagal memuat projects:", err);
+        console.error("Failed to load projects:", err);
       } finally {
         setIsLoading(false);
       }

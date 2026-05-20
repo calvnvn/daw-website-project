@@ -231,21 +231,26 @@ export default function ProjectDetail() {
             )}
           </div>
           {/* Layer 3: Multiply & Cinematic Overlay */}
-          <div className="absolute inset-0 bg-[#004B23]/70 mix-blend-multiply" />
+          <div className="absolute inset-0 bg-daw-green/20 mix-blend-multiply" />
           <div className="absolute inset-0 bg-gradient-to-b from-slate-900/60 via-slate-900/40 to-slate-900/80" />
 
-          <div className="relative z-10 text-center px-6 mt-16 max-w-4xl mx-auto">
+          <div className="relative z-10 text-center px-6 mt-16 max-w-5xl mx-auto animate-in fade-in slide-in-from-bottom-12 duration-1000">
             <ScrollReveal direction="up" delay={0}>
               <p className="text-sm md:text-base text-white/80 font-bold tracking-[0.2em] uppercase mb-4">
                 {sectorLookup[project.category] || project.category} Portfolio
               </p>
-              <h1 className="text-4xl md:text-5xl lg:text-6xl font-serif text-white tracking-tight drop-shadow-lg mb-6 leading-tight">
+              <h1 className="text-5xl md:text-7xl lg:text-8xl font-serif font-bold text-white tracking-tight drop-shadow-lg mb-10 leading-[1.1]">
                 {project.title}
               </h1>
             </ScrollReveal>
 
             <ScrollReveal direction="up" delay={200}>
-              <div className="w-20 h-1.5 bg-white/80 mx-auto rounded-full shadow-sm"></div>
+              {/* Dekorasi Garis */}
+              <div className="flex items-center justify-center gap-8">
+                <div className="h-px w-16 bg-white/30" />
+                <div className="w-3 h-3 border-2 border-daw-yellow rotate-45" />
+                <div className="h-px w-16 bg-white/30" />
+              </div>
             </ScrollReveal>
           </div>
           <div className="absolute bottom-12 left-1/2 -translate-x-1/2 flex flex-col items-center gap-2 text-white/50 animate-bounce">
@@ -373,7 +378,7 @@ export default function ProjectDetail() {
                           />
                           <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-colors duration-300 flex items-center justify-center backdrop-blur-[2px] opacity-0 group-hover:opacity-100">
                             <span className="text-white bg-daw-green/90 px-5 py-2 rounded-full text-xs font-bold tracking-widest uppercase shadow-md transform translate-y-4 group-hover:translate-y-0 transition-all duration-300">
-                              Perbesar
+                              Enlarge
                             </span>
                           </div>
                         </div>
@@ -389,7 +394,7 @@ export default function ProjectDetail() {
               <ScrollReveal direction="left" delay={200}>
                 <div className="bg-white border border-slate-200 rounded-[2rem] p-8 shadow-sm hover:shadow-md transition-shadow duration-300">
                   <h3 className="font-serif text-2xl font-bold text-slate-900 mb-6 border-b border-slate-100 pb-5">
-                    Proyek Terkait
+                    Related Projects
                   </h3>
 
                   {relatedProjects.length > 0 ? (
@@ -423,7 +428,7 @@ export default function ProjectDetail() {
                     </div>
                   ) : (
                     <p className="text-sm text-slate-500 italic">
-                      Belum ada proyek lain di sektor ini.
+                      No other projects in this sector.
                     </p>
                   )}
                 </div>
