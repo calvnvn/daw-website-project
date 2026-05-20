@@ -13,7 +13,7 @@ import {
   Shield,
   Star,
   Leaf,
-  Target
+  Target,
 } from "lucide-react";
 import { useAbout } from "@/contexts/AboutContext";
 import { getCleanImageUrl } from "@/lib/utils";
@@ -43,7 +43,7 @@ const toDisplayDate = (dateStr: string) => {
 export default function Achievement() {
   const { t } = useTranslation();
   const { achievements } = useAbout();
-  
+
   const [activeYear, setActiveYear] = useState("All Time");
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -92,7 +92,7 @@ export default function Achievement() {
       <ScrollReveal direction="up" delay={0}>
         <div className="flex items-start justify-between gap-4 md:gap-6 mb-3">
           <h2 className="font-serif text-3xl md:text-5xl text-slate-900 leading-tight">
-            {t("about.achievement.title", "Awards & Accolades")}
+            {t("about.achievement.title", "Achievements")}
           </h2>
 
           {/* STAT COUNTER — Editorial style, like a magazine pull quote */}
@@ -104,8 +104,8 @@ export default function Achievement() {
             </span>
             <span className="font-sans text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400 mt-1">
               {activeYear === "All Time"
-                ? "Total Awards"
-                : `Awards in ${activeYear}`}
+                ? "Total Achievements"
+                : `Achievements in ${activeYear}`}
             </span>
           </div>
         </div>
@@ -147,7 +147,7 @@ export default function Achievement() {
             <span className="text-slate-900">
               {String(filteredData.length).padStart(2, "0")}
             </span>{" "}
-            awards
+            achievements
           </span>
         </div>
 

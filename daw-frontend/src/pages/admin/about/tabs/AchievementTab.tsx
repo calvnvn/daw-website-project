@@ -56,39 +56,73 @@ export default function AchievementTab({
     removePhoto: false,
     savedPhotoUrl: null as string | null,
     originalSnapshot: null as string | null,
+    previous_notrans: undefined as string | undefined,
   });
 
-  const openModal = (achievement: AchievementItem | null = null) => {
-    // PROTEKSI: Jika ada gembok, modal tidak bisa dibuka sama sekali
+  const openModal = async (achievement: AchievementItem | null = null) => {
+    // PROTEKSI: Jika ada gembok, modal tidak bisa dibuka sama sekali oleh Editor
     if (achievement?.is_locked && !isSuperadmin) {
       return toast.warning("Akses Dibatasi", {
-        description: "Data penghargaan ini sedang dikunci oleh sistem.",
+        description:
+          "Data penghargaan ini sedang dikunci karena proses approval OWL.",
       });
     }
 
     if (achievement) {
       setEditingId(achievement.id);
-      const safeDate = toSafeInputDate(achievement.date);
-      setForm({
-        year: achievement.year,
-        title: achievement.title,
-        category: achievement.category,
-        iconId: achievement.iconId || "star",
-        date: safeDate,
-        description: achievement.description,
+      let payload = { ...achievement };
+      let draftNotrans = undefined;
+
+      // 🔄 DATA RECOVERY FLOW (Blueprint 3)
+      if (achievement.hasRejected && isEditor) {
+        const loadingToast = toast.loading("Memuat draf revisi terakhir...");
+        try {
+          const response = await api.get(
+            `/approval/rejected/${achievement.id}?module=Achievement`,
+          );
+          if (response.data?.success && response.data?.data?.payload) {
+            const parsedPayload =
+              typeof response.data.data.payload === "string"
+                ? JSON.parse(response.data.data.payload)
+                : response.data.data.payload;
+            payload = { ...payload, ...parsedPayload };
+            draftNotrans = response.data.data.notrans;
+
+            toast.info("Memuat draf revisi terakhir yang ditolak.", {
+              id: loadingToast,
+            });
+          } else {
+            toast.dismiss(loadingToast);
+          }
+        } catch (error) {
+          console.error("Gagal memuat draf penolakan:", error);
+          toast.dismiss(loadingToast);
+        }
+      }
+
+      const safeDate = toSafeInputDate(payload.date);
+      setForm((prev) => ({
+        ...prev,
+        year: payload.year || "",
+        title: payload.title || "",
+        category: payload.category || "",
+        iconId: payload.iconId || "star",
+        date: safeDate || "",
+        description: payload.description || "",
         photo: null,
         removePhoto: false,
-        savedPhotoUrl: achievement.imageUrl,
+        savedPhotoUrl: payload.imageUrl || null,
+        previous_notrans: draftNotrans,
         originalSnapshot: JSON.stringify({
-          year: achievement.year,
-          title: achievement.title,
-          category: achievement.category,
-          iconId: achievement.iconId || "star",
-          date: safeDate,
-          description: achievement.description,
-          imageUrl: achievement.imageUrl,
+          year: payload.year || "",
+          title: payload.title || "",
+          category: payload.category || "",
+          iconId: payload.iconId || "star",
+          date: safeDate || "",
+          description: payload.description || "",
+          imageUrl: payload.imageUrl || null,
         }),
-      });
+      }));
     } else {
       setEditingId(null);
       setForm({
@@ -102,6 +136,7 @@ export default function AchievementTab({
         removePhoto: false,
         savedPhotoUrl: null,
         originalSnapshot: null,
+        previous_notrans: undefined,
       });
     }
 
@@ -164,6 +199,14 @@ export default function AchievementTab({
     if (form.removePhoto) formData.append("removePhoto", "true");
     if (form.photo) formData.append("image", form.photo); // achievementRoutes expects 'image'
 
+    // Inject Editor status for approval workflow
+    if (isEditor) {
+      formData.append("status", "Published");
+      if (form.previous_notrans) {
+        formData.append("previous_notrans", form.previous_notrans);
+      }
+    }
+
     try {
       if (editingId) {
         await api.put(`/achievements/${editingId}`, formData, {
@@ -209,6 +252,34 @@ export default function AchievementTab({
 
   return (
     <div className="space-y-8 animate-in fade-in duration-300 relative">
+      {/* REJECTION RIBBON (Blueprint 3) */}
+      {isEditor && achievements.some((item) => item.hasRejected) && (
+        <div className="p-4 rounded-xl bg-red-50 border border-red-200 flex items-start gap-3 text-red-700 shadow-sm">
+          <div className="p-2 bg-red-100 rounded-lg">
+            <svg
+              className="w-5 h-5 text-red-600"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+              xmlns="http://www.w3.org/2000/svg">
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth="2"
+                d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+            </svg>
+          </div>
+          <div className="flex-1">
+            <h4 className="font-bold">Draf Ditolak</h4>
+            <p className="text-sm text-red-600/80">
+              Satu atau lebih draf yang Anda ajukan telah ditolak oleh Approver.
+              Silakan klik tombol <b>'Edit'</b> pada baris dengan label merah <span className="inline-block px-1.5 py-0.5 mx-1 rounded text-[10px] font-bold bg-red-100 text-red-600 border border-red-200">Ditolak</span> untuk melihat revisi terakhir yang
+              ditolak, lalu perbaiki atau buang draf tersebut.
+            </p>
+          </div>
+        </div>
+      )}
+
       {/* HEADER */}
       <div className="flex items-center justify-between mb-4 border-b border-slate-100 pb-4">
         <div>
@@ -241,7 +312,6 @@ export default function AchievementTab({
           </thead>
           <tbody className="divide-y divide-slate-100">
             {achievements.map((item) => {
-              // 🚀 ITEM-LEVEL UI PROTECTION (Blueprint 3)
               const isRowLocked = item.is_locked && !isSuperadmin;
               const lockStyles =
                 "opacity-60 grayscale-[30%] bg-slate-50 pointer-events-none select-none";
@@ -275,9 +345,16 @@ export default function AchievementTab({
                     )}
                   </td>
                   <td className="px-6 py-4">
-                    <p className="text-sm font-bold text-slate-900">
-                      {item.title}
-                    </p>
+                    <div className="flex items-center gap-2">
+                      <p className="text-sm font-bold text-slate-900">
+                        {item.title}
+                      </p>
+                      {item.hasRejected && isEditor && (
+                        <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-red-100 text-red-600 border border-red-200">
+                          Ditolak
+                        </span>
+                      )}
+                    </div>
                     <p className="text-[11px] font-semibold text-slate-500 uppercase tracking-widest mt-1">
                       {item.category}
                     </p>
@@ -344,11 +421,39 @@ export default function AchievementTab({
                 )}
                 {editingId ? "Edit Penghargaan" : "Tambah Penghargaan Baru"}
               </h3>
-              <button
-                onClick={() => setIsModalOpen(false)}
-                className="text-slate-400 hover:text-slate-700 bg-slate-100 hover:bg-slate-200 p-1.5 rounded-md transition-colors">
-                ✕
-              </button>
+              <div className="flex items-center gap-2">
+                {editingId &&
+                  isEditor &&
+                  achievements.find((a) => a.id === editingId)?.hasRejected &&
+                  form.previous_notrans && (
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        if (!form.previous_notrans) return;
+                        const loading = toast.loading("Membuang draf...");
+                        try {
+                          await api.patch("/approval/discard", {
+                            notrans: form.previous_notrans,
+                          });
+                          await refreshData();
+                          setIsModalOpen(false);
+                          toast.success("Draf dibuang & gembok dibuka.", {
+                            id: loading,
+                          });
+                        } catch (e) {
+                          toast.error("Gagal membuang draf.", { id: loading });
+                        }
+                      }}
+                      className="text-xs font-bold text-red-600 bg-red-50 hover:bg-red-100 px-3 py-1.5 rounded-md transition-colors border border-red-200">
+                      Buang Draf Ditolak
+                    </button>
+                  )}
+                <button
+                  onClick={() => setIsModalOpen(false)}
+                  className="text-slate-400 hover:text-slate-700 bg-slate-100 hover:bg-slate-200 p-1.5 rounded-md transition-colors">
+                  ✕
+                </button>
+              </div>
             </div>
 
             <div className="overflow-y-auto p-6">
@@ -415,7 +520,9 @@ export default function AchievementTab({
                       value={form.date}
                       onChange={(e) => {
                         const newDate = e.target.value;
-                        const yearFromDate = newDate ? newDate.split("-")[0] : form.year;
+                        const yearFromDate = newDate
+                          ? newDate.split("-")[0]
+                          : form.year;
                         setForm({ ...form, date: newDate, year: yearFromDate });
                       }}
                       className="w-full px-3 py-2.5 border border-slate-200 rounded-lg focus:ring-2 focus:ring-daw-green/20 transition-all text-sm"

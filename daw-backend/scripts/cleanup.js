@@ -43,6 +43,7 @@ async function runCleanup() {
       { table: "Affiliates", cols: ["logoUrl"] },
       { table: "ImpactStats", cols: ["icon"] },
       { table: "BusinessMapMarkers", cols: ["mapUrl"] },
+      { table: "Achievements", cols: ["imageUrl"] },
     ];
 
     for (const item of extraTables) {

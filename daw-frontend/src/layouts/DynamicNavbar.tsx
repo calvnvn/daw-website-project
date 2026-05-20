@@ -156,6 +156,9 @@ export default function DynamicNavbar() {
                 <Link to="/about?tab=management" className={dropdownItemClass}>
                   {t("nav.management", "Management")}
                 </Link>
+                <Link to="/about?tab=achievement" className={dropdownItemClass}>
+                  {t("nav.achievement", "Achievements")}
+                </Link>
               </div>
             </div>
 
@@ -354,6 +357,12 @@ export default function DynamicNavbar() {
                   onClick={closeMenu}
                   className="py-2 text-[12px] tracking-wider font-bold text-slate-500 hover:text-daw-green">
                   {t("nav.management", "Management")}
+                </Link>
+                <Link
+                  to="/about?tab=achievement"
+                  onClick={closeMenu}
+                  className="py-2 text-[12px] tracking-wider font-bold text-slate-500 hover:text-daw-green">
+                  {t("nav.achievement", "Awards & Accolades")}
                 </Link>
               </div>
             </div>

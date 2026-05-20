@@ -10,6 +10,7 @@ import ProjectPreview from "./previews/ProjectPreview";
 import BusinessSectionPreview from "./previews/BusinessSectionPreview";
 import MapMarkerPreview from "./previews/MapMarkerPreview";
 import PagePreview from "./previews/PagePreview";
+import AchievementPreview from "./previews/AchievementPreview";
 
 const PREVIEW_REGISTRY: Record<string, any> = {
   History: HistoryPreview,
@@ -24,6 +25,7 @@ const PREVIEW_REGISTRY: Record<string, any> = {
   BusinessSection: BusinessSectionPreview,
   BusinessMapMarker: MapMarkerPreview,
   PAGE: PagePreview,
+  Achievement: AchievementPreview,
 };
 
 export default PREVIEW_REGISTRY;
