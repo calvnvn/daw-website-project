@@ -15,6 +15,7 @@ export default function Footer() {
     { label: t("nav.home", "Home"), path: "/" },
     { label: t("nav.about", "About Us"), path: "/about" },
     { label: t("nav.businesses", "Our Businesses"), path: "/businesses" },
+    { label: t("nav.news", "News & Events"), path: "/news" },
     { label: t("nav.contact", "Contact Us"), path: "/contact-us" },
   ];
 
@@ -39,6 +40,7 @@ export default function Footer() {
           "home",
           "about us",
           "our businesses",
+          "news & events",
           "contact us",
         ];
         const filtered = response.data.filter(

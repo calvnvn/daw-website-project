@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { Link } from "react-router-dom";
 import {
   ArrowRight,
@@ -7,6 +7,9 @@ import {
   User,
   Filter,
   ImageIcon,
+  Search,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
 import ScrollReveal from "@/components/ScrollReveal";
 import SEO from "@/components/SEO";
@@ -196,7 +199,11 @@ const CATEGORIES = ["All", "Company News", "Events", "Press Release", "CSR"];
 // ─── MAIN COMPONENT ─────────────────────────────────────────────────────
 export default function NewsEvents() {
   const [activeCategory, setActiveCategory] = useState("All");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [currentPage, setCurrentPage] = useState(1);
   const [scrollProgress, setScrollProgress] = useState(0);
+
+  const ITEMS_PER_PAGE = 6;
 
   useEffect(() => {
     const handleScroll = () => {
@@ -220,16 +227,56 @@ export default function NewsEvents() {
     [],
   );
 
-  // Featured = latest article (only shown on "All")
-  const featuredArticle = activeCategory === "All" ? sortedArticles[0] : null;
+  // Filter by category and search
+  const filteredArticles = useMemo(() => {
+    return sortedArticles.filter((article) => {
+      const matchCategory =
+        activeCategory === "All" || article.category === activeCategory;
+      const matchSearch =
+        article.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        article.excerpt.toLowerCase().includes(searchQuery.toLowerCase());
+      return matchCategory && matchSearch;
+    });
+  }, [sortedArticles, activeCategory, searchQuery]);
 
-  // Filtered articles (excluding featured when on "All")
+  // Featured = latest article (only shown on "All" and if NO search query)
+  const featuredArticle =
+    activeCategory === "All" && searchQuery === "" ? filteredArticles[0] : null;
+
+  // Grid articles (exclude featured if it exists)
   const gridArticles = useMemo(() => {
-    const pool =
-      activeCategory === "All" ? sortedArticles.slice(1) : sortedArticles;
-    if (activeCategory === "All") return pool;
-    return pool.filter((a) => a.category === activeCategory);
-  }, [sortedArticles, activeCategory]);
+    if (featuredArticle) {
+      return filteredArticles.slice(1);
+    }
+    return filteredArticles;
+  }, [filteredArticles, featuredArticle]);
+
+  // Pagination logic
+  const totalPages = Math.ceil(gridArticles.length / ITEMS_PER_PAGE);
+  const paginatedArticles = useMemo(() => {
+    const startIdx = (currentPage - 1) * ITEMS_PER_PAGE;
+    return gridArticles.slice(startIdx, startIdx + ITEMS_PER_PAGE);
+  }, [gridArticles, currentPage]);
+
+  // Reset pagination when filter/search changes
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [activeCategory, searchQuery]);
+
+  // Auto-scroll to article grid AFTER currentPage changes and DOM updates
+  const isInitialMount = useRef(true);
+  useEffect(() => {
+    if (isInitialMount.current) {
+      isInitialMount.current = false;
+      return;
+    }
+    const timer = setTimeout(() => {
+      document
+        .getElementById("article-grid")
+        ?.scrollIntoView({ behavior: "smooth" });
+    }, 100);
+    return () => clearTimeout(timer);
+  }, [currentPage]);
 
   return (
     <>
@@ -253,26 +300,43 @@ export default function NewsEvents() {
         />
 
         {/* Content */}
-        <div className="max-w-7xl mx-auto px-6 py-16 animate-in fade-in duration-500">
-          {/* Filter Bar — konsisten dengan PublicProjects */}
-          <div className="flex flex-wrap justify-center gap-3 mb-16">
-            {CATEGORIES.map((cat) => (
-              <button
-                key={cat}
-                id={`filter-${cat.toLowerCase().replace(/\s+/g, "-")}`}
-                onClick={() => setActiveCategory(cat)}
-                className={`px-6 py-2.5 rounded-full text-xs font-black uppercase tracking-widest transition-all ${
-                  activeCategory === cat
-                    ? "bg-daw-green text-white shadow-lg shadow-green-900/20 scale-105"
-                    : "bg-slate-100 text-slate-500 hover:bg-slate-200"
-                }`}>
-                {cat === "All" ? "All Categories" : cat}
-              </button>
-            ))}
+        <div
+          id="news-feed"
+          className="max-w-7xl mx-auto px-6 py-16 animate-in fade-in duration-500 scroll-mt-24">
+          {/* Control Bar: Filters & Search */}
+          <div className="flex flex-col lg:flex-row items-center justify-between gap-6 mb-12 border-b border-slate-100 pb-8">
+            {/* Filter Bar */}
+            <div className="flex flex-wrap items-center justify-center lg:justify-start gap-2">
+              {CATEGORIES.map((cat) => (
+                <button
+                  key={cat}
+                  id={`filter-${cat.toLowerCase().replace(/\s+/g, "-")}`}
+                  onClick={() => setActiveCategory(cat)}
+                  className={`px-5 py-2.5 rounded-full text-[10px] sm:text-xs font-black uppercase tracking-widest transition-all ${
+                    activeCategory === cat
+                      ? "bg-daw-green text-white shadow-md shadow-green-900/20"
+                      : "bg-slate-50 text-slate-500 hover:bg-slate-100"
+                  }`}>
+                  {cat === "All" ? "All Categories" : cat}
+                </button>
+              ))}
+            </div>
+
+            {/* Search Bar */}
+            <div className="w-full lg:w-80 relative group">
+              <input
+                type="text"
+                placeholder="Search articles..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full bg-slate-50/50 border border-slate-200 rounded-full py-3 pl-11 pr-4 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-daw-green/20 focus:border-daw-green hover:border-slate-300 transition-all shadow-sm"
+              />
+              <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 group-focus-within:text-daw-green transition-colors" />
+            </div>
           </div>
 
-          {/* Featured Article — only on "All" */}
-          {featuredArticle && (
+          {/* Featured Article — only on "All" and Page 1 */}
+          {featuredArticle && currentPage === 1 && (
             <ScrollReveal direction="up" delay={0}>
               <Link
                 to={`/news/${featuredArticle.slug}`}
@@ -331,89 +395,148 @@ export default function NewsEvents() {
           )}
 
           {/* Article Grid */}
-          {gridArticles.length === 0 ? (
-            <div className="text-center text-slate-400 py-32 border-2 border-dashed border-slate-100 rounded-3xl">
-              <Filter className="w-12 h-12 mx-auto mb-4 opacity-20" />
-              <p className="font-bold">No articles found in this category.</p>
-              <button
-                onClick={() => setActiveCategory("All")}
-                className="text-daw-green text-sm underline mt-2">
-                Clear all filters
-              </button>
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-              {gridArticles.map((article, idx) => (
-                <ScrollReveal key={article.id} direction="up" delay={idx * 60}>
-                  <Link
-                    to={`/news/${article.slug}`}
-                    id={`article-${article.id}`}
-                    className={`group flex bg-white rounded-2xl overflow-hidden border border-slate-100 shadow-sm hover:shadow-2xl transition-all duration-500 hover:-translate-y-1 h-full 
+          <div id="article-grid" className="scroll-mt-56">
+            {gridArticles.length === 0 ? (
+              <div className="text-center text-slate-400 py-32 border-2 border-dashed border-slate-100 rounded-3xl">
+                <Filter className="w-12 h-12 mx-auto mb-4 opacity-20" />
+                <p className="font-bold">No articles found in this category.</p>
+                <button
+                  onClick={() => setActiveCategory("All")}
+                  className="text-daw-green text-sm underline mt-2">
+                  Clear all filters
+                </button>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+                {paginatedArticles.map((article, idx) => (
+                  <ScrollReveal
+                    key={article.id}
+                    direction="up"
+                    delay={idx * 60}>
+                    <Link
+                      to={`/news/${article.slug}`}
+                      id={`article-${article.id}`}
+                      className={`group flex bg-white rounded-2xl overflow-hidden border border-slate-100 shadow-sm hover:shadow-2xl transition-all duration-500 hover:-translate-y-1 h-full 
                       ${idx % 3 === 0 ? "flex-col" : "flex-row md:flex-col"}
                     `}>
-                    {/* Image */}
-                    <div className={`relative bg-slate-100 overflow-hidden shrink-0 
+                      {/* Image */}
+                      <div
+                        className={`relative bg-slate-100 overflow-hidden shrink-0 
                       ${idx % 3 === 0 ? "w-full aspect-[4/3]" : "w-[35%] md:w-full aspect-square md:aspect-[4/3]"}
                     `}>
-                      {article.coverImage ? (
-                        <img
-                          src={article.coverImage}
-                          alt={article.title}
-                          className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700"
-                          loading="lazy"
-                        />
-                      ) : (
-                        <div className="w-full h-full flex items-center justify-center text-slate-300">
-                          <ImageIcon className="w-8 h-8 md:w-10 md:h-10" />
-                        </div>
-                      )}
-                      
-                      {/* Category Badge - hide on small list view to keep it clean */}
-                      <div className={`absolute top-3 left-3 md:top-4 md:left-4 bg-white/95 backdrop-blur-sm text-[9px] font-black uppercase tracking-[0.15em] text-daw-green rounded-lg shadow-sm
+                        {article.coverImage ? (
+                          <img
+                            src={article.coverImage}
+                            alt={article.title}
+                            className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700"
+                            loading="lazy"
+                          />
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center text-slate-300">
+                            <ImageIcon className="w-8 h-8 md:w-10 md:h-10" />
+                          </div>
+                        )}
+
+                        {/* Category Badge - hide on small list view to keep it clean */}
+                        <div
+                          className={`absolute top-3 left-3 md:top-4 md:left-4 bg-white/95 backdrop-blur-sm text-[9px] font-black uppercase tracking-[0.15em] text-daw-green rounded-lg shadow-sm
                         ${idx % 3 === 0 ? "px-3 py-1.5" : "px-2 py-1 md:px-3 md:py-1.5 hidden md:block"}
                       `}>
-                        {article.category}
+                          {article.category}
+                        </div>
                       </div>
-                    </div>
 
-                    {/* Content */}
-                    <div className={`flex flex-col flex-1 ${idx % 3 === 0 ? "p-6 md:p-8" : "p-4 md:p-8"}`}>
-                      <p className={`text-[10px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-3 flex-wrap ${idx % 3 === 0 ? "mb-3" : "mb-2 md:mb-3"}`}>
-                        <span className="flex items-center gap-1">
-                          <Calendar className="w-3 h-3" />
-                          {new Date(article.publishedAt).toLocaleDateString(
-                            "en-US",
-                            { month: "short", day: "numeric", year: "numeric" }
-                          )}
-                        </span>
-                        <span className={`flex items-center gap-1 ${idx % 3 === 0 ? "" : "hidden sm:flex md:flex"}`}>
-                          <Clock className="w-3 h-3" />
-                          {article.readTime}
-                        </span>
-                      </p>
+                      {/* Content */}
+                      <div
+                        className={`flex flex-col flex-1 ${idx % 3 === 0 ? "p-6 md:p-8" : "p-4 md:p-8"}`}>
+                        <p
+                          className={`text-[10px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-3 flex-wrap ${idx % 3 === 0 ? "mb-3" : "mb-2 md:mb-3"}`}>
+                          <span className="flex items-center gap-1">
+                            <Calendar className="w-3 h-3" />
+                            {new Date(article.publishedAt).toLocaleDateString(
+                              "en-US",
+                              {
+                                month: "short",
+                                day: "numeric",
+                                year: "numeric",
+                              },
+                            )}
+                          </span>
+                          <span
+                            className={`flex items-center gap-1 ${idx % 3 === 0 ? "" : "hidden sm:flex md:flex"}`}>
+                            <Clock className="w-3 h-3" />
+                            {article.readTime}
+                          </span>
+                        </p>
 
-                      <h3 className={`font-bold text-slate-900 group-hover:text-daw-green transition-colors leading-snug line-clamp-2 md:line-clamp-2 ${
-                        idx % 3 === 0 ? "text-xl md:text-xl mb-4" : "text-sm sm:text-base md:text-xl mb-2 md:mb-4"
-                      }`}>
-                        {article.title}
-                      </h3>
+                        <h3
+                          className={`font-bold text-slate-900 group-hover:text-daw-green transition-colors leading-snug line-clamp-2 md:line-clamp-2 ${
+                            idx % 3 === 0
+                              ? "text-xl md:text-xl mb-4"
+                              : "text-sm sm:text-base md:text-xl mb-2 md:mb-4"
+                          }`}>
+                          {article.title}
+                        </h3>
 
-                      <p className={`text-slate-500 leading-relaxed flex-1 ${
-                        idx % 3 === 0 ? "text-sm line-clamp-3 mb-5" : "text-xs line-clamp-2 mb-2 md:mb-5 hidden md:block"
-                      }`}>
-                        {article.excerpt}
-                      </p>
+                        <p
+                          className={`text-slate-500 leading-relaxed flex-1 ${
+                            idx % 3 === 0
+                              ? "text-sm line-clamp-3 mb-5"
+                              : "text-xs line-clamp-2 mb-2 md:mb-5 hidden md:block"
+                          }`}>
+                          {article.excerpt}
+                        </p>
 
-                      <div className={`mt-auto items-center text-[10px] md:text-xs font-black uppercase tracking-widest text-daw-green border-slate-50 ${
-                        idx % 3 === 0 ? "pt-5 border-t flex" : "pt-2 md:pt-6 md:border-t hidden md:flex"
-                      }`}>
-                        Read Article
-                        <ArrowRight className="w-3 h-3 md:w-4 md:h-4 ml-1 md:ml-2 group-hover:translate-x-1 md:group-hover:translate-x-2 transition-transform" />
+                        <div
+                          className={`mt-auto items-center text-[10px] md:text-xs font-black uppercase tracking-widest text-daw-green border-slate-50 ${
+                            idx % 3 === 0
+                              ? "pt-5 border-t flex"
+                              : "pt-2 md:pt-6 md:border-t hidden md:flex"
+                          }`}>
+                          Read Article
+                          <ArrowRight className="w-3 h-3 md:w-4 md:h-4 ml-1 md:ml-2 group-hover:translate-x-1 md:group-hover:translate-x-2 transition-transform" />
+                        </div>
                       </div>
-                    </div>
-                  </Link>
-                </ScrollReveal>
-              ))}
+                    </Link>
+                  </ScrollReveal>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Pagination Controls */}
+          {totalPages > 1 && (
+            <div className="mt-16 flex items-center justify-center gap-3">
+              <button
+                onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
+                disabled={currentPage === 1}
+                className="w-10 h-10 rounded-full flex items-center justify-center border border-slate-200 text-slate-500 hover:bg-daw-green hover:text-white disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-sm">
+                <ChevronLeft className="w-5 h-5" />
+              </button>
+
+              <div className="flex items-center gap-1.5">
+                {Array.from({ length: totalPages }).map((_, i) => (
+                  <button
+                    key={i}
+                    onClick={() => setCurrentPage(i + 1)}
+                    className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold transition-all ${
+                      currentPage === i + 1
+                        ? "bg-daw-green text-white shadow-md shadow-green-900/20"
+                        : "border border-transparent text-slate-600 hover:bg-slate-100"
+                    }`}>
+                    {i + 1}
+                  </button>
+                ))}
+              </div>
+
+              <button
+                onClick={() =>
+                  setCurrentPage((prev) => Math.min(prev + 1, totalPages))
+                }
+                disabled={currentPage === totalPages}
+                className="w-10 h-10 rounded-full flex items-center justify-center border border-slate-200 text-slate-500 hover:bg-daw-green hover:text-white disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-sm">
+                <ChevronRight className="w-5 h-5" />
+              </button>
             </div>
           )}
         </div>
