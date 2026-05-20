@@ -17,6 +17,7 @@ function getPermissionsByRole(role) {
     "manage_homepage",
     "manage_about",
     "manage_settings",
+    "manage_news",
   ];
 
   if (normalizedRole === "superadmin" || normalizedRole === "admin") {

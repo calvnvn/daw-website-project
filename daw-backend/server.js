@@ -40,6 +40,8 @@ const approvalRoutes = require("./routes/approvalRoutes");
 const philosophyRoutes = require("./routes/philosophyRoutes");
 const philosophyPillarRoutes = require("./routes/philosophyPillarRoutes");
 const achievementRoutes = require("./routes/achievementRoutes");
+const newsRoutes = require("./routes/newsRoutes");
+const newsCategoryRoutes = require("./routes/newsCategoryRoutes");
 
 // INITIALIZATION: Model Registry
 const User = require("./models/User");
@@ -65,6 +67,8 @@ require("./models/InquirySubject");
 require("./models/InvestmentSettings");
 require("./models/ApprovalDraft");
 require("./models/Achievement");
+const NewsCategory = require("./models/NewsCategory");
+const NewsArticle = require("./models/NewsArticle");
 
 const app = express();
 
@@ -150,6 +154,8 @@ app.use("/api/philosophy", philosophyRoutes);
 app.use("/api/philosophy-pillars", philosophyPillarRoutes);
 app.use("/", sitemapRoutes);
 app.use("/api/achievements", achievementRoutes);
+app.use("/api/news", newsRoutes);
+app.use("/api/news-categories", newsCategoryRoutes);
 
 // Mount core health check endpoint
 app.get("/", (req, res) => {
@@ -235,12 +241,24 @@ Project.belongsTo(BusinessSection, {
   as: "sectorData",
 });
 
+NewsCategory.hasMany(NewsArticle, {
+  foreignKey: "category_id",
+  sourceKey: "id",
+  as: "articles",
+});
+
+NewsArticle.belongsTo(NewsCategory, {
+  foreignKey: "category_id",
+  targetKey: "id",
+  as: "categoryData",
+});
+
 // EXECUTION: Server Bootstrap
 // Synchronize schema state and initialize listener on designated port
 const PORT = process.env.PORT || 5000;
 
 sequelize
-  .sync({ alter: true })
+  .sync({ alter: false })
   .then(async () => {
     console.log("[DATABASE] MySQL/MariaDB Connected & Tables Synced.");
 
@@ -252,6 +270,6 @@ sequelize
     console.error(
       "[CRITICAL ERROR] Database connection failed. Shutting down.",
     );
-    console.error(err.message);
+    console.error(err);
     process.exit(1);
   });

@@ -21,6 +21,7 @@ import {
   FileText,
   ClipboardCheck,
   ArrowRight,
+  Newspaper,
 } from "lucide-react";
 import api from "@/lib/api";
 import logoDaw from "@/assets/logo-daw.png";
@@ -81,6 +82,12 @@ const MENU_GROUPS = [
         path: "/admin/investments",
         icon: Briefcase,
         perm: "manage_investments",
+      },
+      {
+        name: "News & Events",
+        path: "/admin/news",
+        icon: Newspaper,
+        perm: "manage_news",
       },
     ],
   },
@@ -150,6 +157,7 @@ export default function AdminLayout() {
     roles: "Access Control",
     settings: "Global Settings",
     home: "Homepage Editor",
+    news: "News & Events",
     create: "New Data",
     edit: "Modify",
   };

@@ -4,6 +4,7 @@ const History = require("../models/History");
 const Management = require("../models/Management");
 const Page = require("../models/Page");
 const Project = require("../models/Project");
+const NewsArticle = require("../models/NewsArticle");
 
 /**
  * Higher-order middleware for pessimistic concurrency control based on record state.

@@ -20,6 +20,7 @@ const InvestmentSettings = require("../models/InvestmentSettings");
 const Settings = require("../models/Settings");
 const AboutInfo = require("../models/AboutInfo");
 const Achievement = require("../models/Achievement");
+const NewsArticle = require("../models/NewsArticle");
 const { Op } = require("sequelize");
 const { deleteSingleFile } = require("../utils/fileRemover");
 const User = require("../models/User");
@@ -564,6 +565,7 @@ const MODEL_MAPPING = {
   Philosophy,
   PhilosophyPillar,
   Achievement,
+  NewsArticle,
 };
 
 function getModelByModuleName(moduleName) {

@@ -50,6 +50,8 @@ const RoleManagement = lazy(
 const ApprovalCenter = lazy(
   () => import("./pages/admin/approvals/ApprovalCenter"),
 );
+const NewsManagement = lazy(() => import("./pages/admin/NewsManagement"));
+const NewsForm = lazy(() => import("./pages/admin/NewsForm"));
 
 // Resolve specialized content management module with context injection
 const ContentManagerWrapper = lazy(async () => {
@@ -146,6 +148,14 @@ function App() {
 
               <Route element={<ProtectedRoute permission="manage_approvals" />}>
                 <Route path="approvals" element={<ApprovalCenter />} />
+              </Route>
+
+              <Route element={<ProtectedRoute permission="manage_news" />}>
+                <Route path="news">
+                  <Route index element={<NewsManagement />} />
+                  <Route path="create" element={<NewsForm />} />
+                  <Route path="edit/:id" element={<NewsForm />} />
+                </Route>
               </Route>
             </Route>
           </Route>
