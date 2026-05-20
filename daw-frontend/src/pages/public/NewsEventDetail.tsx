@@ -10,7 +10,6 @@ import {
   ChevronRight,
   Search,
   FolderOpen,
-  Mail,
 } from "lucide-react";
 import { toast } from "sonner";
 import SEO from "@/components/SEO";
@@ -171,7 +170,9 @@ export default function NewsEventDetail() {
         localFallback={bannerImg}
       />
 
-      <div id="article-content" className="bg-white min-h-screen pt-8 md:pt-12 pb-16 md:pb-20 scroll-mt-[80px] md:scroll-mt-[100px]">
+      <div
+        id="article-content"
+        className="bg-white min-h-screen pt-8 md:pt-12 pb-16 md:pb-20 scroll-mt-[80px] md:scroll-mt-[100px]">
         <div className="container mx-auto px-5 md:px-6 max-w-7xl">
           {/* ─── CONTENT GRID ─── */}
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 lg:gap-16 items-start">
