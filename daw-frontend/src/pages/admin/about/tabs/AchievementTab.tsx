@@ -7,7 +7,6 @@ import {
   Save,
   ChevronDown,
   Target,
-  ImageOff,
   Loader2,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -273,8 +272,12 @@ export default function AchievementTab({
             <h4 className="font-bold">Draf Ditolak</h4>
             <p className="text-sm text-red-600/80">
               Satu atau lebih draf yang Anda ajukan telah ditolak oleh Approver.
-              Silakan klik tombol <b>'Edit'</b> pada baris dengan label merah <span className="inline-block px-1.5 py-0.5 mx-1 rounded text-[10px] font-bold bg-red-100 text-red-600 border border-red-200">Ditolak</span> untuk melihat revisi terakhir yang
-              ditolak, lalu perbaiki atau buang draf tersebut.
+              Silakan klik tombol <b>'Edit'</b> pada baris dengan label merah{" "}
+              <span className="inline-block px-1.5 py-0.5 mx-1 rounded text-[10px] font-bold bg-red-100 text-red-600 border border-red-200">
+                Ditolak
+              </span>{" "}
+              untuk melihat revisi terakhir yang ditolak, lalu perbaiki atau
+              buang draf tersebut.
             </p>
           </div>
         </div>
