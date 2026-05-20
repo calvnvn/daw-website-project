@@ -348,9 +348,13 @@ export default function NewsEvents() {
                   <Link
                     to={`/news/${article.slug}`}
                     id={`article-${article.id}`}
-                    className="group flex flex-col bg-white rounded-2xl overflow-hidden border border-slate-100 shadow-sm hover:shadow-2xl transition-all duration-500 hover:-translate-y-2 h-full">
+                    className={`group flex bg-white rounded-2xl overflow-hidden border border-slate-100 shadow-sm hover:shadow-2xl transition-all duration-500 hover:-translate-y-1 h-full 
+                      ${idx % 3 === 0 ? "flex-col" : "flex-row md:flex-col"}
+                    `}>
                     {/* Image */}
-                    <div className="aspect-[4/3] w-full bg-slate-100 overflow-hidden relative">
+                    <div className={`relative bg-slate-100 overflow-hidden shrink-0 
+                      ${idx % 3 === 0 ? "w-full aspect-[4/3]" : "w-[35%] md:w-full aspect-square md:aspect-[4/3]"}
+                    `}>
                       {article.coverImage ? (
                         <img
                           src={article.coverImage}
@@ -360,46 +364,51 @@ export default function NewsEvents() {
                         />
                       ) : (
                         <div className="w-full h-full flex items-center justify-center text-slate-300">
-                          <ImageIcon className="w-10 h-10" />
+                          <ImageIcon className="w-8 h-8 md:w-10 md:h-10" />
                         </div>
                       )}
-                      {/* Category Badge */}
-                      <div className="absolute top-4 left-4 bg-white/95 backdrop-blur-sm px-3 py-1.5 text-[9px] font-black uppercase tracking-[0.15em] text-daw-green rounded-lg shadow-sm">
+                      
+                      {/* Category Badge - hide on small list view to keep it clean */}
+                      <div className={`absolute top-3 left-3 md:top-4 md:left-4 bg-white/95 backdrop-blur-sm text-[9px] font-black uppercase tracking-[0.15em] text-daw-green rounded-lg shadow-sm
+                        ${idx % 3 === 0 ? "px-3 py-1.5" : "px-2 py-1 md:px-3 md:py-1.5 hidden md:block"}
+                      `}>
                         {article.category}
                       </div>
                     </div>
 
                     {/* Content */}
-                    <div className="p-8 flex flex-col flex-1">
-                      <p className="text-[10px] font-bold text-slate-400 mb-3 uppercase tracking-widest flex items-center gap-3">
+                    <div className={`flex flex-col flex-1 ${idx % 3 === 0 ? "p-6 md:p-8" : "p-4 md:p-8"}`}>
+                      <p className={`text-[10px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-3 flex-wrap ${idx % 3 === 0 ? "mb-3" : "mb-2 md:mb-3"}`}>
                         <span className="flex items-center gap-1">
                           <Calendar className="w-3 h-3" />
                           {new Date(article.publishedAt).toLocaleDateString(
                             "en-US",
-                            {
-                              month: "long",
-                              day: "numeric",
-                              year: "numeric",
-                            },
+                            { month: "short", day: "numeric", year: "numeric" }
                           )}
                         </span>
-                        <span className="flex items-center gap-1">
+                        <span className={`flex items-center gap-1 ${idx % 3 === 0 ? "" : "hidden sm:flex md:flex"}`}>
                           <Clock className="w-3 h-3" />
                           {article.readTime}
                         </span>
                       </p>
 
-                      <h3 className="text-xl font-bold text-slate-900 mb-4 group-hover:text-daw-green transition-colors line-clamp-2 leading-snug">
+                      <h3 className={`font-bold text-slate-900 group-hover:text-daw-green transition-colors leading-snug line-clamp-2 md:line-clamp-2 ${
+                        idx % 3 === 0 ? "text-xl md:text-xl mb-4" : "text-sm sm:text-base md:text-xl mb-2 md:mb-4"
+                      }`}>
                         {article.title}
                       </h3>
 
-                      <p className="text-slate-500 text-sm leading-relaxed line-clamp-3 mb-5 flex-1">
+                      <p className={`text-slate-500 leading-relaxed flex-1 ${
+                        idx % 3 === 0 ? "text-sm line-clamp-3 mb-5" : "text-xs line-clamp-2 mb-2 md:mb-5 hidden md:block"
+                      }`}>
                         {article.excerpt}
                       </p>
 
-                      <div className="mt-auto pt-6 flex items-center text-xs font-black uppercase tracking-widest text-daw-green border-t border-slate-50">
+                      <div className={`mt-auto items-center text-[10px] md:text-xs font-black uppercase tracking-widest text-daw-green border-slate-50 ${
+                        idx % 3 === 0 ? "pt-5 border-t flex" : "pt-2 md:pt-6 md:border-t hidden md:flex"
+                      }`}>
                         Read Article
-                        <ArrowRight className="w-4 h-4 ml-2 group-hover:translate-x-2 transition-transform" />
+                        <ArrowRight className="w-3 h-3 md:w-4 md:h-4 ml-1 md:ml-2 group-hover:translate-x-1 md:group-hover:translate-x-2 transition-transform" />
                       </div>
                     </div>
                   </Link>
