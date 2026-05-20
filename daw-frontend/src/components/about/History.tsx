@@ -31,7 +31,7 @@ export default function History() {
       <ScrollReveal direction="up" delay={0}>
         <div className="flex items-center gap-4 mb-14">
           <h2 className="font-serif text-4xl md:text-5xl text-slate-900">
-            {t("about.history.title", "Our Journey")}
+            {t("about.history.title", "History")}
           </h2>
         </div>
       </ScrollReveal>
