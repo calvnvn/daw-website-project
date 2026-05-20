@@ -723,7 +723,7 @@ async function executeModelUpdate(
       if (payload.histories && Array.isArray(payload.histories)) {
         const historyData = payload.histories.map((h) => ({
           year: h.year,
-          description: h.text,
+          description: h.description,
           is_locked: false,
           lock_ticket: null,
         }));

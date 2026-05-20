@@ -1,12 +1,3 @@
-import {
-  Heart,
-  Briefcase,
-  Users,
-  Zap,
-  Lightbulb,
-  CheckCircle,
-} from "lucide-react";
-
 export default function AboutInfoPreview({ data }: { data: any }) {
   if (!data) return null;
 
@@ -24,24 +15,6 @@ export default function AboutInfoPreview({ data }: { data: any }) {
       }
       return <span key={index}>{part}</span>;
     });
-  };
-
-  // Helper 2: Icon Mapping (Sama dengan Frontend)
-  const getIconForPillar = (id: string) => {
-    switch (id?.toLowerCase()) {
-      case "human":
-        return <Heart className="w-5 h-5" />;
-      case "ethics":
-        return <Briefcase className="w-5 h-5" />;
-      case "unity":
-        return <Users className="w-5 h-5" />;
-      case "speed":
-        return <Zap className="w-5 h-5" />;
-      case "smart":
-        return <Lightbulb className="w-5 h-5" />;
-      default:
-        return <CheckCircle className="w-5 h-5" />;
-    }
   };
 
   return (
@@ -77,48 +50,8 @@ export default function AboutInfoPreview({ data }: { data: any }) {
         </div>
       </div>
 
-      {/* --- SECTION 2: PHILOSOPHY PILLARS --- */}
-      <div className="space-y-4">
-        <div className="flex items-center gap-3">
-          <div className="h-px flex-1 bg-slate-200"></div>
-          <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
-            {data.philosophyTitle || "Philosophy"}
-          </h4>
-          <div className="h-px flex-1 bg-slate-200"></div>
-        </div>
-
-        <div className="grid grid-cols-1 gap-4">
-          {(data.philosophyPillars || []).map((pillar: any, idx: number) => (
-            <div
-              key={idx}
-              className="p-4 bg-slate-50 border border-slate-200 rounded-xl flex gap-4">
-              <div className="w-10 h-10 shrink-0 flex items-center justify-center rounded-full bg-daw-green/10 text-daw-green">
-                {getIconForPillar(pillar.id)}
-              </div>
-              <div className="space-y-2">
-                <h5 className="font-bold text-sm text-slate-900">
-                  {pillar.title}
-                </h5>
-                <ul className="space-y-1">
-                  {(pillar.text || "")
-                    .split("\n")
-                    .map((point: string, pIdx: number) => (
-                      <li
-                        key={pIdx}
-                        className="flex items-start gap-2 text-[11px] text-slate-600">
-                        <span className="mt-1.5 w-1 h-1 rounded-full bg-daw-green/40 shrink-0"></span>
-                        <span>{point.trim()}</span>
-                      </li>
-                    ))}
-                </ul>
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-
       <p className="text-[9px] text-slate-400 text-center italic">
-        * Tampilan disederhanakan untuk kebutuhan komparasi data.
+        * Preview identitas dan nilai perusahaan (Visi, Misi, Spirit).
       </p>
     </div>
   );

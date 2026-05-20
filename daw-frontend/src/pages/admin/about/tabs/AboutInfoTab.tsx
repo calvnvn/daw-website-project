@@ -212,11 +212,10 @@ export default function AboutInfoTab({
       }`}>
       {/* BUREAUCRATIC MIRROR - Red Recovery Banner */}
       {rejectedDraft && !isSaving && !optimisticLock && (
-        <div className="bg-red-50 border-l-4 border-l-red-500 border-y border-r border-red-200 rounded-xl overflow-hidden shadow-sm animate-in slide-in-from-top-4 duration-300 mb-6">
-          <div className="p-5 flex gap-4 items-start">
-            <div className="bg-red-100 p-2.5 rounded-lg h-fit shrink-0">
-              <AlertTriangle className="w-5 h-5 text-red-600" />
-            </div>
+        <div className="p-5 rounded-xl bg-red-50 border border-red-200 flex items-start gap-4 text-red-700 shadow-sm mb-6 animate-in slide-in-from-top-4 duration-300">
+          <div className="p-2 bg-red-100 rounded-lg shrink-0">
+            <AlertTriangle className="w-5 h-5 text-red-600" />
+          </div>
             <div className="flex-1 space-y-3">
               <div className="flex justify-between items-center">
                 <h4 className="text-sm font-black text-red-900 uppercase tracking-tighter">
@@ -267,7 +266,6 @@ export default function AboutInfoTab({
               </div>
             </div>
           </div>
-        </div>
       )}
 
       {/* BUREAUCRATIC MIRROR: Local Lock Indicator */}

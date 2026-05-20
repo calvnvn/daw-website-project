@@ -11,6 +11,11 @@ import BusinessSectionPreview from "./previews/BusinessSectionPreview";
 import MapMarkerPreview from "./previews/MapMarkerPreview";
 import PagePreview from "./previews/PagePreview";
 import AchievementPreview from "./previews/AchievementPreview";
+import PhilosophyPreview from "./previews/PhilosophyPreview";
+import PhilosophyPillarPreview from "./previews/PhilosophyPillarPreview";
+import MenuPreview from "./previews/MenuPreview";
+import MapCategoryPreview from "./previews/MapCategoryPreview";
+import SettingsPreview from "./previews/SettingsPreview";
 
 const PREVIEW_REGISTRY: Record<string, any> = {
   History: HistoryPreview,
@@ -24,8 +29,13 @@ const PREVIEW_REGISTRY: Record<string, any> = {
   Project: ProjectPreview,
   BusinessSection: BusinessSectionPreview,
   BusinessMapMarker: MapMarkerPreview,
-  PAGE: PagePreview,
+  Page: PagePreview,
   Achievement: AchievementPreview,
+  Philosophy: PhilosophyPreview,
+  PhilosophyPillar: PhilosophyPillarPreview,
+  Menu: MenuPreview,
+  MapCategory: MapCategoryPreview,
+  Settings: SettingsPreview,
 };
 
 export default PREVIEW_REGISTRY;

@@ -303,6 +303,22 @@ export default function ManagementTab({
   // RENDER
   return (
     <div className="space-y-8 animate-in fade-in duration-300 relative">
+      {/* REJECTION RIBBON (Blueprint 3) */}
+      {isEditor && managementTeam.some((person) => person.hasRejected) && (
+        <div className="p-4 rounded-xl bg-red-50 border border-red-200 flex items-start gap-3 text-red-700 shadow-sm mb-6">
+          <div className="p-2 bg-red-100 rounded-lg">
+            <AlertTriangle className="w-5 h-5 text-red-600" />
+          </div>
+          <div className="flex-1">
+            <h4 className="font-bold">Draf Ditolak</h4>
+            <p className="text-sm text-red-600/80">
+              Satu atau lebih draf profil kepemimpinan yang Anda ajukan telah ditolak oleh Approver.
+              Silakan klik tombol <b>'Edit'</b> pada baris dengan titik merah <span className="inline-block h-2.5 w-2.5 rounded-full bg-red-500 ring-2 ring-white mx-1" /> untuk melihat revisi terakhir, memulihkan data, atau mengabaikan notifikasi penolakan.
+            </p>
+          </div>
+        </div>
+      )}
+
       {/* HEADER & ADD BUTTON */}
       <div className="flex items-center justify-between mb-4 border-b border-slate-100 pb-4">
         <div>

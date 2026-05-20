@@ -8,6 +8,7 @@ import {
   ChevronDown,
   Target,
   Loader2,
+  AlertTriangle,
 } from "lucide-react";
 import { toast } from "sonner";
 import api from "@/lib/api";
@@ -56,6 +57,7 @@ export default function AchievementTab({
     savedPhotoUrl: null as string | null,
     originalSnapshot: null as string | null,
     previous_notrans: undefined as string | undefined,
+    rejection_reason: undefined as string | undefined,
   });
 
   const openModal = async (achievement: AchievementItem | null = null) => {
@@ -71,6 +73,7 @@ export default function AchievementTab({
       setEditingId(achievement.id);
       let payload = { ...achievement };
       let draftNotrans = undefined;
+      let draftReason = undefined;
 
       // 🔄 DATA RECOVERY FLOW (Blueprint 3)
       if (achievement.hasRejected && isEditor) {
@@ -86,6 +89,7 @@ export default function AchievementTab({
                 : response.data.data.payload;
             payload = { ...payload, ...parsedPayload };
             draftNotrans = response.data.data.notrans;
+            draftReason = response.data.data.rejection_reason;
 
             toast.info("Memuat draf revisi terakhir yang ditolak.", {
               id: loadingToast,
@@ -112,6 +116,7 @@ export default function AchievementTab({
         removePhoto: false,
         savedPhotoUrl: payload.imageUrl || null,
         previous_notrans: draftNotrans,
+        rejection_reason: draftReason,
         originalSnapshot: JSON.stringify({
           year: payload.year || "",
           title: payload.title || "",
@@ -136,6 +141,7 @@ export default function AchievementTab({
         savedPhotoUrl: null,
         originalSnapshot: null,
         previous_notrans: undefined,
+        rejection_reason: undefined,
       });
     }
 
@@ -458,6 +464,25 @@ export default function AchievementTab({
                 </button>
               </div>
             </div>
+
+            {/* REJECTION RIBBON (Didalam Modal) */}
+            {form.rejection_reason && (
+              <div className="bg-red-50 border-b border-red-200 p-5 shrink-0 animate-in slide-in-from-top-2">
+                <div className="flex gap-3 items-start">
+                  <div className="bg-red-100 p-2.5 rounded-lg shrink-0">
+                    <AlertTriangle className="w-5 h-5 text-red-600 animate-pulse" />
+                  </div>
+                  <div className="flex-1 text-left">
+                    <h4 className="font-black text-xs text-red-900 uppercase tracking-tighter">
+                      Draf Ditolak
+                    </h4>
+                    <p className="text-xs text-red-800 mt-1">
+                      {form.rejection_reason}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
 
             <div className="overflow-y-auto p-6">
               <form

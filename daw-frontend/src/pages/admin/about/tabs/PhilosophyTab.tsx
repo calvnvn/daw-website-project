@@ -334,11 +334,10 @@ export default function PhilosophyTab({
         className={`space-y-6 pb-8 border-b border-slate-200 ${isTitleLocked ? "opacity-60 grayscale-[30%] pointer-events-none select-none" : ""}`}>
         {/* 🚀 REFACTOR: BUREAUCRATIC MIRROR - Red Recovery Banner untuk Title */}
         {rejectedTitleDraft && !isTitleLocked && (
-          <div className="bg-red-50 border-l-4 border-l-red-500 border-y border-r border-red-200 rounded-xl overflow-hidden shadow-sm animate-in slide-in-from-top-4 duration-300 mb-6">
-            <div className="p-5 flex gap-4 items-start">
-              <div className="bg-red-100 p-2.5 rounded-lg h-fit shrink-0">
-                <AlertTriangle className="w-5 h-5 text-red-600" />
-              </div>
+          <div className="p-5 rounded-xl bg-red-50 border border-red-200 flex items-start gap-4 text-red-700 shadow-sm mb-6 animate-in slide-in-from-top-4 duration-300">
+            <div className="p-2 bg-red-100 rounded-lg h-fit shrink-0">
+              <AlertTriangle className="w-5 h-5 text-red-600" />
+            </div>
               <div className="flex-1 space-y-3">
                 <h4 className="text-sm font-black text-red-900 uppercase tracking-tighter">
                   ⚠️ Revisi Ditolak: Headline
@@ -376,7 +375,6 @@ export default function PhilosophyTab({
                 </div>
               </div>
             </div>
-          </div>
         )}
 
         <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
@@ -421,6 +419,22 @@ export default function PhilosophyTab({
           SECTION 2: PILLARS COLLECTION (GRANULAR)
            */}
       <div>
+        {/* REJECTION RIBBON (Pillars) */}
+        {isEditor && philosophyPillars.some((p) => p.hasRejected) && (
+          <div className="p-4 rounded-xl bg-red-50 border border-red-200 flex items-start gap-3 text-red-700 shadow-sm mb-6">
+            <div className="p-2 bg-red-100 rounded-lg">
+              <AlertTriangle className="w-5 h-5 text-red-600" />
+            </div>
+            <div className="flex-1">
+              <h4 className="font-bold">Draf Pilar Ditolak</h4>
+              <p className="text-sm text-red-600/80">
+                Satu atau lebih draf nilai inti yang Anda ajukan telah ditolak oleh Approver.
+                Silakan klik tombol <b>'Edit'</b> pada kartu pilar dengan peringatan merah untuk melihat revisi terakhir, memulihkan data, atau mengabaikan notifikasi penolakan.
+              </p>
+            </div>
+          </div>
+        )}
+
         <div className="flex items-center justify-between mb-6">
           <div>
             <h3 className="font-bold text-slate-900 text-lg">
