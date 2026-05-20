@@ -217,46 +217,44 @@ export default function HistoryTab({
   return (
     <div
       className={`space-y-6 animate-in fade-in duration-300 transition-all ${isModuleLocked ? "opacity-60 grayscale-[30%] pointer-events-none select-none" : ""}`}>
-      {/* 🚀 FIX C: Banner hanya muncul jika tidak sedang saving DAN tidak sedang optimistic lock */}
       {rejectedDraft && !isSaving && !optimisticLock && (
         <div className="p-5 rounded-xl bg-red-50 border border-red-200 flex items-start gap-4 text-red-700 shadow-sm mb-6 animate-in slide-in-from-top-4 duration-300">
           <div className="p-2 bg-red-100 rounded-lg shrink-0 h-fit">
             <AlertTriangle className="w-5 h-5 text-red-600" />
           </div>
-            <div className="flex-1 space-y-3">
-              <h4 className="text-sm font-black text-red-900 uppercase tracking-tighter">
-                ⚠️ Revisi Ditolak
-              </h4>
-              <p className="text-xs text-red-800 leading-relaxed bg-white/60 p-3 rounded-md border border-red-200/50 shadow-inner italic">
-                "
-                {rejectedDraft.rejection_reason ||
-                  "Perbaiki data sesuai arahan."}
-                "
-              </p>
-              <div className="pt-2 flex flex-col sm:flex-row sm:items-center gap-3">
-                <button
-                  onClick={handleRestoreDraft}
-                  disabled={!isEditing}
-                  className="flex items-center justify-center gap-2 bg-red-600 hover:bg-red-700 disabled:bg-red-300 text-white px-5 py-2.5 rounded-lg text-[10px] font-black uppercase tracking-widest active:scale-95 transition-all">
-                  <RotateCcw
-                    className={`w-3.5 h-3.5 ${isEditing ? "" : "opacity-50"}`}
-                  />{" "}
-                  PULIHKAN DATA
-                </button>
-                <button
-                  onClick={handleDiscardDraft}
-                  disabled={isDiscarding}
-                  className="flex items-center justify-center gap-2 bg-white border border-red-200 text-red-600 hover:bg-red-50 disabled:bg-slate-50 px-4 py-2.5 rounded-lg text-[10px] font-black uppercase tracking-widest active:scale-95 transition-all">
-                  {isDiscarding ? (
-                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                  ) : (
-                    <X className="w-3.5 h-3.5" />
-                  )}{" "}
-                  ABAIKAN NOTIFIKASI
-                </button>
-              </div>
+          <div className="flex-1 space-y-3">
+            <h4 className="text-sm font-black text-red-900 uppercase tracking-tighter">
+              ⚠️ Revisi Ditolak
+            </h4>
+            <p className="text-xs text-red-800 leading-relaxed bg-white/60 p-3 rounded-md border border-red-200/50 shadow-inner italic">
+              "
+              {rejectedDraft.rejection_reason || "Perbaiki data sesuai arahan."}
+              "
+            </p>
+            <div className="pt-2 flex flex-col sm:flex-row sm:items-center gap-3">
+              <button
+                onClick={handleRestoreDraft}
+                disabled={!isEditing}
+                className="flex items-center justify-center gap-2 bg-red-600 hover:bg-red-700 disabled:bg-red-300 text-white px-5 py-2.5 rounded-lg text-[10px] font-black uppercase tracking-widest active:scale-95 transition-all">
+                <RotateCcw
+                  className={`w-3.5 h-3.5 ${isEditing ? "" : "opacity-50"}`}
+                />{" "}
+                PULIHKAN DATA
+              </button>
+              <button
+                onClick={handleDiscardDraft}
+                disabled={isDiscarding}
+                className="flex items-center justify-center gap-2 bg-white border border-red-200 text-red-600 hover:bg-red-50 disabled:bg-slate-50 px-4 py-2.5 rounded-lg text-[10px] font-black uppercase tracking-widest active:scale-95 transition-all">
+                {isDiscarding ? (
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                ) : (
+                  <X className="w-3.5 h-3.5" />
+                )}{" "}
+                ABAIKAN NOTIFIKASI
+              </button>
             </div>
           </div>
+        </div>
       )}
 
       {/* HEADER & LIST (Sama seperti sebelumnya tapi menggunakan logic gembok baru) */}
