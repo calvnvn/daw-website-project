@@ -30,10 +30,12 @@ const PREVIEW_REGISTRY: Record<string, any> = {
   BusinessSection: BusinessSectionPreview,
   BusinessMapMarker: MapMarkerPreview,
   Page: PagePreview,
+  PAGE: PagePreview,
   Achievement: AchievementPreview,
   Philosophy: PhilosophyPreview,
   PhilosophyPillar: PhilosophyPillarPreview,
   Menu: MenuPreview,
+  MENU: MenuPreview,
   MapCategory: MapCategoryPreview,
   Settings: SettingsPreview,
 };

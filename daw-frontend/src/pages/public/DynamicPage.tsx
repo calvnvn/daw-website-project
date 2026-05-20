@@ -457,7 +457,6 @@ export default function DynamicPage() {
 
               {/* Supplementary Widget */}
               {safeSidebarLinks.length > 0 ? (
-                // 🛡️ SENIOR FIX: Perbaiki CSS Grid col-span agar tidak pecah di layar LG
                 <aside className="lg:col-span-12 xl:col-span-3 sticky top-32">
                   <div className="p-8 bg-slate-50 rounded-[2rem] border border-slate-100 shadow-sm">
                     <h4 className="text-lg font-serif font-bold text-slate-900 mb-4 flex items-center gap-2">
@@ -465,13 +464,11 @@ export default function DynamicPage() {
                       Topic
                     </h4>
                     <p className="text-xs text-slate-500 leading-relaxed mb-6">
-                      Discover more about DAW Group's related initiatives and
-                      resources.
+                      Discover more about this topic.
                     </p>
                     <div className="flex flex-col gap-2">
                       {safeSidebarLinks.map((link, index) => (
                         <Link
-                          // Gunakan kombinasi url/index sebagai key agar react map lebih stabil
                           key={`sidebar-link-${index}`}
                           to={link.url}
                           className="flex items-center justify-between p-4 bg-white rounded-xl border border-slate-200 hover:border-daw-green hover:shadow-md transition-all group">
