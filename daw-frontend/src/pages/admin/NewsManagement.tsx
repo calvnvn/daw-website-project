@@ -6,7 +6,6 @@ import {
   Edit,
   Trash2,
   Eye,
-  FileText,
   AlertTriangle,
   Lock,
   X,
