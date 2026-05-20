@@ -44,7 +44,7 @@ export default function GlobalHeroBanner({
       />
 
       {/* DAW Green Overlay (Multiply for rich color blending) */}
-      <div className="absolute inset-0 bg-daw-green/70 mix-blend-multiply" />
+      <div className="absolute inset-0 bg-daw-green/20 mix-blend-multiply" />
 
       {/* Gradient Overlay untuk keterbacaan teks */}
       <div className="absolute inset-0 bg-gradient-to-b from-slate-900/60 via-slate-900/40 to-slate-900/80" />

@@ -192,7 +192,12 @@ export default function DynamicNavbar() {
                 </Link>
               </div>
             </div>
-            {/* 4. MENU DINAMIS: (Dari Admin, contoh: ACHIEVEMENT) */}
+            {/* 4. MENU STATIS: News & Events */}
+            <Link to="/news" className={navLinkClass}>
+              {t("nav.news", "News & Events")}
+            </Link>
+
+            {/* 5. MENU DINAMIS: (Dari Admin, contoh: ACHIEVEMENT) */}
             {menus.map((menu) => {
               const hasChildren = menu.children && menu.children.length > 0;
               const link = resolveLink(menu);
@@ -409,7 +414,15 @@ export default function DynamicNavbar() {
               </div>
             </div>
 
-            {/* 4. DYNAMIC MENUS DARI ADMIN */}
+            {/* 4. STATIC: News & Events */}
+            <Link
+              to="/news"
+              onClick={closeMenu}
+              className="text-[13px] py-3 tracking-wide font-bold text-slate-800 hover:text-daw-green transition-colors uppercase border-b border-slate-50/50">
+              {t("nav.news", "News & Events")}
+            </Link>
+
+            {/* 5. DYNAMIC MENUS DARI ADMIN */}
             {menus.map((menu) => {
               const hasChildren = menu.children && menu.children.length > 0;
               const link = resolveLink(menu);

@@ -5,6 +5,7 @@ export default {
     extend: {
       colors: {
         "daw-green": "#004B23",
+        "daw-yellow": "#D4A843",
       },
       fontFamily: {
         serif: ["Lora", "serif"],

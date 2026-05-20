@@ -1,0 +1,399 @@
+import { useEffect, useState } from "react";
+import { useParams, Link } from "react-router-dom";
+import {
+  Calendar,
+  Share2,
+  Facebook,
+  Twitter,
+  Linkedin,
+  Link as LinkIcon,
+  ChevronRight,
+  Search,
+  FolderOpen,
+  Mail,
+} from "lucide-react";
+import { toast } from "sonner";
+import SEO from "@/components/SEO";
+import ScrollReveal from "@/components/ScrollReveal";
+import GlobalHeroBanner from "@/components/ui/GlobalHeroBanner";
+import bannerImg from "@/assets/about-banner.jpg";
+
+// ─── DUMMY DATA ─────────────────────────────────────────────────────────
+// Ini hanya data sementara untuk UI development. Nantinya akan diambil via API berdasar slug.
+const DUMMY_ARTICLE = {
+  id: "1",
+  title: "DAW Group Secures 15 MW Hydropower Plant in North Sumatera",
+  slug: "daw-group-secures-15mw-hydropower",
+  category: "Company News",
+  publishedAt: "2026-05-15T10:00:00Z",
+  coverImage:
+    "https://images.unsplash.com/photo-1473341304170-971dccb5ac1e?w=1600&q=80",
+  // HTML Content statis untuk preview (mirip dengan yang akan di-render oleh ReactQuill)
+  content: `
+    <p>A major milestone in our renewable energy portfolio — the acquisition of a hydropower facility in the Toba Samosir region marks DAW Group's continued commitment to Indonesia's energy transition and sustainable development goals. This strategic move aligns with the national agenda to increase the renewable energy mix to 23% by 2025.</p>
+    
+    <h2>Strengthening Our Renewable Energy Footprint</h2>
+    <p>The 15 MW run-of-river hydropower plant has been fully operational since 2018 and has a proven track record of reliable electricity generation. By integrating this asset into our portfolio, DAW Group not only boosts its total generation capacity but also diversifies its renewable energy assets across different geographical regions in Indonesia.</p>
+    
+    <p>We are dedicated to optimizing the performance of the plant through the implementation of advanced operational technologies and predictive maintenance systems. Our engineering teams have already begun conducting comprehensive assessments to identify areas for efficiency improvements.</p>
+    
+    <blockquote>
+      "This acquisition is a testament to our long-term vision of becoming a leading force in Indonesia's sustainable energy sector. We believe that investing in clean energy is not just a business decision, but a responsibility towards future generations."
+    </blockquote>
+    
+    <h3>Environmental and Social Impact</h3>
+    <p>Beyond electricity generation, the hydropower plant plays a crucial role in supporting the local economy. We are committed to maintaining the existing workforce and implementing capacity-building programs to enhance their technical skills. Furthermore, DAW Group will initiate community development programs focusing on education, health, and environmental conservation in the surrounding villages.</p>
+    
+    <ul>
+      <li>Reduction of carbon footprint by approximately 60,000 tons of CO2 annually.</li>
+      <li>Creation of direct and indirect employment opportunities for local communities.</li>
+      <li>Investment in local infrastructure and educational facilities.</li>
+    </ul>
+    
+    <p>As we move forward, DAW Group will continue to explore similar opportunities in the renewable energy sector, including solar and wind projects, to further solidify our position as a key player in the transition towards a greener and more sustainable future.</p>
+  `,
+};
+
+const OTHER_POSTS = [
+  {
+    id: "2",
+    title:
+      "Annual Sustainability Summit 2026: Shaping the Future of Green Energy",
+    slug: "annual-sustainability-summit-2026",
+    category: "Events",
+    publishedAt: "2026-05-10T08:00:00Z",
+    coverImage:
+      "https://images.unsplash.com/photo-1540575467063-178a50c2df87?w=800&q=80",
+  },
+  {
+    id: "3",
+    title: "DAW Group Reports Record Revenue Growth in Q1 2026",
+    slug: "daw-record-revenue-q1-2026",
+    category: "Press Release",
+    publishedAt: "2026-05-08T14:00:00Z",
+    coverImage:
+      "https://images.unsplash.com/photo-1460925895917-afdab827c52f?w=800&q=80",
+  },
+  {
+    id: "4",
+    title: "Community Empowerment Program: Building Schools in East Kalimantan",
+    slug: "community-empowerment-east-kalimantan",
+    category: "CSR",
+    publishedAt: "2026-05-05T09:00:00Z",
+    coverImage:
+      "https://images.unsplash.com/photo-1497375638960-ca368c7231e4?w=800&q=80",
+  },
+];
+
+// ─── SCROLL PROGRESS BAR ────────────────────────────────────────────────
+const ScrollProgressBar = () => {
+  const [scrollProgress, setScrollProgress] = useState(0);
+  useEffect(() => {
+    const handleScroll = () => {
+      const totalHeight =
+        document.documentElement.scrollHeight - window.innerHeight;
+      const progress =
+        totalHeight > 0 ? (window.scrollY / totalHeight) * 100 : 0;
+      setScrollProgress(progress);
+    };
+    window.addEventListener("scroll", handleScroll, { passive: true });
+    return () => window.removeEventListener("scroll", handleScroll);
+  }, []);
+  return (
+    <div
+      className="fixed top-0 left-0 h-1.5 bg-gradient-to-r from-daw-green via-emerald-400 to-daw-green z-[100] transition-all duration-150 ease-out shadow-[0_0_10px_rgba(16,185,129,0.5)]"
+      style={{ width: `${scrollProgress}%` }}
+    />
+  );
+};
+
+export default function NewsEventDetail() {
+  const { slug } = useParams();
+  // Nantinya: fetch data berdasarkan slug. Untuk sekarang, pakai dummy.
+  const article = DUMMY_ARTICLE;
+
+  // Auto-scroll melewati Global Banner saat masuk ke detail page
+  useEffect(() => {
+    // Beri sedikit jeda agar DOM terender sempurna sebelum scrolling
+    const timer = setTimeout(() => {
+      const contentElement = document.getElementById("article-content");
+      if (contentElement) {
+        contentElement.scrollIntoView({ behavior: "smooth" });
+      } else {
+        window.scrollTo(0, 0);
+      }
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [slug]);
+
+  const handleShare = (platform: string) => {
+    const url = window.location.href;
+    const title = article.title;
+
+    if (platform === "copy") {
+      navigator.clipboard.writeText(url);
+      toast.success("Link copied to clipboard");
+      return;
+    }
+
+    let shareUrl = "";
+    switch (platform) {
+      case "facebook":
+        shareUrl = `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(url)}`;
+        break;
+      case "twitter":
+        shareUrl = `https://twitter.com/intent/tweet?url=${encodeURIComponent(url)}&text=${encodeURIComponent(title)}`;
+        break;
+      case "linkedin":
+        shareUrl = `https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(url)}`;
+        break;
+    }
+
+    if (shareUrl) {
+      window.open(shareUrl, "_blank", "width=600,height=400");
+    }
+  };
+
+  return (
+    <>
+      <SEO
+        title={`${article.title} | News & Events`}
+        description={article.title}
+        image={article.coverImage}
+        type="article"
+      />
+      <ScrollProgressBar />
+
+      {/* Hero Banner Global */}
+      <GlobalHeroBanner
+        title="News & Events"
+        targetIndex={2}
+        localFallback={bannerImg}
+      />
+
+      <div id="article-content" className="bg-white min-h-screen pt-8 md:pt-12 pb-16 md:pb-20 scroll-mt-[80px] md:scroll-mt-[100px]">
+        <div className="container mx-auto px-5 md:px-6 max-w-7xl">
+          {/* ─── CONTENT GRID ─── */}
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 lg:gap-16 items-start">
+            {/* Left Column: Main Article Flow */}
+            <div className="lg:col-span-8 w-full overflow-hidden">
+              {/* Breadcrumb */}
+              <nav className="flex text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-6 md:mb-8">
+                <Link to="/" className="hover:text-daw-green transition-colors">
+                  Home
+                </Link>
+                <span className="mx-2">/</span>
+                <Link
+                  to="/news"
+                  className="hover:text-daw-green transition-colors">
+                  News
+                </Link>
+                <span className="mx-2">/</span>
+                <span className="text-slate-900">{article.category}</span>
+              </nav>
+
+              {/* Article Header */}
+              <div className="mb-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
+                <div className="flex items-center gap-3 mb-6">
+                  <span className="px-3 py-1.5 bg-daw-green text-white text-[10px] font-black uppercase tracking-widest rounded-md">
+                    {article.category}
+                  </span>
+                  <span className="flex items-center gap-1.5 text-slate-500 text-[11px] font-bold uppercase tracking-widest">
+                    <Calendar className="w-3.5 h-3.5" />
+                    {new Date(article.publishedAt).toLocaleDateString("en-US", {
+                      month: "long",
+                      day: "numeric",
+                      year: "numeric",
+                    })}
+                  </span>
+                </div>
+
+                <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-5xl font-serif font-bold text-slate-900 leading-[1.25] md:leading-[1.2] mb-6 md:mb-8">
+                  {article.title}
+                </h1>
+
+                {/* Share Buttons */}
+                <div className="flex items-center gap-4 py-5 border-y border-slate-100">
+                  <span className="text-xs font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2">
+                    <Share2 className="w-4 h-4" /> Share
+                  </span>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => handleShare("facebook")}
+                      className="w-9 h-9 rounded-full bg-slate-50 flex items-center justify-center text-slate-500 hover:bg-[#1877F2] hover:text-white transition-colors">
+                      <Facebook className="w-4 h-4" />
+                    </button>
+                    <button
+                      onClick={() => handleShare("twitter")}
+                      className="w-9 h-9 rounded-full bg-slate-50 flex items-center justify-center text-slate-500 hover:bg-[#1DA1F2] hover:text-white transition-colors">
+                      <Twitter className="w-4 h-4" />
+                    </button>
+                    <button
+                      onClick={() => handleShare("linkedin")}
+                      className="w-9 h-9 rounded-full bg-slate-50 flex items-center justify-center text-slate-500 hover:bg-[#0A66C2] hover:text-white transition-colors">
+                      <Linkedin className="w-4 h-4" />
+                    </button>
+                    <button
+                      onClick={() => handleShare("copy")}
+                      className="w-9 h-9 rounded-full bg-slate-50 flex items-center justify-center text-slate-500 hover:bg-daw-green hover:text-white transition-colors">
+                      <LinkIcon className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {/* Cover Image */}
+              <ScrollReveal direction="up" delay={0}>
+                <div className="w-full aspect-[4/3] md:aspect-[16/9] bg-slate-100 rounded-2xl md:rounded-3xl overflow-hidden mb-8 md:mb-12">
+                  <img
+                    src={article.coverImage}
+                    alt={article.title}
+                    className="w-full h-full object-cover"
+                  />
+                </div>
+              </ScrollReveal>
+              <article
+                className={`w-full text-left
+                  [&>*:first-child]:mt-0
+                  /* PROSE CORE - Identik dengan DynamicPage */
+                  prose prose-slate prose-lg md:prose-xl max-w-none
+                  prose-p:leading-[1.8] prose-p:text-slate-600 prose-p:mb-6 
+                  prose-p:text-[1.125rem] md:prose-p:text-[1.2rem]
+                  prose-headings:font-serif prose-headings:text-slate-900 
+                  
+                  /* HEADINGS */
+                  prose-h2:text-3xl md:prose-h2:text-4xl prose-h2:mt-12 prose-h2:mb-6
+                  prose-headings:tracking-tight prose-headings:font-bold
+                  prose-h3:text-2xl md:prose-h3:text-3xl prose-h3:mt-10
+                  
+                  /* MEDIA */
+                  [&_img]:rounded-[2rem] [&_img]:my-8
+                  [&_iframe]:rounded-[1.5rem] [&_iframe]:shadow-2xl [&_iframe]:my-8
+                  
+                  /* DROP CAP - The "Vogue" Style (Selalu aktif untuk detail berita) */
+                  prose-p:first-of-type:first-letter:text-[4rem] md:prose-p:first-of-type:first-letter:text-[5.5rem] 
+                  prose-p:first-of-type:first-letter:font-serif 
+                  prose-p:first-of-type:first-letter:font-black 
+                  prose-p:first-of-type:first-letter:text-daw-green 
+                  prose-p:first-of-type:first-letter:mr-4 md:prose-p:first-of-type:first-letter:mr-5 
+                  prose-p:first-of-type:first-letter:float-left 
+                  prose-p:first-of-type:first-letter:leading-[0.8] md:prose-p:first-of-type:first-letter:leading-[0.7] 
+                  prose-p:first-of-type:first-letter:mt-1 md:prose-p:first-of-type:first-letter:mt-2
+                  prose-p:first-of-type:first-letter:drop-shadow-sm
+
+                  /* BLOCKQUOTE */
+                  prose-blockquote:border-l-4 prose-blockquote:border-daw-green
+                  prose-blockquote:bg-slate-50 prose-blockquote:py-4 prose-blockquote:px-6
+                  prose-blockquote:rounded-r-2xl prose-blockquote:text-daw-green
+                  prose-blockquote:font-serif prose-blockquote:italic
+                  prose-blockquote:my-10
+
+                  /* LISTS */
+                  prose-li:marker:text-daw-green prose-li:my-2
+                `}
+                dangerouslySetInnerHTML={{
+                  __html: article.content.replace(/&nbsp;|\u00A0/g, " "),
+                }}
+              />
+            </div>
+
+            {/* Right Column: Sidebar Widgets */}
+            <aside className="lg:col-span-4 sticky top-32 flex flex-col gap-8">
+              {/* Widget 1: Search */}
+              <div className="p-6 md:p-8 bg-slate-50 rounded-2xl md:rounded-3xl border border-slate-100">
+                <form className="relative" onSubmit={(e) => e.preventDefault()}>
+                  <input
+                    type="text"
+                    placeholder="Search articles..."
+                    className="w-full bg-white border border-slate-200 rounded-full py-3.5 pl-5 pr-12 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-daw-green/20 focus:border-daw-green transition-all"
+                  />
+                  <button
+                    type="submit"
+                    className="absolute right-2 top-2 p-2 bg-daw-green text-white rounded-full hover:bg-emerald-800 transition-colors">
+                    <Search className="w-4 h-4" />
+                  </button>
+                </form>
+              </div>
+
+              {/* Widget 2: Categories */}
+              <div className="p-6 md:p-8 bg-slate-50 rounded-2xl md:rounded-3xl border border-slate-100">
+                <h4 className="text-xl font-serif font-bold text-slate-900 mb-6 flex items-center gap-3">
+                  <span className="w-6 h-1 bg-daw-green rounded-full"></span>
+                  Categories
+                </h4>
+                <ul className="flex flex-col gap-3">
+                  {["Company News", "Events", "Press Release", "CSR"].map(
+                    (cat) => (
+                      <li key={cat}>
+                        <Link
+                          to={`/news?category=${cat.toLowerCase().replace(/\s+/g, "-")}`}
+                          className="group flex items-center justify-between p-3 bg-white rounded-xl border border-slate-100 hover:border-daw-green/30 hover:shadow-sm transition-all">
+                          <span className="flex items-center gap-3 text-sm font-bold text-slate-600 group-hover:text-daw-green transition-colors">
+                            <FolderOpen className="w-4 h-4 text-slate-300 group-hover:text-daw-green transition-colors" />
+                            {cat}
+                          </span>
+                          <ChevronRight className="w-4 h-4 text-slate-300 group-hover:text-daw-green group-hover:translate-x-1 transition-transform" />
+                        </Link>
+                      </li>
+                    ),
+                  )}
+                </ul>
+              </div>
+
+              {/* Widget 3: Popular/Other Posts */}
+              <div className="p-6 md:p-8 bg-slate-50 rounded-2xl md:rounded-3xl border border-slate-100">
+                <h4 className="text-xl font-serif font-bold text-slate-900 mb-6 flex items-center gap-3">
+                  <span className="w-6 h-1 bg-daw-green rounded-full"></span>
+                  Other Posts
+                </h4>
+
+                <div className="flex flex-col gap-6">
+                  {OTHER_POSTS.map((post) => (
+                    <Link
+                      key={post.id}
+                      to={`/news/${post.slug}`}
+                      className="group flex gap-4 items-start">
+                      <div className="w-24 h-24 shrink-0 rounded-xl overflow-hidden bg-slate-200">
+                        <img
+                          src={post.coverImage}
+                          alt={post.title}
+                          className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
+                        />
+                      </div>
+                      <div className="flex flex-col">
+                        <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-1.5">
+                          {new Date(post.publishedAt).toLocaleDateString(
+                            "en-US",
+                            {
+                              month: "short",
+                              day: "numeric",
+                              year: "numeric",
+                            },
+                          )}
+                        </span>
+                        <h5 className="text-sm font-bold text-slate-900 group-hover:text-daw-green transition-colors line-clamp-3 leading-snug">
+                          {post.title}
+                        </h5>
+                      </div>
+                    </Link>
+                  ))}
+                </div>
+
+                <div className="mt-8 pt-6 border-t border-slate-200">
+                  <Link
+                    to="/news"
+                    className="flex items-center justify-between p-4 bg-white rounded-xl border border-slate-200 hover:border-daw-green hover:shadow-md transition-all group">
+                    <span className="text-xs font-bold uppercase tracking-wider text-slate-700 group-hover:text-daw-green transition-colors">
+                      View All News
+                    </span>
+                    <ChevronRight className="w-4 h-4 text-slate-300 group-hover:text-daw-green group-hover:translate-x-1 transition-transform" />
+                  </Link>
+                </div>
+              </div>
+            </aside>
+          </div>
+        </div>
+      </div>
+    </>
+  );
+}

@@ -19,6 +19,8 @@ const AboutUs = lazy(() => import("./pages/public/AboutUs"));
 const OurBusinesses = lazy(() => import("./pages/public/OurBusinesses"));
 const ContactUs = lazy(() => import("./pages/public/ContactUs"));
 const ProjectDetail = lazy(() => import("./pages/public/ProjectDetail"));
+const NewsEvents = lazy(() => import("./pages/public/NewsEvents"));
+const NewsEventDetail = lazy(() => import("./pages/public/NewsEventDetail"));
 const DynamicPage = lazy(() => import("./pages/public/DynamicPage"));
 const NotFound = lazy(() => import("./pages/public/NotFound"));
 
@@ -85,6 +87,8 @@ function App() {
             <Route path="/businesses" element={<OurBusinesses />} />
             <Route path="/contact-us" element={<ContactUs />} />
             <Route path="/projects/:slug" element={<ProjectDetail />} />
+            <Route path="/news" element={<NewsEvents />} />
+            <Route path="/news/:slug" element={<NewsEventDetail />} />
             <Route path="page/:slug" element={<DynamicPage />} />
             <Route path="*" element={<NotFound />} />
           </Route>
