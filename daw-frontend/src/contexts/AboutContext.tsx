@@ -53,12 +53,24 @@ export interface ManagementItem extends Lockable {
   photoUrl: string | null;
 }
 
+export interface AchievementItem extends Lockable {
+  id: number;
+  year: string;
+  title: string;
+  category: string;
+  iconId: string;
+  date: string;
+  description: string;
+  imageUrl: string | null;
+}
+
 interface AboutContextType {
   aboutData: AboutData | null;
   philosophyData: PhilosophyData | null;
   philosophyPillars: PhilosophyPillar[];
   companyHistory: HistoryItem[];
   managementTeam: ManagementItem[];
+  achievements: AchievementItem[];
   isLoading: boolean;
   refreshData: () => Promise<void>;
 }
@@ -69,6 +81,7 @@ export const AboutContext = createContext<AboutContextType>({
   philosophyPillars: [],
   companyHistory: [],
   managementTeam: [],
+  achievements: [],
   isLoading: true,
   refreshData: async () => {},
 });
@@ -83,20 +96,28 @@ export function AboutProvider({ children }: { children: ReactNode }) {
   >([]);
   const [companyHistory, setCompanyHistory] = useState<HistoryItem[]>([]);
   const [managementTeam, setManagementTeam] = useState<ManagementItem[]>([]);
+  const [achievements, setAchievements] = useState<AchievementItem[]>([]);
 
   const [isLoading, setIsLoading] = useState(true);
 
   const fetchData = useCallback(async (signal?: AbortSignal) => {
     setIsLoading(true);
     try {
-      const [resAbout, resPhilosophy, resPillars, resHistory, resManagement] =
-        await Promise.allSettled([
-          api.get("/about", { signal }),
-          api.get("/philosophy", { signal }),
-          api.get("/philosophy-pillars", { signal }),
-          api.get("/history", { signal }),
-          api.get("/management", { signal }),
-        ]);
+      const [
+        resAbout,
+        resPhilosophy,
+        resPillars,
+        resHistory,
+        resManagement,
+        resAchievements,
+      ] = await Promise.allSettled([
+        api.get("/about", { signal }),
+        api.get("/philosophy", { signal }),
+        api.get("/philosophy-pillars", { signal }),
+        api.get("/history", { signal }),
+        api.get("/management", { signal }),
+        api.get("/achievements", { signal }),
+      ]);
 
       // 1. Process About Info (Visi Misi)
       if (resAbout.status === "fulfilled") {
@@ -139,6 +160,15 @@ export function AboutProvider({ children }: { children: ReactNode }) {
         console.error("❌ Management Fetch Failed");
         toast.error("Gagal memuat Data Manajemen.");
       }
+
+      // 6. Process Achievements
+      if (resAchievements.status === "fulfilled") {
+        const data = resAchievements.value.data;
+        setAchievements(data.data || data);
+      } else if (resAchievements.reason.name !== "CanceledError") {
+        console.error("❌ Achievements Fetch Failed");
+        toast.error("Gagal memuat Data Penghargaan.");
+      }
     } catch (err) {
       console.error("🚨 Critical Fetch Error:", err);
       toast.error("Kesalahan sinkronisasi data kritis.");
@@ -169,6 +199,7 @@ export function AboutProvider({ children }: { children: ReactNode }) {
         philosophyPillars,
         companyHistory,
         managementTeam,
+        achievements,
         isLoading,
         refreshData,
       }}>

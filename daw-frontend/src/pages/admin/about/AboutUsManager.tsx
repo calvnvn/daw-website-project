@@ -8,6 +8,7 @@ import {
   Unlock,
   ShieldAlert,
   Clock,
+  Award,
 } from "lucide-react";
 import { useAbout } from "@/contexts/AboutContext";
 import { useAuth } from "@/contexts/AuthContext";
@@ -17,6 +18,7 @@ import AboutInfoTab from "./tabs/AboutInfoTab";
 import HistoryTab from "./tabs/HistoryTab";
 import PhilosophyTab from "./tabs/PhilosophyTab";
 import ManagementTab from "./tabs/ManagementTab";
+import AchievementTab from "./tabs/AchievementTab";
 
 export default function AboutUsManager() {
   const {
@@ -25,12 +27,13 @@ export default function AboutUsManager() {
     philosophyPillars,
     companyHistory,
     managementTeam,
+    achievements,
     isLoading,
   } = useAbout();
   const { user } = useAuth();
 
   const [activeTab, setActiveTab] = useState<
-    "info" | "history" | "philosophy" | "management"
+    "info" | "history" | "philosophy" | "management" | "achievement"
   >("info");
   const [isEditing, setIsEditing] = useState(false);
   // const [hideDraftBanner, setHideDraftBanner] = useState(false);
@@ -88,6 +91,12 @@ export default function AboutUsManager() {
       isLocked: false,
       hasRejected: managementTeam.some((m) => m.hasRejected),
       hasPartialLock: managementTeam.some((m) => m.is_locked),
+      isSingleton: false,
+    },
+    achievement: {
+      isLocked: achievements.some((a) => a.is_locked),
+      hasRejected: achievements.some((a) => a.hasRejected),
+      hasPartialLock: false,
       isSingleton: false,
     },
   };
@@ -229,6 +238,12 @@ export default function AboutUsManager() {
             icon: Users,
             state: radar.management,
           },
+          {
+            id: "achievement",
+            label: "Achievements",
+            icon: Award,
+            state: radar.achievement,
+          },
         ].map((tab) => (
           <button
             key={tab.id}
@@ -283,6 +298,13 @@ export default function AboutUsManager() {
         )}
         {activeTab === "management" && (
           <ManagementTab
+            isEditing={isEditing}
+            isSuperadmin={isSuperadmin}
+            isEditor={isEditor}
+          />
+        )}
+        {activeTab === "achievement" && (
+          <AchievementTab
             isEditing={isEditing}
             isSuperadmin={isSuperadmin}
             isEditor={isEditor}

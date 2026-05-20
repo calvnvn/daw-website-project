@@ -2,7 +2,7 @@ const express = require("express");
 const router = express.Router();
 const achievementController = require("../controllers/achievementController");
 const { verifyToken } = require("../middleware/authJwt");
-const upload = require("../middleware/upload");
+const { upload, optimizeImage } = require("../middleware/upload");
 
 /**
  * ACHIEVEMENT ROUTES
@@ -22,6 +22,7 @@ router.post(
   "/",
   verifyToken,
   upload.single("image"),
+  optimizeImage,
   achievementController.createAchievement,
 );
 
@@ -30,6 +31,7 @@ router.put(
   "/:id",
   verifyToken,
   upload.single("image"),
+  optimizeImage,
   achievementController.updateAchievement,
 );
 

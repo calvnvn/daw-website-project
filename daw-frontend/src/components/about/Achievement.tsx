@@ -1,95 +1,73 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import ScrollReveal from "../ScrollReveal";
 import {
-  Award,
-  Trophy,
-  Star,
-  ShieldCheck,
-  TrendingUp,
   Calendar,
   ChevronDown,
+  Trophy,
+  Heart,
+  Briefcase,
+  Globe,
+  Zap,
+  Lightbulb,
+  Shield,
+  Star,
+  Leaf,
+  Target
 } from "lucide-react";
+import { useAbout } from "@/contexts/AboutContext";
+import { getCleanImageUrl } from "@/lib/utils";
 
-// --- MOCK DATA ---
-const MOCK_ACHIEVEMENTS = [
-  {
-    id: 1,
-    year: "2026",
-    title: "Indonesia Best Women Empowerment Companies Awards",
-    category: "CSR Excellence",
-    icon: Star,
-    date: "Feb 11, 2026",
-    description:
-      "Prestigious recognition for the company's consistent efforts and care in empowering hundreds of women-led MSMEs through the sustainable Kampung Wirausaha initiative.",
-    imageUrl:
-      "https://images.unsplash.com/photo-1561489401-fc2876ced162?q=80&w=800&auto=format&fit=crop",
-  },
-  {
-    id: 2,
-    year: "2025",
-    title: "Indonesia CEO Excellence Award",
-    category: "Corporate Leadership",
-    icon: Award,
-    date: "Dec 19, 2025",
-    description:
-      "An appreciation given to the board of directors for their visionary leadership, resilience in navigating global economic dynamics, and innovative expansion strategies.",
-    imageUrl:
-      "https://images.unsplash.com/photo-1578269174936-2709b6aeb913?q=80&w=800&auto=format&fit=crop",
-  },
-  {
-    id: 3,
-    year: "2025",
-    title: "Regional Sustainability Corporate Award",
-    category: "Sustainability",
-    icon: ShieldCheck,
-    date: "Dec 18, 2025",
-    description:
-      "Crowned as an industry pioneer in clean corporate governance standards and tangible commitments to the preservation of green ecosystems.",
-    imageUrl:
-      "https://images.unsplash.com/photo-1507679799987-c73779587ccf?q=80&w=800&auto=format&fit=crop",
-  },
-  {
-    id: 4,
-    year: "2024",
-    title: "Top 10 Fast-Growing Enterprise in SE Asia",
-    category: "Business Growth",
-    icon: TrendingUp,
-    date: "Nov 05, 2024",
-    description:
-      "Remarkable achievement in double-digit revenue growth metrics, establishing the company as one of the primary economic drivers in the Southeast Asian region.",
-    imageUrl:
-      "https://images.unsplash.com/photo-1531315630201-bb15abeb1653?q=80&w=1200&auto=format&fit=crop",
-  },
-  {
-    id: 5,
-    year: "2020",
-    title: "National Industry Resilience Award",
-    category: "Business Growth",
-    icon: ShieldCheck,
-    date: "Aug 15, 2020",
-    description:
-      "Recognized for exceptional business resilience and uninterrupted supply chain management during times of global market uncertainty.",
-    imageUrl:
-      "https://images.unsplash.com/photo-1507679799987-c73779587ccf?q=80&w=800&auto=format&fit=crop",
-  },
-];
+const ICON_MAP: Record<string, React.ElementType> = {
+  human: Heart,
+  ethics: Briefcase,
+  unity: Globe,
+  speed: Zap,
+  smart: Lightbulb,
+  shield: Shield,
+  star: Star,
+  leaf: Leaf,
+};
 
-// Derive available years dynamically — only years that have data will appear
-const AVAILABLE_YEARS = Array.from(
-  new Set(MOCK_ACHIEVEMENTS.map((a) => a.year)),
-).sort((a, b) => Number(b) - Number(a));
+const toDisplayDate = (dateStr: string) => {
+  if (!dateStr) return "";
+  const d = new Date(dateStr);
+  if (isNaN(d.getTime())) return dateStr;
+  return d.toLocaleDateString("en-US", {
+    month: "short",
+    day: "2-digit",
+    year: "numeric",
+  });
+};
 
 export default function Achievement() {
   const { t } = useTranslation();
+  const { achievements } = useAbout();
+  
   const [activeYear, setActiveYear] = useState("All Time");
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
+  // Client-Side Sorting Engine
+  const sortedAchievements = useMemo(() => {
+    return [...achievements].sort((a, b) => {
+      // Descending by year
+      const yearDiff = Number(b.year) - Number(a.year);
+      if (yearDiff !== 0) return yearDiff;
+      // Ascending by title (alphabetical) as fallback
+      return a.title.localeCompare(b.title);
+    });
+  }, [achievements]);
+
+  // Derive available years dynamically from actual data
+  const availableYears = useMemo(() => {
+    return Array.from(new Set(sortedAchievements.map((a) => a.year)));
+  }, [sortedAchievements]);
+
   const filteredData =
     activeYear === "All Time"
-      ? MOCK_ACHIEVEMENTS
-      : MOCK_ACHIEVEMENTS.filter((item) => item.year === activeYear);
+      ? sortedAchievements
+      : sortedAchievements.filter((item) => item.year === activeYear);
 
   // Close dropdown on outside click
   useEffect(() => {
@@ -198,7 +176,7 @@ export default function Achievement() {
                   ? "bg-daw-green text-white"
                   : "bg-slate-100 text-slate-400"
               }`}>
-              {MOCK_ACHIEVEMENTS.length}
+              {sortedAchievements.length}
             </span>
           </button>
 
@@ -206,8 +184,8 @@ export default function Achievement() {
 
           {/* Dynamically generated — only years with actual data */}
           <div className="max-h-[220px] overflow-y-auto [&::-webkit-scrollbar]:w-1 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-slate-200 [&::-webkit-scrollbar-thumb]:rounded-full">
-            {AVAILABLE_YEARS.map((year) => {
-              const count = MOCK_ACHIEVEMENTS.filter(
+            {availableYears.map((year) => {
+              const count = sortedAchievements.filter(
                 (a) => a.year === year,
               ).length;
               return (
@@ -258,7 +236,7 @@ export default function Achievement() {
                   <div className="aspect-[16/10] md:aspect-[4/3] rounded-xl md:rounded-2xl overflow-hidden border border-slate-100 relative group-hover:shadow-lg transition-all duration-500">
                     <div className="absolute inset-0 bg-daw-green/0 group-hover:bg-daw-green/5 transition-colors duration-500 z-10 mix-blend-overlay" />
                     <img
-                      src={item.imageUrl}
+                      src={item.imageUrl ? getCleanImageUrl(item.imageUrl) : ""}
                       alt={item.title}
                       className="w-full h-full object-cover transform scale-100 group-hover:scale-105 transition-transform duration-700 ease-[cubic-bezier(0.25,1,0.5,1)]"
                     />
@@ -270,12 +248,15 @@ export default function Achievement() {
                   {/* Meta Tags Row */}
                   <div className="flex flex-wrap items-center gap-4 mb-4 md:mb-5">
                     <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-daw-green/5 text-daw-green font-bold text-[11px] tracking-widest uppercase border border-daw-green/10 group-hover:bg-daw-green group-hover:text-white transition-colors duration-300">
-                      <item.icon className="w-3.5 h-3.5" />
+                      {(() => {
+                        const Icon = ICON_MAP[item.iconId || "star"] || Target;
+                        return <Icon className="w-3.5 h-3.5" />;
+                      })()}
                       <span>{item.category}</span>
                     </div>
                     <div className="flex items-center gap-2 text-slate-400 text-xs font-sans font-bold tracking-widest uppercase">
                       <Calendar className="w-3.5 h-3.5" />
-                      <span>{item.date}</span>
+                      <span>{toDisplayDate(item.date)}</span>
                     </div>
                   </div>
 
