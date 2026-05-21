@@ -52,6 +52,7 @@ interface PaginationData {
 export default function NewsEvents() {
   const [articles, setArticles] = useState<Article[]>([]);
   const [categories, setCategories] = useState<CategoryData[]>([]);
+  const [trendingKeywords, setTrendingKeywords] = useState<string[]>([]);
   const [pagination, setPagination] = useState<PaginationData>({
     currentPage: 1,
     totalPages: 1,
@@ -72,9 +73,14 @@ export default function NewsEvents() {
     api
       .get("/news/public/categories")
       .then((res) => {
-        if (Array.isArray(res.data)) {
-          const activeCats = res.data.filter((c: any) => c.published_count > 0);
+        if (res.data.categories) {
+          const activeCats = res.data.categories.filter(
+            (c: any) => c.published_count > 0,
+          );
           setCategories(activeCats);
+        }
+        if (res.data.trendingKeywords) {
+          setTrendingKeywords(res.data.trendingKeywords);
         }
       })
       .catch(console.error);
@@ -229,17 +235,13 @@ export default function NewsEvents() {
               {/* Popular Searches Popover */}
               <div className="absolute top-full left-0 right-0 mt-3 bg-white rounded-2xl shadow-[0_10px_40px_-10px_rgba(0,0,0,0.1)] border border-slate-100 p-5 opacity-0 invisible group-focus-within:opacity-100 group-focus-within:visible transition-all duration-300 translate-y-2 group-focus-within:translate-y-0 before:content-[''] before:absolute before:-top-2 before:left-10 before:w-4 before:h-4 before:bg-white before:border-t before:border-l before:border-slate-100 before:rotate-45">
                 <span className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-3 flex items-center gap-1.5">
-                  <TrendingUp className="w-3.5 h-3.5" /> Popular Searches
+                  <TrendingUp className="w-3.5 h-3.5" /> Related Searches
                 </span>
                 <div className="flex flex-wrap gap-2 relative z-10">
-                  {[
-                    "Sustainability",
-                    "Energi Terbarukan",
-                    "Penghargaan",
-                    "Inovasi",
-                    "Pembangkit Listrik",
-                    "CSR",
-                  ].map((tag) => (
+                  {(trendingKeywords.length > 0
+                    ? trendingKeywords
+                    : ["News", "Latest", "Update"]
+                  ).map((tag) => (
                     <button
                       key={tag}
                       onMouseDown={(e) => {

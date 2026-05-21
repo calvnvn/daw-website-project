@@ -584,7 +584,7 @@ exports.getPublicNewsBySlug = async (req, res) => {
   }
 };
 
-// Fetch all categories (public — for filter dropdowns)
+// Fetch all categories (public — for filter dropdowns) and auto-extract trending keywords
 exports.getPublicCategories = async (req, res) => {
   try {
     const categories = await NewsCategory.findAll({
@@ -603,7 +603,34 @@ exports.getPublicCategories = async (req, res) => {
       },
       order: [["orderIndex", "ASC"], ["name", "ASC"]],
     });
-    res.status(200).json(categories);
+
+    // Auto-extract keywords from the 20 most recent published titles
+    const recentArticles = await NewsArticle.findAll({
+      where: { status: "Published" },
+      attributes: ["title"],
+      limit: 20,
+      order: [["published_at", "DESC"], ["createdAt", "DESC"]],
+    });
+
+    const stopWords = ["untuk", "dalam", "dengan", "pada", "dari", "yang", "dan", "di", "ke", "ini", "itu", "akan", "telah", "oleh", "sebagai", "adalah"];
+    const wordCounts = {};
+    recentArticles.forEach(a => {
+       const words = (a.title || "").toLowerCase().replace(/[^a-z0-9\s]/g, "").split(/\s+/);
+       words.forEach(word => {
+         if (word.length > 4 && !stopWords.includes(word)) {
+           const cap = word.charAt(0).toUpperCase() + word.slice(1);
+           wordCounts[cap] = (wordCounts[cap] || 0) + 1;
+         }
+       })
+    });
+    const trendingKeywords = Object.entries(wordCounts)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 6)
+      .map(entry => entry[0]);
+
+    if (trendingKeywords.length === 0) trendingKeywords.push("News", "Latest", "Update");
+
+    res.status(200).json({ categories, trendingKeywords });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }

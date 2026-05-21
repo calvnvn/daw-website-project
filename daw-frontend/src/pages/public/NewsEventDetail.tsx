@@ -82,6 +82,8 @@ export default function NewsEventDetail() {
   const [article, setArticle] = useState<ArticleDetail | null>(null);
   const [otherPosts, setOtherPosts] = useState<SidebarPost[]>([]);
   const [categories, setCategories] = useState<CategoryData[]>([]);
+  const [trendingKeywords, setTrendingKeywords] = useState<string[]>([]);
+  const [searchQuery, setSearchQuery] = useState("");
   const [isLoading, setIsLoading] = useState(true);
 
   // Fetch article by slug
@@ -121,7 +123,15 @@ export default function NewsEventDetail() {
     api
       .get("/news/public/categories")
       .then((res) => {
-        if (Array.isArray(res.data)) setCategories(res.data);
+        if (res.data.categories) {
+          const activeCats = res.data.categories.filter(
+            (c: any) => c.published_count > 0,
+          );
+          setCategories(activeCats);
+        }
+        if (res.data.trendingKeywords) {
+          setTrendingKeywords(res.data.trendingKeywords);
+        }
       })
       .catch(console.error);
   }, [slug]);
@@ -326,9 +336,20 @@ export default function NewsEventDetail() {
             <aside className="lg:col-span-4 w-full min-w-0 sticky top-32 flex flex-col gap-8">
               {/* Widget: Search */}
               <div className="p-6 md:p-8 bg-slate-50 rounded-2xl md:rounded-3xl border border-slate-100">
-                <form className="relative" onSubmit={(e) => e.preventDefault()}>
+                <form
+                  className="relative group"
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    if (searchQuery.trim()) {
+                      navigate(
+                        `/news?search=${encodeURIComponent(searchQuery.trim())}`,
+                      );
+                    }
+                  }}>
                   <input
                     type="text"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
                     placeholder="Search articles..."
                     className="w-full bg-white border border-slate-200 rounded-full py-3.5 pl-5 pr-12 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-daw-green/20 focus:border-daw-green transition-all"
                   />
@@ -337,6 +358,31 @@ export default function NewsEventDetail() {
                     className="absolute right-2 top-2 p-2 bg-daw-green text-white rounded-full hover:bg-emerald-800 transition-colors">
                     <Search className="w-4 h-4" />
                   </button>
+
+                  {/* Popular Searches Dropdown */}
+                  <div className="absolute top-full left-0 right-0 mt-3 bg-white rounded-2xl shadow-[0_10px_40px_-10px_rgba(0,0,0,0.1)] border border-slate-100 p-5 opacity-0 invisible group-focus-within:opacity-100 group-focus-within:visible transition-all duration-300 translate-y-2 group-focus-within:translate-y-0 z-50 before:content-[''] before:absolute before:-top-2 before:left-10 before:w-4 before:h-4 before:bg-white before:border-t before:border-l before:border-slate-100 before:rotate-45">
+                    <span className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-3 flex items-center gap-1.5">
+                      Related Searches
+                    </span>
+                    <div className="flex flex-wrap gap-2 relative z-10">
+                      {(trendingKeywords.length > 0
+                        ? trendingKeywords
+                        : ["News", "Latest", "Update"]
+                      ).map((tag) => (
+                        <button
+                          key={tag}
+                          type="button"
+                          onMouseDown={(e) => {
+                            e.preventDefault();
+                            setSearchQuery(tag);
+                            navigate(`/news?search=${encodeURIComponent(tag)}`);
+                          }}
+                          className="px-3 py-1.5 bg-slate-50 hover:bg-daw-green hover:text-white text-slate-600 text-xs font-bold rounded-xl border border-slate-200 hover:border-daw-green transition-all">
+                          {tag}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
                 </form>
               </div>
 
