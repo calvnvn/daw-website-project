@@ -1,5 +1,5 @@
 import DOMPurify from "dompurify";
-import { LinkIcon, Search, FileText, Calendar, Clock } from "lucide-react";
+import { LinkIcon, FileText, Calendar, Clock } from "lucide-react";
 import { getCleanImageUrl } from "@/lib/utils";
 
 export default function NewsArticlePreview({ data }: { data: any }) {
@@ -13,8 +13,7 @@ export default function NewsArticlePreview({ data }: { data: any }) {
   const getDynamicSeoDescription = () => {
     if (data.meta_description && data.meta_description.trim() !== "")
       return data.meta_description;
-    if (data.excerpt && data.excerpt.trim() !== "")
-      return data.excerpt;
+    if (data.excerpt && data.excerpt.trim() !== "") return data.excerpt;
 
     if (!data.content || data.content.trim() === "") {
       return "No description preview available.";
@@ -74,7 +73,9 @@ export default function NewsArticlePreview({ data }: { data: any }) {
         <div className="p-4 bg-slate-50 border-t border-slate-100 flex flex-wrap items-center gap-6 text-xs text-slate-500 font-bold uppercase tracking-wider">
           <div className="flex items-center gap-1.5">
             <LinkIcon className="w-3.5 h-3.5 text-daw-green" />
-            <span className="font-mono text-slate-400">/news/{generatedSlug || "---"}</span>
+            <span className="font-mono text-slate-400">
+              /news/{generatedSlug || "---"}
+            </span>
           </div>
           {data.published_at && (
             <div className="flex items-center gap-1.5">
@@ -108,7 +109,9 @@ export default function NewsArticlePreview({ data }: { data: any }) {
             {data.seo_title || data.title || "Untitled Article"}
           </p>
           <p className="text-[#006621] text-xs truncate mb-1 flex items-center gap-1 font-mono">
-            daw.co.id <span className="text-slate-400 text-[10px]">› news ›</span> {generatedSlug || "..."}
+            daw.co.id{" "}
+            <span className="text-slate-400 text-[10px]">› news ›</span>{" "}
+            {generatedSlug || "..."}
           </p>
           <p className="text-[#545454] text-xs line-clamp-2 leading-relaxed break-words">
             {getDynamicSeoDescription()}
@@ -144,7 +147,7 @@ export default function NewsArticlePreview({ data }: { data: any }) {
             dangerouslySetInnerHTML={{
               __html: DOMPurify.sanitize(
                 (data.content || "").replace(/&nbsp;|\u00A0/g, " "),
-                sanitizeConfig
+                sanitizeConfig,
               ),
             }}
           />

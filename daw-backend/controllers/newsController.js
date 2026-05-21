@@ -588,7 +588,19 @@ exports.getPublicNewsBySlug = async (req, res) => {
 exports.getPublicCategories = async (req, res) => {
   try {
     const categories = await NewsCategory.findAll({
-      attributes: ["id", "name", "slug", "color"],
+      attributes: {
+        include: [
+          [
+            sequelize.literal(`(
+              SELECT COUNT(*)
+              FROM NewsArticles AS na
+              WHERE na.category_id = NewsCategory.id
+                AND na.status = 'Published'
+            )`),
+            "published_count",
+          ],
+        ],
+      },
       order: [["orderIndex", "ASC"], ["name", "ASC"]],
     });
     res.status(200).json(categories);

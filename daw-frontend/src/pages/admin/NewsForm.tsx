@@ -7,7 +7,6 @@ import {
   ChevronLeft,
   Image as ImageIcon,
   Save,
-  Send,
   X,
   AlertTriangle,
   Lock,
@@ -21,7 +20,6 @@ import {
   UploadCloud,
   FileText,
   Calendar,
-  Clock,
   RefreshCw,
 } from "lucide-react";
 import { useDropzone } from "react-dropzone";
@@ -77,7 +75,6 @@ export default function NewsForm() {
     is_locked: false,
     lock_ticket: "",
     published_at: "",
-    read_time: "",
   };
 
   const [formData, setFormData] = useState(initialFormState);
@@ -148,6 +145,7 @@ export default function NewsForm() {
 
         if (articleRes.status === "fulfilled") {
           const data = articleRes.value.data.data || articleRes.value.data;
+
           const normalized = {
             ...initialFormState,
             title: data.title || "",
@@ -163,7 +161,6 @@ export default function NewsForm() {
             published_at: data.published_at
               ? new Date(data.published_at).toISOString().slice(0, 16)
               : "",
-            read_time: data.read_time || "",
           };
           setFormData(normalized);
           setOriginalData(normalized);
@@ -239,7 +236,7 @@ export default function NewsForm() {
         published_at: payload.published_at
           ? new Date(payload.published_at).toISOString().slice(0, 16)
           : prev.published_at,
-        read_time: payload.read_time ?? prev.read_time,
+        read_time: payload.read_time ?? 0,
       }));
       setCoverFile(null);
       setCoverPreview(null);
@@ -314,7 +311,6 @@ export default function NewsForm() {
       "seo_title",
       "meta_description",
       "published_at",
-      "read_time",
     ]) {
       // @ts-expect-error dynamic access
       if (formData[key] !== originalData[key]) return true;
@@ -356,8 +352,6 @@ export default function NewsForm() {
           "published_at",
           new Date(formData.published_at).toISOString(),
         );
-      if (formData.read_time)
-        payload.append("read_time", formData.read_time.trim());
 
       if (rejectedDraft?.notrans)
         payload.append("previous_notrans", rejectedDraft.notrans);
@@ -394,7 +388,7 @@ export default function NewsForm() {
     }
   };
 
-  const { getRootProps, getInputProps, isDragActive } = useDropzone({
+  const { getRootProps, getInputProps } = useDropzone({
     disabled: shouldLockUI,
     onDrop: (files) => {
       if (files[0]) {
@@ -439,6 +433,18 @@ export default function NewsForm() {
       return plainText.slice(0, 150) + (plainText.length > 150 ? "..." : "");
     }
   };
+
+  const currentAutoReadTime = useMemo(() => {
+    if (!formData.content) return "1 min read";
+    const plainText = formData.content
+      .replace(/<[^>]*>?/gm, "")
+      .replace(/&nbsp;|\u00A0/g, " ")
+      .replace(/\s+/g, " ")
+      .trim();
+    const wordCount = plainText.split(/\s+/).filter(Boolean).length;
+    const minutes = Math.ceil(wordCount / 200);
+    return `${Math.max(1, minutes)} min read`;
+  }, [formData.content]);
 
   if (isFetching) {
     return (
@@ -866,47 +872,23 @@ export default function NewsForm() {
                       </select>
                     </div>
 
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="space-y-2">
-                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 flex items-center gap-1">
-                          <Calendar className="w-3 h-3" /> Tanggal Terbit
-                        </label>
-                        <input
-                          type="datetime-local"
-                          readOnly={shouldLockUI}
-                          value={formData.published_at}
-                          onChange={(e) =>
-                            setFormData({
-                              ...formData,
-                              published_at: e.target.value,
-                            })
-                          }
-                          className="w-full px-4 py-3 rounded-xl border border-slate-200 bg-slate-50 text-slate-600 outline-none focus:bg-white focus:border-daw-green focus:ring-2 focus:ring-daw-green/20 transition-all text-sm"
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 flex items-center gap-1">
-                          <Clock className="w-3 h-3" /> Manual Waktu Baca
-                        </label>
-                        <input
-                          type="text"
-                          readOnly={shouldLockUI}
-                          value={formData.read_time}
-                          placeholder="Auto by System"
-                          onChange={(e) =>
-                            setFormData({
-                              ...formData,
-                              read_time: e.target.value,
-                            })
-                          }
-                          className="w-full px-4 py-3 rounded-xl border border-slate-200 bg-slate-50 text-slate-600 outline-none focus:bg-white focus:border-daw-green focus:ring-2 focus:ring-daw-green/20 transition-all text-sm placeholder:text-slate-400"
-                        />
-                      </div>
+                    <div className="space-y-2">
+                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 flex items-center gap-1">
+                        <Calendar className="w-3 h-3" /> Tanggal Terbit
+                      </label>
+                      <input
+                        type="datetime-local"
+                        readOnly={shouldLockUI}
+                        value={formData.published_at}
+                        onChange={(e) =>
+                          setFormData({
+                            ...formData,
+                            published_at: e.target.value,
+                          })
+                        }
+                        className="w-full px-4 py-3 rounded-xl border border-slate-200 bg-slate-50 text-slate-600 outline-none focus:bg-white focus:border-daw-green focus:ring-2 focus:ring-daw-green/20 transition-all text-sm"
+                      />
                     </div>
-                    <p className="text-[10px] text-slate-400 italic">
-                      Biarkan Manual Waktu Baca kosong agar sistem secara
-                      otomatis menghitungnya berdasarkan panjang artikel.
-                    </p>
                   </div>
 
                   {/* Cover Image Dropzone */}
@@ -1083,7 +1065,7 @@ export default function NewsForm() {
                         : "Hari ini"}
                     </span>
                     <span className="text-slate-500 text-[11px] font-bold uppercase tracking-widest">
-                      • {formData.read_time || "1 min read"}
+                      • {currentAutoReadTime}
                     </span>
                   </div>
 
@@ -1098,7 +1080,6 @@ export default function NewsForm() {
                       prose-h3:text-2xl prose-h3:mt-10
                       [&_img]:rounded-[2rem] [&_img]:my-5
                       [&_iframe]:rounded-[1.5rem] [&_iframe]:shadow-2xl [&_iframe]:my-5
-                      
                       prose-blockquote:border-l-4 prose-blockquote:border-daw-green
                       prose-blockquote:bg-slate-50 prose-blockquote:py-4 prose-blockquote:px-6
                       prose-blockquote:rounded-r-2xl prose-blockquote:text-daw-green

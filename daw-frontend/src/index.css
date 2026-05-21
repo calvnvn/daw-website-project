@@ -227,3 +227,14 @@ Normalize editor-generated alignment classes within Tailwind Prose containers */
 .prose .ql-align-justify {
   text-align: left !important;
 }
+
+/* Sembunyikan scrollbar untuk Chrome, Safari dan Opera */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+/* Sembunyikan scrollbar untuk IE, Edge dan Firefox */
+.no-scrollbar {
+  -ms-overflow-style: none; /* IE and Edge */
+  scrollbar-width: none; /* Firefox */
+}

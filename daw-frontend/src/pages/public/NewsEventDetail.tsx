@@ -12,11 +12,9 @@ import {
   FolderOpen,
   Loader2,
   Clock,
-  User,
 } from "lucide-react";
 import { toast } from "sonner";
 import SEO from "@/components/SEO";
-import ScrollReveal from "@/components/ScrollReveal";
 import GlobalHeroBanner from "@/components/ui/GlobalHeroBanner";
 import bannerImg from "@/assets/about-banner.jpg";
 import api, { BASE_UPLOAD_URL } from "@/lib/api";
