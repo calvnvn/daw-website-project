@@ -7,16 +7,21 @@ interface GlobalHeroBannerProps {
   title: string;
   targetIndex: number;
   localFallback: string;
+  dynamicImageUrl?: string; // Database-driven override for article-specific banners
 }
 
 export default function GlobalHeroBanner({
   title,
   targetIndex,
   localFallback,
+  dynamicImageUrl,
 }: GlobalHeroBannerProps) {
   const { slides, isLoading } = useHome();
 
   const activeImageUrl = (() => {
+    // Priority 1: Database-driven dynamic image (e.g. article cover)
+    if (dynamicImageUrl) return dynamicImageUrl;
+
     if (isLoading || !slides || slides.length === 0) {
       return localFallback;
     }

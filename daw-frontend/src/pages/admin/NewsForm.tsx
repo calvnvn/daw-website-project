@@ -1,13 +1,13 @@
-/* eslint-disable @typescript-eslint/ban-ts-comment */
 import { useState, useRef, useMemo, useCallback, useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import ReactQuill from "react-quill-new";
 import "react-quill-new/dist/quill.snow.css";
 import { toast } from "sonner";
 import {
-  ArrowLeft, Image as ImageIcon, Save, Send, X,
-  Link as LinkIcon, AlertTriangle, LockIcon, Loader2,
-  AlertCircle, RotateCcw,
+  ChevronLeft, Image as ImageIcon, Save, Send, X,
+  AlertTriangle, Lock, RotateCcw, PenTool, Layout, Eye,
+  Search, Globe, Trash2, UploadCloud, FileText, Calendar, Clock,
+  RefreshCw,
 } from "lucide-react";
 import { useDropzone } from "react-dropzone";
 import api, { BASE_UPLOAD_URL } from "@/lib/api";
@@ -42,34 +42,51 @@ export default function NewsForm() {
   const [categories, setCategories] = useState<NewsCategory[]>([]);
   const [isFetching, setIsFetching] = useState(isEditMode);
   const [isSaving, setIsSaving] = useState(false);
+  const [isDiscarding, setIsDiscarding] = useState(false);
+
+  // Workspace Layout State
+  const [viewLayout, setViewLayout] = useState<"split" | "editor" | "preview">("split");
+  const [isDragging, setIsDragging] = useState(false);
 
   const initialFormState = {
-    title: "", excerpt: "", content: "", category_id: "",
-    status: "Draft", cover_image: "", seo_title: "",
-    meta_description: "", is_locked: false, lock_ticket: "",
-    published_at: "", read_time: "", author: "",
+    title: "",
+    excerpt: "",
+    content: "",
+    category_id: "",
+    status: "Draft",
+    cover_image: "",
+    seo_title: "",
+    meta_description: "",
+    is_locked: false,
+    lock_ticket: "",
+    published_at: "",
+    read_time: "",
   };
 
   const [formData, setFormData] = useState(initialFormState);
   const [originalData, setOriginalData] = useState(initialFormState);
   const [rejectedDraft, setRejectedDraft] = useState<RejectedDraft | null>(null);
   const [showDraftBanner, setShowDraftBanner] = useState(false);
-  const [isRestoring, setIsRestoring] = useState(false);
 
   const isDataLocked = formData.is_locked;
   const shouldLockUI = isDataLocked && !isSuperadmin;
   const isOverrideMode = isDataLocked && isSuperadmin;
-  const lockStyles = shouldLockUI ? "opacity-60 grayscale-[30%] pointer-events-none cursor-not-allowed select-none" : "";
 
   const [coverFile, setCoverFile] = useState<File | null>(null);
   const [coverPreview, setCoverPreview] = useState<string | null>(null);
 
-  const generatedSlug = useMemo(() => {
-    return formData.title.toLowerCase().trim().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)+/g, "");
-  }, [formData.title]);
+  // Sync title to seo_title auto
+  useEffect(() => {
+    if (!isEditMode && !formData.seo_title) {
+      setFormData((prev) => ({ ...prev, seo_title: prev.title }));
+    }
+  }, [formData.title, isEditMode]);
 
   useEffect(() => {
-    if (!coverFile) { setCoverPreview(null); return; }
+    if (!coverFile) {
+      setCoverPreview(null);
+      return;
+    }
     const url = URL.createObjectURL(coverFile);
     setCoverPreview(url);
     return () => URL.revokeObjectURL(url);
@@ -77,9 +94,11 @@ export default function NewsForm() {
 
   // Fetch categories
   useEffect(() => {
-    api.get("/news-categories").then((res) => {
-      if (Array.isArray(res.data)) setCategories(res.data);
-    }).catch(console.error);
+    api.get("/news-categories")
+      .then((res) => {
+        if (Array.isArray(res.data)) setCategories(res.data);
+      })
+      .catch(console.error);
   }, []);
 
   // Default category
@@ -92,33 +111,50 @@ export default function NewsForm() {
   // Fetch existing data (Edit Mode)
   useEffect(() => {
     const controller = new AbortController();
-    if (!isEditMode) { setIsFetching(false); return; }
+    if (!isEditMode) {
+      setIsFetching(false);
+      return;
+    }
 
     const fetchData = async () => {
       setIsFetching(true);
       try {
         const [articleRes, draftRes] = await Promise.allSettled([
           api.get(`/news/${id}`, { signal: controller.signal }),
-          api.get(`/approval/rejected/${id}?module=NewsArticle`, { signal: controller.signal }),
+          api.get(`/approval/rejected/${id}?module=NewsArticle`, {
+            signal: controller.signal,
+          }),
         ]);
 
         if (articleRes.status === "fulfilled") {
           const data = articleRes.value.data.data || articleRes.value.data;
           const normalized = {
             ...initialFormState,
-            title: data.title || "", excerpt: data.excerpt || "",
-            content: data.content || "", category_id: data.category_id || "",
-            status: data.status || "Draft", cover_image: data.cover_image || "",
-            seo_title: data.seo_title || "", meta_description: data.meta_description || "",
-            is_locked: Boolean(data.is_locked), lock_ticket: data.lock_ticket || "",
-            published_at: data.published_at ? new Date(data.published_at).toISOString().slice(0, 16) : "",
-            read_time: data.read_time || "", author: data.author || "",
+            title: data.title || "",
+            excerpt: data.excerpt || "",
+            content: data.content || "",
+            category_id: data.category_id || "",
+            status: data.status || "Draft",
+            cover_image: data.cover_image || "",
+            seo_title: data.seo_title || "",
+            meta_description: data.meta_description || "",
+            is_locked: Boolean(data.is_locked),
+            lock_ticket: data.lock_ticket || "",
+            published_at: data.published_at
+              ? new Date(data.published_at).toISOString().slice(0, 16)
+              : "",
+            read_time: data.read_time || "",
           };
           setFormData(normalized);
           setOriginalData(normalized);
-        } else if (articleRes.reason.name !== "CanceledError") throw articleRes.reason;
+        } else if (articleRes.reason.name !== "CanceledError") {
+          throw articleRes.reason;
+        }
 
-        if (draftRes.status === "fulfilled" && draftRes.value.data?.hasRejected) {
+        if (
+          draftRes.status === "fulfilled" &&
+          draftRes.value.data?.hasRejected
+        ) {
           setRejectedDraft(draftRes.value.data.data);
           setShowDraftBanner(true);
         }
@@ -127,47 +163,70 @@ export default function NewsForm() {
           toast.error("Gagal memuat data artikel");
           navigate("/admin/news");
         }
-      } finally { if (!controller.signal.aborted) setIsFetching(false); }
+      } finally {
+        if (!controller.signal.aborted) setIsFetching(false);
+      }
     };
 
     fetchData();
-    return () => { controller.abort(); };
+    return () => {
+      controller.abort();
+    };
   }, [id, isEditMode, navigate]);
 
   const handleDiscardDraft = async () => {
     if (!rejectedDraft?.notrans) return;
+    setIsDiscarding(true);
     const toastId = toast.loading("Mengabaikan notifikasi penolakan...");
     try {
       await api.patch("/approval/discard", { notrans: rejectedDraft.notrans });
       toast.success("Notifikasi revisi berhasil diabaikan.", { id: toastId });
-      setRejectedDraft(null); setShowDraftBanner(false);
+      setRejectedDraft(null);
+      setShowDraftBanner(false);
+      setFormData((prev) => ({ ...prev, is_locked: false, lock_ticket: "" }));
     } catch (error: any) {
-      toast.error("Gagal mengabaikan draf", { id: toastId, description: error.response?.data?.message });
+      toast.error("Gagal mengabaikan draf", {
+        id: toastId,
+        description: error.response?.data?.message,
+      });
+    } finally {
+      setIsDiscarding(false);
     }
   };
 
   const handleRestoreDraft = () => {
-    if (!rejectedDraft?.payload) return toast.error("Data pemulihan tidak ditemukan.");
-    if (rejectedDraft?.action === "DELETE") return toast.error("Permintaan hapus yang ditolak tidak bisa dipulihkan.");
-    setIsRestoring(true);
+    if (!rejectedDraft?.payload)
+      return toast.error("Data pemulihan tidak ditemukan.");
+    if (rejectedDraft?.action === "DELETE")
+      return toast.error("Permintaan hapus yang ditolak tidak bisa dipulihkan.");
     try {
-      const payload = typeof rejectedDraft.payload === "string" ? JSON.parse(rejectedDraft.payload) : rejectedDraft.payload;
+      const payload =
+        typeof rejectedDraft.payload === "string"
+          ? JSON.parse(rejectedDraft.payload)
+          : rejectedDraft.payload;
       setFormData((prev) => ({
-        ...prev, title: payload.title ?? prev.title, excerpt: payload.excerpt ?? prev.excerpt,
-        content: payload.content ?? prev.content, category_id: payload.category_id ?? prev.category_id,
-        status: "Draft", cover_image: payload.cover_image ?? prev.cover_image,
-        seo_title: payload.seo_title ?? prev.seo_title, meta_description: payload.meta_description ?? prev.meta_description,
-        published_at: payload.published_at ? new Date(payload.published_at).toISOString().slice(0, 16) : prev.published_at,
+        ...prev,
+        title: payload.title ?? prev.title,
+        excerpt: payload.excerpt ?? prev.excerpt,
+        content: payload.content ?? prev.content,
+        category_id: payload.category_id ?? prev.category_id,
+        status: "Draft",
+        cover_image: payload.cover_image ?? prev.cover_image,
+        seo_title: payload.seo_title ?? prev.seo_title,
+        meta_description: payload.meta_description ?? prev.meta_description,
+        published_at: payload.published_at
+          ? new Date(payload.published_at).toISOString().slice(0, 16)
+          : prev.published_at,
         read_time: payload.read_time ?? prev.read_time,
       }));
-      setCoverFile(null); setCoverPreview(null);
+      setCoverFile(null);
+      setCoverPreview(null);
       toast.success("Konten draf berhasil dipulihkan!");
-      setShowDraftBanner(false);
-    } catch { toast.error("Gagal memproses data pemulihan."); }
-    finally { setIsRestoring(false); }
+    } catch {
+      toast.error("Gagal memproses data pemulihan.");
+    }
   };
 
-  // WYSIWYG Image Handler
   const imageHandler = useCallback(() => {
     if (shouldLockUI) return;
     const input = document.createElement("input");
@@ -176,36 +235,66 @@ export default function NewsForm() {
     input.click();
     input.onchange = async () => {
       if (input.files?.[0]) {
-        const uploadData = new FormData();
-        uploadData.append("inline_image", input.files[0]);
-        const toastId = toast.loading("Mengunggah gambar...");
+        const file = input.files[0];
+        const toastId = toast.loading("Mengunggah gambar inline...");
         try {
+          // Compress image client side before upload
+          const compressed = await compressImage(file);
+          const uploadData = new FormData();
+          uploadData.append("inline_image", compressed);
+          
           const response = await api.post("/news/upload-inline", uploadData);
           const quill = quillRef.current?.getEditor();
           if (!quill) throw new Error("Editor not ready");
           const range = quill.getSelection(true);
-          quill.insertEmbed(range ? range.index : quill.getLength(), "image", response.data.url);
+          quill.insertEmbed(
+            range ? range.index : quill.getLength(),
+            "image",
+            response.data.url
+          );
           toast.success("Gambar disisipkan!", { id: toastId });
         } catch (err: any) {
-          toast.error("Upload gagal", { id: toastId, description: err.response?.data?.message });
+          toast.error("Upload gagal", {
+            id: toastId,
+            description: err.response?.data?.message,
+          });
         }
       }
     };
   }, [shouldLockUI]);
 
-  const modules = useMemo(() => ({
-    toolbar: {
-      container: [[{ header: [1, 2, 3, false] }], ["bold", "italic", "underline"], [{ list: "ordered" }, { list: "bullet" }], ["link", "image"], ["clean"]],
-      handlers: { image: imageHandler },
-    },
-  }), [imageHandler]);
+  const quillModules = useMemo(
+    () => ({
+      toolbar: {
+        container: [
+          [{ header: [1, 2, 3, false] }],
+          ["bold", "italic", "underline", "strike", "blockquote"],
+          [{ list: "ordered" }, { list: "bullet" }],
+          [{ align: [] }, { color: [] }, { background: [] }],
+          ["link", "image", "video"],
+          ["clean"],
+        ],
+        handlers: { image: imageHandler },
+      },
+    }),
+    [imageHandler]
+  );
 
   const hasDataChanged = () => {
     if (!isEditMode) return true;
     if (coverFile !== null) return true;
-    if (rejectedDraft !== null && !showDraftBanner) return true;
-    for (const key of ["title", "excerpt", "content", "category_id", "seo_title", "meta_description", "published_at", "read_time"]) {
-      // @ts-expect-error
+    if (rejectedDraft !== null) return true;
+    for (const key of [
+      "title",
+      "excerpt",
+      "content",
+      "category_id",
+      "seo_title",
+      "meta_description",
+      "published_at",
+      "read_time",
+    ]) {
+      // @ts-expect-error dynamic access
       if (formData[key] !== originalData[key]) return true;
     }
     return false;
@@ -213,205 +302,788 @@ export default function NewsForm() {
 
   const handleSave = async (targetStatus: string) => {
     if (shouldLockUI) return toast.error("Data terkunci.");
-    if (!formData.title.trim()) return toast.error("Judul artikel tidak boleh kosong.");
+    if (!formData.title.trim())
+      return toast.error("Judul artikel tidak boleh kosong.");
     const plainText = formData.content.replace(/<[^>]*>?/gm, "").trim();
-    if (!formData.content || plainText.length === 0) return toast.error("Isi artikel wajib diisi.");
-    if (targetStatus === "Published" && !coverFile && !formData.cover_image) return toast.error("Gambar sampul wajib untuk publikasi.");
-    if (targetStatus === "Published" && !hasDataChanged()) return toast.info("Tidak ada perubahan terdeteksi.");
+    if (!formData.content || plainText.length === 0)
+      return toast.error("Isi artikel wajib diisi.");
+    if (targetStatus === "Published" && !coverFile && !formData.cover_image)
+      return toast.error("Gambar sampul wajib untuk publikasi.");
+    if (targetStatus === "Published" && !hasDataChanged())
+      return toast.info("Tidak ada perubahan terdeteksi.");
 
     setIsSaving(true);
-    const loadingToast = toast.loading(`${isEditMode ? "Memperbarui" : "Menyimpan"} artikel...`);
+    const loadingToast = toast.loading(
+      `${isEditMode ? "Memperbarui" : "Menyimpan"} artikel...`
+    );
 
     try {
       const payload = new FormData();
-      if (coverFile) payload.append("cover_image", await compressImage(coverFile));
+      if (coverFile)
+        payload.append("cover_image", await compressImage(coverFile));
       payload.append("title", formData.title.trim());
       payload.append("excerpt", formData.excerpt.trim());
       payload.append("content", formData.content);
       payload.append("category_id", formData.category_id);
       payload.append("status", targetStatus);
-      payload.append("seo_title", formData.seo_title.trim() || formData.title.trim());
-      payload.append("meta_description", formData.meta_description.trim() || formData.excerpt.trim());
-      payload.append("author", user?.name || "System Admin");
-      if (formData.published_at) payload.append("published_at", new Date(formData.published_at).toISOString());
-      if (formData.read_time) payload.append("read_time", formData.read_time);
-      if (rejectedDraft?.notrans) payload.append("previous_notrans", rejectedDraft.notrans);
+      payload.append("seo_title", formData.seo_title.trim());
+      payload.append("meta_description", formData.meta_description.trim());
+      
+      if (formData.published_at)
+        payload.append(
+          "published_at",
+          new Date(formData.published_at).toISOString()
+        );
+      if (formData.read_time)
+        payload.append("read_time", formData.read_time.trim());
+        
+      if (rejectedDraft?.notrans)
+        payload.append("previous_notrans", rejectedDraft.notrans);
 
       const endpoint = isEditMode ? `/news/${id}` : "/news";
       const method = isEditMode ? api.put : api.post;
       const response = await method(endpoint, payload, { timeout: 60000 });
 
       if ([200, 201, 202].includes(response.status)) {
-        setRejectedDraft(null); setShowDraftBanner(false);
+        setRejectedDraft(null);
+        setShowDraftBanner(false);
         if (response.status === 202) {
-          setFormData((prev) => ({ ...prev, is_locked: true, lock_ticket: response.data.ticket }));
+          setFormData((prev) => ({
+            ...prev,
+            is_locked: true,
+            lock_ticket: response.data.ticket,
+          }));
           toast.success("Revisi Berhasil Diajukan!", { id: loadingToast });
         } else {
-          toast.success(isSuperadmin ? "Berhasil Dipublikasikan!" : "Draf Tersimpan.", { id: loadingToast });
+          toast.success(
+            isSuperadmin ? "Berhasil Dipublikasikan!" : "Draf Tersimpan.",
+            { id: loadingToast }
+          );
         }
         setTimeout(() => navigate("/admin/news"), 800);
       }
     } catch (err: any) {
-      toast.error("Gagal menyimpan", { id: loadingToast, description: err.response?.data?.message || "Koneksi terganggu." });
-    } finally { setIsSaving(false); }
+      toast.error("Gagal menyimpan", {
+        id: loadingToast,
+        description: err.response?.data?.message || "Koneksi terganggu.",
+      });
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     disabled: shouldLockUI,
-    onDrop: (files) => { if (files[0]) setCoverFile(files[0]); },
+    onDrop: (files) => {
+      if (files[0]) {
+        if (!files[0].type.startsWith("image/")) {
+          return toast.error("Hanya file gambar yang didukung.");
+        }
+        setCoverFile(files[0]);
+      }
+    },
     accept: { "image/jpeg": [], "image/png": [], "image/webp": [] },
     multiple: false,
+    onDragEnter: () => setIsDragging(true),
+    onDragLeave: () => setIsDragging(false),
+    onDropAccepted: () => setIsDragging(false),
+    onDropRejected: () => setIsDragging(false),
   });
 
-  if (isFetching) return (
-    <div className="h-[60vh] flex items-center justify-center text-slate-500">
-      <div className="animate-pulse flex flex-col items-center gap-4">
-        <div className="w-10 h-10 border-4 border-daw-green border-t-transparent rounded-full animate-spin" />
-        Memuat data artikel...
+  const getDynamicSeoDescription = () => {
+    if (formData.meta_description && formData.meta_description.trim() !== "")
+      return formData.meta_description;
+    if (formData.excerpt && formData.excerpt.trim() !== "")
+      return formData.excerpt;
+
+    if (!formData.content || formData.content.trim() === "") {
+      return "Tulis excerpt atau konten artikel untuk melihat deskripsi otomatis di sini.";
+    }
+
+    try {
+      const parser = new DOMParser();
+      const doc = parser.parseFromString(formData.content, "text/html");
+      let plainText = doc.body.textContent || "";
+      plainText = plainText.replace(/\s+/g, " ").trim();
+      if (plainText.length === 0) {
+        return "Tulis excerpt atau konten artikel untuk melihat deskripsi otomatis di sini.";
+      }
+      return plainText.slice(0, 150) + (plainText.length > 150 ? "..." : "");
+    } catch (e) {
+      const plainText = formData.content
+        .replace(/<[^>]*>?/gm, "")
+        .replace(/&nbsp;|\u00A0/g, " ")
+        .trim();
+      return plainText.slice(0, 150) + (plainText.length > 150 ? "..." : "");
+    }
+  };
+
+  if (isFetching) {
+    return (
+      <div className="h-[60vh] flex items-center justify-center text-slate-500">
+        <div className="animate-pulse flex flex-col items-center gap-4">
+          <div className="w-10 h-10 border-4 border-daw-green border-t-transparent rounded-full animate-spin" />
+          Memuat data artikel...
+        </div>
       </div>
-    </div>
-  );
+    );
+  }
+
+  const generatedSlug = formData.title
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/(^-|-$)+/g, "");
+
+  const activeCategory = categories.find((c) => c.id === formData.category_id);
 
   return (
-    <div className="max-w-7xl mx-auto animate-in fade-in duration-500 pb-24">
-      {/* OVERRIDE BANNER */}
-      {isOverrideMode && (
-        <div className="mb-6 bg-amber-50 border border-amber-200 p-4 rounded-xl flex items-center gap-4 shadow-sm">
-          <div className="bg-amber-100 p-2 rounded-full text-amber-600 shrink-0"><AlertTriangle className="w-5 h-5" /></div>
-          <div>
-            <h4 className="text-xs font-black text-amber-900 uppercase tracking-tight">Mode Override Admin</h4>
-            <p className="text-xs text-amber-700 mt-0.5">Data dikunci oleh <strong>{formData.lock_ticket}</strong>. Menyimpan akan membatalkan antrean.</p>
-          </div>
-        </div>
-      )}
-
-      {/* LOCKED BANNER */}
-      {shouldLockUI && (
-        <div className="mb-6 bg-blue-50 border border-blue-200 p-4 rounded-xl flex items-center gap-4 shadow-sm">
-          <div className="bg-blue-100 p-2 rounded-full text-blue-600 shrink-0"><LockIcon className="w-5 h-5" /></div>
-          <div>
-            <h4 className="text-xs font-black text-blue-900 uppercase tracking-tight">Akses Dibatasi</h4>
-            <p className="text-xs text-blue-700 mt-0.5">Revisi sedang ditinjau. Data tidak dapat diubah.</p>
-          </div>
-        </div>
-      )}
-
-      {/* RECOVERY BANNER */}
-      {showDraftBanner && rejectedDraft && (
-        <div className="mb-6 bg-red-50 border-l-4 border-l-red-500 border border-red-200 rounded-xl p-5 flex flex-col md:flex-row items-start md:items-center justify-between gap-4 shadow-sm animate-in slide-in-from-top-4">
-          <div className="flex items-start gap-4">
-            <div className="p-3 bg-amber-100 rounded-xl text-amber-600 shrink-0"><AlertTriangle className="w-6 h-6" /></div>
-            <div>
-              <h4 className="text-sm font-black text-red-900 uppercase tracking-tighter mb-1">⚠️ Catatan Peninjau</h4>
-              <p className="text-xs text-red-800 font-bold bg-white/60 p-2.5 rounded border border-red-200/50">"{rejectedDraft.rejection_reason || "Revisi memerlukan perbaikan."}"</p>
-            </div>
-          </div>
-          <div className="flex items-center gap-2">
-            {rejectedDraft.action !== "DELETE" && (
-              <button onClick={handleRestoreDraft} disabled={isRestoring} className="flex items-center gap-2 bg-red-600 hover:bg-red-700 text-white px-5 py-2.5 rounded-xl text-xs font-bold transition-all active:scale-95 disabled:bg-red-300">
-                <RotateCcw className={`w-4 h-4 ${isRestoring ? "animate-spin" : ""}`} /> Pulihkan
-              </button>
-            )}
-            <button onClick={handleDiscardDraft} className="flex items-center gap-2 bg-white border border-red-200 text-red-600 hover:bg-red-50 px-4 py-2.5 rounded-xl text-xs font-bold transition-all active:scale-95">
-              <X className="w-4 h-4" /> Abaikan
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* TOOLBAR HEADER */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white/90 backdrop-blur-xl p-5 rounded-2xl border border-slate-200 shadow-sm mb-8">
+    <div className="fixed inset-0 z-[100] bg-slate-50 flex flex-col animate-in fade-in duration-300">
+      {/* IMMERSIVE TOP BAR */}
+      <div className="bg-white border-b border-slate-200 px-6 py-3.5 flex items-center justify-between shadow-sm shrink-0">
         <div className="flex items-center gap-4">
-          <button onClick={() => navigate("/admin/news")} className="p-2 bg-slate-50 hover:bg-slate-100 text-slate-500 rounded-lg transition-all border border-slate-200 shadow-sm"><ArrowLeft className="w-5 h-5" /></button>
+          <button
+            type="button"
+            onClick={() => navigate("/admin/news")}
+            className="p-2 hover:bg-slate-100 rounded-xl transition-all text-slate-500 hover:text-slate-800"
+            title="Kembali ke Repositori"
+          >
+            <ChevronLeft className="w-5 h-5" />
+          </button>
+          <div className="h-6 w-px bg-slate-200" />
           <div>
-            <h1 className="text-lg font-bold text-slate-900">{isEditMode ? "Edit Artikel" : "Artikel Baru"}</h1>
-            {formData.title && <p className="text-[11px] font-mono text-slate-400 mt-1 flex items-center gap-1"><LinkIcon className="w-3 h-3" /> /news/{generatedSlug}</p>}
+            <div className="flex items-center gap-2">
+              <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                News Builder
+              </span>
+              {formData.is_locked && (
+                <span className="flex items-center gap-1 px-1.5 py-0.5 rounded bg-blue-100 text-blue-600 text-[9px] font-bold uppercase tracking-wider">
+                  <Lock className="w-2.5 h-2.5" /> Locked
+                </span>
+              )}
+            </div>
+            <h2 className="text-xs font-bold text-slate-800 truncate max-w-[150px] sm:max-w-[300px] mt-0.5">
+              {formData.title || "Draf Artikel Baru"}
+            </h2>
           </div>
         </div>
-        <div className="flex gap-3 w-full sm:w-auto">
-          <button type="button" onClick={() => handleSave("Draft")} disabled={isSaving || shouldLockUI || !can("manage_news")} className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-6 py-2.5 bg-white border border-slate-200 text-slate-600 hover:bg-slate-50 rounded-xl font-black text-[11px] uppercase tracking-widest shadow-sm transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed">
-            <Save className="w-4 h-4 text-slate-400" /> Simpan Draf
+
+        {/* Middle: Layout Selector */}
+        <div className="hidden lg:flex items-center gap-1 bg-slate-100 p-1 rounded-xl border border-slate-200/50">
+          <button
+            type="button"
+            onClick={() => setViewLayout("editor")}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all ${
+              viewLayout === "editor"
+                ? "bg-white text-daw-green shadow-sm"
+                : "text-slate-500 hover:text-slate-800"
+            }`}
+          >
+            <PenTool className="w-3.5 h-3.5" /> Focus Editor
           </button>
-          <button type="button" onClick={() => handleSave("Published")} disabled={isSaving || shouldLockUI || !can("manage_news")} className={`flex-1 sm:flex-none flex items-center justify-center gap-2 px-6 py-2.5 rounded-xl font-black text-[11px] uppercase tracking-widest transition-all shadow-lg active:scale-95 disabled:cursor-not-allowed min-w-[170px] ${isSaving ? "bg-slate-300 text-slate-700" : shouldLockUI ? "bg-slate-200 text-slate-500" : isOverrideMode ? "bg-amber-600 hover:bg-amber-700 text-white shadow-amber-600/20" : isSuperadmin ? "bg-daw-green hover:bg-[#003b1c] text-white shadow-daw-green/20" : "bg-blue-600 hover:bg-blue-700 text-white shadow-blue-600/20"}`}>
-            {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : shouldLockUI ? <LockIcon className="w-4 h-4" /> : isOverrideMode ? <AlertCircle className="w-4 h-4" /> : isSuperadmin ? <Send className="w-4 h-4" /> : <Send className="w-4 h-4" />}
-            {isSaving ? "Menyimpan..." : shouldLockUI ? "Terkunci" : isOverrideMode ? "Override & Publish" : isSuperadmin ? "Publikasikan" : "Ajukan Revisi"}
+          <button
+            type="button"
+            onClick={() => setViewLayout("split")}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all ${
+              viewLayout === "split"
+                ? "bg-white text-daw-green shadow-sm"
+                : "text-slate-500 hover:text-slate-800"
+            }`}
+          >
+            <Layout className="w-3.5 h-3.5" /> Split Screen
           </button>
+          <button
+            type="button"
+            onClick={() => setViewLayout("preview")}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all ${
+              viewLayout === "preview"
+                ? "bg-white text-daw-green shadow-sm"
+                : "text-slate-500 hover:text-slate-800"
+            }`}
+          >
+            <Eye className="w-3.5 h-3.5" /> Full Preview
+          </button>
+        </div>
+
+        {/* Right: Actions */}
+        <div className="flex items-center gap-2">
+          {shouldLockUI ? (
+            <div className="px-4 py-2 bg-blue-50 border border-blue-200 rounded-xl flex items-center gap-2">
+              <div className="w-2 h-2 rounded-full bg-blue-500 animate-pulse" />
+              <span className="text-[10px] font-black uppercase tracking-widest text-blue-600">
+                Read Only Mode
+              </span>
+            </div>
+          ) : (
+            <>
+              <button
+                type="button"
+                disabled={isSaving || (!hasDataChanged() && !isSuperadmin) || !can("manage_news")}
+                onClick={() => handleSave("Draft")}
+                className="bg-slate-100 hover:bg-slate-200 text-slate-700 px-4 py-2 rounded-xl text-xs font-bold transition-all disabled:opacity-50 disabled:cursor-not-allowed border border-slate-200"
+              >
+                {isSaving ? "..." : "Simpan Draf"}
+              </button>
+              <button
+                type="button"
+                disabled={isSaving || (!hasDataChanged() && !isSuperadmin) || !can("manage_news")}
+                onClick={() => handleSave("Published")}
+                className={`text-white px-5 py-2.5 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all disabled:opacity-50 disabled:cursor-not-allowed
+                  ${
+                    isOverrideMode
+                      ? "bg-amber-500 hover:bg-amber-600 shadow-md shadow-amber-500/10"
+                      : "bg-emerald-600 hover:bg-emerald-700 shadow-md shadow-emerald-600/10"
+                  }`}
+              >
+                <Save className="w-4 h-4" />
+                {isSaving
+                  ? "Menyimpan..."
+                  : isOverrideMode
+                  ? "Override & Publish"
+                  : isSuperadmin
+                  ? "Publish Live"
+                  : "Request Approval"}
+              </button>
+            </>
+          )}
         </div>
       </div>
 
-      {/* FORM BODY */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        {/* MAIN COLUMN */}
-        <div className={`lg:col-span-2 space-y-6 ${lockStyles}`}>
-          <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6 space-y-5">
-            <div>
-              <label className="block text-xs font-black text-slate-500 uppercase tracking-wider mb-2">Judul Artikel *</label>
-              <input type="text" value={formData.title} onChange={(e) => setFormData({ ...formData, title: e.target.value })} placeholder="Tulis judul yang menarik..." className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl text-lg font-bold text-slate-900 placeholder:text-slate-300 focus:outline-none focus:ring-2 focus:ring-daw-green/20 focus:border-daw-green" />
-            </div>
-            <div>
-              <label className="block text-xs font-black text-slate-500 uppercase tracking-wider mb-2">Ringkasan</label>
-              <textarea value={formData.excerpt} onChange={(e) => setFormData({ ...formData, excerpt: e.target.value })} placeholder="Rangkuman singkat artikel untuk kartu berita..." rows={3} maxLength={500} className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl text-sm text-slate-700 placeholder:text-slate-300 focus:outline-none focus:ring-2 focus:ring-daw-green/20 focus:border-daw-green resize-none" />
-              <p className="text-right text-[10px] text-slate-400 mt-1">{formData.excerpt.length}/500</p>
-            </div>
-          </div>
+      {/* WORKSPACE BODY */}
+      <div className="flex-1 flex overflow-hidden min-h-0">
+        {/* LEFT: EDITORIAL WORKSPACE (Main Form) */}
+        {(viewLayout === "editor" || viewLayout === "split") && (
+          <div
+            className={`h-full overflow-y-auto custom-scrollbar p-6 ${
+              viewLayout === "editor"
+                ? "w-full max-w-7xl mx-auto"
+                : "w-1/2 border-r border-slate-200"
+            }`}
+          >
+            <div
+              className={`bg-white rounded-2xl border transition-all duration-500 shadow-sm overflow-hidden
+                ${
+                  shouldLockUI
+                    ? "border-blue-200"
+                    : isOverrideMode
+                    ? "border-amber-200"
+                    : "border-slate-200"
+                }`}
+            >
+              {/* THE COMMAND CENTER (Banners) */}
+              {(formData.is_locked || (rejectedDraft && showDraftBanner)) && (
+                <div className="px-8 pt-6 pb-0 space-y-4">
+                  {/* 1. SOVEREIGN OVERRIDE BANNER */}
+                  {isOverrideMode && (
+                    <div className="flex items-start gap-4 p-5 bg-amber-50 border border-amber-200 rounded-2xl animate-in slide-in-from-top-4 shadow-sm">
+                      <div className="p-2.5 bg-amber-100 text-amber-600 rounded-xl shrink-0">
+                        <AlertTriangle className="w-6 h-6" />
+                      </div>
+                      <div>
+                        <h4 className="text-sm font-black text-amber-900 uppercase tracking-tight">
+                          System Intervention Required
+                        </h4>
+                        <p className="text-xs text-amber-700 mt-1 leading-relaxed">
+                          Data ini dikunci (Tiket:{" "}
+                          <strong>{formData.lock_ticket}</strong>). Sebagai
+                          Admin, Anda dapat mengabaikan birokrasi dan
+                          memublikasikan secara langsung (Override).
+                        </p>
+                      </div>
+                    </div>
+                  )}
 
-          <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6">
-            <label className="block text-xs font-black text-slate-500 uppercase tracking-wider mb-3">Konten Artikel (WYSIWYG) *</label>
-            <ReactQuill ref={quillRef} theme="snow" value={formData.content} onChange={(v) => setFormData({ ...formData, content: v })} modules={modules} className="bg-white rounded-lg [&_.ql-container]:min-h-[300px] [&_.ql-toolbar]:rounded-t-lg [&_.ql-container]:rounded-b-lg [&_.ql-editor]:text-sm [&_.ql-editor]:leading-relaxed" placeholder="Tulis konten artikel Anda di sini..." />
-          </div>
-        </div>
+                  {/* 2. LOCKED UI BANNER */}
+                  {shouldLockUI && (
+                    <div className="flex items-start gap-3 p-4 bg-blue-50 border border-blue-200 rounded-2xl animate-in fade-in shadow-sm">
+                      <div className="p-2 bg-blue-100 text-blue-600 rounded-xl shrink-0">
+                        <Lock className="w-5 h-5 animate-pulse" />
+                      </div>
+                      <div>
+                        <h4 className="text-sm font-bold text-blue-900">
+                          Mode Baca (Read-Only)
+                        </h4>
+                        <p className="text-xs text-blue-700 mt-1 leading-relaxed">
+                          Halaman dikunci karena dalam proses peninjauan
+                          (Tiket: <strong>{formData.lock_ticket}</strong>).
+                        </p>
+                      </div>
+                    </div>
+                  )}
 
-        {/* SIDEBAR */}
-        <div className={`space-y-6 ${lockStyles}`}>
-          {/* Cover Image */}
-          <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6">
-            <label className="block text-xs font-black text-slate-500 uppercase tracking-wider mb-3">Gambar Sampul</label>
-            {coverPreview || formData.cover_image ? (
-              <div className="relative rounded-xl overflow-hidden aspect-video mb-3 group">
-                <img src={coverPreview || `${BASE_UPLOAD_URL}/${formData.cover_image}`} alt="Cover" className="w-full h-full object-cover" />
-                {!shouldLockUI && (
-                  <button type="button" onClick={() => { setCoverFile(null); setFormData({ ...formData, cover_image: "" }); }} className="absolute top-2 right-2 bg-red-500 text-white p-1.5 rounded-full opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-600"><X className="w-4 h-4" /></button>
-                )}
+                  {/* 3. REJECTION BANNER & RESTORE */}
+                  {rejectedDraft && showDraftBanner && !formData.is_locked && (
+                    <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-4 p-5 bg-red-50/50 border border-red-200 rounded-2xl animate-in slide-in-from-top-2 shadow-sm">
+                      <div className="flex items-start gap-3">
+                        <div className="p-2 bg-red-100 text-red-600 rounded-xl shrink-0">
+                          <AlertTriangle className="w-5 h-5 animate-bounce" />
+                        </div>
+                        <div>
+                          <h4 className="text-sm font-black text-red-900 uppercase tracking-tight">
+                            Revisi Diperlukan
+                          </h4>
+                          <p className="text-xs text-red-800 bg-white/50 p-2 rounded-lg mt-1 italic border border-red-100">
+                            "{rejectedDraft.rejection_reason}"
+                          </p>
+                        </div>
+                      </div>
+                      <div className="flex gap-2 shrink-0">
+                        <button
+                          type="button"
+                          onClick={handleRestoreDraft}
+                          className="flex items-center gap-2 px-5 py-2.5 bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold rounded-xl shadow-md transition-all active:scale-95"
+                        >
+                          <RotateCcw className="w-4 h-4" /> Pulihkan Draf
+                        </button>
+                        <button
+                          type="button"
+                          disabled={isDiscarding}
+                          onClick={handleDiscardDraft}
+                          className="flex items-center gap-2 px-5 py-2.5 bg-white hover:bg-red-50 text-red-600 border border-red-200 text-xs font-bold rounded-xl shadow-sm transition-all disabled:opacity-50"
+                        >
+                          {isDiscarding ? (
+                            <RefreshCw className="w-4 h-4 animate-spin" />
+                          ) : (
+                            <X className="w-4 h-4" />
+                          )}
+                          Abaikan
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* DYNAMIC WORKSPACE CONTENT */}
+              <div className="p-8 space-y-10">
+                {/* SECTION 1: CORE IDENTITY */}
+                <div className="space-y-8">
+                  <div className="flex items-center gap-2 border-b border-slate-100 pb-2">
+                    <FileText className="w-4 h-4 text-slate-400" />
+                    <h3 className="text-sm font-bold text-slate-900">
+                      Informasi Utama Artikel
+                    </h3>
+                  </div>
+                  <div className="space-y-6">
+                    <div className="space-y-2">
+                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">
+                        Judul Artikel *
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        value={formData.title}
+                        onChange={(e) =>
+                          setFormData({ ...formData, title: e.target.value })
+                        }
+                        readOnly={shouldLockUI}
+                        className={`w-full px-5 py-4 rounded-2xl border transition-all font-bold text-slate-800 outline-none
+                          ${
+                            shouldLockUI
+                              ? "bg-slate-50 border-slate-200 opacity-60 cursor-not-allowed"
+                              : "bg-slate-50 border-slate-200 focus:bg-white focus:border-daw-green focus:ring-4 focus:ring-daw-green/10"
+                          }`}
+                        placeholder="Tulis judul yang memikat pembaca..."
+                      />
+                    </div>
+                    
+                    <div className="space-y-2">
+                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 flex justify-between">
+                        <span>Ringkasan (Excerpt)</span>
+                        <span>{formData.excerpt.length}/500</span>
+                      </label>
+                      <textarea
+                        value={formData.excerpt}
+                        onChange={(e) =>
+                          setFormData({ ...formData, excerpt: e.target.value })
+                        }
+                        readOnly={shouldLockUI}
+                        maxLength={500}
+                        rows={3}
+                        className={`w-full px-5 py-4 rounded-2xl border transition-all text-slate-600 outline-none resize-none
+                          ${
+                            shouldLockUI
+                              ? "bg-slate-50 border-slate-200 opacity-60 cursor-not-allowed"
+                              : "bg-slate-50 border-slate-200 focus:bg-white focus:border-daw-green focus:ring-4 focus:ring-daw-green/10"
+                          }`}
+                        placeholder="Rangkuman singkat untuk ditampilkan di kartu halaman depan..."
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* SECTION 2: SEO ENGINE */}
+                <div className="space-y-6 bg-slate-900 p-8 rounded-[2rem] shadow-2xl">
+                  <div className="flex items-center gap-2 border-b border-white/10 pb-3">
+                    <Search className="w-5 h-5 text-blue-400" />
+                    <h3 className="text-sm font-black text-white uppercase tracking-widest">
+                      Search Engine Optimization
+                    </h3>
+                  </div>
+                  <div className="grid grid-cols-1 xl:grid-cols-2 gap-8">
+                    <div className="space-y-4">
+                      <div className="space-y-2">
+                        <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest">
+                          SEO Title Override
+                        </label>
+                        <input
+                          type="text"
+                          readOnly={shouldLockUI}
+                          value={formData.seo_title}
+                          onChange={(e) =>
+                            setFormData({ ...formData, seo_title: e.target.value })
+                          }
+                          className={`w-full px-4 py-3 rounded-xl bg-slate-800 border outline-none text-sm text-white transition-all
+                            ${
+                              shouldLockUI
+                                ? "opacity-60 border-white/5 cursor-not-allowed"
+                                : "border-white/10 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
+                            }`}
+                          placeholder={formData.title || "Custom title untuk search engine"}
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <div className="flex justify-between items-center">
+                          <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest">
+                            Meta Description
+                          </label>
+                          <span
+                            className={`text-[9px] font-bold ${
+                              formData.meta_description?.length > 160
+                                ? "text-red-400"
+                                : "text-slate-400"
+                            }`}
+                          >
+                            {formData.meta_description?.length || 0}/160
+                          </span>
+                        </div>
+                        <textarea
+                          readOnly={shouldLockUI}
+                          placeholder="Tulis deskripsi meta spesifik..."
+                          value={formData.meta_description}
+                          onChange={(e) =>
+                            setFormData({
+                              ...formData,
+                              meta_description: e.target.value,
+                            })
+                          }
+                          className={`w-full p-4 rounded-xl bg-slate-800 border outline-none text-sm text-slate-300 h-24 resize-none transition-all custom-scrollbar ${
+                            shouldLockUI
+                              ? "opacity-60 border-white/5 cursor-not-allowed"
+                              : formData.meta_description?.length > 160
+                              ? "border-red-400 focus:border-red-500 focus:ring-2 focus:ring-red-500/20"
+                              : "border-white/10 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
+                          }`}
+                        />
+                        <p className="text-[9px] text-slate-500 italic leading-relaxed">
+                          *Jika kosong, sistem akan menggunakan Excerpt atau teks paragraf awal.
+                        </p>
+                      </div>
+                    </div>
+                    
+                    {/* Google Card Preview */}
+                    <div className="bg-white p-6 rounded-2xl shadow-inner flex flex-col justify-center relative overflow-hidden group">
+                      <p className="text-[10px] font-black text-slate-300 uppercase mb-3 flex items-center gap-2">
+                        <Globe className="w-3 h-3" /> Live Google Search Snippet
+                      </p>
+                      <div className="space-y-1">
+                        <p className="text-[#1a0dab] text-xl font-medium truncate hover:underline cursor-pointer">
+                          {formData.seo_title || formData.title || "Judul Artikel"}
+                        </p>
+                        <p className="text-[#006621] text-sm truncate mb-1 flex items-center gap-1 font-mono">
+                          daw.co.id{" "}
+                          <span className="text-slate-400 text-xs">› news ›</span>{" "}
+                          {generatedSlug || "..."}
+                        </p>
+                        <p className="text-[#545454] text-sm line-clamp-2 leading-relaxed break-words">
+                          {getDynamicSeoDescription()}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* SECTION 3: EDITORIAL METADATA & COVER */}
+                <div className="grid grid-cols-1 xl:grid-cols-2 gap-8">
+                  {/* Category & Dates */}
+                  <div className="space-y-6">
+                    <div className="flex items-center gap-2 border-b border-slate-100 pb-2">
+                      <Layout className="w-4 h-4 text-slate-400" />
+                      <h3 className="text-sm font-bold text-slate-900">
+                        Editorial Settings
+                      </h3>
+                    </div>
+                    
+                    <div className="space-y-2">
+                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">
+                        Kategori Artikel *
+                      </label>
+                      <select
+                        disabled={shouldLockUI}
+                        value={formData.category_id}
+                        onChange={(e) =>
+                          setFormData({ ...formData, category_id: e.target.value })
+                        }
+                        className="w-full px-4 py-3 rounded-xl border border-slate-200 bg-slate-50 text-slate-700 outline-none focus:bg-white focus:border-daw-green focus:ring-2 focus:ring-daw-green/20 transition-all disabled:opacity-60 cursor-pointer disabled:cursor-not-allowed"
+                      >
+                        <option value="">-- Pilih Kategori --</option>
+                        {categories.map((cat) => (
+                          <option key={cat.id} value={cat.id}>
+                            {cat.name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 flex items-center gap-1">
+                          <Calendar className="w-3 h-3" /> Tanggal Terbit
+                        </label>
+                        <input
+                          type="datetime-local"
+                          readOnly={shouldLockUI}
+                          value={formData.published_at}
+                          onChange={(e) =>
+                            setFormData({ ...formData, published_at: e.target.value })
+                          }
+                          className="w-full px-4 py-3 rounded-xl border border-slate-200 bg-slate-50 text-slate-600 outline-none focus:bg-white focus:border-daw-green focus:ring-2 focus:ring-daw-green/20 transition-all text-sm"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 flex items-center gap-1">
+                          <Clock className="w-3 h-3" /> Manual Waktu Baca
+                        </label>
+                        <input
+                          type="text"
+                          readOnly={shouldLockUI}
+                          value={formData.read_time}
+                          placeholder="Auto by System"
+                          onChange={(e) =>
+                            setFormData({ ...formData, read_time: e.target.value })
+                          }
+                          className="w-full px-4 py-3 rounded-xl border border-slate-200 bg-slate-50 text-slate-600 outline-none focus:bg-white focus:border-daw-green focus:ring-2 focus:ring-daw-green/20 transition-all text-sm placeholder:text-slate-400"
+                        />
+                      </div>
+                    </div>
+                    <p className="text-[10px] text-slate-400 italic">
+                      Biarkan Manual Waktu Baca kosong agar sistem secara otomatis menghitungnya berdasarkan panjang artikel.
+                    </p>
+                  </div>
+
+                  {/* Cover Image Dropzone */}
+                  <div className="space-y-4">
+                    <div className="flex items-center gap-2 border-b border-slate-100 pb-2">
+                      <ImageIcon className="w-4 h-4 text-slate-400" />
+                      <h3 className="text-sm font-bold text-slate-900">
+                        Gambar Sampul Artikel
+                      </h3>
+                    </div>
+                    {coverPreview || formData.cover_image ? (
+                      <div className="relative w-full h-[220px] rounded-3xl overflow-hidden group border border-slate-200 shadow-sm">
+                        <img
+                          src={
+                            coverPreview ||
+                            `${BASE_UPLOAD_URL}/${formData.cover_image}`
+                          }
+                          alt="Cover Preview"
+                          className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
+                        />
+                        {!shouldLockUI && (
+                          <div className="absolute inset-0 bg-slate-900/60 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-center justify-center">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setCoverPreview(null);
+                                setCoverFile(null);
+                                setFormData({ ...formData, cover_image: "" });
+                              }}
+                              className="bg-red-500 text-white px-6 py-3 rounded-2xl flex items-center gap-2 font-bold shadow-lg transform hover:scale-105 transition-all"
+                            >
+                              <Trash2 className="w-5 h-5" /> Hapus Gambar
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      <div
+                        {...getRootProps()}
+                        className={`relative border-2 border-dashed rounded-3xl h-[220px] flex flex-col items-center justify-center transition-all duration-300 group outline-none
+                          ${
+                            shouldLockUI
+                              ? "border-slate-200 bg-slate-100 opacity-60 cursor-not-allowed"
+                              : isDragging
+                              ? "border-daw-green bg-daw-green/5 scale-[0.99] ring-4 ring-daw-green/10"
+                              : "border-slate-300 bg-slate-50 hover:border-daw-green hover:bg-slate-50/80 cursor-pointer"
+                          }`}
+                      >
+                        <input {...getInputProps()} />
+                        <div
+                          className={`p-4 rounded-2xl mb-3 transition-all duration-500 ${
+                            isDragging
+                              ? "bg-daw-green text-white scale-110 rotate-6"
+                              : "bg-white text-slate-400 shadow-sm group-hover:text-daw-green"
+                          }`}
+                        >
+                          {shouldLockUI ? (
+                            <Lock className="w-8 h-8 text-slate-300" />
+                          ) : (
+                            <UploadCloud
+                              className={`w-8 h-8 ${isDragging ? "animate-bounce" : ""}`}
+                            />
+                          )}
+                        </div>
+                        <div className="text-center space-y-1">
+                          <p className="text-sm font-bold text-slate-700">
+                            {shouldLockUI
+                              ? "Upload Terkunci"
+                              : isDragging
+                              ? "Lepaskan gambar di sini"
+                              : "Drag & Drop gambar sampul"}
+                          </p>
+                          {!shouldLockUI && (
+                            <p className="text-[10px] text-slate-500 font-medium">
+                              JPG, PNG, WebP (Maks. 5MB)
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* SECTION 4: TEXT EDITOR */}
+                <div className="space-y-6">
+                  <div className="flex items-center gap-2 border-b border-slate-100 pb-2">
+                    <PenTool className="w-4 h-4 text-slate-400" />
+                    <h3 className="text-sm font-bold text-slate-900">
+                      Area Penulisan Konten (WYSIWYG) *
+                    </h3>
+                  </div>
+
+                  <div
+                    className={`rounded-[1.5rem] border overflow-hidden bg-white shadow-sm transition-all
+                      ${
+                        shouldLockUI
+                          ? "border-slate-200 opacity-70 pointer-events-none"
+                          : "border-slate-200 focus-within:ring-4 focus-within:ring-daw-green/10 focus-within:border-daw-green"
+                      }`}
+                  >
+                    <ReactQuill
+                      ref={quillRef}
+                      theme="snow"
+                      value={formData.content}
+                      readOnly={shouldLockUI}
+                      onChange={(val) =>
+                        setFormData((prev) => ({ ...prev, content: val }))
+                      }
+                      modules={quillModules}
+                      className="min-h-[500px] flex flex-col [&_.ql-editor]:p-10 [&_.ql-editor]:text-slate-700 [&_.ql-editor]:text-lg [&_.ql-toolbar]:border-0 [&_.ql-toolbar]:border-b [&_.ql-toolbar]:bg-slate-50/80 [&_.ql-container]:border-0"
+                    />
+                  </div>
+                </div>
               </div>
-            ) : (
-              <div {...getRootProps()} className={`border-2 border-dashed rounded-xl p-8 text-center cursor-pointer transition-all ${isDragActive ? "border-daw-green bg-daw-green/5" : "border-slate-200 hover:border-daw-green/50 hover:bg-slate-50"}`}>
-                <input {...getInputProps()} />
-                <ImageIcon className="w-10 h-10 text-slate-300 mx-auto mb-3" />
-                <p className="text-sm text-slate-500 font-medium">Klik atau seret gambar</p>
-                <p className="text-xs text-slate-400 mt-1">JPG, PNG, WebP (maks. 10MB)</p>
+            </div>
+          </div>
+        )}
+
+        {/* RIGHT: LIVE PREVIEW PANEL */}
+        {(viewLayout === "preview" || viewLayout === "split") && (
+          <div
+            className={`h-full overflow-y-auto custom-scrollbar bg-slate-50 ${
+              viewLayout === "preview"
+                ? "w-full max-w-7xl mx-auto p-8"
+                : "w-1/2 p-6"
+            }`}
+          >
+            <div className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden relative pb-32 min-h-full">
+              <div className="sticky top-0 bg-white/80 backdrop-blur-md z-50 p-4 border-b border-slate-200 flex items-center justify-between">
+                <h3 className="text-sm font-bold text-slate-700 flex items-center gap-2">
+                  <Globe className="w-4 h-4 text-daw-green" /> Live Preview
+                </h3>
+                <span className="text-[10px] font-mono font-bold text-slate-400 bg-slate-100 px-3 py-1.5 rounded-lg border border-slate-200 uppercase tracking-widest">
+                  {activeCategory ? activeCategory.name : "Uncategorized"}
+                </span>
               </div>
-            )}
-          </div>
 
-          {/* Category */}
-          <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6">
-            <label className="block text-xs font-black text-slate-500 uppercase tracking-wider mb-3">Kategori</label>
-            <select value={formData.category_id} onChange={(e) => setFormData({ ...formData, category_id: e.target.value })} className="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-lg text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-daw-green/20 focus:border-daw-green">
-              <option value="">Pilih Kategori</option>
-              {categories.map((cat) => <option key={cat.id} value={cat.id}>{cat.name}</option>)}
-            </select>
-          </div>
+              {/* Simulation of NewsEventDetail.tsx */}
+              <div className="w-full bg-white relative">
+                {/* Hero Section Simulation */}
+                <section className="relative h-[300px] md:h-[400px] flex items-center justify-center overflow-hidden">
+                  <div
+                    className="absolute inset-0 bg-cover bg-center"
+                    style={{
+                      backgroundImage: `url(${
+                        coverPreview || formData.cover_image
+                          ? coverPreview || `${BASE_UPLOAD_URL}/${formData.cover_image}`
+                          : "/placeholder.jpg"
+                      })`,
+                    }}
+                  />
+                  <div className="absolute inset-0 bg-daw-green/20 mix-blend-multiply" />
+                  <div className="absolute inset-0 bg-gradient-to-b from-slate-900/60 via-slate-900/40 to-slate-900/80" />
 
-          {/* Metadata */}
-          <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6 space-y-4">
-            <label className="block text-xs font-black text-slate-500 uppercase tracking-wider">Metadata</label>
-            <div>
-              <label className="block text-xs text-slate-500 mb-1">Tanggal Terbit</label>
-              <input type="datetime-local" value={formData.published_at} onChange={(e) => setFormData({ ...formData, published_at: e.target.value })} className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-daw-green/20" />
+                  <div className="relative z-10 text-center px-6 max-w-3xl mt-8">
+                    <h1 className="text-3xl md:text-5xl font-serif font-bold text-white leading-[1.1] tracking-tight drop-shadow-lg">
+                      {formData.title || "Judul Artikel"}
+                    </h1>
+                  </div>
+                </section>
+
+                {/* Content Area Simulation */}
+                <div className="px-6 md:px-8 py-10 max-w-[800px] mx-auto">
+                  <div className="flex flex-wrap items-center gap-3 mb-8 pb-6 border-b border-slate-100">
+                    <span className="px-3 py-1 bg-daw-green text-white text-[10px] font-black uppercase tracking-widest rounded-md">
+                      {activeCategory ? activeCategory.name : "Kategori"}
+                    </span>
+                    <span className="text-slate-500 text-[11px] font-bold uppercase tracking-widest">
+                      {formData.published_at
+                        ? new Date(formData.published_at).toLocaleDateString("id-ID", {
+                            day: "numeric", month: "long", year: "numeric",
+                          })
+                        : "Hari ini"}
+                    </span>
+                    <span className="text-slate-500 text-[11px] font-bold uppercase tracking-widest">
+                      • {formData.read_time || "1 min read"}
+                    </span>
+                  </div>
+
+                  <article
+                    className={`w-full text-left
+                      [&>*:first-child]:mt-0
+                      prose prose-slate prose-lg max-w-none
+                      prose-p:leading-[1.8] prose-p:text-slate-600 prose-p:mb-5 
+                      prose-headings:font-serif prose-headings:text-slate-900 
+                      prose-h2:text-3xl prose-h2:mt-10 prose-h2:mb-8
+                      prose-headings:tracking-tight prose-headings:font-bold
+                      prose-h3:text-2xl prose-h3:mt-10
+                      [&_img]:rounded-[2rem] [&_img]:my-5
+                      [&_iframe]:rounded-[1.5rem] [&_iframe]:shadow-2xl [&_iframe]:my-5
+                      prose-p:first-of-type:first-letter:text-[5rem] 
+                      prose-p:first-of-type:first-letter:font-serif 
+                      prose-p:first-of-type:first-letter:font-black 
+                      prose-p:first-of-type:first-letter:text-daw-green 
+                      prose-p:first-of-type:first-letter:mr-4 
+                      prose-p:first-of-type:first-letter:float-left 
+                      prose-p:first-of-type:first-letter:leading-[0.7] 
+                      prose-p:first-of-type:first-letter:mt-2
+                      prose-p:first-of-type:first-letter:drop-shadow-sm
+                      prose-blockquote:border-l-4 prose-blockquote:border-daw-green
+                      prose-blockquote:bg-slate-50 prose-blockquote:py-4 prose-blockquote:px-6
+                      prose-blockquote:rounded-r-2xl prose-blockquote:text-daw-green
+                      prose-blockquote:font-serif prose-blockquote:italic prose-blockquote:my-10
+                      prose-li:marker:text-daw-green prose-li:my-2`}
+                    dangerouslySetInnerHTML={{
+                      __html:
+                        formData.content.replace(/&nbsp;|\u00A0/g, " ") ||
+                        "<p class='text-slate-300 italic'>Konten akan muncul di sini...</p>",
+                    }}
+                  />
+                </div>
+              </div>
             </div>
-            <div>
-              <label className="block text-xs text-slate-500 mb-1">Estimasi Waktu Baca</label>
-              <input type="text" value={formData.read_time} onChange={(e) => setFormData({ ...formData, read_time: e.target.value })} placeholder="e.g. 5 min read" className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-daw-green/20" />
-            </div>
           </div>
-
-          {/* SEO */}
-          <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6 space-y-4">
-            <label className="block text-xs font-black text-slate-500 uppercase tracking-wider">SEO</label>
-            <input type="text" value={formData.seo_title} onChange={(e) => setFormData({ ...formData, seo_title: e.target.value })} placeholder="SEO Title" className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-daw-green/20" />
-            <textarea value={formData.meta_description} onChange={(e) => setFormData({ ...formData, meta_description: e.target.value })} placeholder="Meta Description" rows={3} className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-daw-green/20 resize-none" />
-          </div>
-        </div>
+        )}
       </div>
     </div>
   );

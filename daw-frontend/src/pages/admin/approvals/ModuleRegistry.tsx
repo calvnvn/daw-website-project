@@ -16,6 +16,7 @@ import PhilosophyPillarPreview from "./previews/PhilosophyPillarPreview";
 import MenuPreview from "./previews/MenuPreview";
 import MapCategoryPreview from "./previews/MapCategoryPreview";
 import SettingsPreview from "./previews/SettingsPreview";
+import NewsArticlePreview from "./previews/NewsArticlePreview";
 
 const PREVIEW_REGISTRY: Record<string, any> = {
   History: HistoryPreview,
@@ -38,6 +39,7 @@ const PREVIEW_REGISTRY: Record<string, any> = {
   MENU: MenuPreview,
   MapCategory: MapCategoryPreview,
   Settings: SettingsPreview,
+  NewsArticle: NewsArticlePreview,
 };
 
 export default PREVIEW_REGISTRY;

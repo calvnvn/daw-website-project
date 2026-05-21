@@ -10,6 +10,19 @@ const { generateNotrans } = require("../utils/notransGenerator");
 
 const MODULE_NAME = "NewsArticle";
 
+// Utility: Calculates estimated reading time from HTML content using industry-standard 200 WPM.
+const calculateReadTime = (htmlContent) => {
+  if (!htmlContent) return "1 min read";
+  const plainText = htmlContent
+    .replace(/<[^>]*>?/gm, "")
+    .replace(/&nbsp;|\u00A0/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+  const wordCount = plainText.split(/\s+/).filter(Boolean).length;
+  const minutes = Math.ceil(wordCount / 200);
+  return `${Math.max(1, minutes)} min read`;
+};
+
 // Utility: Parses HTML content to identify uploaded image paths for garbage collection.
 const extractImagesFromHtml = (html) => {
   if (!html) return [];
@@ -123,7 +136,10 @@ const processNewsPayload = async (req, article) => {
       meta_description: meta_description ?? article.meta_description,
       author: authorIdentity,
       published_at: published_at ?? article.published_at,
-      read_time: read_time ?? article.read_time,
+      read_time:
+        read_time && read_time.trim()
+          ? read_time.trim()
+          : calculateReadTime(cleanContent),
       _filesToDelete: allFilesToTrash,
     },
     filesToDelete,

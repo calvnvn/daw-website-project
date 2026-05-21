@@ -119,18 +119,6 @@ app.use(
   }),
 );
 
-// Resolve and serve crawler instructions
-app.get("/robots.txt", (req, res) => {
-  const robotsPath = path.join(process.cwd(), "public", "robots.txt");
-  if (fs.existsSync(robotsPath)) {
-    res.type("text/plain");
-    res.sendFile(robotsPath);
-  } else {
-    res.type("text/plain");
-    res.send("User-agent: *\nDisallow: /");
-  }
-});
-
 // EXECUTION: API Router Registration
 // Map logical resource domains to dedicated route handlers
 app.use("/api/auth", authRoutes);
