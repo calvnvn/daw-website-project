@@ -309,13 +309,7 @@ export default function NewsEventDetail() {
                   prose-h3:text-2xl md:prose-h3:text-3xl prose-h3:mt-10
                   [&_img]:rounded-[2rem] [&_img]:my-8
                   [&_iframe]:rounded-[1.5rem] [&_iframe]:shadow-2xl [&_iframe]:my-8
-                  prose-p:first-of-type:first-letter:text-[4rem] md:prose-p:first-of-type:first-letter:text-[5.5rem] 
-                  prose-p:first-of-type:first-letter:font-serif prose-p:first-of-type:first-letter:font-black 
-                  prose-p:first-of-type:first-letter:text-daw-green prose-p:first-of-type:first-letter:mr-4 
-                  md:prose-p:first-of-type:first-letter:mr-5 prose-p:first-of-type:first-letter:float-left 
-                  prose-p:first-of-type:first-letter:leading-[0.8] md:prose-p:first-of-type:first-letter:leading-[0.7] 
-                  prose-p:first-of-type:first-letter:mt-1 md:prose-p:first-of-type:first-letter:mt-2
-                  prose-p:first-of-type:first-letter:drop-shadow-sm
+                  
                   prose-blockquote:border-l-4 prose-blockquote:border-daw-green
                   prose-blockquote:bg-slate-50 prose-blockquote:py-4 prose-blockquote:px-6
                   prose-blockquote:rounded-r-2xl prose-blockquote:text-daw-green
