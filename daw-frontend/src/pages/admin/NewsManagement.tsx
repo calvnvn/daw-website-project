@@ -10,6 +10,8 @@ import {
   Lock,
   X,
   Newspaper,
+  Tags,
+  Loader2,
 } from "lucide-react";
 import { Link } from "react-router-dom";
 import { toast } from "sonner";
@@ -538,69 +540,116 @@ export default function NewsManagement() {
       {/* CATEGORY MANAGER MODAL */}
       {showCatModal && (
         <div
-          className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/60 animate-in fade-in duration-200"
+          className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/60  animate-in fade-in duration-200"
           onClick={() => setShowCatModal(false)}>
           <div
-            className="bg-white rounded-2xl shadow-2xl w-full max-w-md animate-in zoom-in-95 duration-200"
+            className="bg-white rounded-2xl shadow-2xl w-full max-w-md animate-in zoom-in-95 duration-200 overflow-hidden flex flex-col max-h-[85vh]"
             onClick={(e) => e.stopPropagation()}>
-            <div className="p-6 border-b border-slate-100 flex justify-between items-center">
-              <h3 className="text-lg font-bold text-slate-900">
-                Kelola Kategori
-              </h3>
+            {/* Header */}
+            <div className="px-6 py-5 border-b border-slate-100 flex justify-between items-center bg-slate-50/50 shrink-0">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-daw-green/10 text-daw-green rounded-lg">
+                  <Tags className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-slate-900">
+                    Manajemen Kategori
+                  </h3>
+                  <p className="text-[11px] text-slate-500 uppercase tracking-widest font-bold mt-0.5">
+                    Label & Warna Berita
+                  </p>
+                </div>
+              </div>
               <button
                 onClick={() => setShowCatModal(false)}
-                className="p-2 hover:bg-slate-100 rounded-lg">
-                <X className="w-5 h-5 text-slate-400" />
+                className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-200 rounded-lg transition-colors">
+                <X className="w-5 h-5" />
               </button>
             </div>
-            <div className="p-6 space-y-4">
-              <div className="flex gap-2">
-                <input
-                  type="text"
-                  placeholder="Nama kategori baru..."
-                  value={newCatName}
-                  onChange={(e) => setNewCatName(e.target.value)}
-                  className="flex-1 px-4 py-2.5 bg-white border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-daw-green/20 focus:border-daw-green text-sm"
-                />
-                <input
-                  type="color"
-                  value={newCatColor}
-                  onChange={(e) => setNewCatColor(e.target.value)}
-                  className="w-12 h-10 rounded-lg border border-slate-200 cursor-pointer"
-                />
-                <button
-                  onClick={handleAddCategory}
-                  disabled={isCatSaving}
-                  className="px-4 py-2.5 bg-daw-green text-white rounded-lg text-sm font-bold hover:bg-[#003b1c] transition-all active:scale-95 disabled:opacity-50">
-                  <Plus className="w-4 h-4" />
-                </button>
-              </div>
-              <div className="divide-y divide-slate-100 max-h-60 overflow-y-auto">
-                {categories.map((cat) => (
-                  <div
-                    key={cat.id}
-                    className="flex items-center justify-between py-3 group">
-                    <div className="flex items-center gap-3">
-                      <div
-                        className="w-4 h-4 rounded-full border"
-                        style={{ backgroundColor: cat.color }}
-                      />
-                      <span className="text-sm font-medium text-slate-700">
-                        {cat.name}
-                      </span>
-                    </div>
-                    <button
-                      onClick={() => handleDeleteCategory(cat.id, cat.name)}
-                      className="p-1.5 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-lg opacity-0 group-hover:opacity-100 transition-all">
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </button>
+
+            {/* Content Area */}
+            <div className="p-6 flex flex-col gap-6 overflow-hidden">
+              {/* Add New Form */}
+              <div className="bg-slate-50 border border-slate-100 p-4 rounded-xl shrink-0">
+                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-3">
+                  Buat Kategori Baru
+                </label>
+                <div className="flex gap-2">
+                  <div className="relative flex-1">
+                    <input
+                      type="text"
+                      placeholder="Misal: CSR, Awards..."
+                      value={newCatName}
+                      onChange={(e) => setNewCatName(e.target.value)}
+                      className="w-full pl-3 pr-4 py-2.5 bg-white border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-daw-green/20 focus:border-daw-green text-sm shadow-sm transition-all"
+                    />
                   </div>
-                ))}
-                {categories.length === 0 && (
-                  <p className="py-4 text-center text-sm text-slate-400 italic">
-                    Belum ada kategori.
-                  </p>
-                )}
+
+                  <div className="relative group" title="Pilih Warna Kategori">
+                    <input
+                      type="color"
+                      value={newCatColor}
+                      onChange={(e) => setNewCatColor(e.target.value)}
+                      className="w-[42px] h-[42px] p-1 bg-white border border-slate-200 rounded-lg cursor-pointer shadow-sm group-hover:border-daw-green transition-colors"
+                    />
+                  </div>
+
+                  <button
+                    onClick={handleAddCategory}
+                    disabled={isCatSaving || !newCatName.trim()}
+                    className="flex items-center justify-center px-4 py-2 bg-daw-green text-white rounded-lg text-sm font-bold hover:bg-[#003b1c] transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed shadow-sm shadow-daw-green/20">
+                    {isCatSaving ? (
+                      <Loader2 className="w-5 h-5 animate-spin" />
+                    ) : (
+                      <Plus className="w-5 h-5" />
+                    )}
+                  </button>
+                </div>
+              </div>
+
+              {/* List Area */}
+              <div className="flex flex-col flex-1 overflow-hidden">
+                <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3 px-1">
+                  Daftar Kategori Aktif
+                </h4>
+                <div className="overflow-y-auto pr-2 pb-2 space-y-2 custom-scrollbar">
+                  {categories.map((cat) => (
+                    <div
+                      key={cat.id}
+                      className="flex items-center justify-between p-3.5 bg-white border border-slate-100 rounded-xl hover:border-slate-200 hover:shadow-sm group transition-all">
+                      <div className="flex items-center gap-3">
+                        <div
+                          className="w-5 h-5 rounded-md border shadow-sm flex items-center justify-center shrink-0"
+                          style={{
+                            backgroundColor: cat.color,
+                            borderColor: "rgba(0,0,0,0.1)",
+                          }}
+                        />
+                        <span className="text-sm font-bold text-slate-700">
+                          {cat.name}
+                        </span>
+                      </div>
+                      <button
+                        onClick={() => handleDeleteCategory(cat.id, cat.name)}
+                        className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 border border-transparent hover:border-red-100 rounded-lg transition-all opacity-0 group-hover:opacity-100 focus:opacity-100"
+                        title={`Hapus kategori ${cat.name}`}>
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+                  ))}
+
+                  {categories.length === 0 && (
+                    <div className="py-10 text-center border-2 border-dashed border-slate-100 rounded-xl bg-slate-50/50 flex flex-col items-center justify-center">
+                      <Tags className="w-8 h-8 text-slate-300 mb-3" />
+                      <p className="text-sm font-medium text-slate-500">
+                        Belum ada kategori yang dibuat.
+                      </p>
+                      <p className="text-xs text-slate-400 mt-1">
+                        Gunakan form di atas untuk membuat kategori pertama.
+                      </p>
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
           </div>
