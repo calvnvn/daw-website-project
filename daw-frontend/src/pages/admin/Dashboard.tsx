@@ -389,9 +389,9 @@ export default function Dashboard() {
   // 1. APPROVER VIEW
   if (role === "approver") {
     return (
-      <div className="max-w-4xl mx-auto space-y-8 animate-in fade-in duration-500 pb-12">
+      <div className="max-w-6xl mx-auto space-y-6 animate-in fade-in duration-500 pb-12">
         <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
-          <h1 className="text-3xl font-bold text-slate-900 tracking-tight">
+          <h1 className="text-2xl font-serif font-bold text-slate-900">
             Dashboard Peninjauan Konten
           </h1>
           <p className="text-sm text-slate-500 mt-1">
@@ -435,10 +435,10 @@ export default function Dashboard() {
   // 2. EDITOR VIEW
   if (role === "editor") {
     return (
-      <div className="max-w-6xl mx-auto space-y-8 animate-in fade-in duration-500 pb-12">
+      <div className="max-w-6xl mx-auto space-y-6 animate-in fade-in duration-500 pb-12">
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
           <div>
-            <h1 className="text-3xl font-bold text-slate-900 tracking-tight">
+            <h1 className="text-2xl font-serif font-bold text-slate-900">
               Pusat Konten
             </h1>
             <p className="text-sm text-slate-500 mt-1">
@@ -507,10 +507,10 @@ export default function Dashboard() {
 
   // 3. ADMIN / SUPERADMIN VIEW
   return (
-    <div className="max-w-6xl mx-auto space-y-8 animate-in fade-in duration-500 pb-12">
+    <div className="max-w-6xl mx-auto space-y-6 animate-in fade-in duration-500 pb-12">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
         <div>
-          <h1 className="text-3xl font-bold text-slate-900 tracking-tight">
+          <h1 className="text-2xl font-serif font-bold text-slate-900">
             Pusat Konten
           </h1>
           <p className="text-sm text-slate-500 mt-1">
@@ -532,8 +532,8 @@ export default function Dashboard() {
           <div className="bg-white rounded-xl border border-slate-200 shadow-sm flex flex-col h-[350px]">
             <div className="px-6 py-5 border-b border-slate-100 bg-slate-50/50 flex justify-between items-center">
               <h3 className="text-sm font-bold text-slate-800 flex items-center gap-2 uppercase tracking-wider">
-                <Activity className="w-4 h-4 text-blue-500" /> Pantau
-                Peninjauan Aktif
+                <Activity className="w-4 h-4 text-blue-500" /> Pantau Peninjauan
+                Aktif
               </h3>
               <span className="text-[10px] bg-slate-100 text-slate-500 px-2 py-1 rounded-md uppercase font-bold">
                 Hanya Baca
