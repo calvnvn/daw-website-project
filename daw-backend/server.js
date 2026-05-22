@@ -66,7 +66,7 @@ require("./models/Inquiry");
 require("./models/InquirySubject");
 require("./models/InvestmentSettings");
 require("./models/ApprovalDraft");
-require("./models/Achievement");
+const Achievement = require("./models/Achievement");
 const NewsCategory = require("./models/NewsCategory");
 const NewsArticle = require("./models/NewsArticle");
 
@@ -239,6 +239,11 @@ NewsArticle.belongsTo(NewsCategory, {
   foreignKey: "category_id",
   targetKey: "id",
   as: "categoryData",
+});
+
+Achievement.belongsTo(NewsArticle, {
+  foreignKey: "news_article_id",
+  as: "newsArticle",
 });
 
 // EXECUTION: Server Bootstrap

@@ -62,6 +62,13 @@ export interface AchievementItem extends Lockable {
   date: string;
   description: string;
   imageUrl: string | null;
+  news_article_id: string | null;
+  newsArticle?: {
+    id: string;
+    title: string;
+    slug: string;
+    status: string;
+  } | null;
 }
 
 interface AboutContextType {

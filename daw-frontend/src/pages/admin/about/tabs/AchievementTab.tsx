@@ -1,4 +1,4 @@
-import React, { useState, useRef, useMemo } from "react";
+import React, { useState, useRef, useMemo, useEffect } from "react";
 import {
   Lock,
   Edit,
@@ -9,6 +9,7 @@ import {
   Target,
   Loader2,
   AlertTriangle,
+  Link2,
 } from "lucide-react";
 import { toast } from "sonner";
 import api from "@/lib/api";
@@ -42,8 +43,24 @@ export default function AchievementTab({
   const [editingId, setEditingId] = useState<number | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [openIconPicker, setOpenIconPicker] = useState(false);
+  const [publishedArticles, setPublishedArticles] = useState<
+    { id: string; title: string }[]
+  >([]);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Fetch published news articles for the linking dropdown
+  useEffect(() => {
+    api
+      .get("/news", { params: { status: "Published" } })
+      .then((res) => {
+        const articles = (res.data?.data || res.data || [])
+          .filter((a: any) => a.status === "Published")
+          .map((a: any) => ({ id: a.id, title: a.title }));
+        setPublishedArticles(articles);
+      })
+      .catch(() => {});
+  }, []);
 
   const [form, setForm] = useState({
     year: "",
@@ -55,6 +72,7 @@ export default function AchievementTab({
     photo: null as File | null,
     removePhoto: false,
     savedPhotoUrl: null as string | null,
+    news_article_id: "" as string,
     originalSnapshot: null as string | null,
     previous_notrans: undefined as string | undefined,
     rejection_reason: undefined as string | undefined,
@@ -115,6 +133,7 @@ export default function AchievementTab({
         photo: null,
         removePhoto: false,
         savedPhotoUrl: payload.imageUrl || null,
+        news_article_id: payload.news_article_id || "",
         previous_notrans: draftNotrans,
         rejection_reason: draftReason,
         originalSnapshot: JSON.stringify({
@@ -125,6 +144,7 @@ export default function AchievementTab({
           date: safeDate || "",
           description: payload.description || "",
           imageUrl: payload.imageUrl || null,
+          news_article_id: payload.news_article_id || "",
         }),
       }));
     } else {
@@ -139,6 +159,7 @@ export default function AchievementTab({
         photo: null,
         removePhoto: false,
         savedPhotoUrl: null,
+        news_article_id: "",
         originalSnapshot: null,
         previous_notrans: undefined,
         rejection_reason: undefined,
@@ -168,6 +189,7 @@ export default function AchievementTab({
       date: form.date.trim(),
       description: form.description.trim(),
       imageUrl: form.savedPhotoUrl,
+      news_article_id: form.news_article_id || "",
     };
 
     return JSON.stringify(currentData) !== form.originalSnapshot;
@@ -202,7 +224,8 @@ export default function AchievementTab({
     formData.append("description", form.description.trim());
 
     if (form.removePhoto) formData.append("removePhoto", "true");
-    if (form.photo) formData.append("image", form.photo); // achievementRoutes expects 'image'
+    if (form.photo) formData.append("image", form.photo);
+    formData.append("news_article_id", form.news_article_id || "");
 
     // Inject Editor status for approval workflow
     if (isEditor) {
@@ -612,6 +635,33 @@ export default function AchievementTab({
                     }
                     className="w-full px-3 py-2.5 border border-slate-200 rounded-lg focus:ring-2 focus:ring-daw-green/20 resize-none transition-all text-sm"
                   />
+                </div>
+
+                {/* ARTICLE LINK DROPDOWN (Optional) */}
+                <div>
+                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                    <Link2 className="w-3.5 h-3.5" />
+                    Hubungkan ke Artikel Berita (Opsional)
+                  </label>
+                  <select
+                    value={form.news_article_id}
+                    onChange={(e) =>
+                      setForm({ ...form, news_article_id: e.target.value })
+                    }
+                    className="w-full px-3 py-2.5 border border-slate-200 rounded-lg focus:ring-2 focus:ring-daw-green/20 transition-all text-sm bg-white"
+                  >
+                    <option value="">— Tidak Ada Hubungan Artikel —</option>
+                    {publishedArticles.map((art) => (
+                      <option key={art.id} value={art.id}>
+                        {art.title}
+                      </option>
+                    ))}
+                  </select>
+                  <p className="text-[10px] text-slate-400 mt-1.5">
+                    Jika dihubungkan, pengunjung dapat menekan tombol "Read Full
+                    Story" pada kartu penghargaan untuk membaca cerita
+                    lengkapnya di News & Events.
+                  </p>
                 </div>
 
                 <div>

@@ -1,5 +1,6 @@
 const sequelize = require("../config/database");
 const Achievement = require("../models/Achievement");
+const NewsArticle = require("../models/NewsArticle");
 const ApprovalDraft = require("../models/ApprovalDraft");
 const { deleteSingleFile } = require("../utils/fileRemover");
 const ErpApprovalService = require("../services/erpApprovalService");
@@ -20,6 +21,14 @@ const getRole = (req) => (req.userRole ? req.userRole.toLowerCase().trim() : "")
 exports.getAllAchievements = async (req, res) => {
   try {
     const achievements = await Achievement.findAll({
+      include: [
+        {
+          model: NewsArticle,
+          as: "newsArticle",
+          attributes: ["id", "title", "slug", "status"],
+          required: false,
+        },
+      ],
       attributes: {
         include: [
           [
@@ -35,7 +44,7 @@ exports.getAllAchievements = async (req, res) => {
         ],
       },
       order: [
-        ["year", "DESC"], // Sort by most recent year
+        ["year", "DESC"],
         ["id", "DESC"],
       ],
     });
@@ -81,7 +90,7 @@ exports.createAchievement = async (req, res) => {
     const actorId = String(req.owl_username || req.karyawanId || "")
       .trim()
       .toLowerCase();
-    const { year, title, category, iconId, date, description, status } = req.body;
+    const { year, title, category, iconId, date, description, status, news_article_id } = req.body;
 
     const imageUrl = req.file ? req.file.filename : null;
     const isEditor = userRole === "editor" && status === "Published";
@@ -95,6 +104,7 @@ exports.createAchievement = async (req, res) => {
         date,
         description,
         imageUrl,
+        news_article_id: news_article_id || null,
         is_locked: isEditor,
         lock_ticket: null,
       },
@@ -172,7 +182,7 @@ exports.updateAchievement = async (req, res) => {
       .trim()
       .toLowerCase();
     const { id } = req.params;
-    const { year, title, category, iconId, date, description, removePhoto, status, previous_notrans } = req.body;
+    const { year, title, category, iconId, date, description, removePhoto, status, previous_notrans, news_article_id } = req.body;
 
     const achievement = await Achievement.findByPk(id, {
       transaction: t,
@@ -216,6 +226,7 @@ exports.updateAchievement = async (req, res) => {
       date: date || achievement.date,
       description: description || achievement.description,
       imageUrl: finalImageUrl,
+      news_article_id: news_article_id !== undefined ? (news_article_id || null) : achievement.news_article_id,
     };
 
     const isEditor = userRole === "editor" && status === "Published";

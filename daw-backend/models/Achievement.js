@@ -37,6 +37,11 @@ const Achievement = sequelize.define(
       type: DataTypes.STRING(255),
       allowNull: true,
     },
+    news_article_id: {
+      type: DataTypes.UUID,
+      allowNull: true,
+      comment: "Optional FK to NewsArticles for 'Read More' link",
+    },
     is_locked: {
       type: DataTypes.BOOLEAN,
       defaultValue: false,

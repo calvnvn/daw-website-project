@@ -1,7 +1,9 @@
 import { useState, useRef, useEffect, useMemo } from "react";
 import { useTranslation } from "react-i18next";
+import { Link } from "react-router-dom";
 import ScrollReveal from "../ScrollReveal";
 import {
+  ArrowRight,
   Calendar,
   ChevronDown,
   Trophy,
@@ -269,6 +271,20 @@ export default function Achievement() {
                   <p className="font-sans text-slate-600 leading-relaxed text-sm md:text-base">
                     {item.description}
                   </p>
+
+                  {/* Conditional: Read More link (only if a published article is linked) */}
+                  {item.newsArticle &&
+                    item.newsArticle.slug &&
+                    item.newsArticle.status === "Published" && (
+                      <div className="mt-5 pt-5 border-t border-slate-100">
+                        <Link
+                          to={`/news/${item.newsArticle.slug}`}
+                          className="inline-flex items-center gap-2 px-5 py-2.5 border-2 border-daw-green text-daw-green hover:bg-daw-green hover:text-white rounded-xl text-[11px] font-black uppercase tracking-[0.15em] transition-all duration-300 shadow-sm hover:shadow-md group/btn">
+                          <span>Read More</span>
+                          <ArrowRight className="w-3.5 h-3.5 group-hover/btn:translate-x-1 transition-transform" />
+                        </Link>
+                      </div>
+                    )}
                 </div>
               </div>
             </ScrollReveal>
