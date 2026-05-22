@@ -203,8 +203,7 @@ exports.getNewsById = async (req, res) => {
       ],
     });
 
-    if (!article)
-      return res.status(404).json({ message: "Article not found" });
+    if (!article) return res.status(404).json({ message: "Article not found" });
     res.status(200).json(article);
   } catch (error) {
     res.status(500).json({ message: error.message });
@@ -267,8 +266,7 @@ exports.createNews = async (req, res) => {
 
       await t.commit();
       return res.status(202).json({
-        message:
-          "Artikel baru diajukan. Data dikunci menunggu persetujuan.",
+        message: "Artikel baru diajukan. Data dikunci menunggu persetujuan.",
         ticket: notrans,
       });
     }
@@ -517,19 +515,34 @@ exports.getPublicNews = async (req, res) => {
     let orderClause;
     if (sortBy === "oldest") {
       orderClause = [
-        [sequelize.literal("COALESCE(`NewsArticle`.`published_at`, `NewsArticle`.`createdAt`)"), "ASC"],
+        [
+          sequelize.literal(
+            "COALESCE(`NewsArticle`.`published_at`, `NewsArticle`.`createdAt`)",
+          ),
+          "ASC",
+        ],
         ["id", "ASC"],
       ];
     } else if (sortBy === "popular") {
       orderClause = [
         ["views", "DESC"],
-        [sequelize.literal("COALESCE(`NewsArticle`.`published_at`, `NewsArticle`.`createdAt`)"), "DESC"],
+        [
+          sequelize.literal(
+            "COALESCE(`NewsArticle`.`published_at`, `NewsArticle`.`createdAt`)",
+          ),
+          "DESC",
+        ],
         ["id", "DESC"],
       ];
     } else {
       // Default: latest — guarantees newest article is always first
       orderClause = [
-        [sequelize.literal("COALESCE(`NewsArticle`.`published_at`, `NewsArticle`.`createdAt`)"), "DESC"],
+        [
+          sequelize.literal(
+            "COALESCE(`NewsArticle`.`published_at`, `NewsArticle`.`createdAt`)",
+          ),
+          "DESC",
+        ],
         ["id", "DESC"],
       ];
     }
@@ -623,7 +636,10 @@ exports.getPublicCategories = async (req, res) => {
           ],
         ],
       },
-      order: [["orderIndex", "ASC"], ["name", "ASC"]],
+      order: [
+        ["orderIndex", "ASC"],
+        ["name", "ASC"],
+      ],
     });
 
     // Auto-extract keywords from the 20 most recent published titles
@@ -631,26 +647,50 @@ exports.getPublicCategories = async (req, res) => {
       where: { status: "Published" },
       attributes: ["title"],
       limit: 20,
-      order: [["published_at", "DESC"], ["createdAt", "DESC"]],
+      order: [
+        ["published_at", "DESC"],
+        ["createdAt", "DESC"],
+      ],
     });
 
-    const stopWords = ["untuk", "dalam", "dengan", "pada", "dari", "yang", "dan", "di", "ke", "ini", "itu", "akan", "telah", "oleh", "sebagai", "adalah"];
+    const stopWords = [
+      "for",
+      "in",
+      "with",
+      "on",
+      "from",
+      "which",
+      "and",
+      "at",
+      "to",
+      "this",
+      "that",
+      "will",
+      "has",
+      "by",
+      "as",
+      "is",
+    ];
     const wordCounts = {};
-    recentArticles.forEach(a => {
-       const words = (a.title || "").toLowerCase().replace(/[^a-z0-9\s]/g, "").split(/\s+/);
-       words.forEach(word => {
-         if (word.length > 4 && !stopWords.includes(word)) {
-           const cap = word.charAt(0).toUpperCase() + word.slice(1);
-           wordCounts[cap] = (wordCounts[cap] || 0) + 1;
-         }
-       })
+    recentArticles.forEach((a) => {
+      const words = (a.title || "")
+        .toLowerCase()
+        .replace(/[^a-z0-9\s]/g, "")
+        .split(/\s+/);
+      words.forEach((word) => {
+        if (word.length > 4 && !stopWords.includes(word)) {
+          const cap = word.charAt(0).toUpperCase() + word.slice(1);
+          wordCounts[cap] = (wordCounts[cap] || 0) + 1;
+        }
+      });
     });
     const trendingKeywords = Object.entries(wordCounts)
       .sort((a, b) => b[1] - a[1])
       .slice(0, 6)
-      .map(entry => entry[0]);
+      .map((entry) => entry[0]);
 
-    if (trendingKeywords.length === 0) trendingKeywords.push("News", "Latest", "Update");
+    if (trendingKeywords.length === 0)
+      trendingKeywords.push("News", "Latest", "Update");
 
     res.status(200).json({ categories, trendingKeywords });
   } catch (error) {
