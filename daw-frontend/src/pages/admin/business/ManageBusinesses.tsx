@@ -435,6 +435,8 @@ export default function ManageBusinesses() {
         isLocked={shouldLockUI}
         lockTicket={currentSection?.lock_ticket}
         isSuperadmin={isSuperadmin}
+        activeSubTab={activeSubTab}
+        setActiveSubTab={setActiveSubTab}
       />
 
       <SectionTabs
@@ -453,31 +455,6 @@ export default function ManageBusinesses() {
           <CategoryManager />
         ) : (
           <div className="flex flex-col gap-6">
-            <div className="flex justify-between items-center w-full top-0 z-20 bg-white/95 backdrop-blur py-2 border-b border-slate-100">
-              <h3 className="text-sm font-bold text-slate-800">
-                Mode Tampilan:
-              </h3>
-              <div className="flex bg-slate-100 p-1 rounded-xl w-fit">
-                <button
-                  onClick={() => setActiveSubTab("edit")}
-                  className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-bold transition-all ${
-                    activeSubTab === "edit"
-                      ? "bg-white text-slate-800 shadow-sm"
-                      : "text-slate-500 hover:text-slate-700"
-                  }`}>
-                  <FileEdit className="w-3.5 h-3.5" /> Edit Form
-                </button>
-                <button
-                  onClick={() => setActiveSubTab("preview")}
-                  className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-bold transition-all ${
-                    activeSubTab === "preview"
-                      ? "bg-white text-slate-800 shadow-sm"
-                      : "text-slate-500 hover:text-slate-700"
-                  }`}>
-                  <Eye className="w-3.5 h-3.5" /> Live Preview
-                </button>
-              </div>
-            </div>
 
             {activeSubTab === "preview" ? (
               <BusinessLivePreview

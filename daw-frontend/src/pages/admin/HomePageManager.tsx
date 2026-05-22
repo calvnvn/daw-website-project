@@ -59,42 +59,41 @@ export default function HomepageManager() {
 
   return (
     <div className="max-w-6xl mx-auto space-y-6 animate-in fade-in duration-500 pb-12">
-      {/* HEADER */}
-      <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm flex justify-between items-center">
+      {/* GLOBAL HEADER & ACTION MATRIX */}
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white p-6 rounded-2xl border border-slate-200 shadow-sm top-0 z-30">
         <div>
-          <h1 className="text-2xl font-serif font-bold text-slate-900">
+          <h1 className="text-2xl font-serif font-black text-slate-900 tracking-tight">
             Homepage Manager
           </h1>
           <p className="text-sm text-slate-500 mt-1">
             Kelola identitas visual dan narasi utama beranda secara terpusat.
           </p>
         </div>
-      </div>
 
-      {/* VIEW MODE SWITCHER */}
-      <div className="bg-white p-3 rounded-xl border border-slate-200 shadow-sm flex flex-col sm:flex-row items-start sm:items-center justify-between mb-2 gap-4">
-        <h3 className="text-sm font-bold text-slate-800 px-2">
-          Mode Tampilan:
-        </h3>
-        <div className="flex bg-slate-100 p-1 rounded-xl w-full sm:w-fit">
-          <button
-            onClick={() => setActiveSubTab("edit")}
-            className={`flex-1 sm:flex-none flex items-center justify-center gap-1.5 px-5 py-2 rounded-lg text-xs font-bold transition-all ${
-              activeSubTab === "edit"
-                ? "bg-white text-slate-800 shadow-sm"
-                : "text-slate-500 hover:text-slate-700"
-            }`}>
-            <FileEdit className="w-3.5 h-3.5" /> Edit Form
-          </button>
-          <button
-            onClick={() => setActiveSubTab("preview")}
-            className={`flex-1 sm:flex-none flex items-center justify-center gap-1.5 px-5 py-2 rounded-lg text-xs font-bold transition-all ${
-              activeSubTab === "preview"
-                ? "bg-white text-slate-800 shadow-sm"
-                : "text-slate-500 hover:text-slate-700"
-            }`}>
-            <Eye className="w-3.5 h-3.5" /> Live Preview
-          </button>
+        <div className="flex items-center gap-3 w-full sm:w-auto">
+          {/* VIEW MODE TOGGLE */}
+          <div className="flex bg-slate-100 p-1 rounded-xl w-full sm:w-auto shadow-inner">
+            <button
+              onClick={() => setActiveSubTab("edit")}
+              className={`flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-2 rounded-lg text-xs font-bold transition-all duration-300 ${
+                activeSubTab === "edit"
+                  ? "bg-white text-daw-green shadow-sm ring-1 ring-slate-200"
+                  : "text-slate-500 hover:text-slate-700"
+              }`}>
+              <FileEdit className="w-3.5 h-3.5" />
+              <span>Input Form</span>
+            </button>
+            <button
+              onClick={() => setActiveSubTab("preview")}
+              className={`flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-2 rounded-lg text-xs font-bold transition-all duration-300 ${
+                activeSubTab === "preview"
+                  ? "bg-daw-green text-white shadow-sm"
+                  : "text-slate-500 hover:text-slate-700"
+              }`}>
+              <Eye className="w-3.5 h-3.5" />
+              <span>Live Preview</span>
+            </button>
+          </div>
         </div>
       </div>
 

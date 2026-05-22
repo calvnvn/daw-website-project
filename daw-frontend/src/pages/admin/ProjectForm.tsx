@@ -1017,7 +1017,7 @@ export default function ProjectForm() {
                   ? "bg-white text-slate-800 shadow-sm"
                   : "text-slate-500 hover:text-slate-700"
               }`}>
-              <FileEdit className="w-3.5 h-3.5" /> Edit Form
+              <FileEdit className="w-3.5 h-3.5" /> Input Form
             </button>
             <button
               type="button"

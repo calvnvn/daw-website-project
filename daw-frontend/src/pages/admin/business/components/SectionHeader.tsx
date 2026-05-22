@@ -7,6 +7,8 @@ import {
   Send,
   Loader2,
   ShieldAlert,
+  FileEdit,
+  Eye,
 } from "lucide-react";
 
 interface SectionHeaderProps {
@@ -19,6 +21,8 @@ interface SectionHeaderProps {
   isLocked: boolean;
   lockTicket?: string;
   isSuperadmin: boolean;
+  activeSubTab?: "edit" | "preview";
+  setActiveSubTab?: (val: "edit" | "preview") => void;
 }
 
 export default function SectionHeader({
@@ -31,6 +35,8 @@ export default function SectionHeader({
   isLocked,
   lockTicket,
   isSuperadmin,
+  activeSubTab = "edit",
+  setActiveSubTab,
 }: SectionHeaderProps) {
   const isCategoryTab = activeTab === "categories";
 
@@ -87,6 +93,32 @@ export default function SectionHeader({
             }>
             <Trash2 className="w-5 h-5" />
           </button>
+        )}
+
+        {/* VIEW MODE TOGGLE */}
+        {!isCategoryTab && setActiveSubTab && (
+          <div className="flex bg-slate-100 p-1 rounded-xl w-full sm:w-auto shadow-inner">
+            <button
+              onClick={() => setActiveSubTab("edit")}
+              className={`flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-2 rounded-lg text-xs font-bold transition-all duration-300 ${
+                activeSubTab === "edit"
+                  ? "bg-white text-daw-green shadow-sm ring-1 ring-slate-200"
+                  : "text-slate-500 hover:text-slate-700"
+              }`}>
+              <FileEdit className="w-3.5 h-3.5" />
+              <span>Input Form</span>
+            </button>
+            <button
+              onClick={() => setActiveSubTab("preview")}
+              className={`flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-2 rounded-lg text-xs font-bold transition-all duration-300 ${
+                activeSubTab === "preview"
+                  ? "bg-daw-green text-white shadow-sm"
+                  : "text-slate-500 hover:text-slate-700"
+              }`}>
+              <Eye className="w-3.5 h-3.5" />
+              <span>Live Preview</span>
+            </button>
+          </div>
         )}
 
         {/* MODE TOGGLE (Sesuai Tipografi Blueprint) */}
