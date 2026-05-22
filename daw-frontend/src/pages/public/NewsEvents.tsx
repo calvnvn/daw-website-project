@@ -1,8 +1,10 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { Link } from "react-router-dom";
 import {
   ArrowRight,
   Calendar,
+  Check,
+  ChevronDown,
   Clock,
   Filter,
   ImageIcon,
@@ -10,6 +12,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Loader2,
+  SlidersHorizontal,
   X,
   TrendingUp,
 } from "lucide-react";
@@ -63,8 +66,23 @@ export default function NewsEvents() {
 
   const [activeCategory, setActiveCategory] = useState("All");
   const [searchQuery, setSearchQuery] = useState("");
+  const [sortBy, setSortBy] = useState<"latest" | "oldest" | "popular">("latest");
+  const [isSortOpen, setIsSortOpen] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [scrollProgress, setScrollProgress] = useState(0);
+
+  const sortRef = useRef<HTMLDivElement>(null);
+
+  // Close sort dropdown on outside click
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (sortRef.current && !sortRef.current.contains(e.target as Node)) {
+        setIsSortOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
 
   const ITEMS_PER_PAGE = 6;
 
@@ -94,6 +112,7 @@ export default function NewsEvents() {
         const params: Record<string, string | number> = {
           page: currentPage,
           limit: ITEMS_PER_PAGE,
+          sortBy,
         };
         if (searchQuery.trim()) params.search = searchQuery.trim();
         if (activeCategory !== "All") params.category = activeCategory;
@@ -115,12 +134,12 @@ export default function NewsEvents() {
       }
     };
     fetchArticles();
-  }, [currentPage, activeCategory, searchQuery]);
+  }, [currentPage, activeCategory, searchQuery, sortBy]);
 
-  // Reset page when filter/search changes
+  // Reset page when filter/search/sort changes
   useEffect(() => {
     setCurrentPage(1);
-  }, [activeCategory, searchQuery]);
+  }, [activeCategory, searchQuery, sortBy]);
 
   // Scroll progress
   useEffect(() => {
@@ -150,9 +169,9 @@ export default function NewsEvents() {
     return () => clearTimeout(timer);
   }, [currentPage]);
 
-  // Featured article (only on All + page 1 + no search)
+  // Featured article (only on All + page 1 + no search + latest sort)
   const featuredArticle =
-    activeCategory === "All" && searchQuery === "" && currentPage === 1
+    activeCategory === "All" && searchQuery === "" && currentPage === 1 && sortBy === "latest"
       ? articles[0]
       : null;
   const gridArticles = featuredArticle ? articles.slice(1) : articles;
@@ -212,47 +231,88 @@ export default function NewsEvents() {
               ))}
             </div>
 
-            {/* Rich Search Bar */}
-            <div className="w-full lg:w-96 relative group z-30 shrink-0">
-              <div className="relative">
-                <input
-                  type="text"
-                  placeholder="Search articles, topics..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full bg-slate-50 border border-slate-200 rounded-full py-3.5 pl-12 pr-10 text-sm text-slate-700 focus:outline-none focus:ring-4 focus:ring-daw-green/10 focus:border-daw-green hover:border-slate-300 transition-all shadow-inner"
-                />
-                <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 group-focus-within:text-daw-green transition-colors" />
-                {searchQuery && (
-                  <button
-                    onClick={() => setSearchQuery("")}
-                    className="absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 hover:text-red-500 transition-colors">
-                    <X className="w-4 h-4" />
-                  </button>
-                )}
+            {/* Search + Sort Row */}
+            <div className="flex items-center gap-3 w-full lg:w-auto shrink-0">
+              {/* Rich Search Bar */}
+              <div className="w-full lg:w-80 relative group z-30">
+                <div className="relative">
+                  <input
+                    type="text"
+                    placeholder="Search articles, topics..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="w-full bg-slate-50 border border-slate-200 rounded-full py-3.5 pl-12 pr-10 text-sm text-slate-700 focus:outline-none focus:ring-4 focus:ring-daw-green/10 focus:border-daw-green hover:border-slate-300 transition-all shadow-inner"
+                  />
+                  <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 group-focus-within:text-daw-green transition-colors" />
+                  {searchQuery && (
+                    <button
+                      onClick={() => setSearchQuery("")}
+                      className="absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 hover:text-red-500 transition-colors">
+                      <X className="w-4 h-4" />
+                    </button>
+                  )}
+                </div>
+
+                {/* Popular Searches Popover */}
+                <div className="absolute top-full left-0 right-0 mt-3 bg-white rounded-2xl shadow-[0_10px_40px_-10px_rgba(0,0,0,0.1)] border border-slate-100 p-5 opacity-0 invisible group-focus-within:opacity-100 group-focus-within:visible transition-all duration-300 translate-y-2 group-focus-within:translate-y-0 before:content-[''] before:absolute before:-top-2 before:left-10 before:w-4 before:h-4 before:bg-white before:border-t before:border-l before:border-slate-100 before:rotate-45">
+                  <span className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-3 flex items-center gap-1.5">
+                    <TrendingUp className="w-3.5 h-3.5" /> Related Searches
+                  </span>
+                  <div className="flex flex-wrap gap-2 relative z-10">
+                    {(trendingKeywords.length > 0
+                      ? trendingKeywords
+                      : ["News", "Latest", "Update"]
+                    ).map((tag) => (
+                      <button
+                        key={tag}
+                        onMouseDown={(e) => {
+                          e.preventDefault();
+                          setSearchQuery(tag);
+                        }}
+                        className="px-3 py-1.5 bg-slate-50 hover:bg-daw-green hover:text-white text-slate-600 text-xs font-bold rounded-xl border border-slate-200 hover:border-daw-green transition-all">
+                        {tag}
+                      </button>
+                    ))}
+                  </div>
+                </div>
               </div>
 
-              {/* Popular Searches Popover */}
-              <div className="absolute top-full left-0 right-0 mt-3 bg-white rounded-2xl shadow-[0_10px_40px_-10px_rgba(0,0,0,0.1)] border border-slate-100 p-5 opacity-0 invisible group-focus-within:opacity-100 group-focus-within:visible transition-all duration-300 translate-y-2 group-focus-within:translate-y-0 before:content-[''] before:absolute before:-top-2 before:left-10 before:w-4 before:h-4 before:bg-white before:border-t before:border-l before:border-slate-100 before:rotate-45">
-                <span className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-3 flex items-center gap-1.5">
-                  <TrendingUp className="w-3.5 h-3.5" /> Related Searches
-                </span>
-                <div className="flex flex-wrap gap-2 relative z-10">
-                  {(trendingKeywords.length > 0
-                    ? trendingKeywords
-                    : ["News", "Latest", "Update"]
-                  ).map((tag) => (
-                    <button
-                      key={tag}
-                      onMouseDown={(e) => {
-                        e.preventDefault(); // Prevent input blur on click
-                        setSearchQuery(tag);
-                      }}
-                      className="px-3 py-1.5 bg-slate-50 hover:bg-daw-green hover:text-white text-slate-600 text-xs font-bold rounded-xl border border-slate-200 hover:border-daw-green transition-all">
-                      {tag}
-                    </button>
-                  ))}
-                </div>
+              {/* Sort Dropdown */}
+              <div className="relative shrink-0" ref={sortRef}>
+                <button
+                  onClick={() => setIsSortOpen(!isSortOpen)}
+                  className="flex items-center gap-2 px-5 py-3.5 bg-slate-50 border border-slate-200 hover:border-slate-300 text-slate-600 hover:text-slate-800 rounded-full text-[10px] sm:text-xs font-black uppercase tracking-widest transition-all whitespace-nowrap focus:outline-none focus:ring-4 focus:ring-daw-green/10">
+                  <SlidersHorizontal className="w-3.5 h-3.5" />
+                  <span className="hidden sm:inline">
+                    {sortBy === "latest" ? "Latest" : sortBy === "oldest" ? "Oldest" : "Popular"}
+                  </span>
+                  <ChevronDown className={`w-3.5 h-3.5 transition-transform duration-300 ${isSortOpen ? "rotate-180" : ""}`} />
+                </button>
+
+                {isSortOpen && (
+                  <div className="absolute right-0 mt-2.5 w-52 bg-white border border-slate-100 rounded-2xl shadow-[0_10px_40px_-10px_rgba(0,0,0,0.12)] z-50 p-2 animate-in fade-in slide-in-from-top-2 duration-200">
+                    {([
+                      { value: "latest", label: "Latest Release" },
+                      { value: "oldest", label: "Oldest First" },
+                      { value: "popular", label: "Most Popular" },
+                    ] as const).map((opt) => (
+                      <button
+                        key={opt.value}
+                        onClick={() => {
+                          setSortBy(opt.value);
+                          setIsSortOpen(false);
+                        }}
+                        className={`w-full flex items-center justify-between px-4 py-2.5 text-xs font-bold rounded-xl transition-colors ${
+                          sortBy === opt.value
+                            ? "bg-daw-green/5 text-daw-green"
+                            : "text-slate-600 hover:bg-slate-50"
+                        }`}>
+                        <span>{opt.label}</span>
+                        {sortBy === opt.value && <Check className="w-3.5 h-3.5" />}
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
           </div>

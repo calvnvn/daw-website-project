@@ -501,6 +501,7 @@ exports.getPublicNews = async (req, res) => {
     const offset = (page - 1) * limit;
     const search = req.query.search || "";
     const category = req.query.category || "";
+    const sortBy = req.query.sortBy || "latest";
 
     const whereClause = { status: "Published" };
 
@@ -510,6 +511,27 @@ exports.getPublicNews = async (req, res) => {
 
     if (category) {
       whereClause.category_id = category;
+    }
+
+    // Dynamic sorting with COALESCE fallback for null published_at
+    let orderClause;
+    if (sortBy === "oldest") {
+      orderClause = [
+        [sequelize.literal("COALESCE(`NewsArticle`.`published_at`, `NewsArticle`.`createdAt`)"), "ASC"],
+        ["id", "ASC"],
+      ];
+    } else if (sortBy === "popular") {
+      orderClause = [
+        ["views", "DESC"],
+        [sequelize.literal("COALESCE(`NewsArticle`.`published_at`, `NewsArticle`.`createdAt`)"), "DESC"],
+        ["id", "DESC"],
+      ];
+    } else {
+      // Default: latest — guarantees newest article is always first
+      orderClause = [
+        [sequelize.literal("COALESCE(`NewsArticle`.`published_at`, `NewsArticle`.`createdAt`)"), "DESC"],
+        ["id", "DESC"],
+      ];
     }
 
     const { count, rows } = await NewsArticle.findAndCountAll({
@@ -534,7 +556,7 @@ exports.getPublicNews = async (req, res) => {
           attributes: ["id", "name", "slug", "color"],
         },
       ],
-      order: [["published_at", "DESC"], ["createdAt", "DESC"]],
+      order: orderClause,
       limit,
       offset,
     });
