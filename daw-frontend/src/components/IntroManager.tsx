@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useHome } from "@/contexts/HomeContext";
+import HomeLivePreview from "./HomeLivePreview";
 import { useAuth } from "@/contexts/AuthContext";
 import {
   Save,
@@ -15,7 +16,7 @@ import {
 import { toast } from "sonner";
 import api from "@/lib/api";
 
-export default function IntroManager() {
+export default function IntroManager({ mode = "edit" }: { mode?: "edit" | "preview" }) {
   // 🚀 Identity Sync: Kasta Pengguna
   const { user } = useAuth();
   const isSuperadmin =
@@ -223,6 +224,10 @@ export default function IntroManager() {
       setIsSaving(false);
     }
   };
+
+  if (mode === "preview") {
+    return <HomeLivePreview type="intro" data={settings} />;
+  }
 
   return (
     <div className="space-y-6 animate-in fade-in duration-300">

@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useHome, type ImpactStats } from "@/contexts/HomeContext";
+import HomeLivePreview from "./HomeLivePreview";
 import { useAuth } from "@/contexts/AuthContext";
 import {
   Save,
@@ -26,7 +27,7 @@ const AVAILABLE_ICONS = [
   { name: "Globe", label: "Globe / Global" },
 ];
 
-export default function StatsManager() {
+export default function StatsManager({ mode = "edit" }: { mode?: "edit" | "preview" }) {
   const { stats: initialStats, refreshData, rejectedStatsMap } = useHome();
   const { user } = useAuth();
 
@@ -370,6 +371,10 @@ export default function StatsManager() {
       setIsSaving(false);
     }
   };
+  if (mode === "preview") {
+    return <HomeLivePreview type="stats" data={stats} />;
+  }
+
   return (
     <div className="space-y-6 animate-in fade-in duration-300">
       {/* HEADER (MATRIX BUTTONS) */}

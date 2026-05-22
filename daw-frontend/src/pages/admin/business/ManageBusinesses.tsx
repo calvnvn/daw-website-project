@@ -10,13 +10,14 @@ import {
 import SectionHeader from "./components/SectionHeader";
 import SectionTabs from "./components/SectionTabs";
 import BusinessEditor from "./components/BusinessEditor";
+import BusinessLivePreview from "./components/BusinessLivePreview";
 import MapManager from "./components/MapManager";
 import CategoryManager from "./components/CategoryManager";
 import AddSectionModal from "./modals/AddSectionModal";
 import DeleteSectionModal from "./modals/DeleteSectionModal";
 import MapPickerModal from "./modals/MapPickerModal";
 import { useAuth } from "@/contexts/AuthContext";
-import { LockIcon, ShieldAlert } from "lucide-react";
+import { LockIcon, ShieldAlert, FileEdit, Eye } from "lucide-react";
 
 const normalizeBool = (val: any): boolean => {
   return val === true || val === "true" || val === 1 || val === "1";
@@ -49,6 +50,7 @@ export default function ManageBusinesses() {
 
   // --- 1. CORE & DATA STATES (Blueprint Form: 1A) ---
   const [activeTab, setActiveTab] = useState<string>("");
+  const [activeSubTab, setActiveSubTab] = useState<"edit" | "preview">("edit");
   const [formData, setFormData] =
     useState<Omit<SectionData, "id">>(initialFormData);
   const [originalData, setOriginalData] =
@@ -192,7 +194,7 @@ export default function ManageBusinesses() {
 
     const toastId = toast.loading("Mengabaikan notifikasi penolakan...");
     try {
-      await api.patch('/approval/discard', { notrans: rejectedDraft.notrans });
+      await api.patch("/approval/discard", { notrans: rejectedDraft.notrans });
 
       toast.success("Notifikasi revisi berhasil diabaikan.", { id: toastId });
       clearRejectedDraft();
@@ -450,25 +452,60 @@ export default function ManageBusinesses() {
         {activeTab === "categories" ? (
           <CategoryManager />
         ) : (
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-            <BusinessEditor
-              activeTab={activeTab}
-              formData={formData}
-              setFormData={setFormData}
-              isEditing={isEditing && !shouldLockUI}
-              handleDiscardDraft={handleDiscardDraft}
-            />
+          <div className="flex flex-col gap-6">
+            <div className="flex justify-between items-center w-full top-0 z-20 bg-white/95 backdrop-blur py-2 border-b border-slate-100">
+              <h3 className="text-sm font-bold text-slate-800">
+                Mode Tampilan:
+              </h3>
+              <div className="flex bg-slate-100 p-1 rounded-xl w-fit">
+                <button
+                  onClick={() => setActiveSubTab("edit")}
+                  className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-bold transition-all ${
+                    activeSubTab === "edit"
+                      ? "bg-white text-slate-800 shadow-sm"
+                      : "text-slate-500 hover:text-slate-700"
+                  }`}>
+                  <FileEdit className="w-3.5 h-3.5" /> Edit Form
+                </button>
+                <button
+                  onClick={() => setActiveSubTab("preview")}
+                  className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-bold transition-all ${
+                    activeSubTab === "preview"
+                      ? "bg-white text-slate-800 shadow-sm"
+                      : "text-slate-500 hover:text-slate-700"
+                  }`}>
+                  <Eye className="w-3.5 h-3.5" /> Live Preview
+                </button>
+              </div>
+            </div>
 
-            <MapManager
-              formData={formData}
-              setFormData={setFormData}
-              isEditing={isEditing && !shouldLockUI}
-              categories={categories}
-              categoryMap={categoryMap}
-              onOpenMapPicker={() => setIsMapModalOpen(true)}
-              updateMarker={updateMarker}
-              removeMarker={removeMarker}
-            />
+            {activeSubTab === "preview" ? (
+              <BusinessLivePreview
+                formData={formData}
+                categories={categories}
+              />
+            ) : (
+              <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+                <BusinessEditor
+                  activeTab={activeTab}
+                  formData={formData}
+                  setFormData={setFormData}
+                  isEditing={isEditing && !shouldLockUI}
+                  handleDiscardDraft={handleDiscardDraft}
+                />
+
+                <MapManager
+                  formData={formData}
+                  setFormData={setFormData}
+                  isEditing={isEditing && !shouldLockUI}
+                  categories={categories}
+                  categoryMap={categoryMap}
+                  onOpenMapPicker={() => setIsMapModalOpen(true)}
+                  updateMarker={updateMarker}
+                  removeMarker={removeMarker}
+                />
+              </div>
+            )}
           </div>
         )}
       </main>

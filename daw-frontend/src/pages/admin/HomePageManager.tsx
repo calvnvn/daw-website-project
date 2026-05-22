@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import {
   MonitorPlay,
@@ -5,6 +6,8 @@ import {
   BarChart3,
   Lock,
   AlertTriangle,
+  FileEdit,
+  Eye,
 } from "lucide-react";
 import { useHome } from "@/contexts/HomeContext";
 import { useAuth } from "@/contexts/AuthContext";
@@ -15,6 +18,7 @@ import HeroManager from "@/components/HeroManager";
 export default function HomepageManager() {
   const [searchParams, setSearchParams] = useSearchParams();
   const activeTab = searchParams.get("tab") || "hero";
+  const [activeSubTab, setActiveSubTab] = useState<"edit" | "preview">("edit");
 
   const { user } = useAuth();
   const isSuperadmin = user?.role === "superadmin" || user?.role === "admin";
@@ -64,6 +68,33 @@ export default function HomepageManager() {
           <p className="text-sm text-slate-500 mt-1">
             Kelola identitas visual dan narasi utama beranda secara terpusat.
           </p>
+        </div>
+      </div>
+
+      {/* VIEW MODE SWITCHER */}
+      <div className="bg-white p-3 rounded-xl border border-slate-200 shadow-sm flex flex-col sm:flex-row items-start sm:items-center justify-between mb-2 gap-4">
+        <h3 className="text-sm font-bold text-slate-800 px-2">
+          Mode Tampilan:
+        </h3>
+        <div className="flex bg-slate-100 p-1 rounded-xl w-full sm:w-fit">
+          <button
+            onClick={() => setActiveSubTab("edit")}
+            className={`flex-1 sm:flex-none flex items-center justify-center gap-1.5 px-5 py-2 rounded-lg text-xs font-bold transition-all ${
+              activeSubTab === "edit"
+                ? "bg-white text-slate-800 shadow-sm"
+                : "text-slate-500 hover:text-slate-700"
+            }`}>
+            <FileEdit className="w-3.5 h-3.5" /> Edit Form
+          </button>
+          <button
+            onClick={() => setActiveSubTab("preview")}
+            className={`flex-1 sm:flex-none flex items-center justify-center gap-1.5 px-5 py-2 rounded-lg text-xs font-bold transition-all ${
+              activeSubTab === "preview"
+                ? "bg-white text-slate-800 shadow-sm"
+                : "text-slate-500 hover:text-slate-700"
+            }`}>
+            <Eye className="w-3.5 h-3.5" /> Live Preview
+          </button>
         </div>
       </div>
 
@@ -119,13 +150,13 @@ export default function HomepageManager() {
       {/* TAB CONTENT AREA */}
       <div className="bg-white rounded-b-xl border border-t-0 border-slate-200 shadow-sm p-6 lg:p-8 min-h-[500px]">
         <div className={activeTab === "hero" ? "block" : "hidden"}>
-          <HeroManager />
+          <HeroManager mode={activeSubTab} />
         </div>
         <div className={activeTab === "intro" ? "block" : "hidden"}>
-          <IntroManager />
+          <IntroManager mode={activeSubTab} />
         </div>
         <div className={activeTab === "stats" ? "block" : "hidden"}>
-          <StatsManager />
+          <StatsManager mode={activeSubTab} />
         </div>
       </div>
     </div>

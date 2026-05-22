@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useHome, type HeroSlides } from "@/contexts/HomeContext";
+import HomeLivePreview from "./HomeLivePreview";
 import {
   Save,
   Plus,
@@ -30,7 +31,7 @@ interface EditableSlide extends Omit<HeroSlides, "id"> {
   isDeleting?: boolean;
 }
 
-export default function HeroManager() {
+export default function HeroManager({ mode = "edit" }: { mode?: "edit" | "preview" }) {
   const { slides: initialSlides, rejectedSlidesMap, refreshData } = useHome();
   const { user } = useAuth();
 
@@ -394,6 +395,10 @@ export default function HeroManager() {
   };
 
   const hasRejectedSlides = Object.keys(rejectedSlidesMap || {}).length > 0;
+
+  if (mode === "preview") {
+    return <HomeLivePreview type="hero" data={slides} />;
+  }
 
   return (
     <div className="space-y-6 animate-in fade-in duration-300">
