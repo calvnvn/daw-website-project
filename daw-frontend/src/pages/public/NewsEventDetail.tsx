@@ -12,6 +12,9 @@ import {
   FolderOpen,
   Loader2,
   Clock,
+  Maximize2,
+  ChevronLeft,
+  X,
 } from "lucide-react";
 import { toast } from "sonner";
 import SEO from "@/components/SEO";
@@ -42,6 +45,7 @@ interface ArticleDetail {
   meta_description: string;
   createdAt: string;
   categoryData?: CategoryData | null;
+  gallery_images?: any[];
 }
 
 interface SidebarPost {
@@ -85,6 +89,14 @@ export default function NewsEventDetail() {
   const [trendingKeywords, setTrendingKeywords] = useState<string[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [isLoading, setIsLoading] = useState(true);
+
+  // Gallery States
+  const [lightboxOpen, setLightboxOpen] = useState(false);
+  const [currentImageIndex, setCurrentImageIndex] = useState(0);
+  const [isZoomed, setIsZoomed] = useState(false);
+
+  // Gallery Data
+  const galleryImages = article?.gallery_images || [];
 
   // Fetch article by slug
   useEffect(() => {
@@ -330,6 +342,217 @@ export default function NewsEventDetail() {
                   ),
                 }}
               />
+
+              {/* --- PREMIUM GALLERY SECTION --- */}
+              {galleryImages && galleryImages.length > 0 && (
+                <div className="mt-16 pt-12 border-t border-slate-100 animate-in fade-in duration-700">
+                  <h3 className="text-2xl font-serif font-bold text-slate-900 mb-8 flex items-center gap-3">
+                    <span className="w-8 h-1 bg-daw-green rounded-full" />
+                    GALLERY
+                  </h3>
+
+                  {/* 1 PHOTO LAYOUT */}
+                  {galleryImages.length === 1 && (
+                    <div className="rounded-[2rem] overflow-hidden shadow-xl border border-slate-100 bg-slate-200/60 h-[400px] relative group cursor-pointer">
+                      <div
+                        className="w-full h-full"
+                        onClick={() => {
+                          setCurrentImageIndex(0);
+                          setLightboxOpen(true);
+                        }}>
+                        <img
+                          src={getImageUrl(galleryImages[0].imageUrl)}
+                          alt="Gallery Showcase"
+                          className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
+                        />
+                        <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex flex-col justify-end p-8">
+                          <p className="text-white font-sans text-xs font-semibold uppercase tracking-widest mb-1.5 opacity-80">
+                            View Photo
+                          </p>
+                          <p className="text-white font-sans text-[15px] font-medium translate-y-4 group-hover:translate-y-0 transition-transform duration-300">
+                            {galleryImages[0].caption ||
+                              "Click to expand image"}
+                          </p>
+                        </div>
+                        <div className="absolute top-6 right-6 w-12 h-12 rounded-full bg-white/20 backdrop-blur-md flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300 border border-white/30">
+                          <Maximize2 className="w-6 h-6 text-white" />
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* 2 PHOTOS LAYOUT */}
+                  {galleryImages.length === 2 && (
+                    <div className="rounded-[2rem] overflow-hidden shadow-xl border border-slate-100 bg-slate-200/60 grid grid-cols-1 md:grid-cols-2 gap-[3px]">
+                      {galleryImages.map((img, idx) => (
+                        <div
+                          key={idx}
+                          className="h-[350px] relative group cursor-pointer overflow-hidden"
+                          onClick={() => {
+                            setCurrentImageIndex(idx);
+                            setLightboxOpen(true);
+                          }}>
+                          <img
+                            src={getImageUrl(img.imageUrl)}
+                            alt={`Gallery ${idx}`}
+                            className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
+                          />
+                          <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex flex-col justify-end p-6">
+                            <p className="text-white font-sans text-xs font-semibold uppercase tracking-widest mb-1.5 opacity-80">
+                              View Photo
+                            </p>
+                            <p className="text-white font-sans text-sm font-medium translate-y-4 group-hover:translate-y-0 transition-transform duration-300">
+                              {img.caption || "Click to expand image"}
+                            </p>
+                          </div>
+                          <div className="absolute top-4 right-4 w-10 h-10 rounded-full bg-white/20 backdrop-blur-md flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300 border border-white/30">
+                            <Maximize2 className="w-5 h-5 text-white" />
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* 3 PHOTOS LAYOUT */}
+                  {galleryImages.length === 3 && (
+                    <div className="rounded-[2rem] overflow-hidden shadow-xl border border-slate-100 bg-slate-200/60 flex flex-col md:grid md:grid-cols-12 gap-[3px]">
+                      {/* Main Image */}
+                      <div
+                        className="md:col-span-8 h-[300px] md:h-[450px] overflow-hidden relative group cursor-pointer"
+                        onClick={() => {
+                          setCurrentImageIndex(0);
+                          setLightboxOpen(true);
+                        }}>
+                        <img
+                          src={galleryImages[0].imageUrl}
+                          alt="Gallery Cover"
+                          className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
+                        />
+                        <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex flex-col justify-end p-6">
+                          <p className="text-white font-sans text-xs font-semibold uppercase tracking-widest mb-1.5 opacity-80">
+                            View Photo
+                          </p>
+                          <p className="text-white font-sans text-sm font-medium translate-y-4 group-hover:translate-y-0 transition-transform duration-300">
+                            {galleryImages[0].caption ||
+                              "Click to expand image"}
+                          </p>
+                        </div>
+                        <div className="absolute top-4 right-4 w-10 h-10 rounded-full bg-white/20 backdrop-blur-md flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300 border border-white/30">
+                          <Maximize2 className="w-5 h-5 text-white" />
+                        </div>
+                      </div>
+
+                      {/* Stacked Images Column */}
+                      <div className="md:col-span-4 flex flex-col gap-[3px]">
+                        {galleryImages.slice(1, 3).map((img, idx) => {
+                          const globalIndex = idx + 1;
+                          return (
+                            <div
+                              key={globalIndex}
+                              className="h-[223.5px] overflow-hidden relative group cursor-pointer"
+                              onClick={() => {
+                                setCurrentImageIndex(globalIndex);
+                                setLightboxOpen(true);
+                              }}>
+                              <img
+                                src={getImageUrl(img.imageUrl)}
+                                alt={`Gallery ${globalIndex}`}
+                                className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
+                              />
+                              <div className="absolute inset-0 bg-gradient-to-t from-black/80 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex flex-col justify-end p-4">
+                                <p className="text-white text-[10px] font-sans font-semibold uppercase tracking-widest mb-1 opacity-80">
+                                  View Photo
+                                </p>
+                                <p className="text-white text-xs font-medium translate-y-2 group-hover:translate-y-0 transition-transform duration-300 line-clamp-2">
+                                  {img.caption || "Click to expand image"}
+                                </p>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* 4+ PHOTOS LAYOUT (Bento Showcase) */}
+                  {galleryImages.length >= 4 && (
+                    <div className="rounded-[2rem] overflow-hidden shadow-xl border border-slate-100 bg-slate-200/60 flex flex-col md:grid md:grid-cols-12 gap-[3px]">
+                      {/* Main Image */}
+                      <div
+                        className="md:col-span-8 h-[300px] md:h-[450px] overflow-hidden relative group cursor-pointer"
+                        onClick={() => {
+                          setCurrentImageIndex(0);
+                          setLightboxOpen(true);
+                        }}>
+                        <img
+                          src={getImageUrl(galleryImages[0].imageUrl)}
+                          alt="Gallery Cover"
+                          className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
+                        />
+                        <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex flex-col justify-end p-6">
+                          <p className="text-white font-sans text-xs font-semibold uppercase tracking-widest mb-1.5 opacity-80">
+                            View Photo
+                          </p>
+                          <p className="text-white font-sans text-sm font-medium translate-y-4 group-hover:translate-y-0 transition-transform duration-300">
+                            {galleryImages[0].caption ||
+                              "Click to expand image"}
+                          </p>
+                        </div>
+                        <div className="absolute top-4 right-4 w-10 h-10 rounded-full bg-white/20 backdrop-blur-md flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300 border border-white/30">
+                          <Maximize2 className="w-5 h-5 text-white" />
+                        </div>
+                      </div>
+
+                      {/* Stacked Images Column */}
+                      <div className="md:col-span-4 flex flex-col gap-[3px]">
+                        {galleryImages.slice(1, 4).map((img, idx) => {
+                          const isLast = idx === 2 && galleryImages.length > 4;
+                          const globalIndex = idx + 1;
+
+                          return (
+                            <div
+                              key={globalIndex}
+                              className="h-[148px] overflow-hidden relative group cursor-pointer"
+                              onClick={() => {
+                                setCurrentImageIndex(globalIndex);
+                                setLightboxOpen(true);
+                              }}>
+                              <img
+                                src={getImageUrl(img.imageUrl)}
+                                alt={`Gallery ${globalIndex}`}
+                                className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
+                              />
+                              {!isLast && (
+                                <div className="absolute inset-0 bg-gradient-to-t from-black/80 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex flex-col justify-end p-4">
+                                  <p className="text-white text-[10px] font-sans font-semibold uppercase tracking-widest mb-1 opacity-80">
+                                    View Photo
+                                  </p>
+                                  <p className="text-white text-xs font-medium translate-y-2 group-hover:translate-y-0 transition-transform duration-300 line-clamp-2">
+                                    {img.caption || "Click to expand image"}
+                                  </p>
+                                </div>
+                              )}
+
+                              {/* Overlay +X More Photos */}
+                              {isLast && (
+                                <div className="absolute inset-0 bg-black/70 flex flex-col items-center justify-center group-hover:bg-black/80 transition-colors">
+                                  <span className="text-white font-serif text-3xl font-bold">
+                                    +{galleryImages.length - 4}
+                                  </span>
+                                  <span className="text-white/80 text-[10px] font-black tracking-[0.2em] uppercase mt-2">
+                                    MORE PHOTOS
+                                  </span>
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+              {/* --- END GALLERY SECTION --- */}
             </div>
 
             {/* Right Column: Sticky Sidebar */}
@@ -466,6 +689,77 @@ export default function NewsEventDetail() {
           </div>
         </div>
       </div>
+
+      {/* --- LIGHTBOX MODAL --- */}
+      {lightboxOpen && galleryImages.length > 0 && (
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/95 backdrop-blur-xl">
+          {/* Close Button */}
+          <button
+            className="absolute top-6 right-6 w-12 h-12 flex items-center justify-center rounded-full bg-white/10 hover:bg-white/20 text-white transition-colors z-50 border border-white/10"
+            onClick={() => {
+              setLightboxOpen(false);
+              setIsZoomed(false);
+            }}>
+            <X className="w-6 h-6" />
+          </button>
+
+          {/* Navigation Prev */}
+          <button
+            className="absolute left-6 top-1/2 -translate-y-1/2 w-14 h-14 flex items-center justify-center rounded-full bg-black/50 hover:bg-daw-green text-white transition-all z-50 border border-white/10 hover:scale-110 disabled:opacity-30 disabled:hover:bg-black/50 disabled:hover:scale-100"
+            onClick={(e) => {
+              e.stopPropagation();
+              setIsZoomed(false);
+              setCurrentImageIndex((prev) =>
+                prev > 0 ? prev - 1 : galleryImages.length - 1,
+              );
+            }}>
+            <ChevronLeft className="w-8 h-8" />
+          </button>
+
+          {/* Main Image View */}
+          <div
+            className="relative w-full h-full flex flex-col items-center justify-center p-8 md:p-16 overflow-hidden cursor-zoom-in"
+            onClick={() => setIsZoomed(!isZoomed)}>
+            <img
+              src={getImageUrl(galleryImages[currentImageIndex].imageUrl)}
+              alt="Lightbox View"
+              className={`max-w-full max-h-[80vh] object-contain transition-all duration-500 ${isZoomed ? "scale-150 cursor-zoom-out" : "scale-100"}`}
+            />
+
+            {/* Integrated Caption Bar */}
+            <div
+              className="absolute bottom-8 left-1/2 -translate-x-1/2 w-[90%] max-w-3xl bg-black/40 backdrop-blur-md px-8 py-5 rounded-2xl border border-white/10 shadow-2xl transition-opacity duration-300"
+              onClick={(e) => e.stopPropagation()} // Mencegah klik deskripsi men-trigger zoom
+            >
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-daw-green font-bold text-xs uppercase tracking-widest">
+                  DOCUMENTATION
+                </span>
+                <span className="text-white/60 font-mono text-xs">
+                  {currentImageIndex + 1} / {galleryImages.length}
+                </span>
+              </div>
+              <p className="text-white/90 font-sans text-[15px] leading-relaxed">
+                {galleryImages[currentImageIndex].caption ||
+                  "No description available."}
+              </p>
+            </div>
+          </div>
+
+          {/* Navigation Next */}
+          <button
+            className="absolute right-6 top-1/2 -translate-y-1/2 w-14 h-14 flex items-center justify-center rounded-full bg-black/50 hover:bg-daw-green text-white transition-all z-50 border border-white/10 hover:scale-110 disabled:opacity-30 disabled:hover:bg-black/50 disabled:hover:scale-100"
+            onClick={(e) => {
+              e.stopPropagation();
+              setIsZoomed(false);
+              setCurrentImageIndex((prev) =>
+                prev < galleryImages.length - 1 ? prev + 1 : 0,
+              );
+            }}>
+            <ChevronRight className="w-8 h-8" />
+          </button>
+        </div>
+      )}
     </>
   );
 }

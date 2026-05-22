@@ -12,7 +12,12 @@
     "investments": "Investasi Lainnya",
     "sustainability": "Keberlanjutan",
     "contact": "Hubungi Kami",
-    "cta": "Hubungi Kami"
+    "cta": "Hubungi Kami",
+    "achievement": "Penghargaan",
+    "news": "Berita & Acara",
+    "language": "Bahasa",
+    "english": "Inggris (EN)",
+    "indonesian": "Indonesia (ID)"
   },
   "hero": {
     "slide1": {
@@ -34,7 +39,8 @@
     "tagline": "LOGO KAMI",
     "headline": "Perusahaan Induk Operasional Terkemuka.",
     "body": "PT Dharma Agung Wijaya (DAW Group) berfokus pada dua pilar utama: Energi Terbarukan dan Sumber Daya Alam. Kami berkomitmen pada keunggulan operasional dan hidup selaras dengan Alam, mengintegrasikan bisnis kami dari hulu ke hilir untuk menciptakan nilai berkelanjutan bagi masyarakat.",
-    "cta": "Pelajari Lebih Lanjut Sejarah Kami"
+    "cta": "Pelajari Lebih Lanjut Sejarah Kami",
+    "ctaAria": "Pelajari lebih lanjut tentang sejarah DAW Group"
   },
   "business": {
     "sectionTitle": "Bisnis Kami",

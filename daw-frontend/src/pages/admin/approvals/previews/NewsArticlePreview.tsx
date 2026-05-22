@@ -153,6 +153,34 @@ export default function NewsArticlePreview({ data }: { data: any }) {
           />
         </div>
       </div>
+
+      {/* SECTION 4: GALLERY IMAGES PREVIEW */}
+      {data.gallery_images && Array.isArray(data.gallery_images) && data.gallery_images.length > 0 && (
+        <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm space-y-4">
+          <span className="text-[10px] font-black uppercase tracking-widest text-slate-400 block">
+            Galeri Foto Dokumentasi ({data.gallery_images.length})
+          </span>
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
+            {data.gallery_images.map((img: any, idx: number) => (
+              <div key={idx} className="relative group rounded-xl overflow-hidden border border-slate-200 aspect-video bg-slate-50">
+                <img
+                  src={getCleanImageUrl(img.imageUrl)}
+                  className="w-full h-full object-cover"
+                  alt={`Gallery ${idx}`}
+                />
+                {img.caption && (
+                  <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-end p-2">
+                    <p className="text-[10px] text-white leading-snug line-clamp-2">{img.caption}</p>
+                  </div>
+                )}
+                <div className="absolute top-1.5 left-1.5 bg-black/60 text-white text-[9px] font-bold px-1.5 py-0.5 rounded">
+                  #{idx + 1}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

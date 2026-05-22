@@ -12,7 +12,12 @@
     "investments": "Other Investments",
     "sustainability": "Sustainability",
     "contact": "Contact Us",
-    "cta": "Contact Us"
+    "cta": "Contact Us",
+    "achievement": "Achievements",
+    "news": "News & Events",
+    "language": "Language",
+    "english": "English (EN)",
+    "indonesian": "Indonesia (ID)"
   },
   "hero": {
     "slide1": {
@@ -34,7 +39,8 @@
     "tagline": "OUR LOGO",
     "headline": "A Leading Operating Holding Company.",
     "body": "PT Dharma Agung Wijaya (DAW Group) focuses on two core pillars: Renewable Energy and Resources. We are committed to operational excellence and living in harmony with Mother Nature, integrating our businesses from upstream to downstream to create sustainable value for society.",
-    "cta": "Learn More About Our History"
+    "cta": "Learn More About Our History",
+    "ctaAria": "Learn more about the history of DAW Group"
   },
   "business": {
     "sectionTitle": "Our Businesses",

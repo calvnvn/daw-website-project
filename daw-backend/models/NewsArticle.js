@@ -77,6 +77,11 @@ const NewsArticle = sequelize.define(
       allowNull: true,
       comment: "Menyimpan No. Tiket dari OWL yang sedang mengunci data ini",
     },
+    gallery_images: {
+      type: DataTypes.JSON,
+      allowNull: true,
+      comment: "Stores array of objects: [{ imageUrl, caption, orderIndex }]",
+    },
   },
   {
     timestamps: true,

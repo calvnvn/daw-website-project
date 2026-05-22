@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { useTranslation } from "react-i18next";
-import { Menu, X, ChevronDown } from "lucide-react";
+import { Menu, X, ChevronDown, Globe } from "lucide-react";
 import logoDaw from "@/assets/logo-daw.png";
 import api from "@/lib/api";
 import { useSettings } from "@/contexts/SettingsContext";
@@ -19,7 +19,7 @@ const isLocalRoute = (url: string) =>
 
 export default function DynamicNavbar() {
   const { settings } = useSettings();
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
 
   // FIX 2: Destructuring dengan Alias untuk sinkronisasi sektor bisnis
   const { sections: businessSections } = useBusiness();
@@ -48,10 +48,11 @@ export default function DynamicNavbar() {
     fetchMenus();
   }, []);
 
-  // const toggleLanguage = () => {
-  //   const newLang = i18n.language === "en" ? "id" : "en";
-  //   i18n.changeLanguage(newLang);
-  // };
+  const toggleLanguage = () => {
+    const newLang = i18n.language === "en" ? "id" : "en";
+    i18n.changeLanguage(newLang);
+    localStorage.setItem("lng", newLang);
+  };
 
   const closeMenu = () => {
     setIsMobileMenuOpen(false);
@@ -277,13 +278,20 @@ export default function DynamicNavbar() {
           </nav>
 
           <div className="flex items-center gap-5">
-            {/* <button
+            <button
               onClick={toggleLanguage}
-              className={`flex items-center gap-1.5 text-[13px] tracking-wide font-bold transition-colors ${textClass}`}
+              className={`flex items-center gap-2 px-3 py-1.5 rounded-full border text-[13px] tracking-wide font-bold transition-all duration-300 hover:scale-105 active:scale-95 focus:outline-none cursor-pointer ${
+                isTransparent
+                  ? "text-white border-transparent hover:bg-white/10"
+                  : "text-slate-800 border-slate-200 hover:bg-slate-50 shadow-sm"
+              }`}
+              aria-label={`Ubah bahasa ke ${i18n.language === "en" ? "Indonesia" : "Inggris"}`}
             >
-              <Globe className="h-4 w-4" />
-              {i18n.language === "en" ? "EN" : "ID"}
-            </button> */}
+              <Globe className={`h-4 w-4 transition-transform duration-500 ${
+                isTransparent ? "text-white" : "text-daw-green"
+              } ${i18n.language === "id" ? "rotate-180" : ""}`} />
+              <span className="font-extrabold uppercase select-none">{i18n.language}</span>
+            </button>
             <Link
               to="/contact-us"
               className="hidden md:flex items-center justify-center bg-daw-green hover:bg-[#003b1c] text-white rounded-full px-6 py-3 text-[13px] tracking-wide font-bold shadow-md transition-transform hover:scale-105 border-0">
@@ -520,6 +528,25 @@ export default function DynamicNavbar() {
                 </div>
               );
             })}
+
+            {/* SWITCHER BAHASA MOBILE */}
+            <div className="flex items-center justify-between py-4 border-t border-slate-100 mt-2">
+              <span className="text-[13px] tracking-wide font-bold text-slate-800 uppercase">
+                {t("nav.language", "Language")}
+              </span>
+              <button
+                onClick={() => {
+                  toggleLanguage();
+                  closeMenu();
+                }}
+                className="flex items-center gap-2 px-4 py-2 rounded-full border border-slate-200 text-[12px] font-extrabold text-slate-700 bg-slate-50 active:scale-95 focus:outline-none"
+              >
+                <Globe className="h-4 w-4 text-daw-green" />
+                <span className="uppercase font-extrabold">
+                  {i18n.language === "en" ? t("nav.english", "English (EN)") : t("nav.indonesian", "Indonesia (ID)")}
+                </span>
+              </button>
+            </div>
 
             {/* 5. STATIC: CONTACT US BUTTON */}
             <div className="pt-4 mt-2 border-t border-slate-100">

@@ -82,6 +82,7 @@ const processNewsPayload = async (req, article) => {
     author,
     published_at,
     read_time,
+    gallery_images,
   } = req.body;
 
   const authorIdentity =
@@ -123,6 +124,21 @@ const processNewsPayload = async (req, article) => {
   const allFilesToTrash = [...filesToDelete];
   if (oldCoverToDelete) allFilesToTrash.push(oldCoverToDelete);
 
+  // Parse gallery_images if it's sent as a stringified JSON array from FormData
+  let parsedGallery = article.gallery_images || null;
+  if (gallery_images !== undefined) {
+    if (typeof gallery_images === "string") {
+      try {
+        parsedGallery = JSON.parse(gallery_images);
+      } catch (e) {
+        console.warn("Failed to parse gallery_images JSON string:", e);
+        parsedGallery = article.gallery_images || null;
+      }
+    } else {
+      parsedGallery = gallery_images;
+    }
+  }
+
   return {
     payload: {
       title: title ?? article.title,
@@ -140,6 +156,7 @@ const processNewsPayload = async (req, article) => {
         read_time && read_time.trim()
           ? read_time.trim()
           : calculateReadTime(cleanContent),
+      gallery_images: parsedGallery,
       _filesToDelete: allFilesToTrash,
     },
     filesToDelete,

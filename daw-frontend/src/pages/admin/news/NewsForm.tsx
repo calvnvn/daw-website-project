@@ -43,6 +43,12 @@ interface RejectedDraft {
   createdAt: string;
 }
 
+export interface GalleryImage {
+  imageUrl: string;
+  caption: string;
+  orderIndex: number;
+}
+
 export default function NewsForm() {
   const navigate = useNavigate();
   const { id } = useParams();
@@ -62,6 +68,8 @@ export default function NewsForm() {
     "split",
   );
   const [isDragging, setIsDragging] = useState(false);
+  const [galleryImages, setGalleryImages] = useState<GalleryImage[]>([]);
+  const [isUploadingGallery, setIsUploadingGallery] = useState(false);
 
   const initialFormState = {
     title: "",
@@ -75,6 +83,7 @@ export default function NewsForm() {
     is_locked: false,
     lock_ticket: "",
     published_at: "",
+    gallery_images: [] as GalleryImage[],
   };
 
   const [formData, setFormData] = useState(initialFormState);
@@ -161,9 +170,11 @@ export default function NewsForm() {
             published_at: data.published_at
               ? new Date(data.published_at).toISOString().slice(0, 16)
               : "",
+            gallery_images: Array.isArray(data.gallery_images) ? data.gallery_images : [],
           };
           setFormData(normalized);
           setOriginalData(normalized);
+          setGalleryImages(Array.isArray(data.gallery_images) ? data.gallery_images : []);
         } else if (articleRes.reason.name !== "CanceledError") {
           throw articleRes.reason;
         }
@@ -238,6 +249,9 @@ export default function NewsForm() {
           : prev.published_at,
         read_time: payload.read_time ?? 0,
       }));
+      if (Array.isArray(payload.gallery_images)) {
+        setGalleryImages(payload.gallery_images);
+      }
       setCoverFile(null);
       setCoverPreview(null);
       toast.success("Konten draf berhasil dipulihkan!");
@@ -315,6 +329,7 @@ export default function NewsForm() {
       // @ts-expect-error dynamic access
       if (formData[key] !== originalData[key]) return true;
     }
+    if (JSON.stringify(galleryImages) !== JSON.stringify(originalData.gallery_images)) return true;
     return false;
   };
 
@@ -352,6 +367,10 @@ export default function NewsForm() {
           "published_at",
           new Date(formData.published_at).toISOString(),
         );
+
+      if (galleryImages.length > 0) {
+        payload.append("gallery_images", JSON.stringify(galleryImages));
+      }
 
       if (rejectedDraft?.notrans)
         payload.append("previous_notrans", rejectedDraft.notrans);
@@ -405,6 +424,83 @@ export default function NewsForm() {
     onDropAccepted: () => setIsDragging(false),
     onDropRejected: () => setIsDragging(false),
   });
+
+  const { getRootProps: getGalleryProps, getInputProps: getGalleryInputProps, isDragActive: isGalleryDragging } = useDropzone({
+    disabled: shouldLockUI || isUploadingGallery,
+    onDrop: async (files) => {
+      const validFiles = files.filter(f => f.type.startsWith("image/"));
+      if (validFiles.length === 0) return;
+      
+      setIsUploadingGallery(true);
+      const loadingToast = toast.loading(`Mengunggah ${validFiles.length} foto galeri...`);
+      const newImages: GalleryImage[] = [];
+      let startIdx = galleryImages.length;
+
+      try {
+        for (const file of validFiles) {
+          const compressed = await compressImage(file);
+          const uploadData = new FormData();
+          uploadData.append("inline_image", compressed);
+          
+          const response = await api.post("/news/upload-inline", uploadData);
+          if (response.data?.url) {
+            newImages.push({
+              imageUrl: response.data.url,
+              caption: "",
+              orderIndex: startIdx++
+            });
+          }
+        }
+        
+        if (newImages.length > 0) {
+          setGalleryImages(prev => [...prev, ...newImages]);
+          toast.success(`Berhasil menambahkan ${newImages.length} foto!`, { id: loadingToast });
+        } else {
+          toast.error("Tidak ada foto yang berhasil diunggah.", { id: loadingToast });
+        }
+      } catch (err) {
+        console.error("Gallery upload error", err);
+        toast.error("Sebagian upload galeri gagal. Periksa koneksi Anda.", { id: loadingToast });
+      } finally {
+        setIsUploadingGallery(false);
+      }
+    },
+    accept: { "image/jpeg": [], "image/png": [], "image/webp": [] },
+  });
+
+  const moveGalleryImage = (index: number, direction: 'left' | 'right') => {
+    if (shouldLockUI) return;
+    const newIndex = direction === 'left' ? index - 1 : index + 1;
+    if (newIndex < 0 || newIndex >= galleryImages.length) return;
+    
+    setGalleryImages(prev => {
+      const newArr = [...prev];
+      const temp = newArr[index];
+      newArr[index] = newArr[newIndex];
+      newArr[newIndex] = temp;
+      
+      // Update orderIndex
+      return newArr.map((img, i) => ({ ...img, orderIndex: i }));
+    });
+  };
+
+  const removeGalleryImage = (index: number) => {
+    if (shouldLockUI) return;
+    setGalleryImages(prev => {
+      const newArr = [...prev];
+      newArr.splice(index, 1);
+      return newArr.map((img, i) => ({ ...img, orderIndex: i }));
+    });
+  };
+
+  const updateGalleryCaption = (index: number, caption: string) => {
+    if (shouldLockUI) return;
+    setGalleryImages(prev => {
+      const newArr = [...prev];
+      newArr[index].caption = caption;
+      return newArr;
+    });
+  };
 
   const getDynamicSeoDescription = () => {
     if (formData.meta_description && formData.meta_description.trim() !== "")
@@ -996,6 +1092,138 @@ export default function NewsForm() {
                       modules={quillModules}
                       className="min-h-[500px] flex flex-col [&_.ql-editor]:p-10 [&_.ql-editor]:text-slate-700 [&_.ql-editor]:text-lg [&_.ql-toolbar]:border-0 [&_.ql-toolbar]:border-b [&_.ql-toolbar]:bg-slate-50/80 [&_.ql-container]:border-0"
                     />
+                  </div>
+                </div>
+
+                {/* SECTION 5: EVENT GALLERY EDITOR */}
+                <div className="space-y-6">
+                  <div className="flex items-center gap-2 border-b border-slate-100 pb-2">
+                    <ImageIcon className="w-4 h-4 text-daw-green" />
+                    <h3 className="text-sm font-bold text-slate-900">
+                      Event Gallery
+                    </h3>
+                    <span className="ml-2 text-[9px] font-black uppercase bg-daw-green/10 text-daw-green px-2 py-0.5 rounded border border-daw-green/20">
+                      Optional
+                    </span>
+                  </div>
+
+                  <div className="bg-slate-50 border border-slate-200 rounded-3xl p-6 space-y-6">
+                    {/* Drag and Drop Zone */}
+                    <div
+                      {...getGalleryProps()}
+                      className={`relative border-2 border-dashed rounded-2xl p-6 flex flex-col items-center justify-center transition-all duration-300 outline-none
+                        ${
+                          shouldLockUI
+                            ? "border-slate-200 bg-white opacity-60 cursor-not-allowed"
+                            : isGalleryDragging
+                              ? "border-daw-green bg-daw-green/5 ring-4 ring-daw-green/10 scale-[0.99]"
+                              : "border-slate-300 bg-white hover:border-daw-green hover:bg-slate-50 cursor-pointer"
+                        }`}>
+                      <input {...getGalleryInputProps()} />
+                      <div
+                        className={`p-3 rounded-xl mb-3 transition-all duration-300 ${
+                          isGalleryDragging || isUploadingGallery
+                            ? "bg-daw-green text-white"
+                            : "bg-slate-100 text-slate-400 group-hover:text-daw-green"
+                        }`}>
+                        {isUploadingGallery ? (
+                          <RefreshCw className="w-6 h-6 animate-spin" />
+                        ) : (
+                          <UploadCloud className={`w-6 h-6 ${isGalleryDragging ? "animate-bounce" : ""}`} />
+                        )}
+                      </div>
+                      <div className="text-center">
+                        <p className="text-sm font-bold text-slate-700">
+                          {isUploadingGallery
+                            ? "Sedang mengunggah..."
+                            : "Drag & Drop beberapa foto sekaligus di sini"}
+                        </p>
+                        {!shouldLockUI && !isUploadingGallery && (
+                          <p className="text-[10px] text-slate-500 font-medium mt-1">
+                            Klik untuk menelusuri (JPG, PNG, WebP)
+                          </p>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Draggable Thumbnail Grid */}
+                    {galleryImages.length > 0 && (
+                      <div className="space-y-4">
+                        <div className="flex items-center justify-between">
+                          <h4 className="text-[10px] font-black uppercase text-slate-400 tracking-widest flex items-center gap-1.5">
+                            <Layout className="w-3 h-3" /> Sortable Grid
+                          </h4>
+                          <span className="text-[10px] font-bold text-slate-500 bg-slate-200/50 px-2 py-1 rounded-md">
+                            {galleryImages.length} Foto
+                          </span>
+                        </div>
+
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+                          {galleryImages.map((img, idx) => (
+                            <div key={idx} className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm hover:shadow-md transition-shadow group flex flex-col">
+                              {/* Thumbnail Header */}
+                              <div className="relative h-36 bg-slate-100 border-b border-slate-100">
+                                <img
+                                  src={img.imageUrl.startsWith("http") ? img.imageUrl : `${BASE_UPLOAD_URL}/${img.imageUrl}`}
+                                  alt={`Gallery ${idx}`}
+                                  className="w-full h-full object-cover"
+                                />
+                                <div className="absolute top-2 left-2 bg-black/60 backdrop-blur text-white text-[10px] font-bold px-2 py-1 rounded-lg">
+                                  #{idx + 1}
+                                </div>
+                                {!shouldLockUI && (
+                                  <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                    <button
+                                      type="button"
+                                      disabled={idx === 0}
+                                      onClick={() => moveGalleryImage(idx, 'left')}
+                                      className="p-1.5 bg-white text-slate-700 hover:text-daw-green rounded-lg shadow disabled:opacity-50"
+                                      title="Geser Kiri"
+                                    >
+                                      <ChevronLeft className="w-3.5 h-3.5" />
+                                    </button>
+                                    <button
+                                      type="button"
+                                      disabled={idx === galleryImages.length - 1}
+                                      onClick={() => moveGalleryImage(idx, 'right')}
+                                      className="p-1.5 bg-white text-slate-700 hover:text-daw-green rounded-lg shadow disabled:opacity-50 rotate-180"
+                                      title="Geser Kanan"
+                                    >
+                                      <ChevronLeft className="w-3.5 h-3.5" />
+                                    </button>
+                                  </div>
+                                )}
+                              </div>
+                              
+                              {/* Metadata Body */}
+                              <div className="p-3 flex-1 flex flex-col gap-3">
+                                <div className="space-y-1">
+                                  <label className="text-[9px] font-black uppercase tracking-widest text-slate-400">Caption Hover</label>
+                                  <textarea
+                                    disabled={shouldLockUI}
+                                    maxLength={150}
+                                    value={img.caption || ""}
+                                    onChange={(e) => updateGalleryCaption(idx, e.target.value)}
+                                    placeholder="Opsional keterangan foto..."
+                                    className="w-full text-xs p-2 rounded-lg bg-slate-50 border border-slate-200 outline-none resize-none focus:bg-white focus:border-daw-green transition-colors disabled:opacity-60 disabled:bg-slate-100"
+                                    rows={2}
+                                  />
+                                </div>
+                                {!shouldLockUI && (
+                                  <button
+                                    type="button"
+                                    onClick={() => removeGalleryImage(idx)}
+                                    className="w-full py-1.5 text-[10px] font-bold text-red-500 hover:text-red-600 hover:bg-red-50 rounded-lg flex items-center justify-center gap-1 transition-colors"
+                                  >
+                                    <Trash2 className="w-3 h-3" /> Hapus dari Galeri
+                                  </button>
+                                )}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>

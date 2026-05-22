@@ -9,7 +9,7 @@ i18n.use(initReactI18next).init({
     en: { translation: en },
     id: { translation: id },
   },
-  lng: "en", // Bahasa default
+  lng: localStorage.getItem("lng") || "en", // Bahasa default
   fallbackLng: "en", // Kalau ada teks ID yang kosong, otomatis pakai EN
   debug: false,
   interpolation: {
