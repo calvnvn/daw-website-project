@@ -16,17 +16,20 @@ import api from "@/lib/api";
 import { useAbout } from "@/contexts/AboutContext";
 import type { ManagementItem as ManagementMember } from "@/contexts/AboutContext";
 import { PhotoPreviewer, ManagementImage } from "../AboutSharedComponents";
+import AboutLivePreview from "../../../../components/AboutLivePreview";
 
 interface ManagementTabProps {
   isEditing: boolean;
   isSuperadmin: boolean;
   isEditor: boolean;
+  mode?: "edit" | "preview";
 }
 
 export default function ManagementTab({
   isEditing,
   isSuperadmin,
   isEditor,
+  mode = "edit",
 }: ManagementTabProps) {
   const { managementTeam, refreshData } = useAbout();
 
@@ -301,6 +304,15 @@ export default function ManagementTab({
     });
   };
   // RENDER
+  if (mode === "preview") {
+    // We pass managementTeam to the preview so the user can see it live
+    return (
+      <div className="animate-in fade-in zoom-in-95 duration-500">
+        <AboutLivePreview type="management" data={managementTeam} />
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-8 animate-in fade-in duration-300 relative">
       {/* REJECTION RIBBON (Blueprint 3) */}

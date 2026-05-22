@@ -18,11 +18,13 @@ import type { AchievementItem } from "@/contexts/AboutContext";
 import { PhotoPreviewer } from "../AboutSharedComponents";
 import { AVAILABLE_ICONS } from "../AboutConstants";
 import { getCleanImageUrl } from "@/lib/utils";
+import AboutLivePreview from "../../../../components/AboutLivePreview";
 
 interface AchievementTabProps {
   isEditing: boolean;
   isSuperadmin: boolean;
   isEditor: boolean;
+  mode?: "edit" | "preview";
 }
 
 const toSafeInputDate = (dateStr: string) => {
@@ -36,6 +38,7 @@ export default function AchievementTab({
   isEditing,
   isSuperadmin,
   isEditor,
+  mode = "edit",
 }: AchievementTabProps) {
   const { achievements, refreshData } = useAbout();
 
@@ -277,6 +280,13 @@ export default function AchievementTab({
       },
     });
   };
+  if (mode === "preview") {
+    return (
+      <div className="animate-in fade-in zoom-in-95 duration-500">
+        <AboutLivePreview type="achievement" data={achievements} />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-8 animate-in fade-in duration-300 relative">

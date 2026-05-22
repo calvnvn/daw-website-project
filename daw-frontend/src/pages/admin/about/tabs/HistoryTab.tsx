@@ -13,11 +13,13 @@ import {
 import { toast } from "sonner";
 import api from "@/lib/api";
 import { useAbout } from "@/contexts/AboutContext";
+import AboutLivePreview from "../../../../components/AboutLivePreview";
 
 interface HistoryTabProps {
   isEditing: boolean;
   isSuperadmin: boolean;
   isEditor: boolean;
+  mode?: "edit" | "preview";
 }
 
 interface LocalHistoryItem {
@@ -37,6 +39,7 @@ export default function HistoryTab({
   isEditing,
   isSuperadmin,
   isEditor,
+  mode = "edit",
 }: HistoryTabProps) {
   const { companyHistory, refreshData } = useAbout();
 
@@ -213,6 +216,17 @@ export default function HistoryTab({
       setIsSaving(false);
     }
   };
+
+  // --- RENDER ---
+  if (mode === "preview") {
+    // Sort items by year conceptually? The public site usually displays them as provided or sorted by year? 
+    // Public site renders them in order, so we just pass historyItems.
+    return (
+      <div className="animate-in fade-in zoom-in-95 duration-500">
+        <AboutLivePreview type="history" data={historyItems} />
+      </div>
+    );
+  }
 
   return (
     <div

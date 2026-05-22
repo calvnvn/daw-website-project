@@ -9,6 +9,8 @@ import {
   ShieldAlert,
   Clock,
   Award,
+  Eye,
+  FileEdit,
 } from "lucide-react";
 import { useAbout } from "@/contexts/AboutContext";
 import { useAuth } from "@/contexts/AuthContext";
@@ -35,6 +37,7 @@ export default function AboutUsManager() {
   const [activeTab, setActiveTab] = useState<
     "info" | "history" | "philosophy" | "management" | "achievement"
   >("info");
+  const [activeSubTab, setActiveSubTab] = useState<"edit" | "preview">("edit");
   const [isEditing, setIsEditing] = useState(false);
   // const [hideDraftBanner, setHideDraftBanner] = useState(false);
 
@@ -174,6 +177,30 @@ export default function AboutUsManager() {
         </div>
 
         <div className="flex items-center gap-3 w-full sm:w-auto">
+          {/* VIEW MODE TOGGLE */}
+          <div className="flex bg-slate-100 p-1 rounded-xl w-full sm:w-auto shadow-inner">
+            <button
+              onClick={() => setActiveSubTab("edit")}
+              className={`flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-2 rounded-lg text-xs font-bold transition-all duration-300 ${
+                activeSubTab === "edit"
+                  ? "bg-white text-daw-green shadow-sm ring-1 ring-slate-200"
+                  : "text-slate-500 hover:text-slate-700"
+              }`}>
+              <FileEdit className="w-3.5 h-3.5" />
+              <span>Input Form</span>
+            </button>
+            <button
+              onClick={() => setActiveSubTab("preview")}
+              className={`flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-2 rounded-lg text-xs font-bold transition-all duration-300 ${
+                activeSubTab === "preview"
+                  ? "bg-daw-green text-white shadow-sm"
+                  : "text-slate-500 hover:text-slate-700"
+              }`}>
+              <Eye className="w-3.5 h-3.5" />
+              <span>Live Preview</span>
+            </button>
+          </div>
+
           <button
             onClick={() => {
               if (isGlobalLockActive) {
@@ -277,6 +304,7 @@ export default function AboutUsManager() {
       <div className="bg-white rounded-b-xl border border-t-0 border-slate-200 shadow-sm p-6 lg:p-8 min-h-[500px] transition-all duration-500">
         {activeTab === "info" && (
           <AboutInfoTab
+            mode={activeSubTab}
             isEditing={isEditing}
             isSuperadmin={isSuperadmin}
             isEditor={isEditor}
@@ -284,6 +312,7 @@ export default function AboutUsManager() {
         )}
         {activeTab === "history" && (
           <HistoryTab
+            mode={activeSubTab}
             isEditing={isEditing}
             isSuperadmin={isSuperadmin}
             isEditor={isEditor}
@@ -291,6 +320,7 @@ export default function AboutUsManager() {
         )}
         {activeTab === "philosophy" && (
           <PhilosophyTab
+            mode={activeSubTab}
             isEditing={isEditing}
             isSuperadmin={isSuperadmin}
             isEditor={isEditor}
@@ -298,6 +328,7 @@ export default function AboutUsManager() {
         )}
         {activeTab === "management" && (
           <ManagementTab
+            mode={activeSubTab}
             isEditing={isEditing}
             isSuperadmin={isSuperadmin}
             isEditor={isEditor}
@@ -305,6 +336,7 @@ export default function AboutUsManager() {
         )}
         {activeTab === "achievement" && (
           <AchievementTab
+            mode={activeSubTab}
             isEditing={isEditing}
             isSuperadmin={isSuperadmin}
             isEditor={isEditor}

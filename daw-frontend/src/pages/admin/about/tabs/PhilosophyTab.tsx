@@ -18,17 +18,20 @@ import api from "@/lib/api";
 import { useAbout } from "@/contexts/AboutContext";
 import type { PhilosophyPillar } from "@/contexts/AboutContext";
 import { AVAILABLE_ICONS } from "../AboutConstants";
+import AboutLivePreview from "../../../../components/AboutLivePreview";
 
 interface PhilosophyTabProps {
   isEditing: boolean;
   isSuperadmin: boolean;
   isEditor: boolean;
+  mode?: "edit" | "preview";
 }
 
 export default function PhilosophyTab({
   isEditing,
   isSuperadmin,
   isEditor,
+  mode = "edit",
 }: PhilosophyTabProps) {
   const { philosophyData, philosophyPillars, refreshData } = useAbout();
 
@@ -325,6 +328,17 @@ export default function PhilosophyTab({
   };
 
   // --- RENDER ---
+  if (mode === "preview") {
+    // For philosophy preview, we need to merge the local titleForm and philosophyPillars
+    // Wait, what if the user edited a pillar in the modal and didn't save?
+    // Actually, philosophy pillars save independently. So we just pass the updated titleForm and the current philosophyPillars.
+    return (
+      <div className="animate-in fade-in zoom-in-95 duration-500">
+        <AboutLivePreview type="philosophy" data={titleForm} extraData={philosophyPillars} />
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-12 animate-in fade-in duration-300">
       {/* ==========================================

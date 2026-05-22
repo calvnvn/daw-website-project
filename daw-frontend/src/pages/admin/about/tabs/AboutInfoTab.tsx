@@ -11,11 +11,13 @@ import {
 import { toast } from "sonner";
 import api from "@/lib/api";
 import { useAbout } from "@/contexts/AboutContext";
+import AboutLivePreview from "../../../../components/AboutLivePreview";
 
 interface AboutInfoTabProps {
   isEditing: boolean;
   isSuperadmin: boolean;
   isEditor: boolean;
+  mode?: "edit" | "preview";
 }
 
 interface InfoFormData {
@@ -28,6 +30,7 @@ export default function AboutInfoTab({
   isEditing,
   isSuperadmin,
   isEditor,
+  mode = "edit",
 }: AboutInfoTabProps) {
   const { aboutData, refreshData } = useAbout();
 
@@ -203,6 +206,14 @@ export default function AboutInfoTab({
   };
 
   // --- RENDER ---
+  if (mode === "preview") {
+    return (
+      <div className="animate-in fade-in zoom-in-95 duration-500">
+        <AboutLivePreview type="info" data={formData} />
+      </div>
+    );
+  }
+
   return (
     <div
       className={`space-y-6 animate-in fade-in duration-300 transition-all ${
