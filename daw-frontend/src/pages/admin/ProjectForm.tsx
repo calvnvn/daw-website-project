@@ -18,12 +18,16 @@ import {
   Loader2,
   AlertCircle,
   RotateCcw,
+  Eye,
+  FileEdit,
+  ChevronRight,
 } from "lucide-react";
 import { useDropzone } from "react-dropzone";
 import api, { BASE_UPLOAD_URL } from "@/lib/api";
 import { compressImage } from "@/utils/imageHelper";
 import { useAuth } from "@/contexts/AuthContext";
 import { useBusiness } from "@/contexts/BusinessContext";
+import DOMPurify from "dompurify";
 
 interface RejectedDraft {
   notrans: string;
@@ -80,6 +84,239 @@ const GalleryPreviewItem = ({
   );
 };
 
+// --- SUB-COMPONENT: REAL-TIME LIVE PREVIEW ---
+const ProjectLivePreview = ({
+  formData,
+  coverPreview,
+  galleryFiles,
+  parsedGallery,
+  sections,
+}: {
+  formData: any;
+  coverPreview: string | null;
+  galleryFiles: File[];
+  parsedGallery: string[];
+  sections: any[];
+}) => {
+  const sectorName =
+    sections.find((s) => s.id === formData.category)?.category || "Sektor";
+
+  // Gallery URL mapping with clean memory cleanup
+  const [galleryUrls, setGalleryUrls] = useState<string[]>([]);
+
+  useEffect(() => {
+    const oldUrls = parsedGallery.map((img) => `${BASE_UPLOAD_URL}/${img}`);
+    const newObjectUrls = galleryFiles.map((file) => URL.createObjectURL(file));
+
+    setGalleryUrls([...oldUrls, ...newObjectUrls]);
+
+    return () => {
+      newObjectUrls.forEach((url) => URL.revokeObjectURL(url));
+    };
+  }, [parsedGallery, galleryFiles]);
+
+  const coverUrl =
+    coverPreview ||
+    (formData.cover_image ? `${BASE_UPLOAD_URL}/${formData.cover_image}` : "");
+
+  // Content normalization for typography replica (mirroring ProjectDetail.tsx)
+  const cleanContent = useMemo(() => {
+    if (!formData.content) return "";
+    let sanitizedHtml = formData.content.replace(/&nbsp;|\u00A0/g, " ");
+    sanitizedHtml = sanitizedHtml.replace(/style="[^"]*"/gi, "");
+    sanitizedHtml = sanitizedHtml.replace(/ql-align-justify/gi, "");
+    return sanitizedHtml;
+  }, [formData.content]);
+
+  return (
+    <div className="bg-white rounded-3xl border border-slate-200 overflow-hidden shadow-xl animate-in fade-in zoom-in-95 duration-500">
+      {/* HEADER SIMULASI BROWSER */}
+      <div className="bg-slate-100 border-b border-slate-200 px-6 py-3.5 flex items-center gap-2">
+        <div className="flex gap-1.5">
+          <div className="w-3 h-3 rounded-full bg-rose-400" />
+          <div className="w-3 h-3 rounded-full bg-amber-400" />
+          <div className="w-3 h-3 rounded-full bg-emerald-400" />
+        </div>
+        <div className="flex-1 max-w-xl mx-auto bg-white border border-slate-200/80 rounded-lg py-1 px-3 text-[11px] font-mono text-slate-400 text-center truncate select-none shadow-sm flex items-center justify-center gap-1">
+          <span className="text-emerald-500 font-bold">https://</span>
+          daw.co.id/projects/
+          {formData.title
+            ? formData.title
+                .toLowerCase()
+                .replace(/[^a-z0-9]+/g, "-")
+                .replace(/(^-|-$)+/g, "")
+            : "..."}
+        </div>
+      </div>
+
+      <div className="min-h-[80vh] bg-white pb-20 selection:bg-daw-green selection:text-white pointer-events-none">
+        {/* HERO BANNER */}
+        <section className="relative h-[45vh] flex items-center justify-center overflow-hidden bg-slate-900">
+          <div className="absolute inset-0 w-full h-full">
+            {coverUrl ? (
+              <div
+                className="absolute inset-0 w-full h-full bg-cover bg-center transition-transform duration-700"
+                style={{ backgroundImage: `url(${coverUrl})` }}
+              />
+            ) : (
+              <div className="absolute inset-0 bg-gradient-to-br from-slate-800 to-slate-950 flex items-center justify-center text-slate-500">
+                <ImageIcon className="w-16 h-16 opacity-30" />
+              </div>
+            )}
+          </div>
+          {/* Layer 3: Multiply & Cinematic Overlay */}
+          <div className="absolute inset-0 bg-daw-green/20 mix-blend-multiply" />
+          <div className="absolute inset-0 bg-gradient-to-b from-slate-900/60 via-slate-900/40 to-slate-900/80" />
+
+          <div className="relative z-10 text-center px-6 max-w-3xl mx-auto">
+            <p className="text-[10px] text-white/85 font-bold tracking-[0.2em] uppercase mb-3">
+              {sectorName} Portfolio
+            </p>
+            <h1 className="text-2xl md:text-4xl font-serif font-bold text-white tracking-tight drop-shadow-lg mb-6 leading-tight">
+              {formData.title || "Judul Proyek"}
+            </h1>
+            {/* Dekorasi Garis */}
+            <div className="flex items-center justify-center gap-4">
+              <div className="h-px w-8 bg-white/30" />
+              <div className="w-2 h-2 border border-daw-yellow rotate-45" />
+              <div className="h-px w-8 bg-white/30" />
+            </div>
+          </div>
+        </section>
+
+        {/* DYNAMIC BREADCRUMBS */}
+        <div className="bg-slate-50 border-b border-slate-100 py-3 mb-8">
+          <div className="container mx-auto px-6 max-w-5xl">
+            <div className="flex items-center gap-1.5 text-[9px] font-bold tracking-widest uppercase text-slate-400">
+              <span>Home</span>
+              <ChevronRight className="w-2.5 h-2.5" />
+              <span>Our Businesses</span>
+              <ChevronRight className="w-2.5 h-2.5" />
+              <span className="text-slate-500">{sectorName}</span>
+              <ChevronRight className="w-2.5 h-2.5" />
+              <span className="text-daw-green truncate max-w-[200px]">
+                {formData.title || "Judul Proyek"}
+              </span>
+            </div>
+          </div>
+        </div>
+
+        {/* CONTENT LAYOUT */}
+        <div className="container mx-auto px-6 max-w-5xl">
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+            {/* MAIN COLUMN */}
+            <div className="lg:col-span-8 space-y-6">
+              <div className="group flex items-center gap-1 text-slate-400 font-bold text-[9px] uppercase tracking-wider mb-6">
+                <ArrowLeft className="w-3.5 h-3.5" /> Back To Directory
+              </div>
+
+              <h1 className="text-xl md:text-3xl font-serif font-bold text-slate-900 leading-tight mb-6">
+                {formData.title || "Judul Proyek"}
+              </h1>
+
+              {/* LEAD PARAGRAPH (Excerpt) */}
+              {formData.excerpt && (
+                <div className="relative my-6">
+                  <div className="absolute left-0 top-0 bottom-0 w-1 bg-daw-green rounded-full"></div>
+                  <p className="text-base leading-relaxed text-slate-600 pl-6 py-1 italic">
+                    {formData.excerpt}
+                  </p>
+                </div>
+              )}
+
+              {/* TYPOGRAPHY RESTORATION ENGINE */}
+              {formData.content ? (
+                <div
+                  className="daw-editorial-content max-w-none text-slate-700 text-sm md:text-base leading-relaxed
+                  w-full min-w-0 text-left break-words whitespace-normal
+                  [&_p]:!text-left [&_span]:!inline [&_strong]:!inline
+                  [&_p]:mb-4 last:[&_p]:mb-0 [&_p:empty]:hidden [&_p:has(br):empty]:hidden
+                  [&_strong]:font-bold [&_strong]:text-slate-900
+                  [&_em]:italic [&_em]:text-slate-600
+                  [&_a]:text-daw-green [&_a]:underline
+                  [&_h2]:text-xl md:[&_h2]:text-2xl [&_h2]:font-serif [&_h2]:font-bold [&_h2]:text-slate-900 [&_h2]:mt-8 [&_h2]:mb-2
+                  [&_h3]:text-lg md:[&_h3]:text-xl [&_h3]:font-bold [&_h3]:text-slate-800 [&_h3]:mt-6 [&_h3]:mb-1
+                  [&_ul]:list-disc [&_ul]:pl-5 [&_ul]:my-3
+                  [&_ol]:list-decimal [&_ol]:pl-5 [&_ol]:my-3
+                  [&_blockquote]:border-l-4 [&_blockquote]:border-daw-green [&_blockquote]:pl-4 [&_blockquote]:py-1 [&_blockquote]:my-6 [&_blockquote]:italic [&_blockquote]:text-slate-600 [&_blockquote]:bg-slate-50/50
+                  [&_img]:w-full [&_img]:h-auto [&_img]:rounded-xl [&_img]:my-6 [&_img]:border [&_img]:border-slate-100
+                  "
+                  dangerouslySetInnerHTML={{
+                    __html: DOMPurify.sanitize(cleanContent),
+                  }}
+                />
+              ) : (
+                <p className="text-slate-355 italic text-sm">
+                  Belum ada konten tertulis.
+                </p>
+              )}
+
+              {/* IMAGE GALLERY */}
+              {galleryUrls.length > 0 && (
+                <div className="pt-8 mt-12 border-t border-slate-200">
+                  <h4 className="font-serif text-lg font-bold text-slate-900 mb-6">
+                    Galeri Proyek
+                  </h4>
+                  <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                    {galleryUrls.map((imgUrl, idx) => (
+                      <div
+                        key={idx}
+                        className="aspect-[4/3] rounded-xl overflow-hidden bg-slate-100 border border-slate-100 relative group shadow-sm">
+                        <img
+                          src={imgUrl}
+                          alt={`Gallery ${idx + 1}`}
+                          className="w-full h-full object-cover"
+                        />
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* KOLOM KANAN: SIDEBAR */}
+            <div className="lg:col-span-4 space-y-6">
+              <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm">
+                <h3 className="font-serif text-lg font-bold text-slate-900 mb-4 border-b border-slate-100 pb-3">
+                  Related Projects
+                </h3>
+                <div className="space-y-4">
+                  <div className="flex gap-4 items-start opacity-60">
+                    <div className="w-14 h-14 rounded-xl bg-slate-100 border border-slate-200 flex items-center justify-center shrink-0">
+                      <ImageIcon className="w-4 h-4 text-slate-300" />
+                    </div>
+                    <div className="flex-1">
+                      <span className="text-[9px] uppercase tracking-wider font-bold text-daw-green mb-0.5 block">
+                        {sectorName}
+                      </span>
+                      <h4 className="font-serif text-xs text-slate-800 leading-snug">
+                        Contoh Proyek Sejenis A
+                      </h4>
+                    </div>
+                  </div>
+                  <div className="flex gap-4 items-start opacity-60">
+                    <div className="w-14 h-14 rounded-xl bg-slate-100 border border-slate-200 flex items-center justify-center shrink-0">
+                      <ImageIcon className="w-4 h-4 text-slate-300" />
+                    </div>
+                    <div className="flex-1">
+                      <span className="text-[9px] uppercase tracking-wider font-bold text-daw-green mb-0.5 block">
+                        {sectorName}
+                      </span>
+                      <h4 className="font-serif text-xs text-slate-800 leading-snug">
+                        Contoh Proyek Sejenis B
+                      </h4>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 // --- MAIN COMPONENT ---
 export default function ProjectForm() {
   const navigate = useNavigate();
@@ -97,6 +334,7 @@ export default function ProjectForm() {
   // const [isLoading, setIsLoading] = useState(false);
   const [isFetching, setIsFetching] = useState(isEditMode);
   const [isSaving, setIsSaving] = useState(false);
+  const [activeTab, setActiveTab] = useState<"edit" | "preview">("edit");
 
   // State Data
   const initialFormState = {
@@ -768,7 +1006,31 @@ export default function ProjectForm() {
           </div>
         </div>
 
-        <div className="flex gap-3 w-full sm:w-auto">
+        <div className="flex flex-wrap items-center gap-3 w-full sm:w-auto">
+          {/* Segmented Tab Switcher */}
+          <div className="flex bg-slate-100 p-1 rounded-xl border border-slate-200/80 shadow-inner shrink-0 mr-1">
+            <button
+              type="button"
+              onClick={() => setActiveTab("edit")}
+              className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-[10px] uppercase tracking-widest font-black transition-all ${
+                activeTab === "edit"
+                  ? "bg-white text-slate-800 shadow-sm"
+                  : "text-slate-500 hover:text-slate-700"
+              }`}>
+              <FileEdit className="w-3.5 h-3.5" /> Edit Form
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveTab("preview")}
+              className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-[10px] uppercase tracking-widest font-black transition-all ${
+                activeTab === "preview"
+                  ? "bg-white text-slate-800 shadow-sm"
+                  : "text-slate-500 hover:text-slate-700"
+              }`}>
+              <Eye className="w-3.5 h-3.5" /> Live Preview
+            </button>
+          </div>
+
           <button
             type="button"
             onClick={() => handleSave("Draft")}
@@ -817,70 +1079,79 @@ export default function ProjectForm() {
         </div>
       </div>
 
-      {/* --- MAIN FORM GRID --- */}
-      <div
-        className={`grid grid-cols-1 lg:grid-cols-12 gap-8 items-start transition-all duration-500 ${lockStyles}`}>
-        {/* KOLOM KIRI: EDITORIAL CANVAS (span 8) */}
-        <div className="lg:col-span-8 space-y-8">
-          {/* THE CANVAS */}
-          <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 md:p-8 flex flex-col gap-8">
-            {/* 1. Title Input (Clean & Functional) */}
-            <div>
-              <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">
-                Judul Proyek
-              </label>
-              <textarea
-                placeholder="Masukkan judul proyek..."
-                disabled={shouldLockUI}
-                rows={1}
-                className="w-full text-2xl md:text-3xl font-bold text-slate-900 placeholder:text-slate-300 outline-none resize-none bg-transparent disabled:text-slate-400 border-b border-slate-200 focus:border-daw-green transition-colors pb-2 overflow-hidden"
-                value={formData.title}
-                onChange={(e) => {
-                  setFormData({ ...formData, title: e.target.value });
-                  e.target.style.height = "auto";
-                  e.target.style.height = e.target.scrollHeight + "px";
-                }}
-              />
-            </div>
-
-            {/* 2. Editorial Excerpt (Standardized Form Input) */}
-            <div>
-              <div className="flex justify-between items-end mb-2">
-                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider">
-                  Lead Paragraph (Excerpt)
+      {/* --- MAIN FORM GRID & LIVE PREVIEW --- */}
+      {activeTab === "preview" ? (
+        <ProjectLivePreview
+          formData={formData}
+          coverPreview={coverPreview}
+          galleryFiles={galleryFiles}
+          parsedGallery={parsedGallery}
+          sections={sections}
+        />
+      ) : (
+        <div
+          className={`grid grid-cols-1 lg:grid-cols-12 gap-8 items-start transition-all duration-500 ${lockStyles}`}>
+          {/* KOLOM KIRI: EDITORIAL CANVAS (span 8) */}
+          <div className="lg:col-span-8 space-y-8">
+            {/* THE CANVAS */}
+            <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 md:p-8 flex flex-col gap-8">
+              {/* 1. Title Input (Clean & Functional) */}
+              <div>
+                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">
+                  Judul Proyek
                 </label>
-                <span
-                  className={`text-xs font-bold ${
-                    formData.excerpt.length >= 145
-                      ? "text-red-500"
-                      : "text-slate-400"
-                  }`}>
-                  {formData.excerpt.length} / 150
-                </span>
+                <textarea
+                  placeholder="Masukkan judul proyek..."
+                  disabled={shouldLockUI}
+                  rows={1}
+                  className="w-full text-2xl md:text-3xl font-bold text-slate-900 placeholder:text-slate-300 outline-none resize-none bg-transparent disabled:text-slate-400 border-b border-slate-200 focus:border-daw-green transition-colors pb-2 overflow-hidden"
+                  value={formData.title}
+                  onChange={(e) => {
+                    setFormData({ ...formData, title: e.target.value });
+                    e.target.style.height = "auto";
+                    e.target.style.height = e.target.scrollHeight + "px";
+                  }}
+                />
               </div>
-              <textarea
-                placeholder="Tulis ringkasan singkat atau pengantar artikel di sini..."
-                maxLength={150}
-                disabled={shouldLockUI}
-                className="w-full p-4 text-sm leading-relaxed text-slate-700 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:border-daw-green focus:ring-4 focus:ring-daw-green/10 outline-none resize-none h-[100px] transition-all disabled:text-slate-400 disabled:bg-slate-100/50"
-                value={formData.excerpt}
-                onChange={(e) =>
-                  setFormData({ ...formData, excerpt: e.target.value })
-                }
-              />
-            </div>
 
-            {/* 3. Quill Editor (Containerized & Bounded) */}
-            <div>
-              <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">
-                Konten Proyek
-              </label>
-              <div
-                className={`editor-container rounded-xl border transition-all overflow-hidden ${
-                  shouldLockUI
-                    ? "border-slate-200 bg-slate-50 opacity-80"
-                    : "border-slate-200 focus-within:border-daw-green focus-within:ring-4 focus-within:ring-daw-green/10 bg-white"
-                }
+              {/* 2. Editorial Excerpt (Standardized Form Input) */}
+              <div>
+                <div className="flex justify-between items-end mb-2">
+                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider">
+                    Lead Paragraph (Excerpt)
+                  </label>
+                  <span
+                    className={`text-xs font-bold ${
+                      formData.excerpt.length >= 145
+                        ? "text-red-500"
+                        : "text-slate-400"
+                    }`}>
+                    {formData.excerpt.length} / 150
+                  </span>
+                </div>
+                <textarea
+                  placeholder="Tulis ringkasan singkat atau pengantar artikel di sini..."
+                  maxLength={150}
+                  disabled={shouldLockUI}
+                  className="w-full p-4 text-sm leading-relaxed text-slate-700 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:border-daw-green focus:ring-4 focus:ring-daw-green/10 outline-none resize-none h-[100px] transition-all disabled:text-slate-400 disabled:bg-slate-100/50"
+                  value={formData.excerpt}
+                  onChange={(e) =>
+                    setFormData({ ...formData, excerpt: e.target.value })
+                  }
+                />
+              </div>
+
+              {/* 3. Quill Editor (Containerized & Bounded) */}
+              <div>
+                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">
+                  Konten Proyek
+                </label>
+                <div
+                  className={`editor-container rounded-xl border transition-all overflow-hidden ${
+                    shouldLockUI
+                      ? "border-slate-200 bg-slate-50 opacity-80"
+                      : "border-slate-200 focus-within:border-daw-green focus-within:ring-4 focus-within:ring-daw-green/10 bg-white"
+                  }
                 [&_.ql-toolbar]:border-none [&_.ql-toolbar]:border-b [&_.ql-toolbar]:border-slate-200 [&_.ql-toolbar]:bg-slate-50/50
                 [&_.ql-container]:border-none [&_.ql-editor]:min-h-[350px] [&_.ql-editor]:text-base
                 [&_.ql-editor_p]:text-slate-700 [&_.ql-editor_p]:leading-relaxed [&_.ql-editor_p]:mb-4
@@ -888,146 +1159,146 @@ export default function ProjectForm() {
                 [&_.ql-editor_h3]:font-bold [&_.ql-editor_h3]:text-lg [&_.ql-editor_h3]:mb-2 [&_.ql-editor_h3]:mt-4
                 [&_.ql-editor_img]:rounded-lg [&_.ql-editor_img]:my-6 [&_.ql-editor_img]:border [&_.ql-editor_img]:border-slate-200
                 `}>
-                <ReactQuill
-                  ref={quillRef}
-                  theme="snow"
-                  modules={modules}
-                  readOnly={shouldLockUI}
-                  value={formData.content}
-                  onChange={(v) => setFormData({ ...formData, content: v })}
-                  placeholder="Mulai menulis detail proyek di sini..."
-                />
+                  <ReactQuill
+                    ref={quillRef}
+                    theme="snow"
+                    modules={modules}
+                    readOnly={shouldLockUI}
+                    value={formData.content}
+                    onChange={(v) => setFormData({ ...formData, content: v })}
+                    placeholder="Mulai menulis detail proyek di sini..."
+                  />
+                </div>
               </div>
             </div>
-          </div>
 
-          {/* EXACT GOOGLE SERP PREVIEW ENGINE */}
-          <div className="bg-white rounded-2xl border border-slate-200 p-6 md:p-8 shadow-sm">
-            <h3 className="text-xs font-black uppercase tracking-widest text-slate-800 mb-6 flex items-center gap-2">
-              <Search className="w-4 h-4 text-daw-green" /> Pengoptimalan Mesin
-              Pencari (SEO)
-            </h3>
+            {/* EXACT GOOGLE SERP PREVIEW ENGINE */}
+            <div className="bg-white rounded-2xl border border-slate-200 p-6 md:p-8 shadow-sm">
+              <h3 className="text-xs font-black uppercase tracking-widest text-slate-800 mb-6 flex items-center gap-2">
+                <Search className="w-4 h-4 text-daw-green" /> Pengoptimalan
+                Mesin Pencari (SEO)
+              </h3>
 
-            <div className="grid grid-cols-1 xl:grid-cols-2 gap-8 items-start">
-              <div className="space-y-5">
-                <div>
-                  <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-widest mb-2">
-                    SEO Title
-                  </label>
-                  <input
-                    type="text"
-                    placeholder="Judul Khusus untuk Google..."
-                    disabled={shouldLockUI}
-                    className="w-full p-3.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-medium outline-none focus:bg-white focus:border-daw-green focus:ring-4 focus:ring-daw-green/10 transition-all disabled:text-slate-400"
-                    value={formData.seo_title}
-                    onChange={(e) =>
-                      setFormData({ ...formData, seo_title: e.target.value })
-                    }
-                  />
-                </div>
-                <div>
-                  <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-widest mb-2">
-                    Meta Description
-                  </label>
-                  <textarea
-                    placeholder="Tulis deskripsi memikat maksimal 160 karakter..."
-                    disabled={shouldLockUI}
-                    maxLength={160}
-                    className="w-full p-3.5 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none resize-none h-[110px] focus:bg-white focus:border-daw-green focus:ring-4 focus:ring-daw-green/10 transition-all disabled:text-slate-400"
-                    value={formData.meta_description}
-                    onChange={(e) =>
-                      setFormData({
-                        ...formData,
-                        meta_description: e.target.value,
-                      })
-                    }
-                  />
-                </div>
-              </div>
-
-              {/* Real Google SERP UI Clone */}
-              <div className="bg-white p-5 rounded-2xl border border-slate-100 shadow-[0_4px_20px_rgba(0,0,0,0.04)] flex flex-col justify-center">
-                <div className="flex items-center gap-3 mb-3">
-                  <div className="w-8 h-8 bg-slate-100 rounded-full flex items-center justify-center p-1.5 border border-slate-200 shrink-0">
-                    <img
-                      src="/favicon.png"
-                      alt="Icon"
-                      className="w-full h-full object-contain opacity-80"
+              <div className="grid grid-cols-1 xl:grid-cols-2 gap-8 items-start">
+                <div className="space-y-5">
+                  <div>
+                    <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-widest mb-2">
+                      SEO Title
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="Judul Khusus untuk Google..."
+                      disabled={shouldLockUI}
+                      className="w-full p-3.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-medium outline-none focus:bg-white focus:border-daw-green focus:ring-4 focus:ring-daw-green/10 transition-all disabled:text-slate-400"
+                      value={formData.seo_title}
+                      onChange={(e) =>
+                        setFormData({ ...formData, seo_title: e.target.value })
+                      }
                     />
                   </div>
-                  <div className="flex flex-col truncate">
-                    <span className="text-[14px] text-[#202124] font-normal leading-tight truncate">
-                      PT Dharma Agung Wijaya
-                    </span>
-                    <span className="text-[12px] text-[#4d5156] leading-tight truncate">
-                      daw.co.id &gt; projects &gt; {generatedSlug || "..."}
-                    </span>
+                  <div>
+                    <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-widest mb-2">
+                      Meta Description
+                    </label>
+                    <textarea
+                      placeholder="Tulis deskripsi memikat maksimal 160 karakter..."
+                      disabled={shouldLockUI}
+                      maxLength={160}
+                      className="w-full p-3.5 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none resize-none h-[110px] focus:bg-white focus:border-daw-green focus:ring-4 focus:ring-daw-green/10 transition-all disabled:text-slate-400"
+                      value={formData.meta_description}
+                      onChange={(e) =>
+                        setFormData({
+                          ...formData,
+                          meta_description: e.target.value,
+                        })
+                      }
+                    />
                   </div>
                 </div>
-                <h3 className="text-[20px] text-[#1a0dab] font-normal leading-[1.3] hover:underline cursor-pointer mb-1 line-clamp-2">
-                  {formData.seo_title ||
-                    formData.title ||
-                    "Judul Proyek DAW Group"}
-                </h3>
-                <p className="text-[14px] text-[#4d5156] line-clamp-2 leading-[1.58]">
-                  {formData.meta_description ||
-                    formData.excerpt ||
-                    "Masukkan ringkasan atau meta deskripsi proyek di sini agar Google dapat menampilkannya dengan sempurna di hasil pencarian."}
-                </p>
+
+                {/* Real Google SERP UI Clone */}
+                <div className="bg-white p-5 rounded-2xl border border-slate-100 shadow-[0_4px_20px_rgba(0,0,0,0.04)] flex flex-col justify-center">
+                  <div className="flex items-center gap-3 mb-3">
+                    <div className="w-8 h-8 bg-slate-100 rounded-full flex items-center justify-center p-1.5 border border-slate-200 shrink-0">
+                      <img
+                        src="/favicon.png"
+                        alt="Icon"
+                        className="w-full h-full object-contain opacity-80"
+                      />
+                    </div>
+                    <div className="flex flex-col truncate">
+                      <span className="text-[14px] text-[#202124] font-normal leading-tight truncate">
+                        PT Dharma Agung Wijaya
+                      </span>
+                      <span className="text-[12px] text-[#4d5156] leading-tight truncate">
+                        daw.co.id &gt; projects &gt; {generatedSlug || "..."}
+                      </span>
+                    </div>
+                  </div>
+                  <h3 className="text-[20px] text-[#1a0dab] font-normal leading-[1.3] hover:underline cursor-pointer mb-1 line-clamp-2">
+                    {formData.seo_title ||
+                      formData.title ||
+                      "Judul Proyek DAW Group"}
+                  </h3>
+                  <p className="text-[14px] text-[#4d5156] line-clamp-2 leading-[1.58]">
+                    {formData.meta_description ||
+                      formData.excerpt ||
+                      "Masukkan ringkasan atau meta deskripsi proyek di sini agar Google dapat menampilkannya dengan sempurna di hasil pencarian."}
+                  </p>
+                </div>
               </div>
             </div>
           </div>
-        </div>
 
-        {/* KOLOM KANAN: ASSETS & METADATA (span 4) */}
-        <div className="lg:col-span-4 space-y-6">
-          {/* CATEGORY SELECTOR */}
-          <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm">
-            <h3 className="text-[11px] font-black uppercase tracking-widest text-slate-500 mb-3">
-              Sektor Bisnis
-            </h3>
-            {sections.length === 0 ? (
-              <div className="p-4 border border-dashed border-slate-200 rounded-xl text-center bg-slate-50">
-                <p className="text-xs text-slate-500 mb-2">
-                  Sektor belum dikonfigurasi
-                </p>
-                <Link
-                  to="/admin/businesses"
-                  className="text-xs font-bold text-daw-green hover:underline">
-                  Kelola Sektor &rarr;
-                </Link>
-              </div>
-            ) : (
-              <select
-                disabled={shouldLockUI}
-                className={`w-full p-3 bg-slate-50 border rounded-xl text-sm font-bold outline-none cursor-pointer hover:bg-slate-100 transition-colors focus:ring-4 focus:ring-daw-green/10 disabled:opacity-70 disabled:cursor-not-allowed ${
-                  formData.category && !validSectorIds.has(formData.category)
-                    ? "border-red-300 text-red-600"
-                    : "border-slate-200 text-slate-700"
-                }`}
-                value={formData.category}
-                onChange={(e) =>
-                  setFormData({ ...formData, category: e.target.value })
-                }>
-                {sections.map((sec) => (
-                  <option key={sec.id} value={sec.id}>
-                    {sec.category}
-                  </option>
-                ))}
-              </select>
-            )}
-          </div>
+          {/* KOLOM KANAN: ASSETS & METADATA (span 4) */}
+          <div className="lg:col-span-4 space-y-6">
+            {/* CATEGORY SELECTOR */}
+            <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm">
+              <h3 className="text-[11px] font-black uppercase tracking-widest text-slate-500 mb-3">
+                Sektor Bisnis
+              </h3>
+              {sections.length === 0 ? (
+                <div className="p-4 border border-dashed border-slate-200 rounded-xl text-center bg-slate-50">
+                  <p className="text-xs text-slate-500 mb-2">
+                    Sektor belum dikonfigurasi
+                  </p>
+                  <Link
+                    to="/admin/businesses"
+                    className="text-xs font-bold text-daw-green hover:underline">
+                    Kelola Sektor &rarr;
+                  </Link>
+                </div>
+              ) : (
+                <select
+                  disabled={shouldLockUI}
+                  className={`w-full p-3 bg-slate-50 border rounded-xl text-sm font-bold outline-none cursor-pointer hover:bg-slate-100 transition-colors focus:ring-4 focus:ring-daw-green/10 disabled:opacity-70 disabled:cursor-not-allowed ${
+                    formData.category && !validSectorIds.has(formData.category)
+                      ? "border-red-300 text-red-600"
+                      : "border-slate-200 text-slate-700"
+                  }`}
+                  value={formData.category}
+                  onChange={(e) =>
+                    setFormData({ ...formData, category: e.target.value })
+                  }>
+                  {sections.map((sec) => (
+                    <option key={sec.id} value={sec.id}>
+                      {sec.category}
+                    </option>
+                  ))}
+                </select>
+              )}
+            </div>
 
-          {/* COVER IMAGE HERO */}
-          <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm">
-            <h3 className="text-[11px] font-black uppercase tracking-widest mb-3 flex items-center justify-between text-slate-500">
-              <span>Gambar Utama</span>
-              <span className="text-slate-400 font-normal">Wajib</span>
-            </h3>
+            {/* COVER IMAGE HERO */}
+            <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm">
+              <h3 className="text-[11px] font-black uppercase tracking-widest mb-3 flex items-center justify-between text-slate-500">
+                <span>Gambar Utama</span>
+                <span className="text-slate-400 font-normal">Wajib</span>
+              </h3>
 
-            <div
-              {...getRootCoverProps()}
-              className={`aspect-[4/3] rounded-xl flex flex-col items-center justify-center transition-all relative overflow-hidden group
+              <div
+                {...getRootCoverProps()}
+                className={`aspect-[4/3] rounded-xl flex flex-col items-center justify-center transition-all relative overflow-hidden group
                 ${
                   shouldLockUI
                     ? "border-2 border-slate-100 bg-slate-50 cursor-not-allowed"
@@ -1035,118 +1306,119 @@ export default function ProjectForm() {
                 }
                 ${isCoverDragActive && !shouldLockUI ? "border-daw-green bg-green-50" : ""}
               `}>
-              {!shouldLockUI && <input {...getInputCoverProps()} />}
+                {!shouldLockUI && <input {...getInputCoverProps()} />}
 
-              {coverPreview ? (
-                <img
-                  src={coverPreview}
-                  className="w-full h-full object-cover"
-                  alt="New Cover"
-                />
-              ) : formData.cover_image ? (
-                <>
+                {coverPreview ? (
                   <img
-                    src={
-                      formData.cover_image.startsWith("http")
-                        ? formData.cover_image
-                        : `${BASE_UPLOAD_URL}/${formData.cover_image}`
-                    }
-                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                    alt="Cover Data"
+                    src={coverPreview}
+                    className="w-full h-full object-cover"
+                    alt="New Cover"
                   />
-                  {!shouldLockUI && (
-                    <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                      <span className="text-white text-xs font-bold uppercase tracking-widest bg-daw-green px-4 py-2 rounded-full shadow-lg">
-                        Ubah Cover
-                      </span>
+                ) : formData.cover_image ? (
+                  <>
+                    <img
+                      src={
+                        formData.cover_image.startsWith("http")
+                          ? formData.cover_image
+                          : `${BASE_UPLOAD_URL}/${formData.cover_image}`
+                      }
+                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                      alt="Cover Data"
+                    />
+                    {!shouldLockUI && (
+                      <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                        <span className="text-white text-xs font-bold uppercase tracking-widest bg-daw-green px-4 py-2 rounded-full shadow-lg">
+                          Ubah Cover
+                        </span>
+                      </div>
+                    )}
+                  </>
+                ) : (
+                  <div className="text-center p-6">
+                    <div className="w-12 h-12 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-3 group-hover:scale-110 group-hover:bg-daw-green/10 transition-all">
+                      <ImageIcon className="w-5 h-5 text-slate-400 group-hover:text-daw-green" />
                     </div>
-                  )}
-                </>
-              ) : (
-                <div className="text-center p-6">
-                  <div className="w-12 h-12 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-3 group-hover:scale-110 group-hover:bg-daw-green/10 transition-all">
-                    <ImageIcon className="w-5 h-5 text-slate-400 group-hover:text-daw-green" />
+                    <p className="text-xs font-bold text-slate-600 mb-1">
+                      Tarik & Lepas Gambar
+                    </p>
+                    <p className="text-[10px] text-slate-400">
+                      Maks. 10MB (JPG, PNG, WEBP)
+                    </p>
                   </div>
-                  <p className="text-xs font-bold text-slate-600 mb-1">
-                    Tarik & Lepas Gambar
-                  </p>
-                  <p className="text-[10px] text-slate-400">
-                    Maks. 10MB (JPG, PNG, WEBP)
+                )}
+              </div>
+            </div>
+
+            {/* PROJECT GALLERY */}
+            <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm">
+              <h3 className="text-[11px] font-black uppercase tracking-widest mb-3 flex items-center justify-between text-slate-500">
+                <span>Galeri Proyek</span>
+                <span className="text-slate-400 font-normal">Opsional</span>
+              </h3>
+
+              {(galleryFiles.length > 0 || parsedGallery.length > 0) && (
+                <div className="grid grid-cols-3 gap-3 mb-4">
+                  {isEditMode &&
+                    parsedGallery.map((imgName: string, idx: number) => (
+                      <div
+                        key={`old-${idx}`}
+                        className="relative aspect-square group rounded-lg overflow-hidden border border-slate-200 bg-slate-50">
+                        <img
+                          src={`${BASE_UPLOAD_URL}/${imgName}`}
+                          className="w-full h-full object-cover"
+                          alt="Saved"
+                        />
+                        {!shouldLockUI && (
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              removeOldGalleryImage(idx);
+                            }}
+                            className="absolute inset-0 w-full h-full bg-black/50 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-all z-30">
+                            <X className="w-6 h-6 text-white" />
+                          </button>
+                        )}
+                      </div>
+                    ))}
+                  {galleryFiles.map((file, idx) => (
+                    <GalleryPreviewItem
+                      key={`new-${idx}`}
+                      file={file}
+                      disabled={shouldLockUI}
+                      onRemove={() =>
+                        setGalleryFiles((prev) =>
+                          prev.filter((_, i) => i !== idx),
+                        )
+                      }
+                    />
+                  ))}
+                </div>
+              )}
+
+              {!shouldLockUI && (
+                <div
+                  {...getRootGalleryProps()}
+                  className={`p-5 border-2 border-dashed rounded-xl text-center cursor-pointer transition-all group ${
+                    isGalleryDragActive
+                      ? "border-daw-green bg-green-50"
+                      : "border-slate-200 hover:border-daw-green/50 hover:bg-daw-green/5"
+                  }`}>
+                  <input {...getInputGalleryProps()} />
+                  <div className="w-10 h-10 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-2 group-hover:scale-110 group-hover:bg-daw-green/10 transition-all">
+                    <Images className="w-4 h-4 text-slate-400 group-hover:text-daw-green" />
+                  </div>
+                  <p className="text-[11px] font-bold text-slate-600 uppercase tracking-tight">
+                    {isGalleryDragActive
+                      ? "Lepaskan di sini!"
+                      : "Tambah Foto Ekstra"}
                   </p>
                 </div>
               )}
             </div>
           </div>
-
-          {/* PROJECT GALLERY */}
-          <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm">
-            <h3 className="text-[11px] font-black uppercase tracking-widest mb-3 flex items-center justify-between text-slate-500">
-              <span>Galeri Proyek</span>
-              <span className="text-slate-400 font-normal">Opsional</span>
-            </h3>
-
-            {(galleryFiles.length > 0 || parsedGallery.length > 0) && (
-              <div className="grid grid-cols-3 gap-3 mb-4">
-                {isEditMode &&
-                  parsedGallery.map((imgName: string, idx: number) => (
-                    <div
-                      key={`old-${idx}`}
-                      className="relative aspect-square group rounded-lg overflow-hidden border border-slate-200 bg-slate-50">
-                      <img
-                        src={`${BASE_UPLOAD_URL}/${imgName}`}
-                        className="w-full h-full object-cover"
-                        alt="Saved"
-                      />
-                      {!shouldLockUI && (
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            removeOldGalleryImage(idx);
-                          }}
-                          className="absolute inset-0 w-full h-full bg-black/50 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-all z-30">
-                          <X className="w-6 h-6 text-white" />
-                        </button>
-                      )}
-                    </div>
-                  ))}
-                {galleryFiles.map((file, idx) => (
-                  <GalleryPreviewItem
-                    key={`new-${idx}`}
-                    file={file}
-                    disabled={shouldLockUI}
-                    onRemove={() =>
-                      setGalleryFiles((prev) =>
-                        prev.filter((_, i) => i !== idx),
-                      )
-                    }
-                  />
-                ))}
-              </div>
-            )}
-
-            {!shouldLockUI && (
-              <div
-                {...getRootGalleryProps()}
-                className={`p-5 border-2 border-dashed rounded-xl text-center cursor-pointer transition-all group ${
-                  isGalleryDragActive
-                    ? "border-daw-green bg-green-50"
-                    : "border-slate-200 hover:border-daw-green/50 hover:bg-daw-green/5"
-                }`}>
-                <input {...getInputGalleryProps()} />
-                <div className="w-10 h-10 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-2 group-hover:scale-110 group-hover:bg-daw-green/10 transition-all">
-                  <Images className="w-4 h-4 text-slate-400 group-hover:text-daw-green" />
-                </div>
-                <p className="text-[11px] font-bold text-slate-600 uppercase tracking-tight">
-                  {isGalleryDragActive
-                    ? "Lepaskan di sini!"
-                    : "Tambah Foto Ekstra"}
-                </p>
-              </div>
-            )}
-          </div>
         </div>
-      </div>
+      )}
     </div>
   );
 }
