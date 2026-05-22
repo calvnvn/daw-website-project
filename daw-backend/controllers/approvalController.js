@@ -582,6 +582,25 @@ function getModelByModuleName(moduleName) {
 // Dispatches asynchronous email notifications to workflow participants
 async function _notifyActor({ type, pureNextApp, draftData, reason }) {
   try {
+    // === ANTI-SPAM FILTER ===
+    // Filter minor module approvals to avoid spamming the editor's inbox
+    const HIGH_PRIORITY_MODULES = [
+      "NewsArticle",
+      "Project",
+      "Affiliate",
+      "Management",
+      "Achievement",
+      "AboutInfo",
+      "BusinessSection",
+    ];
+    
+    if (type === "APPROVED" && !HIGH_PRIORITY_MODULES.includes(draftData.module_name)) {
+      console.log(
+        `🛡️ [ANTI-SPAM FILTER] Email APPROVED untuk modul '${draftData.module_name}' dilewati (Silent Publish).`,
+      );
+      return;
+    }
+
     let targetUser = null;
 
     if (type === "NEW_REQUEST" && pureNextApp) {
