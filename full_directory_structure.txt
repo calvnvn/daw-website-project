@@ -1,0 +1,396 @@
+================================================================================
+          DAW WEBSITE PROJECT - COMPLETE DIRECTORY & FILE MAP
+================================================================================
+
+daw-website-project/
+├── daw-backend
+│   ├── .env.example
+│   ├── config
+│   │   └── database.js
+│   ├── controllers
+│   │   ├── aboutController.js
+│   │   ├── achievementController.js
+│   │   ├── approvalController.js
+│   │   ├── authController.js
+│   │   ├── businessController.js
+│   │   ├── dashboardController.js
+│   │   ├── historyController.js
+│   │   ├── homeController.js
+│   │   ├── inquiryController.js
+│   │   ├── investmentController.js
+│   │   ├── managementController.js
+│   │   ├── mapCategoryController.js
+│   │   ├── menuController.js
+│   │   ├── newsCategoryController.js
+│   │   ├── newsController.js
+│   │   ├── pageController.js
+│   │   ├── philosophyController.js
+│   │   ├── philosophyPillarController.js
+│   │   ├── projectController.js
+│   │   ├── roleController.js
+│   │   ├── settingsController.js
+│   │   ├── sitemapController.js
+│   │   └── userController.js
+│   ├── database
+│   │   └── daw_cms_db.sql
+│   ├── docs
+│   │   └── openapi.yaml
+│   ├── middleware
+│   │   ├── authJwt.js
+│   │   ├── checkLock.js
+│   │   └── upload.js
+│   ├── models
+│   │   ├── AboutInfo.js
+│   │   ├── Achievement.js
+│   │   ├── Affiliate.js
+│   │   ├── ApprovalDraft.js
+│   │   ├── BusinessMapMarker.js
+│   │   ├── BusinessSection.js
+│   │   ├── HeroSlides.js
+│   │   ├── History.js
+│   │   ├── HomeSettings.js
+│   │   ├── ImpactStats.js
+│   │   ├── Inquiry.js
+│   │   ├── InquirySubject.js
+│   │   ├── InvestmentSettings.js
+│   │   ├── Management.js
+│   │   ├── MapCategory.js
+│   │   ├── Menu.js
+│   │   ├── NewsArticle.js
+│   │   ├── NewsCategory.js
+│   │   ├── Page.js
+│   │   ├── Permission.js
+│   │   ├── Philosophy.js
+│   │   ├── PhilosophyPillar.js
+│   │   ├── Project.js
+│   │   ├── Role.js
+│   │   ├── Settings.js
+│   │   └── User.js
+│   ├── package.json
+│   ├── public
+│   │   ├── logo-daw.png
+│   │   ├── robots.txt
+│   │   └── uploads
+│   │       ├── 1773279893375-969525494.png
+│   │       ├── 1773282900968-374085108.png
+│   │       ├── 1773282900970-191407272.png
+│   │       ├── 1773282900974-199647141.png
+│   │       ├── 1773282900978-466053072.png
+│   │       ├── 1773306911586-975036686.jpg
+│   │       ├── coverimage-1776227482394-815552946.webp
+│   │       ├── coverimage-1779333196087-3019.webp
+│   │       ├── coverimage-1779334650601-3159.webp
+│   │       ├── coverimage-1779334710839-668.webp
+│   │       ├── coverimage-1779415285965-2713.webp
+│   │       ├── cover_image-1773307530674-706401182.jpg
+│   │       ├── cover_image-1773307610567-486901940.jpg
+│   │       ├── cover_image-1773307642310-730089667.jpeg
+│   │       ├── favicon-1777354889787-9752.webp
+│   │       ├── gallery-1773307381099-381950749.jpg
+│   │       ├── gallery-1773307381125-605669711.jpg
+│   │       ├── gallery-1773307381137-320017060.jpg
+│   │       ├── gallery-1773307381138-174096096.jpg
+│   │       ├── gallery-1773307381140-622291193.jpg
+│   │       ├── gallery-1773307381143-115357957.jpg
+│   │       ├── gallery-1773307381145-771915469.jpg
+│   │       ├── gallery-1773307610570-764330027.jpg
+│   │       ├── gallery-1777458522703-2086.webp
+│   │       ├── gallery-1777458522706-8383.webp
+│   │       ├── gallery-1777458522706-9420.webp
+│   │       ├── gallery-1777458522707-1851.webp
+│   │       ├── gallery-1777458522707-2865.webp
+│   │       ├── gallery-1777458550136-3043.webp
+│   │       ├── gallery-1777458550137-1223.webp
+│   │       ├── gallery-1777458550137-6376.webp
+│   │       ├── gallery-1777458550137-7549.webp
+│   │       ├── gallery-1777458550138-4571.webp
+│   │       ├── heroImage-1779257510644-5951.webp
+│   │       ├── image-1778136934330-1614.webp
+│   │       ├── image-1778136934783-8282.webp
+│   │       ├── image-1778136935170-2879.webp
+│   │       ├── image-1779250541988-406.webp
+│   │       ├── inlineimage-1777522049829-4887.webp
+│   │       ├── inlineimage-1777524278469-187.webp
+│   │       ├── inlineimage-1779415258545-5264.webp
+│   │       ├── inlineimage-1779415340324-774.webp
+│   │       ├── logo-1777354889719-9606.webp
+│   │       ├── management-1773282900972.png
+│   │       ├── management-1773282900973.png
+│   │       ├── photo-1773725805880-128737937.jpg
+│   │       ├── TEMP_inlineimage-1779333099883-2132.webp
+│   │       └── TEMP_inlineimage-1779333184225-1034.webp
+│   ├── routes
+│   │   ├── aboutRoutes.js
+│   │   ├── achievementRoutes.js
+│   │   ├── approvalRoutes.js
+│   │   ├── authRoutes.js
+│   │   ├── businessRoutes.js
+│   │   ├── dashboardRoutes.js
+│   │   ├── historyRoutes.js
+│   │   ├── homeRoutes.js
+│   │   ├── inquiryRoutes.js
+│   │   ├── investmentRoutes.js
+│   │   ├── managementRoutes.js
+│   │   ├── mapCategoryRoutes.js
+│   │   ├── menuRoutes.js
+│   │   ├── newsCategoryRoutes.js
+│   │   ├── newsRoutes.js
+│   │   ├── pageRoutes.js
+│   │   ├── philosophyPillarRoutes.js
+│   │   ├── philosophyRoutes.js
+│   │   ├── projectRoutes.js
+│   │   ├── roleRoutes.js
+│   │   ├── settingsRoutes.js
+│   │   ├── sitemapRoutes.js
+│   │   └── userRoutes.js
+│   ├── scratch
+│   ├── scripts
+│   │   ├── cleanup.js
+│   │   ├── dbCleanup.js
+│   │   ├── seed.js
+│   │   └── seedUsers.js
+│   ├── server.js
+│   ├── services
+│   │   └── erpApprovalService.js
+│   ├── test-mail.js
+│   └── utils
+│       ├── cleanupWorker.js
+│       ├── draftCleanup.js
+│       ├── fileManager.js
+│       ├── fileRemover.js
+│       ├── mailer.js
+│       └── notransGenerator.js
+├── daw-frontend
+│   ├── .vite
+│   │   └── deps
+│   │       ├── package.json
+│   │       └── _metadata.json
+│   ├── components.json
+│   ├── eslint.config.js
+│   ├── index.html
+│   ├── package.json
+│   ├── postcss.config.js
+│   ├── public
+│   │   ├── favicon.png
+│   │   └── robots.txt
+│   ├── README.md
+│   ├── src
+│   │   ├── App.css
+│   │   ├── App.tsx
+│   │   ├── assets
+│   │   │   ├── about-banner.jpg
+│   │   │   ├── hero-bg.jpg
+│   │   │   ├── hero-slide-1.jpg
+│   │   │   ├── hero-slide-2.jpg
+│   │   │   ├── hero-slide-3.jpg
+│   │   │   ├── logo-daw.png
+│   │   │   ├── logos
+│   │   │   │   ├── bankmaju.png
+│   │   │   │   ├── bnm.png
+│   │   │   │   ├── garudafood.png
+│   │   │   │   ├── global-sevilla.png
+│   │   │   │   ├── sns.png
+│   │   │   │   └── suntory.png
+│   │   │   ├── map-indonesia-base.svg
+│   │   │   ├── projects
+│   │   │   │   ├── cpo-mill-and-plantation-in-west-kalimantan.jpg
+│   │   │   │   ├── cpo-mill-and-plantation-in-west-kalimantan2.jpg
+│   │   │   │   ├── cpo-mill-and-plantation-in-west-kalimantan3.jpg
+│   │   │   │   ├── cpo-mill-and-plantation-in-west-kalimantan4.jpg
+│   │   │   │   ├── cpo-mill-and-plantation-in-west-kalimantan5.jpeg
+│   │   │   │   ├── cpo-mill-in-jambi.jpg
+│   │   │   │   ├── cpo-mill-in-jambi2.jpg
+│   │   │   │   ├── cpo-mill-in-jambi3.jpg
+│   │   │   │   ├── cpo-mill-in-jambi4.jpg
+│   │   │   │   ├── cpo-mill-in-jambi5.jpg
+│   │   │   │   ├── cpo-mill-in-sanggau-west-kalimantan.jpg
+│   │   │   │   ├── hydropower-kualu.jpg
+│   │   │   │   ├── hydropower-kualu2.jpg
+│   │   │   │   ├── palm-oil-plantation-in-east-kalimantan.jpg
+│   │   │   │   ├── palm-oil-plantation-in-east-kalimantan2.jpg
+│   │   │   │   ├── palm-oil-plantation-in-east-kalimantan3.jpg
+│   │   │   │   ├── palm-oil-plantation-in-east-kalimantan4.jpg
+│   │   │   │   ├── palm-oil-plantation-in-east-kalimantan5.jpg
+│   │   │   │   ├── palm-oil-plantation-in-east-kalimantan6.jpg
+│   │   │   │   ├── palm-oil-plantation-in-east-kalimantan7.jpg
+│   │   │   │   ├── pkscycle.jpg
+│   │   │   │   └── stockpile-jamb.jpeg
+│   │   │   ├── react.svg
+│   │   │   └── sudhamek-aws.png
+│   │   ├── components
+│   │   │   ├── about
+│   │   │   │   ├── Achievement.tsx
+│   │   │   │   ├── History.tsx
+│   │   │   │   ├── Management.tsx
+│   │   │   │   ├── OurCompany.tsx
+│   │   │   │   └── Philosophy.tsx
+│   │   │   ├── admin
+│   │   │   │   ├── about
+│   │   │   │   │   └── AboutLivePreview.tsx
+│   │   │   │   └── home
+│   │   │   │       ├── HeroManager.tsx
+│   │   │   │       ├── HomeLivePreview.tsx
+│   │   │   │       ├── IntroManager.tsx
+│   │   │   │       └── StatsManager.tsx
+│   │   │   ├── AnimatedNumber.tsx
+│   │   │   ├── businesses
+│   │   │   │   ├── DynamicBusinessSection.tsx
+│   │   │   │   ├── InteractiveMap.tsx
+│   │   │   │   └── InvestmentsSection.tsx
+│   │   │   ├── BusinessGrid.tsx
+│   │   │   ├── Footer.tsx
+│   │   │   ├── Hero.tsx
+│   │   │   ├── ImpactStatistics.tsx
+│   │   │   ├── OtherInvestmentsTeaser.tsx
+│   │   │   ├── ProjectDetailSkeleton.tsx
+│   │   │   ├── ProtectedRoute.tsx
+│   │   │   ├── ScrollReveal.tsx
+│   │   │   ├── ScrollToTop.tsx
+│   │   │   ├── SEO.tsx
+│   │   │   ├── TransformationIntro.tsx
+│   │   │   └── ui
+│   │   │       ├── button.tsx
+│   │   │       ├── GlobalHeroBanner.tsx
+│   │   │       ├── navigation-menu.tsx
+│   │   │       └── sheet.tsx
+│   │   ├── contexts
+│   │   │   ├── AboutContext.tsx
+│   │   │   ├── AuthContext.tsx
+│   │   │   ├── BusinessContext.tsx
+│   │   │   ├── ContentContext.tsx
+│   │   │   ├── HomeContext.tsx
+│   │   │   ├── InvestmentContext.tsx
+│   │   │   └── SettingsContext.tsx
+│   │   ├── hooks
+│   │   ├── index.css
+│   │   ├── layouts
+│   │   │   ├── AdminLayout.tsx
+│   │   │   ├── DynamicNavbar.tsx
+│   │   │   └── MainLayout.tsx
+│   │   ├── lib
+│   │   │   ├── api.ts
+│   │   │   ├── i18n.ts
+│   │   │   └── utils.ts
+│   │   ├── locales
+│   │   │   ├── en.json
+│   │   │   └── id.json
+│   │   ├── main.tsx
+│   │   ├── pages
+│   │   │   ├── admin
+│   │   │   │   ├── about
+│   │   │   │   │   ├── AboutConstants.ts
+│   │   │   │   │   ├── AboutSharedComponents.tsx
+│   │   │   │   │   ├── AboutUsManager.tsx
+│   │   │   │   │   └── tabs
+│   │   │   │   │       ├── AboutInfoTab.tsx
+│   │   │   │   │       ├── AchievementTab.tsx
+│   │   │   │   │       ├── HistoryTab.tsx
+│   │   │   │   │       ├── ManagementTab.tsx
+│   │   │   │   │       └── PhilosophyTab.tsx
+│   │   │   │   ├── approvals
+│   │   │   │   │   ├── ApprovalCenter.tsx
+│   │   │   │   │   ├── ModuleRegistry.tsx
+│   │   │   │   │   └── previews
+│   │   │   │   │       ├── AboutInfoPreview.tsx
+│   │   │   │   │       ├── AchievementPreview.tsx
+│   │   │   │   │       ├── AffiliatePreview.tsx
+│   │   │   │   │       ├── BusinessSectionPreview.tsx
+│   │   │   │   │       ├── HeroPreview.tsx
+│   │   │   │   │       ├── HistoryPreview.tsx
+│   │   │   │   │       ├── ImpactStatPreview.tsx
+│   │   │   │   │       ├── InvestmentSettingPreview.tsx
+│   │   │   │   │       ├── ManagementPreview.tsx
+│   │   │   │   │       ├── MapCategoryPreview.tsx
+│   │   │   │   │       ├── MapMarkerPreview.tsx
+│   │   │   │   │       ├── MenuPreview.tsx
+│   │   │   │   │       ├── NewsArticlePreview.tsx
+│   │   │   │   │       ├── PagePreview.tsx
+│   │   │   │   │       ├── PhilosophyPillarPreview.tsx
+│   │   │   │   │       ├── PhilosophyPreview.tsx
+│   │   │   │   │       ├── ProjectPreview.tsx
+│   │   │   │   │       ├── SettingsPreview.tsx
+│   │   │   │   │       └── TransformationIntroPreview.tsx
+│   │   │   │   ├── business
+│   │   │   │   │   ├── components
+│   │   │   │   │   │   ├── BusinessEditor.tsx
+│   │   │   │   │   │   ├── BusinessLivePreview.tsx
+│   │   │   │   │   │   ├── CategoryManager.tsx
+│   │   │   │   │   │   ├── MapManager.tsx
+│   │   │   │   │   │   ├── SectionHeader.tsx
+│   │   │   │   │   │   └── SectionTabs.tsx
+│   │   │   │   │   ├── ManageBusinesses.tsx
+│   │   │   │   │   └── modals
+│   │   │   │   │       ├── AddSectionModal.tsx
+│   │   │   │   │       ├── DeleteSectionModal.tsx
+│   │   │   │   │       └── MapPickerModal.tsx
+│   │   │   │   ├── content
+│   │   │   │   │   ├── builder
+│   │   │   │   │   │   ├── NavigationBuilder.tsx
+│   │   │   │   │   │   └── PageBuilder.tsx
+│   │   │   │   │   └── ContentManager.tsx
+│   │   │   │   ├── Dashboard.tsx
+│   │   │   │   ├── home
+│   │   │   │   │   └── HomePageManager.tsx
+│   │   │   │   ├── inbox
+│   │   │   │   │   ├── Inbox.tsx
+│   │   │   │   │   └── SubjectManagerModal.tsx
+│   │   │   │   ├── investments
+│   │   │   │   │   └── InvestmentsManager.tsx
+│   │   │   │   ├── news
+│   │   │   │   │   ├── NewsForm.tsx
+│   │   │   │   │   └── NewsManagement.tsx
+│   │   │   │   ├── projects
+│   │   │   │   │   ├── ProjectForm.tsx
+│   │   │   │   │   └── ProjectManagement.tsx
+│   │   │   │   └── system
+│   │   │   │       ├── auth
+│   │   │   │       │   └── Login.tsx
+│   │   │   │       ├── GlobalSettings.tsx
+│   │   │   │       ├── RoleManagement.tsx
+│   │   │   │       └── UserManagement.tsx
+│   │   │   └── public
+│   │   │       ├── AboutUs.tsx
+│   │   │       ├── Admin.tsx
+│   │   │       ├── ContactUs.tsx
+│   │   │       ├── DynamicPage.tsx
+│   │   │       ├── Home.tsx
+│   │   │       ├── NewsEventDetail.tsx
+│   │   │       ├── NewsEvents.tsx
+│   │   │       ├── NotFound.tsx
+│   │   │       ├── OurBusinesses.tsx
+│   │   │       ├── ProjectDetail.tsx
+│   │   │       └── PublicProjects.tsx
+│   │   └── utils
+│   │       └── imageHelper.ts
+│   ├── tailwind.config.js
+│   ├── tsconfig.app.json
+│   ├── tsconfig.json
+│   ├── tsconfig.node.json
+│   └── vite.config.ts
+├── directory_structure.txt
+├── package.json
+└── postman
+    └── collections
+        └── ERP-DAW Approval API
+            ├── .resources
+            │   └── definition.yaml
+            ├── Helper Tools
+            │   ├── .resources
+            │   │   └── definition.yaml
+            │   ├── Generate No Approval.request.yaml
+            │   └── Get Jenis Approval.request.yaml
+            ├── Setup Approval
+            │   ├── .resources
+            │   │   └── definition.yaml
+            │   ├── Add Approval Setup.request.yaml
+            │   ├── Cek Setup Approval.request.yaml
+            │   ├── Delete Approval Setup.request.yaml
+            │   ├── Get Approval Setup.request.yaml
+            │   └── Update Approval Setup.request.yaml
+            └── Transaksi Approval
+                ├── .resources
+                │   └── definition.yaml
+                ├── Add Approval Record.request.yaml
+                ├── Get Next Approver.request.yaml
+                ├── Get Pending Approvals.request.yaml
+                └── Submit Approval (Approve-Reject).request.yaml
