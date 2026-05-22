@@ -18,7 +18,7 @@ import type { AchievementItem } from "@/contexts/AboutContext";
 import { PhotoPreviewer } from "../AboutSharedComponents";
 import { AVAILABLE_ICONS } from "../AboutConstants";
 import { getCleanImageUrl } from "@/lib/utils";
-import AboutLivePreview from "../../../../components/AboutLivePreview";
+import AboutLivePreview from "@/components/admin/about/AboutLivePreview";
 
 interface AchievementTabProps {
   isEditing: boolean;

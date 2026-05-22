@@ -11,9 +11,9 @@ import {
 } from "lucide-react";
 import { useHome } from "@/contexts/HomeContext";
 import { useAuth } from "@/contexts/AuthContext";
-import IntroManager from "@/components/IntroManager";
-import StatsManager from "@/components/StatsManager";
-import HeroManager from "@/components/HeroManager";
+import IntroManager from "@/components/admin/home/IntroManager";
+import StatsManager from "@/components/admin/home/StatsManager";
+import HeroManager from "@/components/admin/home/HeroManager";
 
 export default function HomepageManager() {
   const [searchParams, setSearchParams] = useSearchParams();

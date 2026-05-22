@@ -18,7 +18,7 @@ import api from "@/lib/api";
 import { useAbout } from "@/contexts/AboutContext";
 import type { PhilosophyPillar } from "@/contexts/AboutContext";
 import { AVAILABLE_ICONS } from "../AboutConstants";
-import AboutLivePreview from "../../../../components/AboutLivePreview";
+import AboutLivePreview from "@/components/admin/about/AboutLivePreview";
 
 interface PhilosophyTabProps {
   isEditing: boolean;

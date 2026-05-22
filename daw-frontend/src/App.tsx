@@ -27,31 +27,31 @@ const NotFound = lazy(() => import("./pages/public/NotFound"));
 // ADMINISTRATIVE DOMAINS
 const Login = lazy(() => import("./pages/admin/system/auth/Login"));
 const Dashboard = lazy(() => import("./pages/admin/Dashboard"));
-const ProjectManagement = lazy(() => import("./pages/admin/ProjectManagement"));
+const ProjectManagement = lazy(() => import("./pages/admin/projects/ProjectManagement"));
 const GlobalSettings = lazy(
   () => import("./pages/admin/system/GlobalSettings"),
 );
 const AboutUsManager = lazy(() => import("./pages/admin/about/AboutUsManager"));
-const Inbox = lazy(() => import("./pages/admin/Inbox"));
-const HomepageManager = lazy(() => import("./pages/admin/HomePageManager"));
+const Inbox = lazy(() => import("./pages/admin/inbox/Inbox"));
+const HomepageManager = lazy(() => import("./pages/admin/home/HomePageManager"));
 const UserManagement = lazy(
   () => import("./pages/admin/system/UserManagement"),
 );
 const InvestmentsManager = lazy(
-  () => import("./pages/admin/InvestmentsManager"),
+  () => import("./pages/admin/investments/InvestmentsManager"),
 );
 const ManageBusinesses = lazy(
   () => import("./pages/admin/business/ManageBusinesses"),
 );
-const ProjectForm = lazy(() => import("./pages/admin/ProjectForm"));
+const ProjectForm = lazy(() => import("./pages/admin/projects/ProjectForm"));
 const RoleManagement = lazy(
   () => import("./pages/admin/system/RoleManagement"),
 );
 const ApprovalCenter = lazy(
   () => import("./pages/admin/approvals/ApprovalCenter"),
 );
-const NewsManagement = lazy(() => import("./pages/admin/NewsManagement"));
-const NewsForm = lazy(() => import("./pages/admin/NewsForm"));
+const NewsManagement = lazy(() => import("./pages/admin/news/NewsManagement"));
+const NewsForm = lazy(() => import("./pages/admin/news/NewsForm"));
 
 // Resolve specialized content management module with context injection
 const ContentManagerWrapper = lazy(async () => {

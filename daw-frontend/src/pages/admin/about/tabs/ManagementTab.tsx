@@ -16,7 +16,7 @@ import api from "@/lib/api";
 import { useAbout } from "@/contexts/AboutContext";
 import type { ManagementItem as ManagementMember } from "@/contexts/AboutContext";
 import { PhotoPreviewer, ManagementImage } from "../AboutSharedComponents";
-import AboutLivePreview from "../../../../components/AboutLivePreview";
+import AboutLivePreview from "@/components/admin/about/AboutLivePreview";
 
 interface ManagementTabProps {
   isEditing: boolean;

@@ -3,7 +3,7 @@ import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button";
 import { ArrowRight } from "lucide-react";
 import * as Icons from "lucide-react";
-import ScrollReveal from "./ScrollReveal";
+import ScrollReveal from "@/components/ScrollReveal";
 import logoDaw from "@/assets/logo-daw.png";
 import { BASE_UPLOAD_URL } from "@/lib/api";
 

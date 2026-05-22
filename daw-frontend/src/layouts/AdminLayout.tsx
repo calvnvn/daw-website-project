@@ -83,12 +83,6 @@ const MENU_GROUPS = [
         icon: Briefcase,
         perm: "manage_investments",
       },
-      {
-        name: "News & Events",
-        path: "/admin/news",
-        icon: Newspaper,
-        perm: "manage_news",
-      },
     ],
   },
   {
@@ -111,6 +105,12 @@ const MENU_GROUPS = [
         path: "/admin/about",
         icon: Users,
         perm: "manage_about",
+      },
+      {
+        name: "News & Events",
+        path: "/admin/news",
+        icon: Newspaper,
+        perm: "manage_news",
       },
     ],
   },

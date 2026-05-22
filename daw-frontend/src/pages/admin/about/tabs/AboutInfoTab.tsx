@@ -11,7 +11,7 @@ import {
 import { toast } from "sonner";
 import api from "@/lib/api";
 import { useAbout } from "@/contexts/AboutContext";
-import AboutLivePreview from "../../../../components/AboutLivePreview";
+import AboutLivePreview from "@/components/admin/about/AboutLivePreview";
 
 interface AboutInfoTabProps {
   isEditing: boolean;
