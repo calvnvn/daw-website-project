@@ -227,7 +227,7 @@ export default function Dashboard() {
     <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden flex flex-col">
       <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
         <h3 className="text-sm font-bold text-slate-800 flex items-center gap-2 uppercase tracking-wider">
-          <Flame className="w-4 h-4 text-orange-500" /> Top Berita
+          <Flame className="w-4 h-4 text-orange-500" /> Top News & Events
         </h3>
       </div>
       <div className="divide-y divide-slate-100 flex-1">
