@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Link } from "react-router-dom";
 import {
   ArrowRight,
@@ -66,7 +66,9 @@ export default function NewsEvents() {
 
   const [activeCategory, setActiveCategory] = useState("All");
   const [searchQuery, setSearchQuery] = useState("");
-  const [sortBy, setSortBy] = useState<"latest" | "oldest" | "popular">("latest");
+  const [sortBy, setSortBy] = useState<"latest" | "oldest" | "popular">(
+    "latest",
+  );
   const [isSortOpen, setIsSortOpen] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [scrollProgress, setScrollProgress] = useState(0);
@@ -171,7 +173,10 @@ export default function NewsEvents() {
 
   // Featured article (only on All + page 1 + no search + latest sort)
   const featuredArticle =
-    activeCategory === "All" && searchQuery === "" && currentPage === 1 && sortBy === "latest"
+    activeCategory === "All" &&
+    searchQuery === "" &&
+    currentPage === 1 &&
+    sortBy === "latest"
       ? articles[0]
       : null;
   const gridArticles = featuredArticle ? articles.slice(1) : articles;
@@ -284,18 +289,26 @@ export default function NewsEvents() {
                   className="flex items-center gap-2 px-5 py-3.5 bg-slate-50 border border-slate-200 hover:border-slate-300 text-slate-600 hover:text-slate-800 rounded-full text-[10px] sm:text-xs font-black uppercase tracking-widest transition-all whitespace-nowrap focus:outline-none focus:ring-4 focus:ring-daw-green/10">
                   <SlidersHorizontal className="w-3.5 h-3.5" />
                   <span className="hidden sm:inline">
-                    {sortBy === "latest" ? "Latest" : sortBy === "oldest" ? "Oldest" : "Popular"}
+                    {sortBy === "latest"
+                      ? "Latest"
+                      : sortBy === "oldest"
+                        ? "Oldest"
+                        : "Popular"}
                   </span>
-                  <ChevronDown className={`w-3.5 h-3.5 transition-transform duration-300 ${isSortOpen ? "rotate-180" : ""}`} />
+                  <ChevronDown
+                    className={`w-3.5 h-3.5 transition-transform duration-300 ${isSortOpen ? "rotate-180" : ""}`}
+                  />
                 </button>
 
                 {isSortOpen && (
                   <div className="absolute right-0 mt-2.5 w-52 bg-white border border-slate-100 rounded-2xl shadow-[0_10px_40px_-10px_rgba(0,0,0,0.12)] z-50 p-2 animate-in fade-in slide-in-from-top-2 duration-200">
-                    {([
-                      { value: "latest", label: "Latest Release" },
-                      { value: "oldest", label: "Oldest First" },
-                      { value: "popular", label: "Most Popular" },
-                    ] as const).map((opt) => (
+                    {(
+                      [
+                        { value: "latest", label: "Latest Release" },
+                        { value: "oldest", label: "Oldest First" },
+                        { value: "popular", label: "Most Popular" },
+                      ] as const
+                    ).map((opt) => (
                       <button
                         key={opt.value}
                         onClick={() => {
@@ -308,7 +321,9 @@ export default function NewsEvents() {
                             : "text-slate-600 hover:bg-slate-50"
                         }`}>
                         <span>{opt.label}</span>
-                        {sortBy === opt.value && <Check className="w-3.5 h-3.5" />}
+                        {sortBy === opt.value && (
+                          <Check className="w-3.5 h-3.5" />
+                        )}
                       </button>
                     ))}
                   </div>

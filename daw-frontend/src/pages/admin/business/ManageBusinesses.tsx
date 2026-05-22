@@ -17,7 +17,7 @@ import AddSectionModal from "./modals/AddSectionModal";
 import DeleteSectionModal from "./modals/DeleteSectionModal";
 import MapPickerModal from "./modals/MapPickerModal";
 import { useAuth } from "@/contexts/AuthContext";
-import { LockIcon, ShieldAlert, FileEdit, Eye } from "lucide-react";
+import { LockIcon, ShieldAlert } from "lucide-react";
 
 const normalizeBool = (val: any): boolean => {
   return val === true || val === "true" || val === 1 || val === "1";
@@ -455,7 +455,6 @@ export default function ManageBusinesses() {
           <CategoryManager />
         ) : (
           <div className="flex flex-col gap-6">
-
             {activeSubTab === "preview" ? (
               <BusinessLivePreview
                 formData={formData}

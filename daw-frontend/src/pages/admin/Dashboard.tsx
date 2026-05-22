@@ -16,7 +16,6 @@ import {
   Flame,
   Settings,
   Newspaper,
-  Award,
   AlertCircle,
 } from "lucide-react";
 import api from "@/lib/api";
