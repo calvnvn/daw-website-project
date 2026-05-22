@@ -309,12 +309,12 @@ export default function NewsEventDetail() {
               <article
                 className={`w-full text-left [&>*:first-child]:mt-0
                   prose prose-slate prose-lg md:prose-xl max-w-none
-                  prose-p:leading-[1.8] prose-p:text-slate-600 prose-p:mb-6 
+                  prose-p:leading-[1.8] prose-p:text-slate-600 prose-p:mb-1 
                   prose-p:text-[1.125rem] md:prose-p:text-[1.2rem]
                   prose-headings:font-serif prose-headings:text-slate-900 
-                  prose-h2:text-3xl md:prose-h2:text-4xl prose-h2:mt-12 prose-h2:mb-6
+                  prose-h2:text-3xl md:prose-h2:text-4xl prose-h2:mt-4 prose-h2:mb-4
                   prose-headings:tracking-tight prose-headings:font-bold
-                  prose-h3:text-2xl md:prose-h3:text-3xl prose-h3:mt-10
+                  prose-h3:text-2xl md:prose-h3:text-3xl prose-h3:mt-4 prose-h3:mb-4
                   [&_img]:rounded-[2rem] [&_img]:my-8
                   [&_iframe]:rounded-[1.5rem] [&_iframe]:shadow-2xl [&_iframe]:my-8
                   
