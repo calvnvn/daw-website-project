@@ -270,7 +270,197 @@ const sendApprovalNotification = async ({
   }
 };
 
+const sendInquiryNotification = async ({
+  targetEmail,
+  name,
+  email,
+  phone,
+  company,
+  subject,
+  message,
+  activeSubjectName,
+  logoUrl = null,
+  companyName = "DAW Group",
+}) => {
+  try {
+    const sender = process.env.SYSTEM_EMAIL_FROM || '"DAW Website Portal" <noreply@daw.co.id>';
+    const logoPath = path.join(__dirname, "..", "public", "logo-daw.png");
+    
+    // Choose logo source (CID or absolute URL)
+    const logoSrc = logoUrl || "cid:logo-daw";
+
+    const DAW_GREEN = "#004b23";
+    const DAW_YELLOW = "#e29504";
+
+    const htmlTemplate = `
+      <!DOCTYPE html>
+      <html lang="id">
+      <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <link rel="preconnect" href="https://fonts.googleapis.com">
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Lora:ital,wght@0,400..700;1,400..700&display=swap" rel="stylesheet">
+        
+        <style>
+          /* CSS Reset & Base */
+          body, p, h1, h2, h3, td, th { margin: 0; padding: 0; font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+          body { background-color: #f8fafc; color: #334155; -webkit-font-smoothing: antialiased; }
+          
+          /* Layout */
+          .email-wrapper { width: 100%; background-color: #f8fafc; padding: 48px 0; }
+          .email-card { max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 16px; overflow: hidden; box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.05), 0 8px 10px -6px rgba(0, 0, 0, 0.05); border: 1px solid #e2e8f0; }
+          
+          /* Branding Header */
+          .brand-header { text-align: center; padding: 32px 24px; border-bottom: 1px solid #f1f5f9; background-color: #ffffff; }
+          .brand-header img { max-height: 44px; width: auto; }
+          
+          /* Hero Section */
+          .hero-section { background-color: #f0fdf4; padding: 40px 32px; text-align: center; border-bottom: 1px solid #f1f5f9; }
+          .hero-section h1 { font-family: 'Lora', Georgia, serif; color: ${DAW_GREEN}; font-size: 24px; font-weight: 700; margin-bottom: 8px; line-height: 1.3; }
+          .hero-section p { font-size: 13px; color: #64748b; font-weight: 500; }
+          
+          /* Content Body */
+          .content-body { padding: 40px 32px; }
+          .greeting { font-size: 15px; font-weight: 700; color: #0f172a; margin-bottom: 12px; }
+          .intro-text { font-size: 14px; line-height: 1.6; color: #475569; margin-bottom: 28px; }
+          
+          /* Info Card / Metadata Display */
+          .info-card { background-color: #f8fafc; border: 1px solid #f1f5f9; border-radius: 12px; padding: 24px; margin-bottom: 28px; }
+          .info-card-title { font-size: 11px; font-weight: 800; text-transform: uppercase; color: #94a3b8; letter-spacing: 1.5px; margin-bottom: 16px; border-bottom: 1px solid #e2e8f0; padding-bottom: 8px; }
+          
+          .info-row { display: table; width: 100%; margin-bottom: 12px; }
+          .info-row:last-child { margin-bottom: 0; }
+          .info-label { display: table-cell; width: 35%; font-size: 13px; font-weight: 600; color: #64748b; vertical-align: top; }
+          .info-value { display: table-cell; width: 65%; font-size: 13px; font-weight: 700; color: #1e293b; text-align: right; }
+          
+          /* Message Content Block */
+          .message-block { background-color: #081C15; background: linear-gradient(to right, #081C15, #0a2d22); padding: 24px; border-radius: 12px; color: #ffffff; margin-bottom: 28px; }
+          .message-title { margin: 0 0 10px 0; font-size: 12px; text-transform: uppercase; letter-spacing: 1px; color: ${DAW_YELLOW}; font-weight: 800; }
+          .message-text { margin: 0; font-size: 15px; line-height: 1.7; white-space: pre-wrap; color: #f1f5f9; }
+          
+          /* Call to Action Button */
+          .cta-wrapper { text-align: center; margin: 36px 0 20px 0; }
+          .cta-btn { 
+            display: inline-block; 
+            background-color: ${DAW_GREEN}; 
+            color: #ffffff; 
+            text-decoration: none; 
+            padding: 16px 40px; 
+            border-radius: 10px; 
+            font-size: 14px; 
+            font-weight: 700; 
+            letter-spacing: 0.5px; 
+            box-shadow: 0 4px 14px 0 rgba(0, 75, 35, 0.2);
+            transition: all 0.3s ease;
+          }
+          
+          /* Footer */
+          .footer-section { background-color: #ffffff; padding: 36px 32px; text-align: center; border-top: 1px solid #f1f5f9; }
+          .footer-section p { font-size: 12px; color: #94a3b8; line-height: 1.6; margin-bottom: 12px; }
+          .footer-section p strong { color: #64748b; }
+        </style>
+      </head>
+      <body>
+        <div class="email-wrapper">
+          <div class="email-card">
+            
+            <!-- Logo Section -->
+            <div class="brand-header">
+              <img src="${logoSrc}" alt="${companyName} Logo" />
+            </div>
+
+            <!-- Header -->
+            <div class="hero-section">
+              <h1>New Contact Inquiry</h1>
+              <p>Subjek: <strong>${subject}</strong></p>
+            </div>
+
+            <!-- Email Body -->
+            <div class="content-body">
+              <p class="greeting">Halo Tim ${activeSubjectName},</p>
+              <p class="intro-text">
+                Anda menerima pesan baru dari portal website resmi <strong>${companyName}</strong>. Berikut adalah rincian pengirim:
+              </p>
+              
+              <!-- Info Card -->
+              <div class="info-card">
+                <div class="info-card-title">Informasi Pengirim</div>
+                
+                <div class="info-row">
+                  <span class="info-label">Nama Lengkap</span>
+                  <span class="info-value">${name}</span>
+                </div>
+                
+                <div class="info-row">
+                  <span class="info-label">Alamat Email</span>
+                  <span class="info-value" style="color: ${DAW_GREEN};">${email}</span>
+                </div>
+                
+                <div class="info-row">
+                  <span class="info-label">Nomor Telepon</span>
+                  <span class="info-value">${phone || "-"}</span>
+                </div>
+
+                <div class="info-row">
+                  <span class="info-label">Perusahaan</span>
+                  <span class="info-value">${company || "-"}</span>
+                </div>
+              </div>
+
+              <!-- Message Content Block -->
+              <div class="message-block">
+                <div class="message-title">Isi Pesan:</div>
+                <p class="message-text">${message}</p>
+              </div>
+
+              <!-- Call to Action -->
+              <div class="cta-wrapper">
+                <a href="mailto:${email}" class="cta-btn">Balas Email Pengirim</a>
+              </div>
+            </div>
+            
+            <!-- Branded Footer -->
+            <div class="footer-section">
+              <p><strong>${companyName} Website Management System</strong><br/>
+              Ini adalah email otomatis yang dikirim langsung dari formulir kontak portal DAW.</p>
+            </div>
+
+          </div>
+        </div>
+      </body>
+      </html>
+    `;
+
+    // Only attach local logo if it is used (i.e. no custom logoUrl is provided)
+    const attachments = [];
+    if (!logoUrl) {
+      attachments.push({
+        filename: "logo-daw.png",
+        path: logoPath,
+        cid: "logo-daw",
+      });
+    }
+
+    await transporter.sendMail({
+      from: sender,
+      to: targetEmail,
+      replyTo: email,
+      subject: `[Inquiry] ${subject} - ${name}`,
+      html: htmlTemplate,
+      attachments,
+    });
+
+    console.log(`✉️ [SUCCESS] Email Inquiry terkirim ke: ${targetEmail}`);
+    return true;
+  } catch (error) {
+    console.error(`🚨 [MAILER ERROR] Gagal mengirim email inquiry:`, error.message);
+    return false;
+  }
+};
+
 module.exports = {
   transporter,
   sendApprovalNotification,
+  sendInquiryNotification,
 };
