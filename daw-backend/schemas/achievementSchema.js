@@ -26,8 +26,8 @@ const createAchievementSchema = z.object({
   date: z.string().optional(),
   status: z.string().optional(),
   news_article_id: z.preprocess(
-    (val) => (val && val !== "null" ? Number(val) : null),
-    z.number().nullable().optional()
+    (val) => (val === "null" || val === "" || val === undefined ? null : val),
+    z.string().uuid("ID Artikel Berita tidak valid.").nullable().optional()
   ),
 });
 

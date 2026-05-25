@@ -5,7 +5,10 @@ const newsSchema = z.object({
   slug: z.string().optional(),
   excerpt: z.string().optional(),
   content: z.string().optional(),
-  category_id: z.preprocess((val) => (val && val !== "null" ? Number(val) : null), z.number().nullable().optional()),
+  category_id: z.preprocess(
+    (val) => (val === "null" || val === "" || val === undefined ? null : val),
+    z.string().uuid("ID Kategori tidak valid.").nullable().optional()
+  ),
   status: z.string().optional(),
   seo_title: z.string().optional(),
   meta_description: z.string().optional(),

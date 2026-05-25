@@ -5,7 +5,7 @@ const projectSchema = z.object({
   slug: z.string().optional(),
   excerpt: z.string().optional(),
   content: z.string().optional(),
-  category: z.preprocess((val) => (val && val !== "null" ? Number(val) : null), z.number().nullable().optional()),
+  category: z.string({ required_error: "Kategori wajib diisi." }).min(1, "Kategori tidak boleh kosong.").trim(),
   status: z.string().optional(),
   seo_title: z.string().optional(),
   meta_description: z.string().optional(),
