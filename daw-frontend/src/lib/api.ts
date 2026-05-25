@@ -52,6 +52,8 @@ const handleAuthError = (error: any) => {
     // );
     localStorage.removeItem("daw_token");
     localStorage.removeItem("daw_user");
+
+    window.dispatchEvent(new Event("auth:unauthorized"));
   }
   return Promise.reject(error);
 };
