@@ -8,8 +8,8 @@ import { getCleanImageUrl } from "@/lib/utils";
 export default function OtherInvestmentsTeaser() {
   const { t } = useTranslation();
 
-  const { settings, companies } = useInvestments();
-  const displayCompanies = companies.slice(0, 6);
+  const { publicSettings: settings, publicCompanies: companies } = useInvestments();
+  const displayCompanies = (companies || []).slice(0, 6);
 
   return (
     <section className="py-24 lg:py-32 bg-[#081C15] relative overflow-hidden rounded-t-[50px] lg:rounded-t-[100px] shadow-[inset_0_25px_80px_rgba(0,0,0,0.4)]">
@@ -25,13 +25,13 @@ export default function OtherInvestmentsTeaser() {
               <h2 className="text-4xl md:text-5xl font-serif text-white tracking-tight leading-[1.15] mb-8">
                 {/* 3. Gunakan Teks dari DB, jika kosong pakai fallback i18n */}
                 {settings?.teaserHeadline ||
-                  t("investmentsTeaser.headline", "Other Investments.")}
+                  t("business.investmentsTeaser.headline", "Other Investments.")}
               </h2>
             </ScrollReveal>
 
             <ScrollReveal direction="up" delay={300}>
               <p className="text-lg text-slate-400 font-light leading-relaxed mb-10 whitespace-pre-line">
-                {settings?.teaserBody || t("investmentsTeaser.body")}
+                {settings?.teaserBody || t("business.investmentsTeaser.body")}
               </p>
             </ScrollReveal>
 
@@ -39,12 +39,12 @@ export default function OtherInvestmentsTeaser() {
               <Link
                 to="/businesses#investments"
                 aria-label={t(
-                  "investmentsTeaser.ctaAria",
+                  "business.investmentsTeaser.ctaAria",
                   "View details about our other investments and partnerships",
                 )}
                 className="group inline-flex items-center gap-4 bg-white/5 hover:bg-daw-green border border-white/10 hover:border-daw-green text-white px-7 py-3.5 rounded-full text-[14px] font-bold tracking-widest uppercase transition-all duration-300 backdrop-blur-sm"
               >
-                <span>{t("investmentsTeaser.cta", "Read More")}</span>
+                <span>{t("business.investmentsTeaser.cta", "Explore All Investments")}</span>
                 <ArrowRight className="w-4 h-4 transform group-hover:translate-x-1 transition-transform duration-300" />
               </Link>
             </ScrollReveal>
@@ -93,7 +93,7 @@ export default function OtherInvestmentsTeaser() {
 
               {displayCompanies.length === 0 && (
                 <div className="col-span-full text-center text-slate-400 italic">
-                  No investments to display.
+                  {t("business.investmentsTeaser.noInvestments")}
                 </div>
               )}
             </div>

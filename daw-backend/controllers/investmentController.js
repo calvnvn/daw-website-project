@@ -57,6 +57,7 @@ const processAffiliatePayload = async (req, existingData = {}) => {
 // Retrieve public-facing investment settings and active affiliates
 exports.getPublicInvestmentData = async (req, res) => {
   try {
+    const lang = req.query.lang || "en";
     let settings = await InvestmentSettings.findByPk(1);
     if (!settings) {
       try {
@@ -94,7 +95,77 @@ exports.getPublicInvestmentData = async (req, res) => {
       (c) => !newDraftIds.includes(String(c.id)),
     );
 
-    res.status(200).json({ settings, companies: filteredCompanies });
+    if (lang === "en") {
+      return res.status(200).json({ settings, companies: filteredCompanies });
+    }
+
+    // ─── LAZY ON-DEMAND TRANSLATION FOR INVESTMENTS ───
+    const Translation = require("../models/Translation");
+    const { autoTranslate } = require("../services/openaiService");
+
+    // 1. Translate InvestmentSettings
+    let plainSettings = settings.get({ plain: true });
+    const SETTINGS_MODULE = "InvestmentSettings";
+
+    let headlineTrans = await Translation.findOne({ where: { modelName: SETTINGS_MODULE, recordId: "1", field: "teaserHeadline", locale: "id" } });
+    let bodyTrans = await Translation.findOne({ where: { modelName: SETTINGS_MODULE, recordId: "1", field: "teaserBody", locale: "id" } });
+    let introTrans = await Translation.findOne({ where: { modelName: SETTINGS_MODULE, recordId: "1", field: "sectionIntro", locale: "id" } });
+
+    if (!headlineTrans || !bodyTrans || !introTrans) {
+      console.log(`[Lazy Translation] Translating Investment Settings...`);
+      const freshHeadline = await autoTranslate(plainSettings.teaserHeadline, "Indonesian");
+      const freshBody = await autoTranslate(plainSettings.teaserBody, "Indonesian");
+      const freshIntro = await autoTranslate(plainSettings.sectionIntro, "Indonesian");
+
+      const upsertSettingsTrans = async (field, translatedText) => {
+        if (!translatedText) return;
+        const existing = await Translation.findOne({
+          where: { modelName: SETTINGS_MODULE, recordId: "1", field, locale: "id" }
+        });
+        if (existing) await existing.update({ translatedText });
+        else await Translation.create({ modelName: SETTINGS_MODULE, recordId: "1", field, locale: "id", translatedText });
+      };
+
+      if (freshHeadline) { await upsertSettingsTrans("teaserHeadline", freshHeadline); plainSettings.teaserHeadline = freshHeadline; }
+      if (freshBody) { await upsertSettingsTrans("teaserBody", freshBody); plainSettings.teaserBody = freshBody; }
+      if (freshIntro) { await upsertSettingsTrans("sectionIntro", freshIntro); plainSettings.sectionIntro = freshIntro; }
+    } else {
+      if (headlineTrans) plainSettings.teaserHeadline = headlineTrans.translatedText;
+      if (bodyTrans) plainSettings.teaserBody = bodyTrans.translatedText;
+      if (introTrans) plainSettings.sectionIntro = introTrans.translatedText;
+    }
+
+    // 2. Translate Affiliates Array
+    const AFFILIATE_MODULE = "Affiliate";
+    const translatedCompanies = [];
+
+    for (let i = 0; i < filteredCompanies.length; i++) {
+      let company = filteredCompanies[i].get({ plain: true });
+
+      let descTrans = await Translation.findOne({ where: { modelName: AFFILIATE_MODULE, recordId: company.id, field: "desc", locale: "id" } });
+
+      if (!descTrans) {
+        console.log(`[Lazy Translation] Translating Affiliate Company: ${company.id}...`);
+        const freshDesc = await autoTranslate(company.desc, "Indonesian");
+
+        const upsertAffiliateTrans = async (field, translatedText) => {
+          if (!translatedText) return;
+          const existing = await Translation.findOne({
+            where: { modelName: AFFILIATE_MODULE, recordId: company.id, field, locale: "id" }
+          });
+          if (existing) await existing.update({ translatedText });
+          else await Translation.create({ modelName: AFFILIATE_MODULE, recordId: company.id, field, locale: "id", translatedText });
+        };
+
+        if (freshDesc) { await upsertAffiliateTrans("desc", freshDesc); company.desc = freshDesc; }
+      } else {
+        if (descTrans) company.desc = descTrans.translatedText;
+      }
+
+      translatedCompanies.push(company);
+    }
+
+    res.status(200).json({ settings: plainSettings, companies: translatedCompanies });
   } catch (error) {
     console.error("🚨 [GET_PUBLIC_INVESTMENT_ERROR]:", error.message);
     res.status(500).json({ message: "Gagal mengambil data publik investasi." });

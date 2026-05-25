@@ -8,7 +8,6 @@ import { useHome } from "@/contexts/HomeContext";
 export default function TransformationIntro() {
   const { t } = useTranslation();
 
-  // 👈 TARIK DATA DARI PIPELINE
   const { settings } = useHome();
 
   return (
@@ -50,8 +49,7 @@ export default function TransformationIntro() {
                   "intro.ctaAria",
                   "Learn more about the history of DAW Group",
                 )}
-                className="group inline-flex items-center gap-3 text-daw-green text-[15px] font-bold uppercase tracking-wide transition-colors hover:text-daw-green-hover"
-              >
+                className="group inline-flex items-center gap-3 text-daw-green text-[15px] font-bold uppercase tracking-wide transition-colors hover:text-daw-green-hover">
                 <span>{t("intro.cta")}</span>
                 <ArrowRight className="w-5 h-5 transform group-hover:translate-x-2 transition-transform duration-300" />
               </Link>

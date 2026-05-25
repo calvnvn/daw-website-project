@@ -133,7 +133,7 @@ const DynamicBusinessSection = memo(
                   <span className="w-16 h-[2px] bg-gradient-to-r from-daw-green to-transparent rounded-r-full"></span>
                 </div>
                 <h2 className="text-4xl md:text-5xl font-serif font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-[#004B23] to-[#006E33] tracking-tight pb-2">
-                  {data.category} Projects
+                  {t("business.categoryProjects", "{{category}} Projects", { category: data.category })}
                 </h2>
               </ScrollReveal>
             </div>

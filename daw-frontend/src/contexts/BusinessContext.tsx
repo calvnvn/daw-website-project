@@ -48,6 +48,7 @@ export interface SectionData {
 
 interface BusinessContextType {
   sections: SectionData[];
+  publicSections: SectionData[];
   categories: MapCategory[];
   publicProjects: any[];
   isLoading: boolean;
@@ -83,6 +84,7 @@ export const BusinessProvider = ({ children }: { children: ReactNode }) => {
   const { user } = useAuth();
   const { i18n } = useTranslation();
   const [sections, setSections] = useState<SectionData[]>([]);
+  const [publicSections, setPublicSections] = useState<SectionData[]>([]);
   const [categories, setCategories] = useState<MapCategory[]>([]);
   const [publicProjects, setPublicProjects] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -133,18 +135,21 @@ export const BusinessProvider = ({ children }: { children: ReactNode }) => {
 
     try {
       const promises: Promise<any>[] = [
-        api.get("/map-categories"), // index 0
+        api.get("/map-categories", {
+          params: { lang: i18n.language === "id" ? "id" : "en" }
+        }), // index 0
         api.get("/projects/public", {
           params: { lang: i18n.language === "id" ? "id" : "en" }
         }), // index 1
+        api.get("/businesses/public", {
+          params: { lang: i18n.language === "id" ? "id" : "en" }
+        }), // index 2
       ];
 
-      const sectionsIndex = promises.length; // index 2
+      const sectionsIndex = promises.length; // index 3
 
       if (canAccessAdmin) {
         promises.push(api.get("/businesses/admin"));
-      } else {
-        promises.push(api.get("/businesses/public"));
       }
 
       const results = await Promise.allSettled(promises);
@@ -157,29 +162,43 @@ export const BusinessProvider = ({ children }: { children: ReactNode }) => {
         setPublicProjects(
           results[1].value.data?.data || results[1].value.data || [],
         );
-
-      const sectionRes = results[sectionsIndex];
-
-      if (sectionRes.status === "fulfilled") {
-        const data = sectionRes.value.data;
-        setSections(
-          Array.isArray(data?.data)
-            ? data.data
-            : Array.isArray(data)
-              ? data
+      if (results[2].status === "fulfilled") {
+        const pData = results[2].value.data;
+        setPublicSections(
+          Array.isArray(pData?.data)
+            ? pData.data
+            : Array.isArray(pData)
+              ? pData
               : [],
         );
+      }
+
+      if (canAccessAdmin) {
+        const sectionRes = results[sectionsIndex];
+
+        if (sectionRes.status === "fulfilled") {
+          const data = sectionRes.value.data;
+          setSections(
+            Array.isArray(data?.data)
+              ? data.data
+              : Array.isArray(data)
+                ? data
+                : [],
+          );
+        } else {
+          console.warn(
+            "⚠️ [RETRY] Admin fetch failed, falling back to public data...",
+          );
+          if (results[2].status === "fulfilled") {
+            const pData = results[2].value.data;
+            setSections(Array.isArray(pData) ? pData : []);
+          }
+        }
       } else {
-        console.warn(
-          "⚠️ [RETRY] Admin fetch failed, falling back to public data...",
-        );
-        try {
-          const publicRes = await api.get("/businesses");
-          const publicData = publicRes.data?.data || publicRes.data;
-          setSections(Array.isArray(publicData) ? publicData : []);
-        } catch {
-          console.error("🚨 [FATAL] Public fallback also failed.");
-          setSections([]);
+        // Non-admin uses publicSections for both sections and publicSections
+        if (results[2].status === "fulfilled") {
+          const pData = results[2].value.data;
+          setSections(Array.isArray(pData) ? pData : []);
         }
       }
     } catch (error) {
@@ -353,6 +372,7 @@ export const BusinessProvider = ({ children }: { children: ReactNode }) => {
     <BusinessContext.Provider
       value={{
         sections,
+        publicSections,
         categories,
         publicProjects,
         isLoading,

@@ -174,7 +174,7 @@ export default function BusinessGrid({
 
                     {/* DISPLAY PRETTY SECTOR NAME */}
                     <div className="absolute top-4 left-4 bg-white/95 px-3 py-1.5 rounded-md text-[10px] uppercase tracking-wider font-black text-daw-green shadow-sm border border-slate-100">
-                      {sectorLookup[project.category] || "Portfolio"}
+                      {sectorLookup[project.category] || t("ui.portfolio")}
                     </div>
                   </div>
 
@@ -199,7 +199,7 @@ export default function BusinessGrid({
           <div className="text-center py-32 bg-slate-50 rounded-3xl border-2 border-dashed border-slate-200">
             <ImageIcon className="w-12 h-12 text-slate-200 mx-auto mb-4" />
             <p className="text-slate-400 font-medium">
-              No assets found in this sector.
+              {t("business.noAssets")}
             </p>
           </div>
         )}

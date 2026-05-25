@@ -4,11 +4,13 @@ import { ArrowLeft } from "lucide-react";
 import SEO from "@/components/SEO";
 import { useHome } from "@/contexts/HomeContext";
 import { getCleanImageUrl } from "@/lib/utils";
+import { useTranslation } from "react-i18next";
 
 // Fallback jika API Hero gagal/belum selesai load
 import fallbackSlide from "@/assets/hero-slide-1.jpg";
 
 export default function NotFound() {
+  const { t } = useTranslation();
   const { slides } = useHome();
   const bgImage =
     slides && slides.length > 0 && slides[0].imageUrl
@@ -32,8 +34,8 @@ export default function NotFound() {
   return (
     <>
       <SEO
-        title="404 - Page Not Found | DAW Group"
-        description="The page you are looking for cannot be found."
+        title={t("notFound.seoTitle", "404 - Page Not Found | DAW Group")}
+        description={t("notFound.seoDesc", "The page you are looking for cannot be found.")}
       />
       <section className="relative flex min-h-[100dvh] w-full items-center justify-center overflow-hidden bg-slate-900 selection:bg-daw-green selection:text-white">
         {/* LAYER 1: THE PARALLAX BACKGROUND */}
@@ -68,10 +70,10 @@ export default function NotFound() {
             <div className="mx-auto my-6 h-[1px] w-12 bg-daw-yellow/60 shadow-[0_0_10px_rgba(226,149,4,0.5)] sm:my-8 sm:w-16" />
 
             <h2 className="mb-3 font-serif text-xl font-medium tracking-wide text-white sm:text-3xl md:mb-4 md:text-4xl drop-shadow-md">
-              Not found
+              {t("notFound.title")}
             </h2>
             <p className="mx-auto max-w-lg text-xs font-light leading-relaxed text-slate-300 sm:text-sm md:text-base">
-              The page you are trying to access cannot be found.
+              {t("notFound.desc")}
             </p>
 
             {/* LAYER 4: EXECUTIVE ACTION BUTTONS */}
@@ -80,13 +82,13 @@ export default function NotFound() {
                 to="/"
                 className="group relative flex w-full items-center justify-center gap-3 border border-transparent bg-daw-green px-6 py-3.5 text-[10px] sm:text-[11px] font-bold uppercase tracking-[0.2em] text-white transition-all duration-300 hover:border-[#004B23] hover:bg-daw-green/90 hover:shadow-[0_0_20px_rgba(0,75,35,0.4)] active:scale-[0.98] sm:w-auto rounded-sm">
                 <ArrowLeft className="h-4 w-4 transition-transform group-hover:-translate-x-1" />
-                Back to Homepage
+                {t("notFound.backHome")}
               </Link>
 
               <Link
                 to="/businesses"
                 className="group flex w-full items-center justify-center border border-white/30 bg-transparent px-6 py-3.5 text-[10px] sm:text-[11px] font-bold uppercase tracking-[0.2em] text-white transition-all duration-300 hover:border-white hover:bg-white/10 active:scale-[0.98] sm:w-auto rounded-sm">
-                Explore Our Businesses
+                {t("notFound.explore")}
               </Link>
             </div>
           </div>

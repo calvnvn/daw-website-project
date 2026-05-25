@@ -8,6 +8,7 @@ import {
 } from "react";
 import api from "@/lib/api";
 import { toast } from "sonner";
+import { useTranslation } from "react-i18next";
 
 // --- INTERFACES ---
 export interface PageOption {
@@ -46,6 +47,7 @@ interface ContentContextType {
 const ContentContext = createContext<ContentContextType | undefined>(undefined);
 
 export function ContentProvider({ children }: { children: ReactNode }) {
+  const { i18n } = useTranslation();
   const [pages, setPages] = useState<PageOption[]>([]);
   const [treeMenus, setTreeMenus] = useState<Menu[]>([]);
   const [flatMenus, setFlatMenus] = useState<Menu[]>([]);
@@ -65,10 +67,11 @@ export function ContentProvider({ children }: { children: ReactNode }) {
   const refreshData = useCallback(async () => {
     setIsLoading(true);
     try {
+      const lang = i18n.language || "en";
       const [pagesRes, treeRes, flatRes] = await Promise.allSettled([
-        api.get("/pages"),
-        api.get("/menus/tree"),
-        api.get("/menus/flat"),
+        api.get(`/pages?lang=${lang}`),
+        api.get(`/menus/tree?lang=${lang}`),
+        api.get(`/menus/flat?lang=${lang}`),
       ]);
 
       // 1. Process Pages Data
@@ -116,7 +119,7 @@ export function ContentProvider({ children }: { children: ReactNode }) {
     } finally {
       setIsLoading(false);
     }
-  }, []); // Array kosong wajib hukumnya di sini!
+  }, [i18n.language]);
 
   /**
    * LIFECYCLE & EVENT LISTENER

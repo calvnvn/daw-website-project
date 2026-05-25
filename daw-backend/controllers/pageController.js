@@ -11,6 +11,8 @@ const Page = require("../models/Page");
 const ApprovalDraft = require("../models/ApprovalDraft");
 const { deleteSingleFile } = require("../utils/fileRemover");
 const ErpApprovalService = require("../services/erpApprovalService");
+const Translation = require("../models/Translation");
+const { autoTranslate } = require("../services/openaiService");
 const { generateNotrans } = require("../utils/notransGenerator");
 
 const MODULE_NAME = "PAGE";

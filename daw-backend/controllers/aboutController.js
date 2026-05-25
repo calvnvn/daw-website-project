@@ -46,8 +46,43 @@ exports.getAboutInfo = async (req, res) => {
 
     if (!info) return res.status(404).json({ message: "About info not found" });
 
-    const formattedInfo = info.toJSON();
+    let formattedInfo = info.toJSON();
     formattedInfo.hasRejected = !!formattedInfo.hasRejected;
+
+    const lang = req.query.lang || "en";
+    if (lang === "en") {
+      return res.status(200).json(formattedInfo);
+    }
+
+    // ─── LAZY TRANSLATION ───
+    const Translation = require("../models/Translation");
+    const { autoTranslate } = require("../services/openaiService");
+
+    let spiritTrans = await Translation.findOne({ where: { modelName: MODULE_NAME, recordId: "1", field: "spiritText", locale: "id" } });
+    let missionTrans = await Translation.findOne({ where: { modelName: MODULE_NAME, recordId: "1", field: "missionText", locale: "id" } });
+    let visionTrans = await Translation.findOne({ where: { modelName: MODULE_NAME, recordId: "1", field: "visionText", locale: "id" } });
+
+    if (!spiritTrans || !missionTrans || !visionTrans) {
+      console.log(`[Lazy Translation] Translating About Info...`);
+      const freshSpirit = await autoTranslate(formattedInfo.spiritText, "Indonesian");
+      const freshMission = await autoTranslate(formattedInfo.missionText, "Indonesian");
+      const freshVision = await autoTranslate(formattedInfo.visionText, "Indonesian");
+
+      const upsertAboutTrans = async (field, translatedText) => {
+        if (!translatedText) return;
+        const existing = await Translation.findOne({ where: { modelName: MODULE_NAME, recordId: "1", field, locale: "id" } });
+        if (existing) await existing.update({ translatedText });
+        else await Translation.create({ modelName: MODULE_NAME, recordId: "1", field, locale: "id", translatedText });
+      };
+
+      if (freshSpirit) { await upsertAboutTrans("spiritText", freshSpirit); formattedInfo.spiritText = freshSpirit; }
+      if (freshMission) { await upsertAboutTrans("missionText", freshMission); formattedInfo.missionText = freshMission; }
+      if (freshVision) { await upsertAboutTrans("visionText", freshVision); formattedInfo.visionText = freshVision; }
+    } else {
+      if (spiritTrans) formattedInfo.spiritText = spiritTrans.translatedText;
+      if (missionTrans) formattedInfo.missionText = missionTrans.translatedText;
+      if (visionTrans) formattedInfo.visionText = visionTrans.translatedText;
+    }
 
     res.status(200).json(formattedInfo);
   } catch (error) {

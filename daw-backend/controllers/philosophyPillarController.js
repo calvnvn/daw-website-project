@@ -46,7 +46,44 @@ exports.getPillars = async (req, res) => {
       return item;
     });
 
-    res.status(200).json({ success: true, data: formattedPillars });
+    const lang = req.query.lang || "en";
+    if (lang === "en") {
+      return res.status(200).json({ success: true, data: formattedPillars });
+    }
+
+    // ─── LAZY TRANSLATION ───
+    const Translation = require("../models/Translation");
+    const { autoTranslate } = require("../services/openaiService");
+
+    const translatedPillars = [];
+    for (let i = 0; i < formattedPillars.length; i++) {
+      let item = formattedPillars[i];
+      
+      let titleTrans = await Translation.findOne({ where: { modelName: MODULE_NAME, recordId: String(item.id), field: "title", locale: "id" } });
+      let textTrans = await Translation.findOne({ where: { modelName: MODULE_NAME, recordId: String(item.id), field: "text", locale: "id" } });
+      
+      if (!titleTrans || !textTrans) {
+        console.log(`[Lazy Translation] Translating Philosophy Pillar: ${item.id}...`);
+        const freshTitle = await autoTranslate(item.title, "Indonesian");
+        const freshText = await autoTranslate(item.text, "Indonesian");
+        
+        const upsertPillarTrans = async (field, translatedText) => {
+          if (!translatedText) return;
+          const existing = await Translation.findOne({ where: { modelName: MODULE_NAME, recordId: String(item.id), field, locale: "id" } });
+          if (existing) await existing.update({ translatedText });
+          else await Translation.create({ modelName: MODULE_NAME, recordId: String(item.id), field, locale: "id", translatedText });
+        };
+
+        if (freshTitle) { await upsertPillarTrans("title", freshTitle); item.title = freshTitle; }
+        if (freshText) { await upsertPillarTrans("text", freshText); item.text = freshText; }
+      } else {
+        if (titleTrans) item.title = titleTrans.translatedText;
+        if (textTrans) item.text = textTrans.translatedText;
+      }
+      translatedPillars.push(item);
+    }
+
+    res.status(200).json({ success: true, data: translatedPillars });
   } catch (error) {
     console.error("🚨 [GET PILLARS ERROR]:", error.message);
     res

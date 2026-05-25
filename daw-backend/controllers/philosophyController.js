@@ -45,8 +45,32 @@ exports.getPhilosophy = async (req, res) => {
     if (!data)
       return res.status(404).json({ message: "Philosophy data not found" });
 
-    const formatted = data.toJSON();
+    let formatted = data.toJSON();
     formatted.hasRejected = !!formatted.hasRejected;
+
+    const lang = req.query.lang || "en";
+    if (lang === "en") {
+      return res.status(200).json(formatted);
+    }
+
+    // ─── LAZY TRANSLATION ───
+    const Translation = require("../models/Translation");
+    const { autoTranslate } = require("../services/openaiService");
+
+    let titleTrans = await Translation.findOne({ where: { modelName: MODULE_NAME, recordId: "1", field: "philosophyTitle", locale: "id" } });
+    
+    if (!titleTrans) {
+      console.log(`[Lazy Translation] Translating Philosophy Title...`);
+      const freshTitle = await autoTranslate(formatted.philosophyTitle, "Indonesian");
+      
+      if (freshTitle) {
+        await Translation.create({ modelName: MODULE_NAME, recordId: "1", field: "philosophyTitle", locale: "id", translatedText: freshTitle });
+        formatted.philosophyTitle = freshTitle;
+      }
+    } else {
+      formatted.philosophyTitle = titleTrans.translatedText;
+    }
+
     res.status(200).json(formatted);
   } catch (error) {
     res.status(500).json({ message: error.message });

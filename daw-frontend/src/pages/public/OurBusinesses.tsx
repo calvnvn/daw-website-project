@@ -11,7 +11,7 @@ import GlobalHeroBanner from "@/components/ui/GlobalHeroBanner";
 export default function OurBusinesses() {
   const { t } = useTranslation();
   const { hash } = useLocation();
-  const { sections: pageData, isLoading, refreshData } = useBusiness();
+  const { publicSections: pageData, isLoading, refreshData } = useBusiness();
 
   const [activeSection, setActiveSection] = useState("");
   const [scrollProgress, setScrollProgress] = useState(0);
@@ -46,7 +46,7 @@ export default function OurBusinesses() {
   // FIX 4: Masukkan refreshData ke dalam dependency array
   useEffect(() => {
     refreshData();
-  }, []);
+  }, [refreshData]);
 
   /**
    * @constant navItems

@@ -9,6 +9,7 @@ import {
 } from "react";
 import api from "@/lib/api";
 import { toast } from "sonner";
+import { useTranslation } from "react-i18next";
 
 export interface PhilosophyPillar extends Lockable {
   id: number;
@@ -94,6 +95,7 @@ export const AboutContext = createContext<AboutContextType>({
 });
 
 export function AboutProvider({ children }: { children: ReactNode }) {
+  const { i18n } = useTranslation();
   const [aboutData, setAboutData] = useState<AboutData | null>(null);
   const [philosophyData, setPhilosophyData] = useState<PhilosophyData | null>(
     null,
@@ -110,6 +112,9 @@ export function AboutProvider({ children }: { children: ReactNode }) {
   const fetchData = useCallback(async (signal?: AbortSignal) => {
     setIsLoading(true);
     try {
+      const langParam = i18n.language === "id" ? "id" : "en";
+      const params = { lang: langParam };
+
       const [
         resAbout,
         resPhilosophy,
@@ -118,12 +123,12 @@ export function AboutProvider({ children }: { children: ReactNode }) {
         resManagement,
         resAchievements,
       ] = await Promise.allSettled([
-        api.get("/about", { signal }),
-        api.get("/philosophy", { signal }),
-        api.get("/philosophy-pillars", { signal }),
-        api.get("/history", { signal }),
-        api.get("/management", { signal }),
-        api.get("/achievements", { signal }),
+        api.get("/about", { params, signal }),
+        api.get("/philosophy", { params, signal }),
+        api.get("/philosophy-pillars", { params, signal }),
+        api.get("/history", { params, signal }),
+        api.get("/management", { params, signal }),
+        api.get("/achievements", { params, signal }),
       ]);
 
       // 1. Process About Info (Visi Misi)
@@ -182,7 +187,7 @@ export function AboutProvider({ children }: { children: ReactNode }) {
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [i18n.language]);
 
   const refreshData = useCallback(async () => {
     await fetchData();

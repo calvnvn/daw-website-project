@@ -55,7 +55,44 @@ exports.getAllAchievements = async (req, res) => {
       return item;
     });
 
-    res.status(200).json({ success: true, data: formattedData });
+    const lang = req.query.lang || "en";
+    if (lang === "en") {
+      return res.status(200).json({ success: true, data: formattedData });
+    }
+
+    // ─── LAZY TRANSLATION ───
+    const Translation = require("../models/Translation");
+    const { autoTranslate } = require("../services/openaiService");
+
+    const translatedAchievements = [];
+    for (let i = 0; i < formattedData.length; i++) {
+      let item = formattedData[i];
+      
+      let titleTrans = await Translation.findOne({ where: { modelName: MODULE_NAME, recordId: String(item.id), field: "title", locale: "id" } });
+      let descTrans = await Translation.findOne({ where: { modelName: MODULE_NAME, recordId: String(item.id), field: "description", locale: "id" } });
+      
+      if (!titleTrans || (!descTrans && item.description)) {
+        console.log(`[Lazy Translation] Translating Achievement: ${item.id}...`);
+        const freshTitle = await autoTranslate(item.title, "Indonesian");
+        const freshDesc = item.description ? await autoTranslate(item.description, "Indonesian") : "";
+        
+        const upsertAchvTrans = async (field, translatedText) => {
+          if (!translatedText) return;
+          const existing = await Translation.findOne({ where: { modelName: MODULE_NAME, recordId: String(item.id), field, locale: "id" } });
+          if (existing) await existing.update({ translatedText });
+          else await Translation.create({ modelName: MODULE_NAME, recordId: String(item.id), field, locale: "id", translatedText });
+        };
+
+        if (freshTitle) { await upsertAchvTrans("title", freshTitle); item.title = freshTitle; }
+        if (freshDesc) { await upsertAchvTrans("description", freshDesc); item.description = freshDesc; }
+      } else {
+        if (titleTrans) item.title = titleTrans.translatedText;
+        if (descTrans) item.description = descTrans.translatedText;
+      }
+      translatedAchievements.push(item);
+    }
+
+    res.status(200).json({ success: true, data: translatedAchievements });
   } catch (error) {
     console.error("🚨 [GET ALL ACHIEVEMENTS ERROR]:", error.message);
     res
