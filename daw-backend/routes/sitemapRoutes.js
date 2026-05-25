@@ -13,14 +13,16 @@ router.get("/robots.txt", sitemapController.generateRobotsTxt);
 // CMS MANAGEMENT ENDPOINTS
 router.get(
   "/api/seo/robots",
-  [verifyToken, checkPermission("manage_settings")],
-  sitemapController.getRobotsContent
+  verifyToken,
+  checkPermission("manage_settings"),
+  sitemapController.getRobotsContent,
 );
 
 router.put(
   "/api/seo/robots",
-  [verifyToken, checkPermission("manage_settings")],
-  sitemapController.updateRobotsContent
+  verifyToken,
+  checkPermission("manage_settings"),
+  sitemapController.updateRobotsContent,
 );
 
 module.exports = router;

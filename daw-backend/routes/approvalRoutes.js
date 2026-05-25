@@ -45,6 +45,10 @@ router.get(
 );
 
 // Dismiss rejection status and notifications
-router.patch("/discard", verifyToken, approvalController.discardDraft);
+router.patch(
+  "/discard",
+  verifyToken,
+  approvalController.discardDraft,
+);
 
 module.exports = router;

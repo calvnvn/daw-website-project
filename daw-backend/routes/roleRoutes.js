@@ -4,19 +4,36 @@ const roleController = require("../controllers/roleController");
 const { verifyToken, checkPermission } = require("../middleware/authJwt");
 
 // ADMINISTRATIVE
-router.use(verifyToken);
-router.use(checkPermission("manage_users"));
-
 // Fetch all role definitions
-router.get("/", roleController.getAllRoles);
+router.get(
+  "/",
+  verifyToken,
+  checkPermission("manage_users"),
+  roleController.getAllRoles,
+);
 
 // Initialize new role record
-router.post("/", roleController.createRole);
+router.post(
+  "/",
+  verifyToken,
+  checkPermission("manage_users"),
+  roleController.createRole,
+);
 
 // Mutate role configuration and permissions
-router.put("/:id", roleController.updateRole);
+router.put(
+  "/:id",
+  verifyToken,
+  checkPermission("manage_users"),
+  roleController.updateRole,
+);
 
 // Terminate role record and validate dependencies
-router.delete("/:id", roleController.deleteRole);
+router.delete(
+  "/:id",
+  verifyToken,
+  checkPermission("manage_users"),
+  roleController.deleteRole,
+);
 
 module.exports = router;

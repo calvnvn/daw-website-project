@@ -18,17 +18,26 @@ router.get("/public/:id", projectController.getPublicProjectById);
 router.get("/public/s/:slug", projectController.getPublicProjectBySlug);
 
 // ADMINISTRATIVE
-router.use(verifyToken);
-
 // Fetch comprehensive project registry
-router.get("/", projectController.getAllProjects);
+router.get(
+  "/",
+  verifyToken,
+  checkPermission("manage_projects"),
+  projectController.getAllProjects,
+);
 
 // Fetch internal project record by ID
-router.get("/:id", projectController.getProjectById);
+router.get(
+  "/:id",
+  verifyToken,
+  checkPermission("manage_projects"),
+  projectController.getProjectById,
+);
 
 /// Initialize new project with multi-asset handling and validation/ Create Project
 router.post(
   "/",
+  verifyToken,
   checkPermission("manage_projects"),
   (req, res, next) => {
     upload.fields([
@@ -60,6 +69,7 @@ router.post(
 // Mutate project data and assets with pessimistic lock validation
 router.put(
   "/:id",
+  verifyToken,
   checkPermission("manage_projects"),
   checkLock(Project),
   upload.fields([
@@ -73,6 +83,7 @@ router.put(
 // Terminate project record and associated assets with lock validation
 router.delete(
   "/:id",
+  verifyToken,
   checkPermission("manage_projects"),
   checkLock(Project),
   projectController.deleteProject,
@@ -81,6 +92,7 @@ router.delete(
 // Execute editor asset upload and optimization pipeline
 router.post(
   "/upload-inline",
+  verifyToken,
   checkPermission("manage_projects"),
   upload.single("inline_image"),
   optimizeImage,

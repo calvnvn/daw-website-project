@@ -11,7 +11,8 @@ router.get("/", historyController.getHistories);
 // Mutate historical timeline data
 router.put(
   "/",
-  [verifyToken, checkPermission("manage_about")],
+  verifyToken,
+  checkPermission("manage_about"),
   historyController.updateHistories,
 );
 

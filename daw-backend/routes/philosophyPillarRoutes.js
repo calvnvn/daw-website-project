@@ -11,21 +11,24 @@ router.get("/", philosophyPillarController.getPillars);
 // Initialize new philosophy pillar record
 router.post(
   "/",
-  [verifyToken, checkPermission("manage_about")],
+  verifyToken,
+  checkPermission("manage_about"),
   philosophyPillarController.createPillar,
 );
 
 // Mutate existing philosophy pillar data
 router.put(
   "/:id",
-  [verifyToken, checkPermission("manage_about")],
+  verifyToken,
+  checkPermission("manage_about"),
   philosophyPillarController.updatePillar,
 );
 
 // Terminate philosophy pillar record and validate dependencies
 router.delete(
   "/:id",
-  [verifyToken, checkPermission("manage_about")],
+  verifyToken,
+  checkPermission("manage_about"),
   philosophyPillarController.deletePillar,
 );
 

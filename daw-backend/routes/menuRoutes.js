@@ -8,17 +8,22 @@ const { verifyToken, checkPermission } = require("../middleware/authJwt");
 router.get("/tree", menuController.getMenuTree);
 
 // ADMINISTRATIVE
-router.use(verifyToken);
 
 // Fetch flat menu registry for administrative management
-router.get("/flat", menuController.getAllMenusFlat);
+router.get("/flat", verifyToken, menuController.getAllMenusFlat);
 
 // Initialize new menu record
-router.post("/", checkPermission("manage_content"), menuController.createMenu);
+router.post(
+  "/",
+  verifyToken,
+  checkPermission("manage_content"),
+  menuController.createMenu,
+);
 
 // Mutate global navigation structure and sort order
 router.put(
   "/reorder",
+  verifyToken,
   checkPermission("manage_content"),
   menuController.reorderMenus,
 );
@@ -26,6 +31,7 @@ router.put(
 // Mutate menu item configuration and link mapping
 router.put(
   "/:id",
+  verifyToken,
   checkPermission("manage_content"),
   menuController.updateMenu,
 );
@@ -33,6 +39,7 @@ router.put(
 // Terminate menu record and associated sub-menus
 router.delete(
   "/:id",
+  verifyToken,
   checkPermission("manage_content"),
   menuController.deleteMenu,
 );

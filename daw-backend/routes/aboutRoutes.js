@@ -11,7 +11,8 @@ router.get("/", aboutController.getAboutInfo);
 // Mutate organizational profile and mission data
 router.put(
   "/",
-  [verifyToken, checkPermission("manage_about")],
+  verifyToken,
+  checkPermission("manage_about"),
   aboutController.updateAboutInfo,
 );
 

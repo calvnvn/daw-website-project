@@ -11,7 +11,8 @@ router.get("/", philosophyController.getPhilosophy);
 // Mutate core organizational philosophy and values
 router.put(
   "/",
-  [verifyToken, checkPermission("manage_about")],
+  verifyToken,
+  checkPermission("manage_about"),
   philosophyController.updatePhilosophy,
 );
 

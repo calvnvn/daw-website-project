@@ -1,7 +1,7 @@
 const express = require("express");
 const router = express.Router();
 const achievementController = require("../controllers/achievementController");
-const { verifyToken } = require("../middleware/authJwt");
+const { verifyToken, checkPermission } = require("../middleware/authJwt");
 const { upload, optimizeImage } = require("../middleware/upload");
 
 /**
@@ -21,6 +21,7 @@ router.get("/:id", achievementController.getAchievementById);
 router.post(
   "/",
   verifyToken,
+  checkPermission("manage_achievements"),
   upload.single("image"),
   optimizeImage,
   achievementController.createAchievement,
@@ -30,12 +31,18 @@ router.post(
 router.put(
   "/:id",
   verifyToken,
+  checkPermission("manage_achievements"),
   upload.single("image"),
   optimizeImage,
   achievementController.updateAchievement,
 );
 
 // Delete an achievement record and physically purge its associated assets
-router.delete("/:id", verifyToken, achievementController.deleteAchievement);
+router.delete(
+  "/:id",
+  verifyToken,
+  checkPermission("manage_achievements"),
+  achievementController.deleteAchievement,
+);
 
 module.exports = router;

@@ -7,7 +7,7 @@ const { verifyToken, checkPermission } = require("../middleware/authJwt");
 router.use(verifyToken);
 
 // Fetch comprehensive user registry excluding sensitive credentials
-router.get("/", userController.getAllUsers);
+router.get("/", checkPermission("manage_users"), userController.getAllUsers);
 
 // Initialize new user identity for SSO whitelisting
 router.post("/", checkPermission("manage_users"), userController.createUser);

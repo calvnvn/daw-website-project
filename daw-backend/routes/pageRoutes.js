@@ -2,7 +2,7 @@ const express = require("express");
 const router = express.Router();
 const pageController = require("../controllers/pageController");
 const { upload, optimizeImage } = require("../middleware/upload");
-const { verifyToken } = require("../middleware/authJwt");
+const { verifyToken, checkPermission } = require("../middleware/authJwt");
 
 // PUBLIC
 // Fetch single page record by URL slug
@@ -10,12 +10,18 @@ router.get("/slug/:slug", pageController.getPageBySlug);
 
 // ADMINISTRATIVE
 // Fetch all page records for administrative management
-router.get("/", verifyToken, pageController.getAllPages);
+router.get(
+  "/",
+  verifyToken,
+  checkPermission("manage_content"),
+  pageController.getAllPages,
+);
 
 // Execute inline asset upload and optimization
 router.post(
   "/upload-inline",
   verifyToken,
+  checkPermission("manage_content"),
   upload.single("inline_image"),
   optimizeImage,
   pageController.uploadInlineImage,
@@ -25,6 +31,7 @@ router.post(
 router.post(
   "/",
   verifyToken,
+  checkPermission("manage_content"),
   upload.single("heroImage"),
   optimizeImage,
   pageController.createPage,
@@ -34,12 +41,18 @@ router.post(
 router.put(
   "/:id",
   verifyToken,
+  checkPermission("manage_content"),
   upload.single("heroImage"),
   optimizeImage,
   pageController.updatePage,
 );
 
 // Terminate page record and purge associated assets
-router.delete("/:id", verifyToken, pageController.deletePage);
+router.delete(
+  "/:id",
+  verifyToken,
+  checkPermission("manage_content"),
+  pageController.deletePage,
+);
 
 module.exports = router;

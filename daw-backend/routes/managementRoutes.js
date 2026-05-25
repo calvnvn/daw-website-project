@@ -12,7 +12,8 @@ router.get("/", managementController.getAllManagements);
 // Initialize new management member with asset optimization
 router.post(
   "/",
-  [verifyToken, checkPermission("manage_about")],
+  verifyToken,
+  checkPermission("manage_about"),
   upload.single("photo"),
   optimizeImage,
   managementController.createManagement,
@@ -21,7 +22,8 @@ router.post(
 // Mutate management profile data and photo assets
 router.put(
   "/:id",
-  [verifyToken, checkPermission("manage_about")],
+  verifyToken,
+  checkPermission("manage_about"),
   upload.single("photo"),
   optimizeImage,
   managementController.updateManagement,
@@ -30,7 +32,8 @@ router.put(
 // Terminate management record and validate constraints
 router.delete(
   "/:id",
-  [verifyToken, checkPermission("manage_about")],
+  verifyToken,
+  checkPermission("manage_about"),
   managementController.deleteManagement,
 );
 

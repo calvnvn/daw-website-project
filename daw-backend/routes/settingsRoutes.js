@@ -12,7 +12,8 @@ router.get("/", settingsController.getSettings);
 // Mutate system settings and synchronize branding assets
 router.put(
   "/",
-  [verifyToken, checkPermission("manage_settings")],
+  verifyToken,
+  checkPermission("manage_settings"),
   upload.fields([
     { name: "logo", maxCount: 1 },
     { name: "favicon", maxCount: 1 },

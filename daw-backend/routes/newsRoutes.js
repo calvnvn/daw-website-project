@@ -21,17 +21,26 @@ router.get("/public/s/:slug", newsController.getPublicNewsBySlug);
 router.post("/public/s/:slug/view", newsController.incrementNewsViews);
 
 // ADMINISTRATIVE
-router.use(verifyToken);
-
 // Fetch comprehensive article registry for admin dashboard
-router.get("/", newsController.getAllNews);
+router.get(
+  "/",
+  verifyToken,
+  checkPermission("manage_news"),
+  newsController.getAllNews,
+);
 
 // Fetch internal article record by ID
-router.get("/:id", newsController.getNewsById);
+router.get(
+  "/:id",
+  verifyToken,
+  checkPermission("manage_news"),
+  newsController.getNewsById,
+);
 
 // Initialize new article with cover image handling and validation
 router.post(
   "/",
+  verifyToken,
   checkPermission("manage_news"),
   (req, res, next) => {
     upload.fields([{ name: "cover_image", maxCount: 1 }])(req, res, (err) => {
@@ -55,6 +64,7 @@ router.post(
 // Mutate article data and assets with pessimistic lock validation
 router.put(
   "/:id",
+  verifyToken,
   checkPermission("manage_news"),
   checkLock(NewsArticle),
   upload.fields([{ name: "cover_image", maxCount: 1 }]),
@@ -65,6 +75,7 @@ router.put(
 // Terminate article record and associated assets with lock validation
 router.delete(
   "/:id",
+  verifyToken,
   checkPermission("manage_news"),
   checkLock(NewsArticle),
   newsController.deleteNews,
@@ -73,6 +84,7 @@ router.delete(
 // Execute WYSIWYG editor inline image upload pipeline
 router.post(
   "/upload-inline",
+  verifyToken,
   checkPermission("manage_news"),
   upload.single("inline_image"),
   optimizeImage,

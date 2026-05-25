@@ -10,12 +10,13 @@ router.get("/public", homeController.getPublicHomepageData);
 
 // ADMINISTRATIVE
 // Fetch comprehensive admin dashboard data
-router.get("/admin", [verifyToken], homeController.getAdminHomepageData);
+router.get("/admin", verifyToken, homeController.getAdminHomepageData);
 
 // Mutate singleton homepage configuration
 router.put(
   "/settings",
-  [verifyToken, checkPermission("manage_homepage")],
+  verifyToken,
+  checkPermission("manage_homepage"),
   upload.none(),
   homeController.updateSettings,
 );
@@ -23,7 +24,8 @@ router.put(
 // Initialize hero slide with asset optimization
 router.post(
   "/hero",
-  [verifyToken, checkPermission("manage_homepage")],
+  verifyToken,
+  checkPermission("manage_homepage"),
   upload.single("image"),
   optimizeImage,
   homeController.createHeroSlide,
@@ -32,7 +34,8 @@ router.post(
 // Mutate hero slide data and assets
 router.put(
   "/hero/:id",
-  [verifyToken, checkPermission("manage_homepage")],
+  verifyToken,
+  checkPermission("manage_homepage"),
   upload.single("image"),
   optimizeImage,
   homeController.updateHeroSlide,
@@ -41,14 +44,16 @@ router.put(
 // Terminate hero slide record
 router.delete(
   "/hero/:id",
-  [verifyToken, checkPermission("manage_homepage")],
+  verifyToken,
+  checkPermission("manage_homepage"),
   homeController.deleteHeroSlide,
 );
 
 // Initialize impact statistic record
 router.post(
   "/stats",
-  [verifyToken, checkPermission("manage_homepage")],
+  verifyToken,
+  checkPermission("manage_homepage"),
   upload.none(),
   homeController.createStat,
 );
@@ -56,7 +61,8 @@ router.post(
 // Mutate impact statistic data
 router.put(
   "/stats/:id",
-  [verifyToken, checkPermission("manage_homepage")],
+  verifyToken,
+  checkPermission("manage_homepage"),
   upload.none(),
   homeController.updateStat,
 );
@@ -64,7 +70,8 @@ router.put(
 // Terminate impact statistic record
 router.delete(
   "/stats/:id",
-  [verifyToken, checkPermission("manage_homepage")],
+  verifyToken,
+  checkPermission("manage_homepage"),
   homeController.deleteStat,
 );
 

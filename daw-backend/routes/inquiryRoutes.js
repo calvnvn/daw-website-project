@@ -14,49 +14,56 @@ router.post("/", inquiryController.submitInquiry);
 // Retrieve all inquiry categories including inactive records
 router.get(
   "/subjects",
-  [verifyToken, checkPermission("manage_inbox")],
+  verifyToken,
+  checkPermission("manage_inbox"),
   inquiryController.getAllSubjects,
 );
 
 // Initialize a new inquiry category
 router.post(
   "/subjects",
-  [verifyToken, checkPermission("manage_inbox")],
+  verifyToken,
+  checkPermission("manage_inbox"),
   inquiryController.createSubject,
 );
 
 // Mutate inquiry category routing and configuration
 router.put(
   "/subjects/:id",
-  [verifyToken, checkPermission("manage_inbox")],
+  verifyToken,
+  checkPermission("manage_inbox"),
   inquiryController.updateSubject,
 );
 
 // Terminate inquiry category and validate usage constraints
 router.delete(
   "/subjects/:id",
-  [verifyToken, checkPermission("manage_inbox")],
+  verifyToken,
+  checkPermission("manage_inbox"),
   inquiryController.deleteSubject,
 );
 
 // Retrieve all incoming inquiry messages
 router.get(
   "/",
-  [verifyToken, checkPermission("manage_inbox")],
+  verifyToken,
+  checkPermission("manage_inbox"),
   inquiryController.getAllInquiries,
 );
 
 // Mutate inquiry read status
 router.put(
   "/:id/read",
-  [verifyToken, checkPermission("manage_inbox")],
+  verifyToken,
+  checkPermission("manage_inbox"),
   inquiryController.markAsRead,
 );
 
 // Terminate inquiry record
 router.delete(
   "/:id",
-  [verifyToken, checkPermission("manage_inbox")],
+  verifyToken,
+  checkPermission("manage_inbox"),
   inquiryController.deleteInquiry,
 );
 
