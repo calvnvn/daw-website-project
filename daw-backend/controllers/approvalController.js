@@ -130,9 +130,9 @@ exports.getPendingApprovals = async (req, res) => {
       });
     }
 
-    console.log(
-      `>>> [STITCHING SUCCESS] Total Tiket Final: ${draftsWithExtraData.length} | ERP Rows: ${myOwlTasks.length}`,
-    );
+    // console.log(
+    //   `>>> [STITCHING SUCCESS] Total Tiket Final: ${draftsWithExtraData.length} | ERP Rows: ${myOwlTasks.length}`,
+    // );
     return res.status(200).json(draftsWithExtraData);
   } catch (error) {
     console.error("🚨 [FETCH ERROR]:", error.message);
@@ -593,8 +593,11 @@ async function _notifyActor({ type, pureNextApp, draftData, reason }) {
       "AboutInfo",
       "BusinessSection",
     ];
-    
-    if (type === "APPROVED" && !HIGH_PRIORITY_MODULES.includes(draftData.module_name)) {
+
+    if (
+      type === "APPROVED" &&
+      !HIGH_PRIORITY_MODULES.includes(draftData.module_name)
+    ) {
       console.log(
         `🛡️ [ANTI-SPAM FILTER] Email APPROVED untuk modul '${draftData.module_name}' dilewati (Silent Publish).`,
       );

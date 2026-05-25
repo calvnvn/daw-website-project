@@ -106,9 +106,9 @@ class ErpApprovalService {
         limit: Number(limit),
       };
 
-      console.log(
-        `>>> [ERP COURIER] Membuka Data (getData) untuk NIK: ${karyawanid}...`,
-      );
+      // console.log(
+      //   `>>> [ERP COURIER] Membuka Data (getData) untuk NIK: ${karyawanid}...`,
+      // );
 
       const response = await dawApi.post(
         "/node/approval/trans/getData",
@@ -120,9 +120,9 @@ class ErpApprovalService {
 
       if (response.data) {
         const rowCount = response.data.data?.rows?.length || 0;
-        console.log(
-          `>>> [ERP COURIER] Response: ${response.data.message} | Rows Received: ${rowCount}`,
-        );
+        // console.log(
+        //   `>>> [ERP COURIER] Response: ${response.data.message} | Rows Received: ${rowCount}`,
+        // );
       }
       return response.data;
     } catch (error) {

@@ -64,9 +64,9 @@ const verifyToken = (req, res, next) => {
         : [];
       req.owl_token = decoded.owl_token;
 
-      console.log(
-        `✅ [AUTH SUCCESS] User: ${req.owl_username} | Internal Role: ${req.userRole}`,
-      );
+      // console.log(
+      //   `✅ [AUTH SUCCESS] User: ${req.owl_username} | Internal Role: ${req.userRole}`,
+      // );
 
       next();
     });

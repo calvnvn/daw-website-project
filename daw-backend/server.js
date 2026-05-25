@@ -1,5 +1,5 @@
 require("dotenv").config();
-console.log("Cek Mode:", process.env.NODE_ENV);
+// console.log("Cek Mode:", process.env.NODE_ENV);
 
 const express = require("express");
 const cors = require("cors");
@@ -92,7 +92,7 @@ if (!fs.existsSync(uploadPath)) {
   );
   fs.mkdirSync(uploadPath, { recursive: true });
 } else {
-  console.log("SUCCESS: Folder uploads terhubung di:", uploadPath);
+  console.log("[SUCCESS]  Upload Folder Located At:", uploadPath);
 }
 
 // EXECUTION: Interceptor & Static Assets
@@ -157,7 +157,7 @@ app.get("/", (req, res) => {
 
 // Initialize scheduled background maintenance tasks
 startCleanupTask();
-console.log("🚀 [SYSTEM] Weekly Cleanup Worker has been initialized.");
+console.log("[SYSTEM]   Weekly Cleanup Worker has been initialized.");
 
 // EXECUTION: Documentation Engine
 // Parse OpenApi specifications and mount interactive Swagger UI
@@ -185,7 +185,7 @@ try {
     }),
   );
 
-  console.log("Swagger Docs loaded from openapi.yaml");
+  // console.log("Swagger Docs loaded from openapi.yaml");
 } catch (e) {
   console.error("Gagal memuat file Swagger YAML:", e.message);
 }
@@ -256,7 +256,7 @@ sequelize
     console.log("[DATABASE] MySQL/MariaDB Connected & Tables Synced.");
 
     app.listen(PORT, () => {
-      console.log(`[SERVER] Running cleanly on port ${PORT}`);
+      console.log(`[SERVER]   Running cleanly on port ${PORT}`);
     });
   })
   .catch((err) => {
