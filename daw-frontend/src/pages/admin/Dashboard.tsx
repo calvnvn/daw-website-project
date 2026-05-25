@@ -164,7 +164,7 @@ export default function Dashboard() {
       <div className="divide-y divide-slate-100 flex-1 overflow-y-auto">
         {drafts.map((draft) => (
           <div
-            key={draft.id}
+            key={draft.notrans}
             className="p-4 flex items-center justify-between hover:bg-slate-50/50 transition-colors">
             <div>
               <div className="flex items-center gap-2 mb-1">

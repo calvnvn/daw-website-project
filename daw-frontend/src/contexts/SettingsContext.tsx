@@ -66,10 +66,16 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
   const fetchSettings = useCallback(async (signal?: AbortSignal) => {
     setIsLoading(true);
     try {
-      const results = await Promise.allSettled([
-        api.get("/settings", { signal }),
-        api.get("/approval/rejected/1?module=Settings", { signal }),
-      ]);
+      const hasToken = !!localStorage.getItem("daw_token");
+      const requests = [
+        api.get("/settings", { signal })
+      ];
+
+      if (hasToken) {
+        requests.push(api.get("/approval/rejected/1?module=Settings", { signal }));
+      }
+
+      const results = await Promise.allSettled(requests);
 
       let finalRejectedData: RejectedDraft | null = null;
 
@@ -84,8 +90,10 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
         }
       }
 
-      if (!finalRejectedData && results[1].status === "fulfilled") {
-        const resRadar = results[1].value.data;
+      const secondaryResult = hasToken ? results[1] : null;
+
+      if (secondaryResult && !finalRejectedData && secondaryResult.status === "fulfilled") {
+        const resRadar = (secondaryResult.value as any).data;
         if (resRadar.has_rejected || resRadar.hasRejected || resRadar.success) {
           const draftData = resRadar.rejected_data || resRadar.data;
           if (draftData) {

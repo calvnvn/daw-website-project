@@ -128,7 +128,8 @@ export default function NewsEventDetail() {
     const hasViewed = sessionStorage.getItem(sessionKey);
 
     if (!hasViewed) {
-      api.post(`/news/public/s/${slug}/view`)
+      api
+        .post(`/news/public/s/${slug}/view`)
         .then(() => {
           sessionStorage.setItem(sessionKey, "true");
         })
@@ -349,9 +350,9 @@ export default function NewsEventDetail() {
                   [&_iframe]:rounded-[1.5rem] [&_iframe]:shadow-2xl [&_iframe]:my-8
                   
                   prose-blockquote:border-l-4 prose-blockquote:border-daw-green
-                  prose-blockquote:bg-slate-50 prose-blockquote:py-4 prose-blockquote:px-6
+                  prose-blockquote:bg-slate-50 prose-blockquote:py-2 prose-blockquote:px-6
                   prose-blockquote:rounded-r-2xl prose-blockquote:text-daw-green
-                  prose-blockquote:font-serif prose-blockquote:italic prose-blockquote:my-10
+                  prose-blockquote:font-serif prose-blockquote:italic prose-blockquote:my-2
                   prose-li:marker:text-daw-green prose-li:my-2`}
                 dangerouslySetInnerHTML={{
                   __html: (article.content || "").replace(
