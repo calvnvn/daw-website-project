@@ -609,7 +609,7 @@ exports.getPublicNews = async (req, res) => {
   }
 };
 
-// Retrieves article details by slug for front-end, with view tracking.
+// Retrieves article details by slug for front-end (read-only, no automatic view increment).
 exports.getPublicNewsBySlug = async (req, res) => {
   try {
     const article = await NewsArticle.findOne({
@@ -628,9 +628,28 @@ exports.getPublicNewsBySlug = async (req, res) => {
         .status(404)
         .json({ message: "Article not found or not published" });
 
-    await article.increment("views", { by: 1, silent: true });
-
     res.status(200).json(article);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// Increments the views count of a public news article on demand.
+exports.incrementNewsViews = async (req, res) => {
+  try {
+    const article = await NewsArticle.findOne({
+      where: { slug: req.params.slug, status: "Published" },
+    });
+
+    if (!article)
+      return res
+        .status(404)
+        .json({ message: "Article not found or not published" });
+
+    await article.increment("views", { by: 1, silent: true });
+    await article.reload();
+
+    res.status(200).json({ success: true, views: article.views });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }

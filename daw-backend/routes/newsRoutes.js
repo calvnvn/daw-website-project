@@ -17,6 +17,9 @@ router.get("/public/categories", newsController.getPublicCategories);
 // Fetch article details by URL slug
 router.get("/public/s/:slug", newsController.getPublicNewsBySlug);
 
+// Increment views for a news article by slug
+router.post("/public/s/:slug/view", newsController.incrementNewsViews);
+
 // ADMINISTRATIVE
 router.use(verifyToken);
 

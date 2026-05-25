@@ -120,6 +120,24 @@ export default function NewsEventDetail() {
     fetchArticle();
   }, [slug, navigate]);
 
+  // Increment views once per session to avoid double counting (especially in StrictMode)
+  useEffect(() => {
+    if (!slug) return;
+
+    const sessionKey = `viewed_news_${slug}`;
+    const hasViewed = sessionStorage.getItem(sessionKey);
+
+    if (!hasViewed) {
+      api.post(`/news/public/s/${slug}/view`)
+        .then(() => {
+          sessionStorage.setItem(sessionKey, "true");
+        })
+        .catch((err) => {
+          console.error("Error incrementing view count:", err);
+        });
+    }
+  }, [slug]);
+
   // Fetch sidebar data
   useEffect(() => {
     api
