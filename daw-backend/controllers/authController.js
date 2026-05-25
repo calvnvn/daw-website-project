@@ -140,7 +140,7 @@ exports.login = async (req, res) => {
         karyawanid: nikDariOwl, // Required for approval service identification
       },
       process.env.JWT_SECRET,
-      { expiresIn: "24h" },
+      { expiresIn: process.env.JWT_EXPIRES_IN || "24h" },
     );
 
     return res.status(200).json({

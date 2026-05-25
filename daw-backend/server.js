@@ -1,5 +1,52 @@
 require("dotenv").config();
-// console.log("Cek Mode:", process.env.NODE_ENV);
+
+// Fail-Fast: Boot-time validation of critical environment variables using Zod
+const { z } = require("zod");
+const envSchema = z.object({
+  DB_NAME: z
+    .string({ required_error: "DB_NAME wajib didefinisikan di .env" })
+    .min(1, "DB_NAME tidak boleh kosong"),
+  DB_USER: z
+    .string({ required_error: "DB_USER wajib didefinisikan di .env" })
+    .min(1, "DB_USER tidak boleh kosong"),
+  DB_HOST: z
+    .string({ required_error: "DB_HOST wajib didefinisikan di .env" })
+    .min(1, "DB_HOST tidak boleh kosong"),
+  JWT_SECRET: z
+    .string({ required_error: "JWT_SECRET wajib didefinisikan di .env" })
+    .min(1, "JWT_SECRET tidak boleh kosong"),
+  CMS_APPROVAL_CODE: z
+    .string({ required_error: "CMS_APPROVAL_CODE wajib didefinisikan di .env" })
+    .min(1, "CMS_APPROVAL_CODE tidak boleh kosong"),
+  JWT_EXPIRES_IN: z
+    .string()
+    .optional()
+    .default("24h"),
+});
+
+try {
+  envSchema.parse(process.env);
+  console.log(
+    "[SYSTEM]   Critical environment variables validated successfully.",
+  );
+} catch (error) {
+  console.error(
+    "\n🚨 [FATAL INITIALIZATION ERROR]: Konfigurasi Environment (.env) bermasalah!",
+  );
+  console.error(
+    "=========================================================================",
+  );
+  error.issues.forEach((issue) => {
+    console.error(`   👉 Field [${issue.path.join(".")}]: ${issue.message}`);
+  });
+  console.error(
+    "=========================================================================",
+  );
+  console.error(
+    "Aplikasi dihentikan secara paksa untuk menghindari silent failures.\n",
+  );
+  process.exit(1);
+}
 
 const express = require("express");
 const cors = require("cors");
@@ -7,7 +54,6 @@ const yaml = require("js-yaml");
 const fs = require("fs");
 const path = require("path");
 const swaggerUi = require("swagger-ui-express");
-const swaggerJsDoc = require("swagger-jsdoc");
 
 /**
  * Application Entry Point
