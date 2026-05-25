@@ -132,6 +132,13 @@ app.use(
   helmet({
     // Allow frontend (different port/domain) to render images from /uploads
     crossOriginResourcePolicy: { policy: "cross-origin" },
+    contentSecurityPolicy: {
+      directives: {
+        ...helmet.contentSecurityPolicy.getDefaultDirectives(),
+        "img-src": ["'self'", "data:", "https://img.youtube.com", "https://i.ytimg.com", "https://*.youtube.com", "https://*.uploads"],
+        "frame-src": ["'self'", "https://www.youtube.com", "https://youtube.com", "https://www.youtube-nocookie.com"],
+      },
+    },
   }),
 );
 

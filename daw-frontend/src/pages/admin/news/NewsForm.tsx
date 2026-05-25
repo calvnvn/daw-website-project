@@ -1313,9 +1313,59 @@ export default function NewsForm() {
                       prose-blockquote:font-serif prose-blockquote:italic prose-blockquote:my-10
                       prose-li:marker:text-daw-green prose-li:my-2`}
                     dangerouslySetInnerHTML={{
-                      __html:
-                        formData.content.replace(/&nbsp;|\u00A0/g, " ") ||
-                        "<p class='text-slate-300 italic'>Konten akan muncul di sini...</p>",
+                      __html: (() => {
+                        const rawHtml = formData.content || "";
+                        if (!rawHtml.trim()) {
+                          return "<p class='text-slate-300 italic'>Konten akan muncul di sini...</p>";
+                        }
+                        
+                        const sanitized = rawHtml.replace(/&nbsp;|\u00A0/g, " ");
+                        
+                        // Helper generator untuk HTML kartu putar premium
+                        const getPremiumPlayCard = (videoId: string) => {
+                          return `
+                            <div 
+                              class="relative group aspect-video rounded-[1.5rem] overflow-hidden shadow-2xl my-8 cursor-pointer bg-slate-900 border border-slate-200/60"
+                              onclick="this.innerHTML = '<iframe class=\\'w-full h-full absolute inset-0 rounded-[1.5rem]\\' src=\\'https://www.youtube.com/embed/${videoId}?autoplay=1\\' frameborder=\\'0\\' allow=\\'accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture\\' allowfullscreen></iframe>'"
+                            >
+                              <!-- Image Thumbnail -->
+                              <img 
+                                src="https://img.youtube.com/vi/${videoId}/maxresdefault.jpg" 
+                                onerror="this.src='https://img.youtube.com/vi/${videoId}/hqdefault.jpg'"
+                                class="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+                                alt="YouTube video thumbnail"
+                              />
+                              <!-- Dark overlay on hover -->
+                              <div class="absolute inset-0 bg-black/30 transition-colors duration-300 group-hover:bg-black/45"></div>
+                              
+                              <!-- Premium Glowing Play Button -->
+                              <div class="absolute inset-0 flex items-center justify-center">
+                                <div class="w-16 h-16 md:w-20 md:h-20 flex items-center justify-center rounded-full bg-white text-emerald-700 shadow-lg transform transition-all duration-300 group-hover:scale-110 group-hover:shadow-[0_0_35px_rgba(16,185,129,0.5)]">
+                                  <svg class="w-8 h-8 md:w-10 md:h-10 fill-current translate-x-0.5" viewBox="0 0 24 24">
+                                    <path d="M8 5v14l11-7z"/>
+                                  </svg>
+                                </div>
+                              </div>
+                            </div>
+                          `;
+                        };
+
+                        let processedHtml = sanitized;
+                        
+                        // 1. Ubah tag iframe youtube bawaan editor menjadi kartu premium
+                        const iframeRegex = /<iframe[^>]*src="[^"]*youtube\.com\/embed\/([^"?\s>]+)[^"]*"[^>]*><\/iframe>/g;
+                        processedHtml = processedHtml.replace(iframeRegex, (match, videoId) => {
+                          return getPremiumPlayCard(videoId);
+                        });
+
+                        // 2. Ubah link youtube mentah yang ditulis di dalam paragraf <p>https://www.youtube.com/... </p>
+                        const pYoutubeRegex = /<p>\s*https?:\/\/(?:www\.)?(?:youtube\.com\/watch\?v=|youtu\.be\/)([^"<\s?&]+)[^<]*<\/p>/g;
+                        processedHtml = processedHtml.replace(pYoutubeRegex, (match, videoId) => {
+                          return getPremiumPlayCard(videoId);
+                        });
+
+                        return processedHtml;
+                      })(),
                     }}
                   />
                 </div>
