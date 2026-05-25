@@ -39,14 +39,15 @@ export default function DynamicNavbar() {
   useEffect(() => {
     const fetchMenus = async () => {
       try {
-        const response = await api.get("/menus/tree");
+        const lang = i18n.language || "en";
+        const response = await api.get(`/menus/tree?lang=${lang}`);
         setMenus(response.data);
       } catch (error) {
         console.error("Gagal mengambil menu navigasi:", error);
       }
     };
     fetchMenus();
-  }, []);
+  }, [i18n.language]);
 
   const toggleLanguage = () => {
     const newLang = i18n.language === "en" ? "id" : "en";

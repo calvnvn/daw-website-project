@@ -17,7 +17,7 @@ export default function InvestmentsSection() {
   const { t } = useTranslation();
   const [hoveredCategory, setHoveredCategory] = useState<string | null>(null);
   const [selectedCompany, setSelectedCompany] = useState<any | null>(null);
-  const { settings, companies, isLoading } = useInvestments();
+  const { publicSettings: settings, publicCompanies: companies, isLoading } = useInvestments();
   const sortedCompanies = useMemo(() => {
     if (!companies) return [];
 
@@ -51,7 +51,7 @@ export default function InvestmentsSection() {
       <div className="h-96 flex flex-col justify-center items-center text-white gap-6">
         <div className="w-12 h-12 border-4 border-emerald-500/20 border-t-emerald-500 rounded-full animate-spin"></div>
         <p className="animate-pulse tracking-[0.3em] text-[10px] uppercase font-bold text-emerald-500/60">
-          Syncing Ecosystem
+          {t("ui.syncingEcosystem")}
         </p>
       </div>
     );
@@ -167,7 +167,7 @@ export default function InvestmentsSection() {
                         />
                       ) : (
                         <div className="text-[10px] text-slate-300 font-bold">
-                          NO LOGO
+                          {t("ui.noLogo")}
                         </div>
                       )}
                     </div>
@@ -186,7 +186,7 @@ export default function InvestmentsSection() {
 
               {sortedCompanies.length === 0 && (
                 <div className="col-span-full text-center text-slate-400 italic py-10">
-                  No affiliated companies found.
+                  {t("businessesPage.investments.noCompanies")}
                 </div>
               )}
             </div>
@@ -232,7 +232,7 @@ export default function InvestmentsSection() {
                     }}
                   />
                 ) : (
-                  <div className="text-slate-200">No Image</div>
+                  <div className="text-slate-200">{t("ui.noImage")}</div>
                 )}
               </div>
             </div>
@@ -249,7 +249,7 @@ export default function InvestmentsSection() {
                 rel="noopener noreferrer"
                 className="z-10 mb-8 flex items-center gap-2 px-8 py-3.5 bg-emerald-500 hover:bg-emerald-600 text-white rounded-full font-bold text-sm transition-all shadow-[0_10px_25px_-5px_rgba(16,185,129,0.4)] active:scale-95 group/btn">
                 <Globe2 className="w-4 h-4 group-hover/btn:rotate-12 transition-transform" />
-                VISIT WEBSITE
+                {t("ui.visitWebsite")}
               </a>
             )}
 

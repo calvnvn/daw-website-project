@@ -188,7 +188,9 @@ exports.getAdminBusinessSections = async (req, res) => {
 // Retrieve active business sections and associated map coordinates for public display
 exports.getPublicBusinessData = async (req, res) => {
   try {
-    const sections = await BusinessSection.findAll({
+    const lang = req.query.lang || "en";
+    const MODULE_NAME = "BusinessSection";
+    const rawSections = await BusinessSection.findAll({
       attributes: [
         "id",
         "category",
@@ -216,7 +218,82 @@ exports.getPublicBusinessData = async (req, res) => {
       order: [["orderIndex", "ASC"]],
     });
 
-    res.status(200).json(sections);
+    if (lang === "en") {
+      return res.status(200).json(rawSections);
+    }
+
+    // ─── LAZY ON-DEMAND TRANSLATION FOR ARRAY ───
+    const Translation = require("../models/Translation");
+    const { autoTranslate } = require("../services/openaiService");
+    const translatedSections = [];
+
+    for (let i = 0; i < rawSections.length; i++) {
+      let sec = rawSections[i].get({ plain: true });
+
+      // Translate BusinessSection text fields
+      let catTrans = await Translation.findOne({ where: { modelName: MODULE_NAME, recordId: sec.id, field: "category", locale: "id" } });
+      let titleTrans = await Translation.findOne({ where: { modelName: MODULE_NAME, recordId: sec.id, field: "title", locale: "id" } });
+      let htmlTrans = await Translation.findOne({ where: { modelName: MODULE_NAME, recordId: sec.id, field: "htmlContent", locale: "id" } });
+
+      if (!catTrans || !titleTrans || !htmlTrans) {
+        console.log(`[Lazy Translation] Translating Business Section: ${sec.id}...`);
+        const freshCategory = await autoTranslate(sec.category, "Indonesian");
+        const freshTitle = await autoTranslate(sec.title, "Indonesian");
+        const freshHtml = await autoTranslate(sec.htmlContent, "Indonesian");
+
+        const upsertTranslation = async (field, translatedText) => {
+          if (!translatedText) return;
+          const existing = await Translation.findOne({
+            where: { modelName: MODULE_NAME, recordId: sec.id, field, locale: "id" }
+          });
+          if (existing) await existing.update({ translatedText });
+          else await Translation.create({ modelName: MODULE_NAME, recordId: sec.id, field, locale: "id", translatedText });
+        };
+
+        if (freshCategory) { await upsertTranslation("category", freshCategory); sec.category = freshCategory; }
+        if (freshTitle) { await upsertTranslation("title", freshTitle); sec.title = freshTitle; }
+        if (freshHtml) { await upsertTranslation("htmlContent", freshHtml); sec.htmlContent = freshHtml; }
+      } else {
+        if (catTrans) sec.category = catTrans.translatedText;
+        if (titleTrans) sec.title = titleTrans.translatedText;
+        if (htmlTrans) sec.htmlContent = htmlTrans.translatedText;
+      }
+
+      // Translate Nested Map Markers
+      if (sec.mapMarkers && sec.mapMarkers.length > 0) {
+        const MARKER_MODULE = "BusinessMapMarker";
+        for (let j = 0; j < sec.mapMarkers.length; j++) {
+          let marker = sec.mapMarkers[j];
+          let markerTitleTrans = await Translation.findOne({ where: { modelName: MARKER_MODULE, recordId: marker.id, field: "title", locale: "id" } });
+          let markerDescTrans = await Translation.findOne({ where: { modelName: MARKER_MODULE, recordId: marker.id, field: "desc", locale: "id" } });
+
+          if (!markerTitleTrans || !markerDescTrans) {
+            console.log(`[Lazy Translation] Translating Map Marker: ${marker.id}...`);
+            const freshTitle = await autoTranslate(marker.title, "Indonesian");
+            const freshDesc = await autoTranslate(marker.desc, "Indonesian");
+
+            const upsertMarkerTrans = async (field, translatedText) => {
+              if (!translatedText) return;
+              const existing = await Translation.findOne({
+                where: { modelName: MARKER_MODULE, recordId: marker.id, field, locale: "id" }
+              });
+              if (existing) await existing.update({ translatedText });
+              else await Translation.create({ modelName: MARKER_MODULE, recordId: marker.id, field, locale: "id", translatedText });
+            };
+
+            if (freshTitle) { await upsertMarkerTrans("title", freshTitle); marker.title = freshTitle; }
+            if (freshDesc) { await upsertMarkerTrans("desc", freshDesc); marker.desc = freshDesc; }
+          } else {
+            if (markerTitleTrans) marker.title = markerTitleTrans.translatedText;
+            if (markerDescTrans) marker.desc = markerDescTrans.translatedText;
+          }
+        }
+      }
+
+      translatedSections.push(sec);
+    }
+
+    res.status(200).json(translatedSections);
   } catch (error) {
     console.error("Error fetching business data:", error);
     res.status(500).json({ message: "Failed to fetch business data" });

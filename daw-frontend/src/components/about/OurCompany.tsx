@@ -10,16 +10,23 @@ export default function OurCompany() {
   const { t } = useTranslation();
   const { aboutData, isLoading } = useAbout();
 
-  // UTILITY
-  // Parse and normalize markdown-style bold text into stylized span elements
+  // Parse and normalize markdown-style bold text and i18next markup tags into stylized span elements
   const renderHighlightedText = (text: string) => {
     if (!text) return null;
-    const parts = text.split(/(\*\*.*?\*\*)/g);
+    // Split by either **bold** or <1>markup</1>
+    const parts = text.split(/(\*\*.*?\*\*|<1>.*?<\/1>)/g);
     return parts.map((part, index) => {
       if (part.startsWith("**") && part.endsWith("**")) {
         return (
           <span key={index} className="text-daw-green font-bold">
             {part.replace(/\*\*/g, "")}
+          </span>
+        );
+      }
+      if (part.startsWith("<1>") && part.endsWith("</1>")) {
+        return (
+          <span key={index} className="text-daw-green font-bold">
+            {part.substring(3, part.length - 4)}
           </span>
         );
       }
@@ -42,7 +49,9 @@ export default function OurCompany() {
             {t("about.company.spiritTitle")}
           </h3>
           <p className="font-serif italic text-3xl md:text-4xl text-slate-800 leading-[1.4]">
-            {aboutData?.spiritText || t("about.company.spiritText")}
+            {aboutData?.spiritText
+              ? renderHighlightedText(aboutData.spiritText)
+              : t("about.company.spiritText")}
           </p>
         </div>
       </ScrollReveal>

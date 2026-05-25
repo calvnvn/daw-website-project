@@ -10,11 +10,44 @@ const { invalidateOldDrafts } = require("../utils/draftCleanup");
 // Fetch all categories for public/admin maps
 exports.getAllCategories = async (req, res) => {
   try {
-    const categories = await MapCategory.findAll({
+    const lang = req.query.lang || "en";
+    const MODULE_NAME = "MapCategory";
+    const rawCategories = await MapCategory.findAll({
       attributes: ["id", "name", "color", "is_locked", "lock_ticket"],
       order: [["name", "ASC"]],
     });
-    res.status(200).json({ success: true, data: categories });
+
+    if (lang === "en") {
+      return res.status(200).json({ success: true, data: rawCategories });
+    }
+
+    // ─── LAZY ON-DEMAND TRANSLATION ───
+    const Translation = require("../models/Translation");
+    const { autoTranslate } = require("../services/openaiService");
+    const translatedCategories = [];
+
+    for (let i = 0; i < rawCategories.length; i++) {
+      let cat = rawCategories[i].get({ plain: true });
+      let nameTrans = await Translation.findOne({ where: { modelName: MODULE_NAME, recordId: cat.id, field: "name", locale: "id" } });
+
+      if (!nameTrans) {
+        console.log(`[Lazy Translation] Translating Map Category: ${cat.id}...`);
+        const freshName = await autoTranslate(cat.name, "Indonesian");
+
+        if (freshName) {
+          const existing = await Translation.findOne({ where: { modelName: MODULE_NAME, recordId: cat.id, field: "name", locale: "id" } });
+          if (existing) await existing.update({ translatedText: freshName });
+          else await Translation.create({ modelName: MODULE_NAME, recordId: cat.id, field: "name", locale: "id", translatedText: freshName });
+          
+          cat.name = freshName;
+        }
+      } else {
+        cat.name = nameTrans.translatedText;
+      }
+      translatedCategories.push(cat);
+    }
+
+    res.status(200).json({ success: true, data: translatedCategories });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
   }

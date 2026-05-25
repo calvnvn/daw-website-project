@@ -15,7 +15,11 @@
     "noOtherProjects": "No other projects in this sector.",
     "projectNotFound": "Project Not Found",
     "returnToOurBusinesses": "Return to Our Businesses",
-    "portfolio": "Portfolio"
+    "portfolio": "Portfolio",
+    "syncingEcosystem": "Syncing Ecosystem",
+    "noLogo": "NO LOGO",
+    "noImage": "No Image",
+    "visitWebsite": "VISIT WEBSITE"
   },
   "newsPage": {
     "allCategories": "All Categories",
@@ -74,6 +78,7 @@
     "filterResources": "Resources",
     "filterEnergy": "Energy",
     "readMore": "Read More",
+    "noAssets": "No assets found in this sector.",
     "projects": {
       "item1": {
         "title": "East Kalimantan Operations",
@@ -129,6 +134,7 @@
       "headline": "Other Investments.",
       "body": "Beyond our core operations in Resources and Renewable Energy, we strategically invest in emerging sectors to diversify our business ecosystem and drive long-term sustainable growth.",
       "cta": "Explore All Investments",
+      "noInvestments": "No investments to display.",
       "categories": {
         "fnb": "Food & Beverage",
         "steel": "Precision Stainless Steel",
@@ -153,7 +159,17 @@
       "company": "Our Company",
       "history": "History",
       "philosophy": "Philosophy",
-      "management": "Management"
+      "management": "Management",
+      "achievement": "Achievements"
+    },
+    "achievement": {
+      "title": "Achievements",
+      "total": "Total Achievements",
+      "inYear": "Achievements in {{year}}",
+      "period": "Period",
+      "allTime": "All Time",
+      "countLabel": "achievements",
+      "noAwards": "No awards available for this period."
     },
     "company": {
       "spiritTitle": "Founders' Spirit",
@@ -266,6 +282,7 @@
     "investments": {
       "title": "Other Investments",
       "intro": "DAW also invests in other diversified businesses. Below is a summary of our other investments:",
+      "noCompanies": "No affiliated companies found.",
       "categories": {
         "fnb": "Food & Beverage and Distribution",
         "steel": "Precision Stainless Steel Mill",
@@ -304,5 +321,13 @@
       "sending": "Transmitting message...",
       "success": "Message sent. We will respond shortly."
     }
+  },
+  "notFound": {
+    "seoTitle": "404 - Page Not Found | DAW Group",
+    "seoDesc": "The page you are looking for cannot be found.",
+    "title": "Not Found",
+    "desc": "The page you are trying to access cannot be found.",
+    "backHome": "Back to Homepage",
+    "explore": "Explore Our Businesses"
   }
 }

@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo, memo } from "react";
+import { useTranslation } from "react-i18next";
 import mapBase from "@/assets/map-indonesia-base.svg";
 import { X, ExternalLink } from "lucide-react";
 import { type MapCategory } from "@/contexts/BusinessContext";
@@ -31,6 +32,7 @@ const InteractiveMap = memo(function InteractiveMap({
   markers,
   categories,
 }: InteractiveMapProps) {
+  const { t } = useTranslation();
   const [activeId, setActiveId] = useState<string | null>(null);
   const [isMobile, setIsMobile] = useState(false);
   const [hoveredCategory, setHoveredCategory] = useState<string | null>(null);
@@ -292,7 +294,7 @@ const InteractiveMap = memo(function InteractiveMap({
                             style={{ color: markerColor }}
                             onClick={(e) => e.stopPropagation()}>
                             <ExternalLink className="w-3 h-3" />
-                            <span>View on Maps</span>
+                            <span>{t("map.viewOnMaps", "View on Maps")}</span>
                           </a>
                         )}
                       </div>
@@ -354,7 +356,7 @@ const InteractiveMap = memo(function InteractiveMap({
                   rel="noopener noreferrer"
                   className="flex items-center justify-center gap-3 w-full py-4 rounded-2xl text-sm font-bold text-white shadow-lg transition-transform active:scale-95 hover:opacity-90"
                   style={{ backgroundColor: activeMarker.color }}>
-                  <ExternalLink className="w-4 h-4" /> VIEW ON GOOGLE MAPS
+                  <ExternalLink className="w-4 h-4" /> {t("map.viewOnGoogleMaps", "VIEW ON GOOGLE MAPS")}
                 </a>
               )}
             </div>

@@ -2,6 +2,8 @@ const Menu = require("../models/Menu");
 const Page = require("../models/Page");
 const ApprovalDraft = require("../models/ApprovalDraft");
 const sequelize = require("../config/database");
+const Translation = require("../models/Translation");
+const { autoTranslate } = require("../services/openaiService");
 
 const MODULE_NAME = "MENU";
 
@@ -56,14 +58,61 @@ exports.getMenuTree = async (req, res) => {
       include: [{ model: Page, attributes: ["slug"] }],
     });
 
+    const lang = req.query.lang || "en";
+    const formattedMenus = menus.map((m) => m.toJSON());
+
+    if (lang !== "en") {
+      for (let i = 0; i < formattedMenus.length; i++) {
+        let m = formattedMenus[i];
+        let labelTrans = await Translation.findOne({
+          where: {
+            modelName: MODULE_NAME,
+            recordId: String(m.id),
+            field: "label",
+            locale: "id",
+          },
+        });
+        const needsLabelTrans = m.label && !labelTrans;
+
+        if (needsLabelTrans) {
+          console.log(`[Lazy Translation] Translating Menu Label: ${m.id}...`);
+          const freshLabel = needsLabelTrans
+            ? await autoTranslate(m.label, "Indonesian")
+            : "";
+          if (freshLabel) {
+            const existing = await Translation.findOne({
+              where: {
+                modelName: MODULE_NAME,
+                recordId: String(m.id),
+                field: "label",
+                locale: "id",
+              },
+            });
+            if (existing) await existing.update({ translatedText: freshLabel });
+            else
+              await Translation.create({
+                modelName: MODULE_NAME,
+                recordId: String(m.id),
+                field: "label",
+                locale: "id",
+                translatedText: freshLabel,
+              });
+            m.label = freshLabel;
+          }
+        } else {
+          if (labelTrans) m.label = labelTrans.translatedText;
+        }
+      }
+    }
+
     const menuMap = {};
     const tree = [];
 
-    menus.forEach((menu) => {
-      menuMap[menu.id] = { ...menu.toJSON(), children: [] };
+    formattedMenus.forEach((menu) => {
+      menuMap[menu.id] = { ...menu, children: [] };
     });
 
-    menus.forEach((menu) => {
+    formattedMenus.forEach((menu) => {
       if (menu.parentId) {
         if (menuMap[menu.parentId]) {
           menuMap[menu.parentId].children.push(menuMap[menu.id]);
@@ -88,7 +137,55 @@ exports.getAllMenusFlat = async (req, res) => {
       order: [["orderIndex", "ASC"]],
       include: [{ model: Page, attributes: ["title"] }],
     });
-    res.status(200).json(menus);
+
+    const lang = req.query.lang || "en";
+    const formattedMenus = menus.map((m) => m.toJSON());
+
+    if (lang !== "en") {
+      for (let i = 0; i < formattedMenus.length; i++) {
+        let m = formattedMenus[i];
+        let labelTrans = await Translation.findOne({
+          where: {
+            modelName: MODULE_NAME,
+            recordId: String(m.id),
+            field: "label",
+            locale: "id",
+          },
+        });
+        const needsLabelTrans = m.label && !labelTrans;
+
+        if (needsLabelTrans) {
+          console.log(`[Lazy Translation] Translating Menu Label: ${m.id}...`);
+          const freshLabel = needsLabelTrans
+            ? await autoTranslate(m.label, "Indonesian")
+            : "";
+          if (freshLabel) {
+            const existing = await Translation.findOne({
+              where: {
+                modelName: MODULE_NAME,
+                recordId: String(m.id),
+                field: "label",
+                locale: "id",
+              },
+            });
+            if (existing) await existing.update({ translatedText: freshLabel });
+            else
+              await Translation.create({
+                modelName: MODULE_NAME,
+                recordId: String(m.id),
+                field: "label",
+                locale: "id",
+                translatedText: freshLabel,
+              });
+            m.label = freshLabel;
+          }
+        } else {
+          if (labelTrans) m.label = labelTrans.translatedText;
+        }
+      }
+    }
+
+    res.status(200).json(formattedMenus);
   } catch (error) {
     res
       .status(500)

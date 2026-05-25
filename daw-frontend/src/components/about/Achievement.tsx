@@ -106,8 +106,8 @@ export default function Achievement() {
             </span>
             <span className="font-sans text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400 mt-1">
               {activeYear === "All Time"
-                ? "Total Achievements"
-                : `Achievements in ${activeYear}`}
+                ? t("about.achievement.total")
+                : t("about.achievement.inYear", { year: activeYear })}
             </span>
           </div>
         </div>
@@ -124,7 +124,7 @@ export default function Achievement() {
         {/* TOP ROW: Divider line with floating pill */}
         <div className="flex items-center gap-4 border-b border-slate-200 pb-4">
           <span className="font-sans text-xs font-bold uppercase tracking-[0.2em] text-slate-400 shrink-0">
-            Period
+            {t("about.achievement.period")}
           </span>
 
           {/* PILL TRIGGER */}
@@ -135,7 +135,7 @@ export default function Achievement() {
                 ? "bg-daw-green text-white border-daw-green shadow-[0_6px_16px_-4px_rgba(0,75,35,0.35)]"
                 : "bg-white text-daw-green border-daw-green/40 hover:border-daw-green hover:shadow-sm"
             }`}>
-            <span>{activeYear}</span>
+            <span>{activeYear === "All Time" ? t("about.achievement.allTime") : activeYear}</span>
             <ChevronDown
               className={`w-3.5 h-3.5 transition-transform duration-500 ease-[cubic-bezier(0.25,1,0.5,1)] ${isDropdownOpen ? "rotate-180" : ""}`}
             />
@@ -149,7 +149,7 @@ export default function Achievement() {
             <span className="text-slate-900">
               {String(filteredData.length).padStart(2, "0")}
             </span>{" "}
-            achievements
+            {t("about.achievement.countLabel")}
           </span>
         </div>
 
@@ -171,7 +171,7 @@ export default function Achievement() {
                 ? "text-daw-green bg-daw-green/5"
                 : "text-slate-600 hover:text-slate-900 hover:bg-slate-50"
             }`}>
-            <span>All Time</span>
+            <span>{t("about.achievement.allTime")}</span>
             <span
               className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
                 activeYear === "All Time"
@@ -280,7 +280,7 @@ export default function Achievement() {
                         <Link
                           to={`/news/${item.newsArticle.slug}`}
                           className="inline-flex items-center gap-2 px-5 py-2.5 border-2 border-daw-green text-daw-green hover:bg-daw-green hover:text-white rounded-xl text-[11px] font-black uppercase tracking-[0.15em] transition-all duration-300 shadow-sm hover:shadow-md group/btn">
-                          <span>Read More</span>
+                          <span>{t("ui.readMore")}</span>
                           <ArrowRight className="w-3.5 h-3.5 group-hover/btn:translate-x-1 transition-transform" />
                         </Link>
                       </div>
@@ -293,7 +293,7 @@ export default function Achievement() {
           <div className="py-20 text-center bg-slate-50/50 rounded-3xl border border-dashed border-slate-200">
             <Trophy className="w-12 h-12 text-slate-300 mx-auto mb-4" />
             <p className="text-slate-500 font-sans tracking-wide">
-              No awards available for this period.
+              {t("about.achievement.noAwards")}
             </p>
           </div>
         )}

@@ -10,6 +10,7 @@ import {
 } from "react";
 import api from "@/lib/api";
 import { useAuth } from "./AuthContext"; // 1. Import useAuth
+import { useTranslation } from "react-i18next";
 
 // TYPE DEFINITIONS (Tetap Sama)
 export interface HeroSlides {
@@ -79,6 +80,8 @@ export const HomeContext = createContext<HomeContextType>({
 
 export function HomeProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth(); // 2. Ambil state user
+  const { i18n } = useTranslation();
+  const lang = i18n.language || "en";
 
   const [slides, setSlides] = useState<HeroSlides[]>([]);
   const [stats, setStats] = useState<ImpactStats[]>([]);
@@ -110,7 +113,7 @@ export function HomeProvider({ children }: { children: ReactNode }) {
         if (canAccessAdmin) {
           try {
             // Tembak jalur Admin
-            const response = await api.get("/homepage/admin", { signal });
+            const response = await api.get(`/homepage/admin?lang=${lang}`, { signal });
             payload = response.data?.data || response.data;
           } catch (adminError: any) {
             if (adminError.name === "CanceledError") return;
@@ -119,12 +122,12 @@ export function HomeProvider({ children }: { children: ReactNode }) {
             );
 
             // Banting setir ke jalur publik jika token expired/bermasalah
-            const fallback = await api.get("/homepage/public", { signal });
+            const fallback = await api.get(`/homepage/public?lang=${lang}`, { signal });
             payload = fallback.data?.data || fallback.data;
           }
         } else {
           // Tembak jalur Publik langsung untuk pengunjung biasa
-          const response = await api.get("/homepage/public", { signal });
+          const response = await api.get(`/homepage/public?lang=${lang}`, { signal });
           payload = response.data?.data || response.data;
         }
 
@@ -145,8 +148,8 @@ export function HomeProvider({ children }: { children: ReactNode }) {
         setIsLoading(false);
       }
     },
-    [user],
-  ); // Dependensi ditambahkan ke user
+    [user, lang],
+  ); // Dependensi ditambahkan ke user dan lang
 
   useEffect(() => {
     const controller = new AbortController();

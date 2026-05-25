@@ -51,7 +51,35 @@ exports.getHistories = async (req, res) => {
       return item;
     });
 
-    res.status(200).json(formatted);
+    const lang = req.query.lang || "en";
+    if (lang === "en") {
+      return res.status(200).json(formatted);
+    }
+
+    // ─── LAZY TRANSLATION ───
+    const Translation = require("../models/Translation");
+    const { autoTranslate } = require("../services/openaiService");
+
+    const translatedHistories = [];
+    for (let i = 0; i < formatted.length; i++) {
+      let item = formatted[i];
+      let descTrans = await Translation.findOne({ where: { modelName: MODULE_NAME, recordId: String(item.id), field: "description", locale: "id" } });
+      
+      if (!descTrans) {
+        console.log(`[Lazy Translation] Translating History Timeline: ${item.year}...`);
+        const freshDesc = await autoTranslate(item.description, "Indonesian");
+        
+        if (freshDesc) {
+           await Translation.create({ modelName: MODULE_NAME, recordId: String(item.id), field: "description", locale: "id", translatedText: freshDesc });
+           item.description = freshDesc;
+        }
+      } else {
+        item.description = descTrans.translatedText;
+      }
+      translatedHistories.push(item);
+    }
+
+    res.status(200).json(translatedHistories);
   } catch (error) {
     res.status(500).json({ message: "Gagal memuat timeline sejarah." });
   }

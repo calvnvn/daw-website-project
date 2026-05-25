@@ -15,7 +15,11 @@
     "noOtherProjects": "Tidak ada proyek lain di sektor ini.",
     "projectNotFound": "Proyek Tidak Ditemukan",
     "returnToOurBusinesses": "Kembali ke Unit Bisnis Kami",
-    "portfolio": "Portofolio"
+    "portfolio": "Portofolio",
+    "syncingEcosystem": "Menyinkronkan Ekosistem",
+    "noLogo": "TANPA LOGO",
+    "noImage": "Tidak Ada Gambar",
+    "visitWebsite": "KUNJUNGI SITUS WEB"
   },
   "newsPage": {
     "allCategories": "Semua Kategori",
@@ -32,6 +36,7 @@
     "history": "Sejarah",
     "philosophy": "Filosofi",
     "management": "Manajemen Kami",
+
     "businesses": "Bisnis Kami",
     "resources": "Sumber Daya Alam",
     "energy": "Energi",
@@ -74,6 +79,7 @@
     "filterResources": "Sumber Daya Alam",
     "filterEnergy": "Energi",
     "readMore": "Baca Selengkapnya",
+    "noAssets": "Tidak ada aset yang ditemukan di sektor ini.",
     "projects": {
       "item1": {
         "title": "Operasi Kalimantan Timur",
@@ -129,6 +135,7 @@
       "headline": "Investasi Lainnya.",
       "body": "Di luar operasi inti kami pada sektor Sumber Daya Alam dan Energi Terbarukan, kami berinvestasi secara strategis di berbagai sektor berkembang untuk mendiversifikasi ekosistem bisnis dan mendorong pertumbuhan jangka panjang.",
       "cta": "Lihat Semua Investasi",
+      "noInvestments": "Tidak ada investasi untuk ditampilkan.",
       "categories": {
         "fnb": "Makanan & Minuman",
         "steel": "Baja Tahan Karat Presisi",
@@ -153,7 +160,17 @@
       "company": "Perusahaan Kami",
       "history": "Sejarah",
       "philosophy": "Filosofi",
-      "management": "Manajemen Kami"
+      "management": "Manajemen Kami",
+      "achievement": "Penghargaan"
+    },
+    "achievement": {
+      "title": "Penghargaan",
+      "total": "Total Penghargaan",
+      "inYear": "Penghargaan pada tahun {{year}}",
+      "period": "Periode",
+      "allTime": "Semua Waktu",
+      "countLabel": "penghargaan",
+      "noAwards": "Tidak ada penghargaan untuk periode ini."
     },
     "company": {
       "spiritTitle": "Semangat Pendiri",
@@ -267,6 +284,7 @@
     "investments": {
       "title": "Investasi Lainnya",
       "intro": "DAW juga berinvestasi di berbagai bisnis yang terediversifikasi. Berikut adalah ringkasan investasi kami lainnya:",
+      "noCompanies": "Tidak ada perusahaan afiliasi ditemukan.",
       "categories": {
         "fnb": "Distribusi serta Makanan & Minuman",
         "steel": "Pabrik Baja Tahan Karat Presisi",
@@ -305,5 +323,13 @@
       "sending": "Mengirim pesan...",
       "success": "Pesan terkirim. Kami akan segera merespons."
     }
+  },
+  "notFound": {
+    "seoTitle": "404 - Halaman Tidak Ditemukan | DAW Group",
+    "seoDesc": "Halaman yang Anda cari tidak dapat ditemukan.",
+    "title": "Halaman Tidak Ditemukan",
+    "desc": "Halaman yang Anda coba akses tidak dapat ditemukan.",
+    "backHome": "Kembali ke Beranda",
+    "explore": "Jelajahi Bisnis Kami"
   }
 }

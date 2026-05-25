@@ -10,6 +10,8 @@ const { generateNotrans } = require("../utils/notransGenerator");
 const ErpApprovalService = require("../services/erpApprovalService");
 const sequelize = require("../config/database");
 const { Op } = require("sequelize");
+const Translation = require("../models/Translation");
+const { autoTranslate } = require("../services/openaiService");
 
 const MODULE_NAME = "HomeSettings";
 const NOTRANS_PREFIX = "HOME";
@@ -72,12 +74,114 @@ exports.getPublicHomepageData = async (req, res) => {
       });
     }
 
+    const lang = req.query.lang || "en";
+    let finalSlides = slides;
+    let finalStats = stats;
+    let finalSettings = settings;
+
+    if (lang !== "en") {
+      // 1. Terjemahkan Slides (HeroSlides)
+      finalSlides = [];
+      for (let i = 0; i < slides.length; i++) {
+        const item = slides[i].get ? slides[i].get({ plain: true }) : { ...slides[i] };
+        
+        let titleTrans = await Translation.findOne({ where: { modelName: "HeroSlides", recordId: String(item.id), field: "title", locale: "id" } });
+        let subtitleTrans = await Translation.findOne({ where: { modelName: "HeroSlides", recordId: String(item.id), field: "subtitle", locale: "id" } });
+        
+        const needsTitleTrans = item.title && !titleTrans;
+        const needsSubtitleTrans = item.subtitle && !subtitleTrans;
+
+        if (needsTitleTrans || needsSubtitleTrans) {
+          console.log(`[Lazy Translation] Translating HeroSlide: ${item.id}...`);
+          const freshTitle = needsTitleTrans ? await autoTranslate(item.title, "Indonesian") : "";
+          const freshSubtitle = needsSubtitleTrans ? await autoTranslate(item.subtitle, "Indonesian") : "";
+          
+          const upsertTrans = async (field, translatedText) => {
+            if (!translatedText) return;
+            const existing = await Translation.findOne({ where: { modelName: "HeroSlides", recordId: String(item.id), field, locale: "id" } });
+            if (existing) await existing.update({ translatedText });
+            else await Translation.create({ modelName: "HeroSlides", recordId: String(item.id), field, locale: "id", translatedText });
+          };
+          
+          if (freshTitle) { await upsertTrans("title", freshTitle); item.title = freshTitle; }
+          if (freshSubtitle) { await upsertTrans("subtitle", freshSubtitle); item.subtitle = freshSubtitle; }
+        } else {
+          if (titleTrans) item.title = titleTrans.translatedText;
+          if (subtitleTrans) item.subtitle = subtitleTrans.translatedText;
+        }
+        finalSlides.push(item);
+      }
+
+      // 2. Terjemahkan Statistik (ImpactStats)
+      finalStats = [];
+      for (let i = 0; i < stats.length; i++) {
+        const item = stats[i].get ? stats[i].get({ plain: true }) : { ...stats[i] };
+        
+        let labelTrans = await Translation.findOne({ where: { modelName: "ImpactStats", recordId: String(item.id), field: "label", locale: "id" } });
+        let descTrans = await Translation.findOne({ where: { modelName: "ImpactStats", recordId: String(item.id), field: "desc", locale: "id" } });
+        
+        const needsLabelTrans = item.label && !labelTrans;
+        const needsDescTrans = item.desc && !descTrans;
+
+        if (needsLabelTrans || needsDescTrans) {
+          console.log(`[Lazy Translation] Translating ImpactStat: ${item.id}...`);
+          const freshLabel = needsLabelTrans ? await autoTranslate(item.label, "Indonesian") : "";
+          const freshDesc = needsDescTrans ? await autoTranslate(item.desc, "Indonesian") : "";
+          
+          const upsertTrans = async (field, translatedText) => {
+            if (!translatedText) return;
+            const existing = await Translation.findOne({ where: { modelName: "ImpactStats", recordId: String(item.id), field, locale: "id" } });
+            if (existing) await existing.update({ translatedText });
+            else await Translation.create({ modelName: "ImpactStats", recordId: String(item.id), field, locale: "id", translatedText });
+          };
+          
+          if (freshLabel) { await upsertTrans("label", freshLabel); item.label = freshLabel; }
+          if (freshDesc) { await upsertTrans("desc", freshDesc); item.desc = freshDesc; }
+        } else {
+          if (labelTrans) item.label = labelTrans.translatedText;
+          if (descTrans) item.desc = descTrans.translatedText;
+        }
+        finalStats.push(item);
+      }
+
+      // 3. Terjemahkan Sambutan (HomeSettings)
+      if (settings) {
+        const item = settings.get ? settings.get({ plain: true }) : { ...settings };
+        
+        let headlineTrans = await Translation.findOne({ where: { modelName: "HomeSettings", recordId: "1", field: "introHeadline", locale: "id" } });
+        let bodyTrans = await Translation.findOne({ where: { modelName: "HomeSettings", recordId: "1", field: "introBody", locale: "id" } });
+        
+        const needsHeadlineTrans = item.introHeadline && !headlineTrans;
+        const needsBodyTrans = item.introBody && !bodyTrans;
+
+        if (needsHeadlineTrans || needsBodyTrans) {
+          console.log(`[Lazy Translation] Translating HomeSettings...`);
+          const freshHeadline = needsHeadlineTrans ? await autoTranslate(item.introHeadline, "Indonesian") : "";
+          const freshBody = needsBodyTrans ? await autoTranslate(item.introBody, "Indonesian") : "";
+          
+          const upsertTrans = async (field, translatedText) => {
+            if (!translatedText) return;
+            const existing = await Translation.findOne({ where: { modelName: "HomeSettings", recordId: "1", field, locale: "id" } });
+            if (existing) await existing.update({ translatedText });
+            else await Translation.create({ modelName: "HomeSettings", recordId: "1", field, locale: "id", translatedText });
+          };
+          
+          if (freshHeadline) { await upsertTrans("introHeadline", freshHeadline); item.introHeadline = freshHeadline; }
+          if (freshBody) { await upsertTrans("introBody", freshBody); item.introBody = freshBody; }
+        } else {
+          if (headlineTrans) item.introHeadline = headlineTrans.translatedText;
+          if (bodyTrans) item.introBody = bodyTrans.translatedText;
+        }
+        finalSettings = item;
+      }
+    }
+
     res.status(200).json({
       success: true,
       data: {
-        slides,
-        stats,
-        settings,
+        slides: finalSlides,
+        stats: finalStats,
+        settings: finalSettings,
       },
     });
   } catch (error) {
@@ -144,12 +248,114 @@ exports.getAdminHomepageData = async (req, res) => {
       });
     }
 
+    const lang = req.query.lang || "en";
+    let finalSlides = slides;
+    let finalStats = stats;
+    let finalSettings = settings;
+
+    if (lang !== "en") {
+      // 1. Terjemahkan Slides (HeroSlides)
+      finalSlides = [];
+      for (let i = 0; i < slides.length; i++) {
+        const item = slides[i].get ? slides[i].get({ plain: true }) : { ...slides[i] };
+        
+        let titleTrans = await Translation.findOne({ where: { modelName: "HeroSlides", recordId: String(item.id), field: "title", locale: "id" } });
+        let subtitleTrans = await Translation.findOne({ where: { modelName: "HeroSlides", recordId: String(item.id), field: "subtitle", locale: "id" } });
+        
+        const needsTitleTrans = item.title && !titleTrans;
+        const needsSubtitleTrans = item.subtitle && !subtitleTrans;
+
+        if (needsTitleTrans || needsSubtitleTrans) {
+          console.log(`[Lazy Translation] Translating HeroSlide: ${item.id}...`);
+          const freshTitle = needsTitleTrans ? await autoTranslate(item.title, "Indonesian") : "";
+          const freshSubtitle = needsSubtitleTrans ? await autoTranslate(item.subtitle, "Indonesian") : "";
+          
+          const upsertTrans = async (field, translatedText) => {
+            if (!translatedText) return;
+            const existing = await Translation.findOne({ where: { modelName: "HeroSlides", recordId: String(item.id), field, locale: "id" } });
+            if (existing) await existing.update({ translatedText });
+            else await Translation.create({ modelName: "HeroSlides", recordId: String(item.id), field, locale: "id", translatedText });
+          };
+          
+          if (freshTitle) { await upsertTrans("title", freshTitle); item.title = freshTitle; }
+          if (freshSubtitle) { await upsertTrans("subtitle", freshSubtitle); item.subtitle = freshSubtitle; }
+        } else {
+          if (titleTrans) item.title = titleTrans.translatedText;
+          if (subtitleTrans) item.subtitle = subtitleTrans.translatedText;
+        }
+        finalSlides.push(item);
+      }
+
+      // 2. Terjemahkan Statistik (ImpactStats)
+      finalStats = [];
+      for (let i = 0; i < stats.length; i++) {
+        const item = stats[i].get ? stats[i].get({ plain: true }) : { ...stats[i] };
+        
+        let labelTrans = await Translation.findOne({ where: { modelName: "ImpactStats", recordId: String(item.id), field: "label", locale: "id" } });
+        let descTrans = await Translation.findOne({ where: { modelName: "ImpactStats", recordId: String(item.id), field: "desc", locale: "id" } });
+        
+        const needsLabelTrans = item.label && !labelTrans;
+        const needsDescTrans = item.desc && !descTrans;
+
+        if (needsLabelTrans || needsDescTrans) {
+          console.log(`[Lazy Translation] Translating ImpactStat: ${item.id}...`);
+          const freshLabel = needsLabelTrans ? await autoTranslate(item.label, "Indonesian") : "";
+          const freshDesc = needsDescTrans ? await autoTranslate(item.desc, "Indonesian") : "";
+          
+          const upsertTrans = async (field, translatedText) => {
+            if (!translatedText) return;
+            const existing = await Translation.findOne({ where: { modelName: "ImpactStats", recordId: String(item.id), field, locale: "id" } });
+            if (existing) await existing.update({ translatedText });
+            else await Translation.create({ modelName: "ImpactStats", recordId: String(item.id), field, locale: "id", translatedText });
+          };
+          
+          if (freshLabel) { await upsertTrans("label", freshLabel); item.label = freshLabel; }
+          if (freshDesc) { await upsertTrans("desc", freshDesc); item.desc = freshDesc; }
+        } else {
+          if (labelTrans) item.label = labelTrans.translatedText;
+          if (descTrans) item.desc = descTrans.translatedText;
+        }
+        finalStats.push(item);
+      }
+
+      // 3. Terjemahkan Sambutan (HomeSettings)
+      if (settings) {
+        const item = settings.get ? settings.get({ plain: true }) : { ...settings };
+        
+        let headlineTrans = await Translation.findOne({ where: { modelName: "HomeSettings", recordId: "1", field: "introHeadline", locale: "id" } });
+        let bodyTrans = await Translation.findOne({ where: { modelName: "HomeSettings", recordId: "1", field: "introBody", locale: "id" } });
+        
+        const needsHeadlineTrans = item.introHeadline && !headlineTrans;
+        const needsBodyTrans = item.introBody && !bodyTrans;
+
+        if (needsHeadlineTrans || needsBodyTrans) {
+          console.log(`[Lazy Translation] Translating HomeSettings...`);
+          const freshHeadline = needsHeadlineTrans ? await autoTranslate(item.introHeadline, "Indonesian") : "";
+          const freshBody = needsBodyTrans ? await autoTranslate(item.introBody, "Indonesian") : "";
+          
+          const upsertTrans = async (field, translatedText) => {
+            if (!translatedText) return;
+            const existing = await Translation.findOne({ where: { modelName: "HomeSettings", recordId: "1", field, locale: "id" } });
+            if (existing) await existing.update({ translatedText });
+            else await Translation.create({ modelName: "HomeSettings", recordId: "1", field, locale: "id", translatedText });
+          };
+          
+          if (freshHeadline) { await upsertTrans("introHeadline", freshHeadline); item.introHeadline = freshHeadline; }
+          if (freshBody) { await upsertTrans("introBody", freshBody); item.introBody = freshBody; }
+        } else {
+          if (headlineTrans) item.introHeadline = headlineTrans.translatedText;
+          if (bodyTrans) item.introBody = bodyTrans.translatedText;
+        }
+        finalSettings = item;
+      }
+    }
+
     res.status(200).json({
       success: true,
       data: {
-        slides,
-        stats,
-        settings,
+        slides: finalSlides,
+        stats: finalStats,
+        settings: finalSettings,
         rejectionRadar: rejections,
       },
     });

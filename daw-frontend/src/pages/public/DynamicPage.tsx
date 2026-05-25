@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useMemo } from "react";
 import { useParams, Link } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { Share2, ChevronRight, AlertTriangle, RefreshCw } from "lucide-react";
 import DOMPurify from "dompurify";
 import api, { API_URL } from "@/lib/api";
@@ -61,6 +62,8 @@ const ScrollProgressBar = () => {
 
 export default function DynamicPage() {
   const { slug } = useParams<{ slug: string }>();
+  const { i18n } = useTranslation();
+  const lang = i18n.language || "en";
 
   // STATES
   const [pageData, setPageData] = useState<PageData | null>(null);
@@ -102,7 +105,7 @@ export default function DynamicPage() {
       setIsNotFound(false);
 
       try {
-        const res = await api.get(`/pages/slug/${slug}`);
+        const res = await api.get(`/pages/slug/${slug}?lang=${lang}`);
         const data = res.data;
         if (!data || data.status === "Draft") {
           setIsNotFound(true);
@@ -122,7 +125,7 @@ export default function DynamicPage() {
     if (slug) fetchPage();
     window.scrollTo(0, 0);
     return () => controller.abort();
-  }, [slug]);
+  }, [slug, lang]);
 
   /**
    * Effect 2: Content Pre-Parsing & Persistent ID Injection

@@ -79,7 +79,44 @@ exports.getAllManagements = async (req, res) => {
       return item;
     });
 
-    res.status(200).json(formattedData);
+    const lang = req.query.lang || "en";
+    if (lang === "en") {
+      return res.status(200).json(formattedData);
+    }
+
+    // ─── LAZY TRANSLATION ───
+    const Translation = require("../models/Translation");
+    const { autoTranslate } = require("../services/openaiService");
+
+    const translatedManagements = [];
+    for (let i = 0; i < formattedData.length; i++) {
+      let item = formattedData[i];
+      
+      let roleTrans = await Translation.findOne({ where: { modelName: MODULE_NAME, recordId: String(item.id), field: "role", locale: "id" } });
+      let descTrans = await Translation.findOne({ where: { modelName: MODULE_NAME, recordId: String(item.id), field: "description", locale: "id" } });
+      
+      if (!roleTrans || (!descTrans && item.description)) {
+        console.log(`[Lazy Translation] Translating Management: ${item.name}...`);
+        const freshRole = await autoTranslate(item.role, "Indonesian");
+        const freshDesc = item.description ? await autoTranslate(item.description, "Indonesian") : "";
+        
+        const upsertMgtTrans = async (field, translatedText) => {
+          if (!translatedText) return;
+          const existing = await Translation.findOne({ where: { modelName: MODULE_NAME, recordId: String(item.id), field, locale: "id" } });
+          if (existing) await existing.update({ translatedText });
+          else await Translation.create({ modelName: MODULE_NAME, recordId: String(item.id), field, locale: "id", translatedText });
+        };
+
+        if (freshRole) { await upsertMgtTrans("role", freshRole); item.role = freshRole; }
+        if (freshDesc) { await upsertMgtTrans("description", freshDesc); item.description = freshDesc; }
+      } else {
+        if (roleTrans) item.role = roleTrans.translatedText;
+        if (descTrans) item.description = descTrans.translatedText;
+      }
+      translatedManagements.push(item);
+    }
+
+    res.status(200).json(translatedManagements);
   } catch (error) {
     console.error("🚨 [GET MANAGEMENT ERROR]:", error.message);
     res.status(500).json({ message: "Gagal mengambil data management." });

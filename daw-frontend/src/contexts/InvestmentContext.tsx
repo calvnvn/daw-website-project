@@ -9,6 +9,7 @@ import {
   type ReactNode,
 } from "react";
 import api from "@/lib/api";
+import { useTranslation } from "react-i18next";
 import { useAuth } from "./AuthContext";
 
 export interface InvestmentSettings {
@@ -34,7 +35,9 @@ export interface Affiliate {
 
 interface InvestmentContextType {
   settings: InvestmentSettings | null;
+  publicSettings: InvestmentSettings | null;
   companies: Affiliate[];
+  publicCompanies: Affiliate[];
   rejectedSettings: any | null;
   isLoading: boolean;
   refreshData: () => Promise<void>;
@@ -42,7 +45,9 @@ interface InvestmentContextType {
 
 export const InvestmentContext = createContext<InvestmentContextType>({
   settings: null,
+  publicSettings: null,
   companies: [],
+  publicCompanies: [],
   rejectedSettings: null,
   isLoading: true,
   refreshData: async () => {},
@@ -50,8 +55,11 @@ export const InvestmentContext = createContext<InvestmentContextType>({
 
 export function InvestmentProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth();
+  const { i18n } = useTranslation();
   const [settings, setSettings] = useState<InvestmentSettings | null>(null);
+  const [publicSettings, setPublicSettings] = useState<InvestmentSettings | null>(null);
   const [companies, setCompanies] = useState<Affiliate[]>([]);
+  const [publicCompanies, setPublicCompanies] = useState<Affiliate[]>([]);
   const [rejectedSettings, setRejectedSettings] = useState<any | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -71,6 +79,15 @@ export function InvestmentProvider({ children }: { children: ReactNode }) {
       try {
         let payload;
         const promises: Promise<any>[] = [];
+
+        // Always fetch public translated data first
+        const publicResponse = await api.get("/investments/public", {
+          params: { lang: i18n.language === "id" ? "id" : "en" },
+          signal
+        });
+        const publicPayload = publicResponse.data?.data || publicResponse.data;
+        setPublicSettings(publicPayload?.settings || null);
+        setPublicCompanies(publicPayload?.companies || []);
 
         if (canAccessAdmin) {
           try {
@@ -110,15 +127,12 @@ export function InvestmentProvider({ children }: { children: ReactNode }) {
             console.warn(
               "⚠️ [RETRY] Admin fetch failed (401), falling back to public data...",
             );
-
-            const fallback = await api.get("/investments/public", { signal });
-            payload = fallback.data?.data || fallback.data;
+            payload = publicPayload;
             setRejectedSettings(null);
           }
         } else {
-          // Public Site
-          const response = await api.get("/investments/public", { signal });
-          payload = response.data?.data || response.data;
+          // Public Site uses the already fetched publicPayload
+          payload = publicPayload;
           setRejectedSettings(null);
         }
 
@@ -139,7 +153,7 @@ export function InvestmentProvider({ children }: { children: ReactNode }) {
         setIsLoading(false);
       }
     },
-    [user],
+    [user, i18n.language],
   );
 
   useEffect(() => {
@@ -151,12 +165,14 @@ export function InvestmentProvider({ children }: { children: ReactNode }) {
   const contextValue = useMemo(
     () => ({
       settings,
+      publicSettings,
       companies,
+      publicCompanies,
       rejectedSettings,
       isLoading,
       refreshData: () => fetchData(),
     }),
-    [settings, companies, rejectedSettings, isLoading, fetchData],
+    [settings, publicSettings, companies, publicCompanies, rejectedSettings, isLoading, fetchData],
   );
 
   return (
