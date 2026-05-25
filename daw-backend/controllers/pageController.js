@@ -14,6 +14,7 @@ const ErpApprovalService = require("../services/erpApprovalService");
 const Translation = require("../models/Translation");
 const { autoTranslate } = require("../services/openaiService");
 const { generateNotrans } = require("../utils/notransGenerator");
+const { generateUniqueSlug, handleEditorStaging } = require("../utils/editorHelper");
 
 const MODULE_NAME = "PAGE";
 const NOTRANS_PREFIX = "PAGE";
@@ -21,40 +22,7 @@ const NOTRANS_PREFIX = "PAGE";
 // Remove HTML tags for plain text extraction
 const stripHtml = (html) => html.replace(/<[^>]*>?/gm, "");
 
-// Generate collision-free slug against both live DB and pending ERP drafts
-const generateUniqueSlug = async (title, slug, id = null) => {
-  let baseSlug = (slug || title)
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/(^-|-$)+/g, "");
-
-  let finalSlug = baseSlug;
-  let counter = 1;
-
-  while (true) {
-    const whereClause = id
-      ? { slug: finalSlug, id: { [Op.ne]: id } }
-      : { slug: finalSlug };
-    const existingLive = await Page.findOne({ where: whereClause });
-
-    const existingDraft = await ApprovalDraft.findOne({
-      where: {
-        module_name: MODULE_NAME,
-        status: "Pending",
-        [Op.and]: sequelize.literal(
-          `JSON_UNQUOTE(JSON_EXTRACT(payload, '$.slug')) = '${finalSlug}'`,
-        ),
-      },
-    });
-
-    if (!existingLive && !existingDraft) break;
-
-    finalSlug = `${baseSlug}-${counter}`;
-    counter++;
-  }
-
-  return finalSlug;
-};
+// Removed duplicated generateUniqueSlug (now in editorHelper.js)
 
 // Fetch all pages with dynamic rejection radar via subquery
 exports.getAllPages = async (req, res) => {
@@ -151,7 +119,7 @@ exports.createPage = async (req, res) => {
     const userRole = req.userRole?.toLowerCase();
 
     // Content sanitization and SEO prep
-    const finalSlug = await generateUniqueSlug(title, slug);
+    const finalSlug = await generateUniqueSlug(Page, MODULE_NAME, slug || title);
     const sanitizedContent = dompurify.sanitize(content);
     const finalMetaDesc =
       metaDescription || stripHtml(sanitizedContent).substring(0, 150);
@@ -185,52 +153,16 @@ exports.createPage = async (req, res) => {
 
     // Editor Flow: Stage to ERP
     if (isPublishing) {
-      const notrans = await generateNotrans(NOTRANS_PREFIX);
-
-      if (previous_notrans) {
-        await ApprovalDraft.update(
-          { status: "Replaced" },
-          {
-            where: { notrans: previous_notrans, module_name: MODULE_NAME },
-            transaction: t,
-          },
-        );
-      }
-
-      await ApprovalDraft.create(
-        {
-          notrans,
-          module_name: MODULE_NAME,
-          target_id: String(newPage.id),
-          action: "CREATE",
-          payload: { ...pageData, status: "Published" },
-          created_by: actorId,
-          status: "Pending",
-        },
-        { transaction: t },
-      );
-
-      await newPage.update({ lock_ticket: notrans }, { transaction: t });
-      await t.commit();
-
-      try {
-        await ErpApprovalService.initiateApproval({
-          notrans,
-          moduleName: MODULE_NAME,
-          karyawanId: req.karyawanId,
-          token: req.headers["authorization"]?.split(" ")[1] || req.owl_token,
-        });
-      } catch (owlError) {
-        console.error(
-          `🚨 [ERP SYNC FAILED] CREATE Page Ticket ${notrans}:`,
-          owlError.message,
-        );
-      }
-
-      return res.status(202).json({
-        success: true,
-        message: "Permintaan pembuatan halaman dikirim. Data dikunci.",
-        ticket: notrans,
+      return handleEditorStaging({
+        req, res, t,
+        moduleName: MODULE_NAME,
+        notransPrefix: NOTRANS_PREFIX,
+        action: "CREATE",
+        targetId: newPage.id,
+        payload: { ...pageData, status: "Published" },
+        recordToLock: newPage,
+        previousNotrans: previous_notrans,
+        successMessage: "Permintaan pembuatan halaman dikirim. Data dikunci.",
       });
     }
 
@@ -290,7 +222,7 @@ exports.updatePage = async (req, res) => {
       });
     }
 
-    const finalSlug = await generateUniqueSlug(title, slug, id);
+    const finalSlug = await generateUniqueSlug(Page, MODULE_NAME, slug || title, id);
     const sanitizedContent = dompurify.sanitize(content);
     const finalMetaDesc =
       metaDescription || stripHtml(sanitizedContent).substring(0, 150);
@@ -336,55 +268,18 @@ exports.updatePage = async (req, res) => {
 
     // Editor Flow: Stage updates to ERP
     if (userRole === "editor" && status === "Published") {
-      const notrans = await generateNotrans(NOTRANS_PREFIX);
       const ticketToClear = previous_notrans || page.lock_ticket;
-
-      if (ticketToClear) {
-        await ApprovalDraft.update(
-          { status: "Replaced" },
-          {
-            where: { notrans: ticketToClear, module_name: MODULE_NAME },
-            transaction: t,
-          },
-        );
-      }
-
-      await ApprovalDraft.create(
-        {
-          notrans,
-          module_name: MODULE_NAME,
-          target_id: String(id),
-          action: "UPDATE",
-          payload: { ...updatedData, status: "Published" },
-          created_by: actorId,
-          status: "Pending",
-        },
-        { transaction: t },
-      );
-
-      await page.update(
-        { is_locked: true, lock_ticket: notrans },
-        { transaction: t },
-      );
-      await t.commit();
-
-      try {
-        await ErpApprovalService.initiateApproval({
-          notrans,
-          moduleName: MODULE_NAME,
-          karyawanId: req.karyawanId,
-          token: req.headers["authorization"]?.split(" ")[1] || req.owl_token,
-        });
-      } catch (owlError) {
-        console.error(
-          `🚨 [ERP SYNC FAILED] UPDATE Page Ticket ${notrans}:`,
-          owlError.message,
-        );
-      }
-
-      return res
-        .status(202)
-        .json({ success: true, message: "Revisi dikirim.", ticket: notrans });
+      return handleEditorStaging({
+        req, res, t,
+        moduleName: MODULE_NAME,
+        notransPrefix: NOTRANS_PREFIX,
+        action: "UPDATE",
+        targetId: id,
+        payload: { ...updatedData, status: "Published" },
+        recordToLock: page,
+        previousNotrans: ticketToClear,
+        successMessage: "Revisi dikirim.",
+      });
     }
 
     // Admin Flow: Direct commit and draft invalidation
@@ -457,8 +352,6 @@ exports.deletePage = async (req, res) => {
 
     // Editor Flow: Stage deletion intent
     if (userRole === "editor") {
-      const notrans = await generateNotrans(NOTRANS_PREFIX);
-
       await ApprovalDraft.update(
         { status: "Obsolete" },
         {
@@ -471,43 +364,15 @@ exports.deletePage = async (req, res) => {
         },
       );
 
-      await ApprovalDraft.create(
-        {
-          notrans,
-          module_name: MODULE_NAME,
-          target_id: String(id),
-          action: "DELETE",
-          payload: { title: page.title }, // Minimal payload for DELETE
-          created_by: actorId,
-          status: "Pending",
-        },
-        { transaction: t },
-      );
-
-      await page.update(
-        { is_locked: true, lock_ticket: notrans },
-        { transaction: t },
-      );
-      await t.commit();
-
-      try {
-        await ErpApprovalService.initiateApproval({
-          notrans,
-          moduleName: MODULE_NAME,
-          karyawanId: req.karyawanId,
-          token: req.headers["authorization"]?.split(" ")[1] || req.owl_token,
-        });
-      } catch (owlError) {
-        console.error(
-          `🚨 [ERP SYNC FAILED] DELETE Page Ticket ${notrans}:`,
-          owlError.message,
-        );
-      }
-
-      return res.status(202).json({
-        success: true,
-        message: "Permintaan hapus dikirim.",
-        ticket: notrans,
+      return handleEditorStaging({
+        req, res, t,
+        moduleName: MODULE_NAME,
+        notransPrefix: NOTRANS_PREFIX,
+        action: "DELETE",
+        targetId: id,
+        payload: { title: page.title }, // Minimal payload for DELETE
+        recordToLock: page,
+        successMessage: "Permintaan hapus dikirim.",
       });
     }
 

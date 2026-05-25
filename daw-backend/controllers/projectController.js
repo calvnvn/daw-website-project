@@ -9,6 +9,7 @@ const sequelize = require("../config/database");
 const ErpApprovalService = require("../services/erpApprovalService");
 const { invalidateOldDrafts } = require("../utils/draftCleanup");
 const { generateNotrans } = require("../utils/notransGenerator");
+const { extractImagesFromHtml, generateUniqueSlug, handleEditorStaging } = require("../utils/editorHelper");
 
 const JENIS_APP_CMS = process.env.CMS_APPROVAL_CODE;
 const MODULE_NAME = "Project";
@@ -47,47 +48,7 @@ const triggerBackgroundTranslation = async (projectId, payload) => {
 };
 
 // Utility: Parses HTML content to identify and collect uploaded image paths for subsequent garbage collection.
-const extractImagesFromHtml = (html) => {
-  if (!html) return [];
-  const images = [];
-  const imgRegex = /src="[^"]*\/uploads\/([^"'\s>]+)"/g;
-  let match;
-  while ((match = imgRegex.exec(html)) !== null) {
-    images.push(match[1]);
-  }
-  return images;
-};
-
-// Orchestrates the generation of a unique URL slug, checking both live production data and pending ERP drafts to prevent collisions.
-const generateUniqueProjectSlug = async (title, id = null) => {
-  let baseSlug = title
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/(^-|-$)+/g, "");
-  let finalSlug = baseSlug;
-  let counter = 1;
-
-  while (true) {
-    const whereClause = id
-      ? { slug: finalSlug, id: { [Op.ne]: id } }
-      : { slug: finalSlug };
-    const existingLive = await Project.findOne({ where: whereClause });
-
-    const existingDraft = await ApprovalDraft.findOne({
-      where: {
-        module_name: "Project",
-        status: "Pending",
-        "payload.slug": finalSlug,
-      },
-    });
-
-    if (!existingLive && !existingDraft) break;
-
-    finalSlug = `${baseSlug}-${counter}`;
-    counter++;
-  }
-  return finalSlug;
-};
+// Removed duplicated extractImagesFromHtml and generateUniqueProjectSlug (now in editorHelper.js)
 
 // Consolidates payload parsing, image diffing (for cleanup), and slug generation to keep the main controller logic clean.
 const processProjectPayload = async (req, project) => {
@@ -164,9 +125,9 @@ const processProjectPayload = async (req, project) => {
 
   let finalSlug = project.slug;
   if (slug && slug !== project.slug) {
-    finalSlug = await generateUniqueProjectSlug(slug, project.id);
+    finalSlug = await generateUniqueSlug(Project, "Project", slug, project.id);
   } else if (title && title !== project.title) {
-    finalSlug = await generateUniqueProjectSlug(title, project.id);
+    finalSlug = await generateUniqueSlug(Project, "Project", title, project.id);
   }
 
   const allFilesToTrash = [...filesToDelete];
@@ -261,51 +222,22 @@ exports.createProject = async (req, res) => {
 
     // Branch A: Editor initiates a publication request, locking the new record and syncing with ERP.
     if (userRole === "editor" && requestStatus === "Published") {
-      const notrans = await generateNotrans("Projects");
-
-      if (previous_notrans) {
-        await ApprovalDraft.update(
-          { status: "Replaced" },
-          { where: { notrans: previous_notrans }, transaction: t },
-        );
-      }
-
       const newProject = await Project.create(
-        { ...payload, status: "Draft", is_locked: true, lock_ticket: notrans },
+        { ...payload, status: "Draft", is_locked: true },
         { transaction: t },
       );
 
-      await ApprovalDraft.create(
-        {
-          notrans,
-          module_name: "Project",
-          action: "CREATE",
-          target_id: String(newProject.id),
-          payload: { ...payload, status: "Published" },
-          created_by: actorId,
-          status: "Pending",
-        },
-        { transaction: t },
-      );
-
-      await t.commit();
-
-      try {
-        await ErpApprovalService.initiateApproval({
-          notrans,
-          karyawanId: actorId,
-          token: req.owl_token,
-        });
-      } catch (owlError) {
-        console.error("🚨 [ERP SYNC FAILED]:", owlError.message);
-      }
-
-      // Trigger AI translation in background (Non-blocking)
-      triggerBackgroundTranslation(newProject.id, payload);
-
-      return res.status(202).json({
-        message: "Proyek baru diajukan. Data dikunci menunggu persetujuan.",
-        ticket: notrans,
+      return handleEditorStaging({
+        req, res, t,
+        moduleName: "Project",
+        notransPrefix: "Projects",
+        action: "CREATE",
+        targetId: newProject.id,
+        payload: { ...payload, status: "Published" },
+        recordToLock: newProject,
+        previousNotrans: previous_notrans,
+        successMessage: "Proyek baru diajukan. Data dikunci menunggu persetujuan.",
+        onSuccessCallback: triggerBackgroundTranslation,
       });
     }
 
@@ -372,51 +304,17 @@ exports.updateProject = async (req, res) => {
 
     // Branch A: Editor requests publication of changes, staging them in the Vault and notifying the ERP.
     if (userRole === "editor" && status === "Published") {
-      const notrans = await generateNotrans("Projects");
-
-      if (previous_notrans) {
-        await ApprovalDraft.update(
-          { status: "Replaced" },
-          { where: { notrans: previous_notrans }, transaction: t },
-        );
-      }
-
-      await ApprovalDraft.create(
-        {
-          notrans,
-          module_name: "Project",
-          action: "UPDATE",
-          target_id: String(id),
-          payload: { ...payload, status: "Published" },
-          created_by: actorId,
-          status: "Pending",
-        },
-        { transaction: t },
-      );
-
-      await project.update(
-        { is_locked: true, lock_ticket: notrans },
-        { transaction: t },
-      );
-
-      await t.commit();
-
-      try {
-        await ErpApprovalService.initiateApproval({
-          notrans,
-          karyawanId: actorId,
-          token: req.owl_token,
-        });
-      } catch (owlError) {
-        console.error("🚨 [ERP SYNC FAILED]:", owlError.message);
-      }
-
-      // Trigger AI translation in background (Non-blocking)
-      triggerBackgroundTranslation(id, payload);
-
-      return res.status(202).json({
-        message: "Revisi diajukan. Data asli dikunci.",
-        ticket: notrans,
+      return handleEditorStaging({
+        req, res, t,
+        moduleName: "Project",
+        notransPrefix: "Projects",
+        action: "UPDATE",
+        targetId: id,
+        payload: { ...payload, status: "Published" },
+        recordToLock: project,
+        previousNotrans: previous_notrans,
+        successMessage: "Revisi diajukan. Data asli dikunci.",
+        onSuccessCallback: triggerBackgroundTranslation,
       });
     }
 
@@ -478,40 +376,16 @@ exports.deleteProject = async (req, res) => {
 
     // Branch A: Editor stages a deletion request, locking the record without actually destroying it.
     if (userRole === "editor") {
-      const notrans = await generateNotrans("Projects");
-
-      await ApprovalDraft.create(
-        {
-          notrans,
-          module_name: "Project",
-          action: "DELETE",
-          target_id: String(id),
-          payload: { title: project.title, reason: "Request Delete" },
-          created_by: actorId,
-          status: "Pending",
-        },
-        { transaction: t },
-      );
-
-      await project.update(
-        { is_locked: true, lock_ticket: notrans },
-        { transaction: t },
-      );
-
-      await t.commit();
-
-      try {
-        await ErpApprovalService.initiateApproval({
-          notrans,
-          karyawanId: actorId,
-          token: req.owl_token,
-        });
-      } catch (owlError) {
-        console.error("🚨 [ERP SYNC FAILED]:", owlError.message);
-      }
-      return res
-        .status(202)
-        .json({ message: "Permintaan hapus dikirim.", ticket: notrans });
+      return handleEditorStaging({
+        req, res, t,
+        moduleName: "Project",
+        notransPrefix: "Projects",
+        action: "DELETE",
+        targetId: id,
+        payload: { title: project.title, reason: "Request Delete" },
+        recordToLock: project,
+        successMessage: "Permintaan hapus dikirim.",
+      });
     }
 
     // Branch B: Admin performs a hard delete, triggering physical file cleanup for cover images and gallery assets.

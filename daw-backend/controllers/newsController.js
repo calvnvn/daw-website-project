@@ -9,6 +9,7 @@ const sequelize = require("../config/database");
 const ErpApprovalService = require("../services/erpApprovalService");
 const { invalidateOldDrafts } = require("../utils/draftCleanup");
 const { generateNotrans } = require("../utils/notransGenerator");
+const { extractImagesFromHtml, generateUniqueSlug, handleEditorStaging } = require("../utils/editorHelper");
 
 const MODULE_NAME = "NewsArticle";
 
@@ -58,50 +59,7 @@ const calculateReadTime = (htmlContent) => {
   return `${Math.max(1, minutes)} min read`;
 };
 
-// Utility: Parses HTML content to identify uploaded image paths for garbage collection.
-const extractImagesFromHtml = (html) => {
-  if (!html) return [];
-  const images = [];
-  const imgRegex = /src="[^"]*\/uploads\/([^"'\s>]+)"/g;
-  let match;
-  while ((match = imgRegex.exec(html)) !== null) {
-    images.push(match[1]);
-  }
-  return images;
-};
-
-// Generates a unique URL slug, checking both live data and pending drafts to prevent collisions.
-const generateUniqueNewsSlug = async (title, id = null) => {
-  let baseSlug = title
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/(^-|-$)+/g, "");
-  let finalSlug = baseSlug;
-  let counter = 1;
-
-  while (true) {
-    const whereClause = id
-      ? { slug: finalSlug, id: { [Op.ne]: id } }
-      : { slug: finalSlug };
-    const existingLive = await NewsArticle.findOne({ where: whereClause });
-
-    const existingDraft = await ApprovalDraft.findOne({
-      where: {
-        module_name: MODULE_NAME,
-        status: "Pending",
-        [Op.and]: sequelize.literal(
-          `JSON_UNQUOTE(JSON_EXTRACT(payload, '$.slug')) = '${finalSlug}'`,
-        ),
-      },
-    });
-
-    if (!existingLive && !existingDraft) break;
-
-    finalSlug = `${baseSlug}-${counter}`;
-    counter++;
-  }
-  return finalSlug;
-};
+// Removed duplicated extractImagesFromHtml and generateUniqueNewsSlug (now in editorHelper.js)
 
 // Consolidates payload parsing, image diffing, and slug generation.
 const processNewsPayload = async (req, article) => {
@@ -151,9 +109,9 @@ const processNewsPayload = async (req, article) => {
 
   let finalSlug = article.slug;
   if (slug && slug !== article.slug) {
-    finalSlug = await generateUniqueNewsSlug(slug, article.id);
+    finalSlug = await generateUniqueSlug(NewsArticle, MODULE_NAME, slug, article.id);
   } else if (title && title !== article.title) {
-    finalSlug = await generateUniqueNewsSlug(title, article.id);
+    finalSlug = await generateUniqueSlug(NewsArticle, MODULE_NAME, title, article.id);
   }
 
   const allFilesToTrash = [...filesToDelete];
@@ -278,56 +236,26 @@ exports.createNews = async (req, res) => {
 
     // Branch A: Editor requests publication → ERP approval flow
     if (userRole === "editor" && requestStatus === "Published") {
-      const notrans = await generateNotrans("News");
-
-      if (previous_notrans) {
-        await ApprovalDraft.update(
-          { status: "Replaced" },
-          { where: { notrans: previous_notrans }, transaction: t },
-        );
-      }
-
       const newArticle = await NewsArticle.create(
         {
           ...payload,
           status: "Draft",
           is_locked: true,
-          lock_ticket: notrans,
         },
         { transaction: t },
       );
 
-      await ApprovalDraft.create(
-        {
-          notrans,
-          module_name: MODULE_NAME,
-          action: "CREATE",
-          target_id: String(newArticle.id),
-          payload: { ...payload, status: "Published" },
-          created_by: actorId,
-          status: "Pending",
-        },
-        { transaction: t },
-      );
-
-      await t.commit();
-
-      try {
-        await ErpApprovalService.initiateApproval({
-          notrans,
-          karyawanId: actorId,
-          token: req.owl_token,
-        });
-      } catch (owlError) {
-        console.error("🚨 [ERP SYNC FAILED]:", owlError.message);
-      }
-      
-      // Trigger AI translation in background (Non-blocking)
-      triggerBackgroundTranslation(newArticle.id, payload);
-
-      return res.status(202).json({
-        message: "Artikel baru diajukan. Data dikunci menunggu persetujuan.",
-        ticket: notrans,
+      return handleEditorStaging({
+        req, res, t,
+        moduleName: MODULE_NAME,
+        notransPrefix: "News",
+        action: "CREATE",
+        targetId: newArticle.id,
+        payload: { ...payload, status: "Published" },
+        recordToLock: newArticle,
+        previousNotrans: previous_notrans,
+        successMessage: "Artikel baru diajukan. Data dikunci menunggu persetujuan.",
+        onSuccessCallback: triggerBackgroundTranslation,
       });
     }
 
@@ -394,51 +322,17 @@ exports.updateNews = async (req, res) => {
 
     // Branch A: Editor requests publication → stage in vault + ERP notification.
     if (userRole === "editor" && status === "Published") {
-      const notrans = await generateNotrans("News");
-
-      if (previous_notrans) {
-        await ApprovalDraft.update(
-          { status: "Replaced" },
-          { where: { notrans: previous_notrans }, transaction: t },
-        );
-      }
-
-      await ApprovalDraft.create(
-        {
-          notrans,
-          module_name: MODULE_NAME,
-          action: "UPDATE",
-          target_id: String(id),
-          payload: { ...payload, status: "Published" },
-          created_by: actorId,
-          status: "Pending",
-        },
-        { transaction: t },
-      );
-
-      await article.update(
-        { is_locked: true, lock_ticket: notrans },
-        { transaction: t },
-      );
-
-      await t.commit();
-
-      try {
-        await ErpApprovalService.initiateApproval({
-          notrans,
-          karyawanId: actorId,
-          token: req.owl_token,
-        });
-      } catch (owlError) {
-        console.error("🚨 [ERP SYNC FAILED]:", owlError.message);
-      }
-
-      // Trigger AI translation in background (Non-blocking)
-      triggerBackgroundTranslation(id, payload);
-
-      return res.status(202).json({
-        message: "Revisi diajukan. Data asli dikunci.",
-        ticket: notrans,
+      return handleEditorStaging({
+        req, res, t,
+        moduleName: MODULE_NAME,
+        notransPrefix: "News",
+        action: "UPDATE",
+        targetId: id,
+        payload: { ...payload, status: "Published" },
+        recordToLock: article,
+        previousNotrans: previous_notrans,
+        successMessage: "Revisi diajukan. Data asli dikunci.",
+        onSuccessCallback: triggerBackgroundTranslation,
       });
     }
 
@@ -500,40 +394,16 @@ exports.deleteNews = async (req, res) => {
 
     // Branch A: Editor stages a deletion request.
     if (userRole === "editor") {
-      const notrans = await generateNotrans("News");
-
-      await ApprovalDraft.create(
-        {
-          notrans,
-          module_name: MODULE_NAME,
-          action: "DELETE",
-          target_id: String(id),
-          payload: { title: article.title, reason: "Request Delete" },
-          created_by: actorId,
-          status: "Pending",
-        },
-        { transaction: t },
-      );
-
-      await article.update(
-        { is_locked: true, lock_ticket: notrans },
-        { transaction: t },
-      );
-
-      await t.commit();
-
-      try {
-        await ErpApprovalService.initiateApproval({
-          notrans,
-          karyawanId: actorId,
-          token: req.owl_token,
-        });
-      } catch (owlError) {
-        console.error("🚨 [ERP SYNC FAILED]:", owlError.message);
-      }
-      return res
-        .status(202)
-        .json({ message: "Permintaan hapus dikirim.", ticket: notrans });
+      return handleEditorStaging({
+        req, res, t,
+        moduleName: MODULE_NAME,
+        notransPrefix: "News",
+        action: "DELETE",
+        targetId: id,
+        payload: { title: article.title, reason: "Request Delete" },
+        recordToLock: article,
+        successMessage: "Permintaan hapus dikirim.",
+      });
     }
 
     // Branch B: Admin performs hard delete with physical file cleanup.

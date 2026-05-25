@@ -8,6 +8,7 @@ const { invalidateOldDrafts } = require("../utils/draftCleanup");
 const { deleteSingleFile } = require("../utils/fileRemover");
 const ErpApprovalService = require("../services/erpApprovalService");
 const { generateNotrans } = require("../utils/notransGenerator");
+const { extractImagesFromHtml, handleEditorStaging } = require("../utils/editorHelper");
 const sanitizeHtml = require("sanitize-html");
 const { Op } = require("sequelize");
 
@@ -87,17 +88,7 @@ const slugify = (text) => {
     .trim(); // Trim whitespace
 };
 
-// Parse HTML content to track embedded assets for automated garbage collection
-const extractImagesFromHtml = (html) => {
-  if (!html) return [];
-  const images = [];
-  const imgRegex = /src="[^"]*\/uploads\/([^"'\s>]+)"/g;
-  let match;
-  while ((match = imgRegex.exec(html)) !== null) {
-    images.push(match[1]);
-  }
-  return images;
-};
+// extractImagesFromHtml dipindahkan ke utils/editorHelper.js
 
 // Normalize payload, execute sanitization, and calculate asset differences for orphaned file cleanup
 const processBusinessPayload = async (req, existingData = {}) => {
@@ -399,47 +390,16 @@ exports.updateBusinessSection = async (req, res) => {
       console.log(
         `>>> [APPROVAL REQUIRED] Editor ${actorId} mengubah konten teks. Memulai draf...`,
       );
-      const notrans = await generateNotrans("BusinessSection");
-
-      if (previous_notrans) {
-        await ApprovalDraft.update(
-          { status: "Replaced" },
-          { where: { notrans: previous_notrans }, transaction: t },
-        );
-      }
-
-      await ApprovalDraft.create(
-        {
-          notrans,
-          module_name: "BusinessSection",
-          action: "UPDATE",
-          target_id: String(id),
-          payload: { ...payload, status: "Published" },
-          created_by: actorId,
-          status: "Pending",
-        },
-        { transaction: t },
-      );
-
-      await section.update(
-        { is_locked: true, lock_ticket: notrans },
-        { transaction: t },
-      );
-
-      await t.commit();
-
-      try {
-        await ErpApprovalService.initiateApproval({
-          notrans,
-          karyawanId: actorId,
-          token: req.owl_token,
-        });
-      } catch (owlError) {
-        console.error("🚨 [ERP SYNC FAILED]:", owlError.message);
-      }
-      return res.status(202).json({
-        message: "Revisi konten diajukan. Menunggu persetujuan.",
-        ticket: notrans,
+      return handleEditorStaging({
+        req, res, t,
+        moduleName: "BusinessSection",
+        notransPrefix: "BusinessSection",
+        action: "UPDATE",
+        targetId: id,
+        payload: { ...payload, status: "Published" },
+        recordToLock: section,
+        previousNotrans: previous_notrans,
+        successMessage: "Revisi konten diajukan. Menunggu persetujuan.",
       });
     }
 
