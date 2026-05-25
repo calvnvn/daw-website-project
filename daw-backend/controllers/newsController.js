@@ -711,12 +711,16 @@ exports.getPublicNewsBySlug = async (req, res) => {
       let excerptTrans = await Translation.findOne({ where: { modelName: MODULE_NAME, recordId: result.id, field: "excerpt", locale: "id" } });
       let contentTrans = await Translation.findOne({ where: { modelName: MODULE_NAME, recordId: result.id, field: "content", locale: "id" } });
 
+      const needsTitleTrans = result.title && !titleTrans;
+      const needsExcerptTrans = result.excerpt && !excerptTrans;
+      const needsContentTrans = result.content && !contentTrans;
+
       // If missing completely, generate on-the-fly and save as cache
-      if (!titleTrans || !contentTrans) {
+      if (needsTitleTrans || needsExcerptTrans || needsContentTrans) {
         console.log(`[Lazy Translation] Translating older article ID: ${result.id}...`);
-        const freshTitle = await autoTranslate(result.title, "Indonesian");
-        const freshExcerpt = await autoTranslate(result.excerpt, "Indonesian");
-        const freshContent = await autoTranslate(result.content, "Indonesian");
+        const freshTitle = needsTitleTrans ? await autoTranslate(result.title, "Indonesian") : "";
+        const freshExcerpt = needsExcerptTrans ? await autoTranslate(result.excerpt, "Indonesian") : "";
+        const freshContent = needsContentTrans ? await autoTranslate(result.content, "Indonesian") : "";
 
         const upsertTranslation = async (field, translatedText) => {
           if (!translatedText) return;

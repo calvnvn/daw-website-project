@@ -111,11 +111,15 @@ exports.getPublicInvestmentData = async (req, res) => {
     let bodyTrans = await Translation.findOne({ where: { modelName: SETTINGS_MODULE, recordId: "1", field: "teaserBody", locale: "id" } });
     let introTrans = await Translation.findOne({ where: { modelName: SETTINGS_MODULE, recordId: "1", field: "sectionIntro", locale: "id" } });
 
-    if (!headlineTrans || !bodyTrans || !introTrans) {
+    const needsHeadlineTrans = plainSettings.teaserHeadline && !headlineTrans;
+    const needsBodyTrans = plainSettings.teaserBody && !bodyTrans;
+    const needsIntroTrans = plainSettings.sectionIntro && !introTrans;
+
+    if (needsHeadlineTrans || needsBodyTrans || needsIntroTrans) {
       console.log(`[Lazy Translation] Translating Investment Settings...`);
-      const freshHeadline = await autoTranslate(plainSettings.teaserHeadline, "Indonesian");
-      const freshBody = await autoTranslate(plainSettings.teaserBody, "Indonesian");
-      const freshIntro = await autoTranslate(plainSettings.sectionIntro, "Indonesian");
+      const freshHeadline = needsHeadlineTrans ? await autoTranslate(plainSettings.teaserHeadline, "Indonesian") : "";
+      const freshBody = needsBodyTrans ? await autoTranslate(plainSettings.teaserBody, "Indonesian") : "";
+      const freshIntro = needsIntroTrans ? await autoTranslate(plainSettings.sectionIntro, "Indonesian") : "";
 
       const upsertSettingsTrans = async (field, translatedText) => {
         if (!translatedText) return;
@@ -144,7 +148,9 @@ exports.getPublicInvestmentData = async (req, res) => {
 
       let descTrans = await Translation.findOne({ where: { modelName: AFFILIATE_MODULE, recordId: company.id, field: "desc", locale: "id" } });
 
-      if (!descTrans) {
+      const needsDescTrans = company.desc && !descTrans;
+
+      if (needsDescTrans) {
         console.log(`[Lazy Translation] Translating Affiliate Company: ${company.id}...`);
         const freshDesc = await autoTranslate(company.desc, "Indonesian");
 

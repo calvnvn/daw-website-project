@@ -71,10 +71,13 @@ exports.getAllAchievements = async (req, res) => {
       let titleTrans = await Translation.findOne({ where: { modelName: MODULE_NAME, recordId: String(item.id), field: "title", locale: "id" } });
       let descTrans = await Translation.findOne({ where: { modelName: MODULE_NAME, recordId: String(item.id), field: "description", locale: "id" } });
       
-      if (!titleTrans || (!descTrans && item.description)) {
+      const needsTitleTrans = item.title && !titleTrans;
+      const needsDescTrans = item.description && !descTrans;
+
+      if (needsTitleTrans || needsDescTrans) {
         console.log(`[Lazy Translation] Translating Achievement: ${item.id}...`);
-        const freshTitle = await autoTranslate(item.title, "Indonesian");
-        const freshDesc = item.description ? await autoTranslate(item.description, "Indonesian") : "";
+        const freshTitle = needsTitleTrans ? await autoTranslate(item.title, "Indonesian") : "";
+        const freshDesc = needsDescTrans ? await autoTranslate(item.description, "Indonesian") : "";
         
         const upsertAchvTrans = async (field, translatedText) => {
           if (!translatedText) return;

@@ -95,10 +95,13 @@ exports.getAllManagements = async (req, res) => {
       let roleTrans = await Translation.findOne({ where: { modelName: MODULE_NAME, recordId: String(item.id), field: "role", locale: "id" } });
       let descTrans = await Translation.findOne({ where: { modelName: MODULE_NAME, recordId: String(item.id), field: "description", locale: "id" } });
       
-      if (!roleTrans || (!descTrans && item.description)) {
+      const needsRoleTrans = item.role && !roleTrans;
+      const needsDescTrans = item.description && !descTrans;
+
+      if (needsRoleTrans || needsDescTrans) {
         console.log(`[Lazy Translation] Translating Management: ${item.name}...`);
-        const freshRole = await autoTranslate(item.role, "Indonesian");
-        const freshDesc = item.description ? await autoTranslate(item.description, "Indonesian") : "";
+        const freshRole = needsRoleTrans ? await autoTranslate(item.role, "Indonesian") : "";
+        const freshDesc = needsDescTrans ? await autoTranslate(item.description, "Indonesian") : "";
         
         const upsertMgtTrans = async (field, translatedText) => {
           if (!translatedText) return;

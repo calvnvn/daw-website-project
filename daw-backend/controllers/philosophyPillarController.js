@@ -62,10 +62,13 @@ exports.getPillars = async (req, res) => {
       let titleTrans = await Translation.findOne({ where: { modelName: MODULE_NAME, recordId: String(item.id), field: "title", locale: "id" } });
       let textTrans = await Translation.findOne({ where: { modelName: MODULE_NAME, recordId: String(item.id), field: "text", locale: "id" } });
       
-      if (!titleTrans || !textTrans) {
+      const needsTitleTrans = item.title && !titleTrans;
+      const needsTextTrans = item.text && !textTrans;
+
+      if (needsTitleTrans || needsTextTrans) {
         console.log(`[Lazy Translation] Translating Philosophy Pillar: ${item.id}...`);
-        const freshTitle = await autoTranslate(item.title, "Indonesian");
-        const freshText = await autoTranslate(item.text, "Indonesian");
+        const freshTitle = needsTitleTrans ? await autoTranslate(item.title, "Indonesian") : "";
+        const freshText = needsTextTrans ? await autoTranslate(item.text, "Indonesian") : "";
         
         const upsertPillarTrans = async (field, translatedText) => {
           if (!translatedText) return;
