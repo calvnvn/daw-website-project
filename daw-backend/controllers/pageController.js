@@ -14,15 +14,16 @@ const ErpApprovalService = require("../services/erpApprovalService");
 const Translation = require("../models/Translation");
 const { autoTranslate } = require("../services/openaiService");
 const { generateNotrans } = require("../utils/notransGenerator");
-const { generateUniqueSlug, handleEditorStaging } = require("../utils/editorHelper");
+const {
+  generateUniqueSlug,
+  handleEditorStaging,
+} = require("../utils/editorHelper");
 
 const MODULE_NAME = "PAGE";
 const NOTRANS_PREFIX = "PAGE";
 
 // Remove HTML tags for plain text extraction
 const stripHtml = (html) => html.replace(/<[^>]*>?/gm, "");
-
-// Removed duplicated generateUniqueSlug (now in editorHelper.js)
 
 // Fetch all pages with dynamic rejection radar via subquery
 exports.getAllPages = async (req, res) => {
@@ -119,7 +120,11 @@ exports.createPage = async (req, res) => {
     const userRole = req.userRole?.toLowerCase();
 
     // Content sanitization and SEO prep
-    const finalSlug = await generateUniqueSlug(Page, MODULE_NAME, slug || title);
+    const finalSlug = await generateUniqueSlug(
+      Page,
+      MODULE_NAME,
+      slug || title,
+    );
     const sanitizedContent = dompurify.sanitize(content);
     const finalMetaDesc =
       metaDescription || stripHtml(sanitizedContent).substring(0, 150);
@@ -154,7 +159,9 @@ exports.createPage = async (req, res) => {
     // Editor Flow: Stage to ERP
     if (isPublishing) {
       return handleEditorStaging({
-        req, res, t,
+        req,
+        res,
+        t,
         moduleName: MODULE_NAME,
         notransPrefix: NOTRANS_PREFIX,
         action: "CREATE",
@@ -222,7 +229,12 @@ exports.updatePage = async (req, res) => {
       });
     }
 
-    const finalSlug = await generateUniqueSlug(Page, MODULE_NAME, slug || title, id);
+    const finalSlug = await generateUniqueSlug(
+      Page,
+      MODULE_NAME,
+      slug || title,
+      id,
+    );
     const sanitizedContent = dompurify.sanitize(content);
     const finalMetaDesc =
       metaDescription || stripHtml(sanitizedContent).substring(0, 150);
@@ -270,7 +282,9 @@ exports.updatePage = async (req, res) => {
     if (userRole === "editor" && status === "Published") {
       const ticketToClear = previous_notrans || page.lock_ticket;
       return handleEditorStaging({
-        req, res, t,
+        req,
+        res,
+        t,
         moduleName: MODULE_NAME,
         notransPrefix: NOTRANS_PREFIX,
         action: "UPDATE",
@@ -365,7 +379,9 @@ exports.deletePage = async (req, res) => {
       );
 
       return handleEditorStaging({
-        req, res, t,
+        req,
+        res,
+        t,
         moduleName: MODULE_NAME,
         notransPrefix: NOTRANS_PREFIX,
         action: "DELETE",

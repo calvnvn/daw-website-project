@@ -51,11 +51,11 @@ const fileFilter = (req, file, cb) => {
   );
 };
 
-// Configure Multer with a 15MB hard limit per file
+// Configure Multer with dynamic size limit from environment variables (fallback: 15MB)
 const upload = multer({
   storage: storage,
   fileFilter: fileFilter,
-  limits: { fileSize: 15 * 1024 * 1024 },
+  limits: { fileSize: (parseInt(process.env.MAX_UPLOAD_SIZE_MB) || 15) * 1024 * 1024 },
 });
 
 /**

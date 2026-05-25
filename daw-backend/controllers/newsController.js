@@ -46,7 +46,7 @@ const triggerBackgroundTranslation = async (articleId, payload) => {
   }
 };
 
-// Utility: Calculates estimated reading time from HTML content using industry-standard 200 WPM.
+// Utility: Calculates estimated reading time from HTML content using dynamic WPM.
 const calculateReadTime = (htmlContent) => {
   if (!htmlContent) return "1 min read";
   const plainText = htmlContent
@@ -55,11 +55,11 @@ const calculateReadTime = (htmlContent) => {
     .replace(/\s+/g, " ")
     .trim();
   const wordCount = plainText.split(/\s+/).filter(Boolean).length;
-  const minutes = Math.ceil(wordCount / 200);
+  const wpm = parseInt(process.env.READING_TIME_WPM) || 200;
+  const minutes = Math.ceil(wordCount / wpm);
   return `${Math.max(1, minutes)} min read`;
 };
 
-// Removed duplicated extractImagesFromHtml and generateUniqueNewsSlug (now in editorHelper.js)
 
 // Consolidates payload parsing, image diffing, and slug generation.
 const processNewsPayload = async (req, article) => {

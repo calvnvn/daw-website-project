@@ -8,21 +8,23 @@ const { deleteSingleFile } = require("./fileRemover");
 /**
  * SCRIPT: Stale Draft Cleanup
  * Automates the permanent removal of discarded approval records and orphaned temporary assets.
- * Execution Frequency: Weekly (Sunday at 00:00).
+ * Execution Frequency: Configurable (Fallback: Weekly on Sunday at 00:00).
  */
 const startCleanupTask = () => {
-  // Initialize cron schedule for weekly system maintenance
-  cron.schedule("0 0 * * 0", async () => {
-    console.log("🧹 [CRON JOB] Starting weekly database & file cleanup...");
+  const cronSchedule = process.env.CRON_CLEANUP_SCHEDULE || "0 0 * * 0";
+  // Initialize cron schedule for periodic system maintenance
+  cron.schedule(cronSchedule, async () => {
+    console.log("🧹 [CRON JOB] Starting database & file cleanup...");
 
-    const thirtyDaysAgo = new Date(new Date() - 30 * 24 * 60 * 60 * 1000);
+    const retentionDays = parseInt(process.env.DRAFT_RETENTION_DAYS) || 30;
+    const expirationDate = new Date(new Date() - retentionDays * 24 * 60 * 60 * 1000);
 
     try {
       // Aggregate expired records matching the discard status and retention threshold
       const expiredDrafts = await ApprovalDraft.findAll({
         where: {
           status: "Discarded",
-          updatedAt: { [Op.lt]: thirtyDaysAgo },
+          updatedAt: { [Op.lt]: expirationDate },
         },
       });
 

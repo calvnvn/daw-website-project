@@ -4,7 +4,7 @@ const axios = require("axios");
 const CMS_CODE = process.env.CMS_APPROVAL_CODE;
 const dawApi = axios.create({
   baseURL: process.env.DAW_NODE_URL,
-  timeout: 10000,
+  timeout: parseInt(process.env.ERP_API_TIMEOUT_MS) || 10000,
 });
 
 /**

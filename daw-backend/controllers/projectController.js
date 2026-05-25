@@ -9,7 +9,11 @@ const sequelize = require("../config/database");
 const ErpApprovalService = require("../services/erpApprovalService");
 const { invalidateOldDrafts } = require("../utils/draftCleanup");
 const { generateNotrans } = require("../utils/notransGenerator");
-const { extractImagesFromHtml, generateUniqueSlug, handleEditorStaging } = require("../utils/editorHelper");
+const {
+  extractImagesFromHtml,
+  generateUniqueSlug,
+  handleEditorStaging,
+} = require("../utils/editorHelper");
 
 const JENIS_APP_CMS = process.env.CMS_APPROVAL_CODE;
 const MODULE_NAME = "Project";
@@ -18,22 +22,35 @@ const MODULE_NAME = "Project";
 const triggerBackgroundTranslation = async (projectId, payload) => {
   try {
     const { title, excerpt, content } = payload;
-    
+
     // Process heavy translations asynchronously (Non-blocking)
     const idTitle = title ? await autoTranslate(title, "Indonesian") : null;
-    const idExcerpt = excerpt ? await autoTranslate(excerpt, "Indonesian") : null;
-    const idContent = content ? await autoTranslate(content, "Indonesian") : null;
+    const idExcerpt = excerpt
+      ? await autoTranslate(excerpt, "Indonesian")
+      : null;
+    const idContent = content
+      ? await autoTranslate(content, "Indonesian")
+      : null;
 
     const upsertTranslation = async (field, translatedText) => {
       if (!translatedText) return;
       const existing = await Translation.findOne({
-        where: { modelName: MODULE_NAME, recordId: projectId, field, locale: "id" }
+        where: {
+          modelName: MODULE_NAME,
+          recordId: projectId,
+          field,
+          locale: "id",
+        },
       });
       if (existing) {
         await existing.update({ translatedText });
       } else {
         await Translation.create({
-          modelName: MODULE_NAME, recordId: projectId, field, locale: "id", translatedText
+          modelName: MODULE_NAME,
+          recordId: projectId,
+          field,
+          locale: "id",
+          translatedText,
         });
       }
     };
@@ -48,7 +65,6 @@ const triggerBackgroundTranslation = async (projectId, payload) => {
 };
 
 // Utility: Parses HTML content to identify and collect uploaded image paths for subsequent garbage collection.
-// Removed duplicated extractImagesFromHtml and generateUniqueProjectSlug (now in editorHelper.js)
 
 // Consolidates payload parsing, image diffing (for cleanup), and slug generation to keep the main controller logic clean.
 const processProjectPayload = async (req, project) => {
@@ -228,7 +244,9 @@ exports.createProject = async (req, res) => {
       );
 
       return handleEditorStaging({
-        req, res, t,
+        req,
+        res,
+        t,
         moduleName: "Project",
         notransPrefix: "Projects",
         action: "CREATE",
@@ -236,7 +254,8 @@ exports.createProject = async (req, res) => {
         payload: { ...payload, status: "Published" },
         recordToLock: newProject,
         previousNotrans: previous_notrans,
-        successMessage: "Proyek baru diajukan. Data dikunci menunggu persetujuan.",
+        successMessage:
+          "Proyek baru diajukan. Data dikunci menunggu persetujuan.",
         onSuccessCallback: triggerBackgroundTranslation,
       });
     }
@@ -305,7 +324,9 @@ exports.updateProject = async (req, res) => {
     // Branch A: Editor requests publication of changes, staging them in the Vault and notifying the ERP.
     if (userRole === "editor" && status === "Published") {
       return handleEditorStaging({
-        req, res, t,
+        req,
+        res,
+        t,
         moduleName: "Project",
         notransPrefix: "Projects",
         action: "UPDATE",
@@ -377,7 +398,9 @@ exports.deleteProject = async (req, res) => {
     // Branch A: Editor stages a deletion request, locking the record without actually destroying it.
     if (userRole === "editor") {
       return handleEditorStaging({
-        req, res, t,
+        req,
+        res,
+        t,
         moduleName: "Project",
         notransPrefix: "Projects",
         action: "DELETE",
@@ -443,14 +466,18 @@ exports.getPublicProjects = async (req, res) => {
         where: {
           modelName: MODULE_NAME,
           recordId: { [Op.in]: projectIds },
-          locale: "id"
-        }
+          locale: "id",
+        },
       });
-      
+
       finalProjects.forEach((row) => {
-        const titleTrans = translations.find((t) => t.recordId === row.id && t.field === "title");
-        const excerptTrans = translations.find((t) => t.recordId === row.id && t.field === "excerpt");
-        
+        const titleTrans = translations.find(
+          (t) => t.recordId === row.id && t.field === "title",
+        );
+        const excerptTrans = translations.find(
+          (t) => t.recordId === row.id && t.field === "excerpt",
+        );
+
         // Overwrite standard English text with localized text
         if (titleTrans) row.title = titleTrans.translatedText;
         if (excerptTrans) row.excerpt = excerptTrans.translatedText;
@@ -484,30 +511,68 @@ exports.getPublicProjectById = async (req, res) => {
 
     // ─── LAZY ON-DEMAND TRANSLATION LOGIC ───
     if (lang === "id") {
-      let titleTrans = await Translation.findOne({ where: { modelName: MODULE_NAME, recordId: result.id, field: "title", locale: "id" } });
-      let excerptTrans = await Translation.findOne({ where: { modelName: MODULE_NAME, recordId: result.id, field: "excerpt", locale: "id" } });
-      let contentTrans = await Translation.findOne({ where: { modelName: MODULE_NAME, recordId: result.id, field: "content", locale: "id" } });
+      let titleTrans = await Translation.findOne({
+        where: {
+          modelName: MODULE_NAME,
+          recordId: result.id,
+          field: "title",
+          locale: "id",
+        },
+      });
+      let excerptTrans = await Translation.findOne({
+        where: {
+          modelName: MODULE_NAME,
+          recordId: result.id,
+          field: "excerpt",
+          locale: "id",
+        },
+      });
+      let contentTrans = await Translation.findOne({
+        where: {
+          modelName: MODULE_NAME,
+          recordId: result.id,
+          field: "content",
+          locale: "id",
+        },
+      });
 
       const needsTitleTrans = result.title && !titleTrans;
       const needsExcerptTrans = result.excerpt && !excerptTrans;
       const needsContentTrans = result.content && !contentTrans;
 
       if (needsTitleTrans || needsExcerptTrans || needsContentTrans) {
-        console.log(`[Lazy Translation] Translating older project ID: ${result.id}...`);
-        const freshTitle = needsTitleTrans ? await autoTranslate(result.title, "Indonesian") : "";
-        const freshExcerpt = needsExcerptTrans ? await autoTranslate(result.excerpt, "Indonesian") : "";
-        const freshContent = needsContentTrans ? await autoTranslate(result.content, "Indonesian") : "";
+        console.log(
+          `[Lazy Translation] Translating older project ID: ${result.id}...`,
+        );
+        const freshTitle = needsTitleTrans
+          ? await autoTranslate(result.title, "Indonesian")
+          : "";
+        const freshExcerpt = needsExcerptTrans
+          ? await autoTranslate(result.excerpt, "Indonesian")
+          : "";
+        const freshContent = needsContentTrans
+          ? await autoTranslate(result.content, "Indonesian")
+          : "";
 
         const upsertTranslation = async (field, translatedText) => {
           if (!translatedText) return;
           const existing = await Translation.findOne({
-            where: { modelName: MODULE_NAME, recordId: result.id, field, locale: "id" }
+            where: {
+              modelName: MODULE_NAME,
+              recordId: result.id,
+              field,
+              locale: "id",
+            },
           });
           if (existing) {
             await existing.update({ translatedText });
           } else {
             await Translation.create({
-              modelName: MODULE_NAME, recordId: result.id, field, locale: "id", translatedText
+              modelName: MODULE_NAME,
+              recordId: result.id,
+              field,
+              locale: "id",
+              translatedText,
             });
           }
         };
@@ -579,30 +644,68 @@ exports.getPublicProjectBySlug = async (req, res) => {
 
     // ─── LAZY ON-DEMAND TRANSLATION LOGIC ───
     if (lang === "id") {
-      let titleTrans = await Translation.findOne({ where: { modelName: MODULE_NAME, recordId: result.id, field: "title", locale: "id" } });
-      let excerptTrans = await Translation.findOne({ where: { modelName: MODULE_NAME, recordId: result.id, field: "excerpt", locale: "id" } });
-      let contentTrans = await Translation.findOne({ where: { modelName: MODULE_NAME, recordId: result.id, field: "content", locale: "id" } });
+      let titleTrans = await Translation.findOne({
+        where: {
+          modelName: MODULE_NAME,
+          recordId: result.id,
+          field: "title",
+          locale: "id",
+        },
+      });
+      let excerptTrans = await Translation.findOne({
+        where: {
+          modelName: MODULE_NAME,
+          recordId: result.id,
+          field: "excerpt",
+          locale: "id",
+        },
+      });
+      let contentTrans = await Translation.findOne({
+        where: {
+          modelName: MODULE_NAME,
+          recordId: result.id,
+          field: "content",
+          locale: "id",
+        },
+      });
 
       const needsTitleTrans = result.title && !titleTrans;
       const needsExcerptTrans = result.excerpt && !excerptTrans;
       const needsContentTrans = result.content && !contentTrans;
 
       if (needsTitleTrans || needsExcerptTrans || needsContentTrans) {
-        console.log(`[Lazy Translation] Translating older project ID: ${result.id}...`);
-        const freshTitle = needsTitleTrans ? await autoTranslate(result.title, "Indonesian") : "";
-        const freshExcerpt = needsExcerptTrans ? await autoTranslate(result.excerpt, "Indonesian") : "";
-        const freshContent = needsContentTrans ? await autoTranslate(result.content, "Indonesian") : "";
+        console.log(
+          `[Lazy Translation] Translating older project ID: ${result.id}...`,
+        );
+        const freshTitle = needsTitleTrans
+          ? await autoTranslate(result.title, "Indonesian")
+          : "";
+        const freshExcerpt = needsExcerptTrans
+          ? await autoTranslate(result.excerpt, "Indonesian")
+          : "";
+        const freshContent = needsContentTrans
+          ? await autoTranslate(result.content, "Indonesian")
+          : "";
 
         const upsertTranslation = async (field, translatedText) => {
           if (!translatedText) return;
           const existing = await Translation.findOne({
-            where: { modelName: MODULE_NAME, recordId: result.id, field, locale: "id" }
+            where: {
+              modelName: MODULE_NAME,
+              recordId: result.id,
+              field,
+              locale: "id",
+            },
           });
           if (existing) {
             await existing.update({ translatedText });
           } else {
             await Translation.create({
-              modelName: MODULE_NAME, recordId: result.id, field, locale: "id", translatedText
+              modelName: MODULE_NAME,
+              recordId: result.id,
+              field,
+              locale: "id",
+              translatedText,
             });
           }
         };
