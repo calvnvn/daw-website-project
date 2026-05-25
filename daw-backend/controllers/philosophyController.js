@@ -59,16 +59,20 @@ exports.getPhilosophy = async (req, res) => {
 
     let titleTrans = await Translation.findOne({ where: { modelName: MODULE_NAME, recordId: "1", field: "philosophyTitle", locale: "id" } });
     
-    if (!titleTrans) {
+    const needsTitleTrans = formatted.philosophyTitle && !titleTrans;
+
+    if (needsTitleTrans) {
       console.log(`[Lazy Translation] Translating Philosophy Title...`);
       const freshTitle = await autoTranslate(formatted.philosophyTitle, "Indonesian");
       
       if (freshTitle) {
-        await Translation.create({ modelName: MODULE_NAME, recordId: "1", field: "philosophyTitle", locale: "id", translatedText: freshTitle });
+        const existing = await Translation.findOne({ where: { modelName: MODULE_NAME, recordId: "1", field: "philosophyTitle", locale: "id" } });
+        if (existing) await existing.update({ translatedText: freshTitle });
+        else await Translation.create({ modelName: MODULE_NAME, recordId: "1", field: "philosophyTitle", locale: "id", translatedText: freshTitle });
         formatted.philosophyTitle = freshTitle;
       }
     } else {
-      formatted.philosophyTitle = titleTrans.translatedText;
+      if (titleTrans) formatted.philosophyTitle = titleTrans.translatedText;
     }
 
     res.status(200).json(formatted);

@@ -62,11 +62,15 @@ exports.getAboutInfo = async (req, res) => {
     let missionTrans = await Translation.findOne({ where: { modelName: MODULE_NAME, recordId: "1", field: "missionText", locale: "id" } });
     let visionTrans = await Translation.findOne({ where: { modelName: MODULE_NAME, recordId: "1", field: "visionText", locale: "id" } });
 
-    if (!spiritTrans || !missionTrans || !visionTrans) {
+    const needsSpiritTrans = formattedInfo.spiritText && !spiritTrans;
+    const needsMissionTrans = formattedInfo.missionText && !missionTrans;
+    const needsVisionTrans = formattedInfo.visionText && !visionTrans;
+
+    if (needsSpiritTrans || needsMissionTrans || needsVisionTrans) {
       console.log(`[Lazy Translation] Translating About Info...`);
-      const freshSpirit = await autoTranslate(formattedInfo.spiritText, "Indonesian");
-      const freshMission = await autoTranslate(formattedInfo.missionText, "Indonesian");
-      const freshVision = await autoTranslate(formattedInfo.visionText, "Indonesian");
+      const freshSpirit = needsSpiritTrans ? await autoTranslate(formattedInfo.spiritText, "Indonesian") : "";
+      const freshMission = needsMissionTrans ? await autoTranslate(formattedInfo.missionText, "Indonesian") : "";
+      const freshVision = needsVisionTrans ? await autoTranslate(formattedInfo.visionText, "Indonesian") : "";
 
       const upsertAboutTrans = async (field, translatedText) => {
         if (!translatedText) return;
