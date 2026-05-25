@@ -3,6 +3,8 @@ const router = express.Router();
 const achievementController = require("../controllers/achievementController");
 const { verifyToken, checkPermission } = require("../middleware/authJwt");
 const { upload, optimizeImage } = require("../middleware/upload");
+const validate = require("../middleware/validate");
+const { createAchievementSchema, updateAchievementSchema } = require("../schemas/achievementSchema");
 
 /**
  * ACHIEVEMENT ROUTES
@@ -23,6 +25,7 @@ router.post(
   verifyToken,
   checkPermission("manage_achievements"),
   upload.single("image"),
+  validate(createAchievementSchema),
   optimizeImage,
   achievementController.createAchievement,
 );
@@ -33,6 +36,7 @@ router.put(
   verifyToken,
   checkPermission("manage_achievements"),
   upload.single("image"),
+  validate(updateAchievementSchema),
   optimizeImage,
   achievementController.updateAchievement,
 );

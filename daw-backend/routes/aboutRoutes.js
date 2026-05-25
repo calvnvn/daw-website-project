@@ -2,6 +2,8 @@ const express = require("express");
 const router = express.Router();
 const aboutController = require("../controllers/aboutController");
 const { verifyToken, checkPermission } = require("../middleware/authJwt");
+const validate = require("../middleware/validate");
+const { aboutSchema } = require("../schemas/aboutSchema");
 
 // PUBLIC
 // Fetch organizational profile information
@@ -13,6 +15,7 @@ router.put(
   "/",
   verifyToken,
   checkPermission("manage_about"),
+  validate(aboutSchema),
   aboutController.updateAboutInfo,
 );
 

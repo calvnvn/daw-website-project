@@ -2,6 +2,8 @@ const express = require("express");
 const router = express.Router();
 const newsCategoryController = require("../controllers/newsCategoryController");
 const { verifyToken, checkPermission } = require("../middleware/authJwt");
+const validate = require("../middleware/validate");
+const { newsCategorySchema } = require("../schemas/newsCategorySchema");
 
 // Fetch all categories
 router.get("/", newsCategoryController.getAllCategories);
@@ -11,6 +13,7 @@ router.post(
   "/",
   verifyToken,
   checkPermission("manage_news"),
+  validate(newsCategorySchema),
   newsCategoryController.createCategory,
 );
 
@@ -19,6 +22,7 @@ router.put(
   "/:id",
   verifyToken,
   checkPermission("manage_news"),
+  validate(newsCategorySchema),
   newsCategoryController.updateCategory,
 );
 

@@ -3,6 +3,8 @@ const router = express.Router();
 const settingsController = require("../controllers/settingsController");
 const { verifyToken, checkPermission } = require("../middleware/authJwt");
 const { upload, optimizeImage } = require("../middleware/upload");
+const validate = require("../middleware/validate");
+const { settingsSchema } = require("../schemas/settingsSchema");
 
 // PUBLIC
 // Fetch global system configuration and branding metadata
@@ -19,6 +21,7 @@ router.put(
     { name: "favicon", maxCount: 1 },
   ]),
   optimizeImage,
+  validate(settingsSchema),
   settingsController.updateSettings,
 );
 

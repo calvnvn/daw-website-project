@@ -3,6 +3,9 @@ const router = express.Router();
 const pageController = require("../controllers/pageController");
 const { upload, optimizeImage } = require("../middleware/upload");
 const { verifyToken, checkPermission } = require("../middleware/authJwt");
+const checkLock = require("../middleware/checkLock");
+const validate = require("../middleware/validate");
+const { pageSchema } = require("../schemas/pageSchema");
 
 // PUBLIC
 // Fetch single page record by URL slug
@@ -34,6 +37,7 @@ router.post(
   checkPermission("manage_content"),
   upload.single("heroImage"),
   optimizeImage,
+  validate(pageSchema),
   pageController.createPage,
 );
 
@@ -44,6 +48,7 @@ router.put(
   checkPermission("manage_content"),
   upload.single("heroImage"),
   optimizeImage,
+  validate(pageSchema),
   pageController.updatePage,
 );
 

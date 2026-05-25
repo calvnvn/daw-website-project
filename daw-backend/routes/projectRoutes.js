@@ -6,6 +6,8 @@ const multer = require("multer");
 const { upload, optimizeImage } = require("../middleware/upload");
 const checkLock = require("../middleware/checkLock");
 const Project = require("../models/Project");
+const validate = require("../middleware/validate");
+const { projectSchema } = require("../schemas/projectSchema");
 
 // PUBLIC
 // Fetch project portfolio for public display
@@ -63,6 +65,7 @@ router.post(
     });
   },
   optimizeImage,
+  validate(projectSchema),
   projectController.createProject,
 );
 
@@ -77,6 +80,7 @@ router.put(
     { name: "gallery", maxCount: 10 },
   ]),
   optimizeImage,
+  validate(projectSchema),
   projectController.updateProject,
 );
 

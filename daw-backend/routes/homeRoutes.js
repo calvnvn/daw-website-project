@@ -3,6 +3,8 @@ const router = express.Router();
 const homeController = require("../controllers/homeController");
 const { upload, optimizeImage } = require("../middleware/upload");
 const { verifyToken, checkPermission } = require("../middleware/authJwt");
+const validate = require("../middleware/validate");
+const { heroSchema, statSchema } = require("../schemas/homeSchema");
 
 // PUBLIC
 // Fetch aggregated homepage metadata
@@ -28,6 +30,7 @@ router.post(
   checkPermission("manage_homepage"),
   upload.single("image"),
   optimizeImage,
+  validate(heroSchema),
   homeController.createHeroSlide,
 );
 
@@ -38,6 +41,7 @@ router.put(
   checkPermission("manage_homepage"),
   upload.single("image"),
   optimizeImage,
+  validate(heroSchema),
   homeController.updateHeroSlide,
 );
 
@@ -55,6 +59,7 @@ router.post(
   verifyToken,
   checkPermission("manage_homepage"),
   upload.none(),
+  validate(statSchema),
   homeController.createStat,
 );
 
@@ -64,6 +69,7 @@ router.put(
   verifyToken,
   checkPermission("manage_homepage"),
   upload.none(),
+  validate(statSchema),
   homeController.updateStat,
 );
 

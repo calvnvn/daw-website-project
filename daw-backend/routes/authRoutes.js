@@ -2,10 +2,12 @@ const express = require("express");
 const router = express.Router();
 const authController = require("../controllers/authController");
 const { verifyToken } = require("../middleware/authJwt");
+const validate = require("../middleware/validate");
+const { loginSchema } = require("../schemas/authSchema");
 
 // PUBLIC
 // Authenticate user and synchronize identity
-router.post("/login", authController.login);
+router.post("/login", validate(loginSchema), authController.login);
 
 // AUTHENTICATED
 // Fetch session metadata and user profile

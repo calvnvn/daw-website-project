@@ -2,6 +2,8 @@ const express = require("express");
 const router = express.Router();
 const roleController = require("../controllers/roleController");
 const { verifyToken, checkPermission } = require("../middleware/authJwt");
+const validate = require("../middleware/validate");
+const { roleSchema } = require("../schemas/roleSchema");
 
 // ADMINISTRATIVE
 // Fetch all role definitions
@@ -17,6 +19,7 @@ router.post(
   "/",
   verifyToken,
   checkPermission("manage_users"),
+  validate(roleSchema),
   roleController.createRole,
 );
 
@@ -25,6 +28,7 @@ router.put(
   "/:id",
   verifyToken,
   checkPermission("manage_users"),
+  validate(roleSchema),
   roleController.updateRole,
 );
 

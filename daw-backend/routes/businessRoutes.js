@@ -2,6 +2,9 @@ const express = require("express");
 const router = express.Router();
 const businessController = require("../controllers/businessController");
 const { verifyToken, checkPermission } = require("../middleware/authJwt");
+const checkLock = require("../middleware/checkLock");
+const validate = require("../middleware/validate");
+const { businessSchema } = require("../schemas/businessSchema");
 const { upload, optimizeImage } = require("../middleware/upload");
 
 // PUBLIC
@@ -30,6 +33,8 @@ router.put(
   "/admin/:id",
   verifyToken,
   checkPermission("manage_businesses"),
+  checkLock(require("../models/BusinessSection")),
+  validate(businessSchema),
   businessController.updateBusinessSection,
 );
 

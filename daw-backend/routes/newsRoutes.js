@@ -6,6 +6,8 @@ const multer = require("multer");
 const { upload, optimizeImage } = require("../middleware/upload");
 const checkLock = require("../middleware/checkLock");
 const NewsArticle = require("../models/NewsArticle");
+const validate = require("../middleware/validate");
+const { newsSchema } = require("../schemas/newsSchema");
 
 // PUBLIC
 // Fetch published articles with pagination, search, and category filtering
@@ -58,6 +60,7 @@ router.post(
     });
   },
   optimizeImage,
+  validate(newsSchema),
   newsController.createNews,
 );
 
@@ -69,6 +72,7 @@ router.put(
   checkLock(NewsArticle),
   upload.fields([{ name: "cover_image", maxCount: 1 }]),
   optimizeImage,
+  validate(newsSchema),
   newsController.updateNews,
 );
 

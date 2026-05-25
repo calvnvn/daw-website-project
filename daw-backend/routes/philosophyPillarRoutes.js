@@ -2,6 +2,8 @@ const express = require("express");
 const router = express.Router();
 const philosophyPillarController = require("../controllers/philosophyPillarController");
 const { verifyToken, checkPermission } = require("../middleware/authJwt");
+const validate = require("../middleware/validate");
+const { philosophyPillarSchema } = require("../schemas/philosophySchema");
 
 // PUBLIC
 // Fetch organizational philosophy pillars and core values
@@ -13,6 +15,7 @@ router.post(
   "/",
   verifyToken,
   checkPermission("manage_about"),
+  validate(philosophyPillarSchema),
   philosophyPillarController.createPillar,
 );
 
@@ -21,6 +24,7 @@ router.put(
   "/:id",
   verifyToken,
   checkPermission("manage_about"),
+  validate(philosophyPillarSchema),
   philosophyPillarController.updatePillar,
 );
 
