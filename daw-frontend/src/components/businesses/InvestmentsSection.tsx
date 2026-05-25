@@ -68,7 +68,7 @@ export default function InvestmentsSection() {
           <ScrollReveal direction="up" delay={0}>
             <div className="space-y-6 mb-12">
               <h3 className="text-sm font-sans font-bold text-emerald-400 uppercase tracking-[0.2em]">
-                Diversified Investments
+                {t("ui.diversifiedInvestments", "Diversified Investments")}
               </h3>
               <p className="font-sans text-slate-300 text-[16px] leading-relaxed font-light">
                 {settings?.sectionIntro ||

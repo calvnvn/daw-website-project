@@ -203,14 +203,13 @@ export default function Footer() {
         <div className="border-t border-white/5 bg-[#040804]/50 backdrop-blur-sm">
           <div className="container mx-auto px-6 py-8 max-w-7xl flex flex-col md:flex-row justify-between items-center gap-6">
             <p className="text-[12px] text-slate-400 font-medium tracking-wide">
-              © {new Date().getFullYear()} PT Dharma Agung Wijaya.{" "}
-              {t("All rights reserved.")}
+              {t("ui.copyright", { year: new Date().getFullYear() })}
             </p>
 
             <button
               onClick={scrollToTop}
               className="group flex items-center gap-3 text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 hover:text-white transition-colors">
-              Back to Top
+              {t("ui.backToTop", "Back to Top")}
               <div className="w-10 h-10 rounded-full border border-white/10 flex items-center justify-center group-hover:border-daw-green group-hover:bg-daw-green transition-all shadow-lg">
                 <ChevronUp className="w-4 h-4 group-hover:-translate-y-1 transition-transform" />
               </div>

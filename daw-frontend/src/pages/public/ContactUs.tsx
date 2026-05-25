@@ -280,10 +280,7 @@ export default function ContactUs() {
                       {/* --- BAGIAN 1: SUBJECT (Trigger Utama) --- */}
                       <div className="space-y-2 relative z-20">
                         <label className="text-xs font-bold text-slate-500 uppercase tracking-widest">
-                          {t(
-                            "contactPage.form.subjectLabel",
-                            "Inquiry Subject",
-                          )}{" "}
+                          {t("contactPage.form.subject", "Inquiry Subject")}{" "}
                           <span className="text-daw-green">*</span>
                         </label>
                         <div className="relative">
@@ -424,13 +421,7 @@ export default function ContactUs() {
                             </div>
                             <div className="space-y-2">
                               <label className="text-xs font-bold text-slate-500 uppercase tracking-widest">
-                                {t(
-                                  "contactPage.form.company",
-                                  "Company / Organization",
-                                )}{" "}
-                                <span className="text-slate-400 font-normal lowercase tracking-normal">
-                                  (Optional)
-                                </span>
+                                {t("contactPage.form.company", "Company / Organization (Optional)")}
                               </label>
                               <input
                                 {...register("company")}

@@ -1,4 +1,30 @@
 {
+  "ui": {
+    "scroll": "Scroll to Explore",
+    "readMore": "Read More",
+    "backToTop": "Back to Top",
+    "copyright": "© {{year}} PT Dharma Agung Wijaya. All rights reserved.",
+    "discoverOurWork": "Discover Our Work",
+    "diversifiedInvestments": "Diversified Investments",
+    "gallery": "GALLERY",
+    "otherPosts": "Other Posts",
+    "viewAllNews": "View All News",
+    "backToDirectory": "Back to Directory",
+    "relatedProjects": "Related Projects",
+    "enlarge": "Enlarge",
+    "noOtherProjects": "No other projects in this sector.",
+    "projectNotFound": "Project Not Found",
+    "returnToOurBusinesses": "Return to Our Businesses",
+    "portfolio": "Portfolio"
+  },
+  "newsPage": {
+    "allCategories": "All Categories",
+    "latestRelease": "Latest Release",
+    "oldestFirst": "Oldest First",
+    "mostPopular": "Most Popular",
+    "searchPlaceholder": "Search articles, topics...",
+    "noArticles": "No articles found in this category."
+  },
   "nav": {
     "home": "Home",
     "about": "About Us",
@@ -264,13 +290,17 @@
       "title": "Contact Form",
       "name": "Full Name",
       "namePlaceholder": "Enter your name",
-      "email": "Official Email",
+      "email": "Email Address",
       "emailPlaceholder": "Enter your email address",
       "phone": "Phone Number",
       "phonePlaceholder": "Enter your contact number",
+      "company": "Company / Organization (Optional)",
+      "companyPlaceholder": "Enter your company name",
+      "subject": "Inquiry Subject",
+      "subjectPlaceholder": "Select a subject",
       "message": "Message Body",
       "messagePlaceholder": "State the purpose of your inquiry clearly",
-      "submit": "Send us an email",
+      "submit": "Send Message",
       "sending": "Transmitting message...",
       "success": "Message sent. We will respond shortly."
     }

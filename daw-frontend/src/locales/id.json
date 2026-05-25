@@ -1,4 +1,30 @@
 {
+  "ui": {
+    "scroll": "Gulir untuk Menjelajah",
+    "readMore": "Baca Selengkapnya",
+    "backToTop": "Kembali ke Atas",
+    "copyright": "© {{year}} PT Dharma Agung Wijaya. Hak Cipta Dilindungi.",
+    "discoverOurWork": "Jelajahi Karya Kami",
+    "diversifiedInvestments": "Investasi Terdiversifikasi",
+    "gallery": "GALERI",
+    "otherPosts": "Postingan Lainnya",
+    "viewAllNews": "Lihat Semua Berita",
+    "backToDirectory": "Kembali ke Direktori",
+    "relatedProjects": "Proyek Terkait",
+    "enlarge": "Perbesar",
+    "noOtherProjects": "Tidak ada proyek lain di sektor ini.",
+    "projectNotFound": "Proyek Tidak Ditemukan",
+    "returnToOurBusinesses": "Kembali ke Unit Bisnis Kami",
+    "portfolio": "Portofolio"
+  },
+  "newsPage": {
+    "allCategories": "Semua Kategori",
+    "latestRelease": "Rilis Terbaru",
+    "oldestFirst": "Paling Lama",
+    "mostPopular": "Paling Populer",
+    "searchPlaceholder": "Cari artikel, topik...",
+    "noArticles": "Tidak ada artikel ditemukan pada kategori ini."
+  },
   "nav": {
     "home": "Beranda",
     "about": "Tentang Kami",
@@ -265,15 +291,19 @@
       "title": "Formulir Kontak",
       "name": "Nama Lengkap",
       "namePlaceholder": "Masukkan nama Anda",
-      "email": "Email Resmi",
+      "email": "Alamat Email",
       "emailPlaceholder": "Masukkan alamat email Anda",
       "phone": "Nomor Telepon",
       "phonePlaceholder": "Masukkan nomor kontak Anda",
+      "company": "Perusahaan / Organisasi (Opsional)",
+      "companyPlaceholder": "Masukkan nama perusahaan Anda",
+      "subject": "Subjek Pertanyaan",
+      "subjectPlaceholder": "Pilih subjek",
       "message": "Isi Pesan",
-      "messagePlaceholder": "Sampaikan tujuan pesan Anda secara jelas",
-      "submit": "Kirim email kepada kami",
-      "sending": "Mengirimkan pesan...",
-      "success": "Pesan terkirim. Kami akan segera merespons Anda."
+      "messagePlaceholder": "Sebutkan tujuan pertanyaan Anda dengan jelas",
+      "submit": "Kirim Pesan",
+      "sending": "Mengirim pesan...",
+      "success": "Pesan terkirim. Kami akan segera merespons."
     }
   }
 }

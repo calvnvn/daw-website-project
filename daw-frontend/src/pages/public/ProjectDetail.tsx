@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useMemo } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import {
   ArrowLeft,
   ChevronRight,
@@ -33,6 +34,7 @@ interface ProjectData {
 }
 
 export default function ProjectDetail() {
+  const { t } = useTranslation();
   const { slug } = useParams<{ slug: string }>();
   const navigate = useNavigate();
 
@@ -176,12 +178,12 @@ export default function ProjectDetail() {
     return (
       <div className="min-h-[60vh] flex flex-col items-center justify-center space-y-4">
         <h2 className="text-2xl font-serif text-slate-800">
-          Project Not Found
+          {t("ui.projectNotFound", "Project Not Found")}
         </h2>
         <button
           onClick={() => navigate("/businesses")}
           className="text-daw-green hover:underline">
-          Return to Our Businesses
+          {t("ui.returnToOurBusinesses", "Return to Our Businesses")}
         </button>
       </div>
     );
@@ -237,7 +239,7 @@ export default function ProjectDetail() {
           <div className="relative z-10 text-center px-6 mt-16 max-w-5xl mx-auto animate-in fade-in slide-in-from-bottom-12 duration-1000">
             <ScrollReveal direction="up" delay={0}>
               <p className="text-sm md:text-base text-white/80 font-bold tracking-[0.2em] uppercase mb-4">
-                {sectorLookup[project.category] || project.category} Portfolio
+                {sectorLookup[project.category] || project.category} {t("ui.portfolio", "Portfolio")}
               </p>
               <h1 className="text-5xl md:text-7xl lg:text-8xl font-serif font-bold text-white tracking-tight drop-shadow-lg mb-10 leading-[1.1]">
                 {project.title}
@@ -255,7 +257,7 @@ export default function ProjectDetail() {
           </div>
           <div className="absolute bottom-12 left-1/2 -translate-x-1/2 flex flex-col items-center gap-2 text-white/50 animate-bounce">
             <span className="text-[10px] font-bold tracking-widest uppercase">
-              Scroll to Explore
+              {t("ui.scroll", "Scroll to Explore")}
             </span>
             <ChevronRight className="rotate-90 w-4 h-4" />
           </div>
@@ -298,7 +300,7 @@ export default function ProjectDetail() {
                   onClick={() => navigate("/businesses")}
                   className="group flex items-center gap-2 text-slate-500 hover:text-daw-green font-bold text-xs uppercase tracking-[0.2em] mb-10 transition-all">
                   <ArrowLeft className="w-4 h-4 group-hover:-translate-x-2 transition-transform duration-300" />
-                  Back To Directory
+                  {t("ui.backToDirectory", "Back To Directory")}
                 </button>
 
                 <h1 className="text-3xl md:text-5xl lg:text-[54px] font-serif font-bold text-slate-900 leading-[1.15] tracking-tight mb-8">
@@ -363,7 +365,7 @@ export default function ProjectDetail() {
                 <ScrollReveal direction="up" delay={300}>
                   <div className="pt-12 mt-16 border-t border-slate-200">
                     <h4 className="font-serif text-3xl font-bold text-slate-900 mb-8">
-                      Galeri Proyek
+                      {t("ui.gallery", "GALLERY")}
                     </h4>
                     <div className="grid grid-cols-2 md:grid-cols-3 gap-4 md:gap-6">
                       {galleryUrls.map((imgUrl, idx) => (
@@ -378,7 +380,7 @@ export default function ProjectDetail() {
                           />
                           <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-colors duration-300 flex items-center justify-center backdrop-blur-[2px] opacity-0 group-hover:opacity-100">
                             <span className="text-white bg-daw-green/90 px-5 py-2 rounded-full text-xs font-bold tracking-widest uppercase shadow-md transform translate-y-4 group-hover:translate-y-0 transition-all duration-300">
-                              Enlarge
+                              {t("ui.enlarge", "Enlarge")}
                             </span>
                           </div>
                         </div>
@@ -394,7 +396,7 @@ export default function ProjectDetail() {
               <ScrollReveal direction="left" delay={200}>
                 <div className="bg-white border border-slate-200 rounded-[2rem] p-8 shadow-sm hover:shadow-md transition-shadow duration-300">
                   <h3 className="font-serif text-2xl font-bold text-slate-900 mb-6 border-b border-slate-100 pb-5">
-                    Related Projects
+                    {t("ui.relatedProjects", "Related Projects")}
                   </h3>
 
                   {relatedProjects.length > 0 ? (
@@ -428,7 +430,7 @@ export default function ProjectDetail() {
                     </div>
                   ) : (
                     <p className="text-sm text-slate-500 italic">
-                      No other projects in this sector.
+                      {t("ui.noOtherProjects", "No other projects in this sector.")}
                     </p>
                   )}
                 </div>

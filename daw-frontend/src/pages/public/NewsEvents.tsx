@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { Link } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import {
   ArrowRight,
   Calendar,
@@ -53,6 +54,7 @@ interface PaginationData {
 }
 
 export default function NewsEvents() {
+  const { t } = useTranslation();
   const [articles, setArticles] = useState<Article[]>([]);
   const [categories, setCategories] = useState<CategoryData[]>([]);
   const [trendingKeywords, setTrendingKeywords] = useState<string[]>([]);
@@ -219,7 +221,7 @@ export default function NewsEvents() {
               <button
                 onClick={() => setActiveCategory("All")}
                 className={`px-5 py-2.5 rounded-full text-[10px] sm:text-xs font-black uppercase tracking-widest transition-all whitespace-nowrap ${activeCategory === "All" ? "bg-daw-green text-white shadow-md shadow-green-900/20 scale-105" : "bg-slate-50 text-slate-500 hover:bg-slate-100 hover:text-slate-800"}`}>
-                All Categories
+                {t("newsPage.allCategories", "All Categories")}
               </button>
               {categories.map((cat) => (
                 <button
@@ -243,7 +245,7 @@ export default function NewsEvents() {
                 <div className="relative">
                   <input
                     type="text"
-                    placeholder="Search articles, topics..."
+                    placeholder={t("newsPage.searchPlaceholder", "Search articles, topics...")}
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                     className="w-full bg-slate-50 border border-slate-200 rounded-full py-3.5 pl-12 pr-10 text-sm text-slate-700 focus:outline-none focus:ring-4 focus:ring-daw-green/10 focus:border-daw-green hover:border-slate-300 transition-all shadow-inner"
@@ -290,10 +292,10 @@ export default function NewsEvents() {
                   <SlidersHorizontal className="w-3.5 h-3.5" />
                   <span className="hidden sm:inline">
                     {sortBy === "latest"
-                      ? "Latest"
+                      ? t("newsPage.latestRelease", "Latest Release")
                       : sortBy === "oldest"
-                        ? "Oldest"
-                        : "Popular"}
+                        ? t("newsPage.oldestFirst", "Oldest First")
+                        : t("newsPage.mostPopular", "Most Popular")}
                   </span>
                   <ChevronDown
                     className={`w-3.5 h-3.5 transition-transform duration-300 ${isSortOpen ? "rotate-180" : ""}`}
@@ -304,9 +306,9 @@ export default function NewsEvents() {
                   <div className="absolute right-0 mt-2.5 w-52 bg-white border border-slate-100 rounded-2xl shadow-[0_10px_40px_-10px_rgba(0,0,0,0.12)] z-50 p-2 animate-in fade-in slide-in-from-top-2 duration-200">
                     {(
                       [
-                        { value: "latest", label: "Latest Release" },
-                        { value: "oldest", label: "Oldest First" },
-                        { value: "popular", label: "Most Popular" },
+                        { value: "latest", label: t("newsPage.latestRelease", "Latest Release") },
+                        { value: "oldest", label: t("newsPage.oldestFirst", "Oldest First") },
+                        { value: "popular", label: t("newsPage.mostPopular", "Most Popular") },
                       ] as const
                     ).map((opt) => (
                       <button
@@ -403,7 +405,7 @@ export default function NewsEvents() {
                         </p>
 
                         <div className="inline-flex items-center justify-center px-6 py-3.5 bg-daw-green hover:bg-emerald-600 text-white text-xs font-black uppercase tracking-widest rounded-xl transition-all shadow-lg shadow-daw-green/20 group-hover:shadow-daw-green/40">
-                          Read Full Article{" "}
+                          {t("ui.readMore", "Read Full Article")}{" "}
                           <ArrowRight className="w-4 h-4 ml-2 group-hover:translate-x-1.5 transition-transform" />
                         </div>
                       </div>
@@ -418,12 +420,12 @@ export default function NewsEvents() {
                   <div className="text-center text-slate-400 py-32 border-2 border-dashed border-slate-100 rounded-3xl">
                     <Filter className="w-12 h-12 mx-auto mb-4 opacity-20" />
                     <p className="font-bold">
-                      No articles found in this category.
+                      {t("newsPage.noArticles", "No articles found in this category.")}
                     </p>
                     <button
                       onClick={() => setActiveCategory("All")}
                       className="text-daw-green text-sm underline mt-2">
-                      Clear all filters
+                      {t("newsPage.clearFilters", "Clear all filters")}
                     </button>
                   </div>
                 ) : (
@@ -500,7 +502,7 @@ export default function NewsEvents() {
 
                             {/* Read Article Link */}
                             <div className="mt-auto flex items-center text-[10px] md:text-xs font-black uppercase tracking-widest text-daw-green pt-2 md:pt-6 border-t border-slate-50/50">
-                              Read Article{" "}
+                              {t("ui.readMore", "Read Article")}{" "}
                               <ArrowRight className="w-3 h-3 md:w-4 md:h-4 ml-1 md:ml-2 group-hover:translate-x-1.5 transition-transform" />
                             </div>
                           </div>

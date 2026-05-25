@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import {
   Calendar,
   Share2,
@@ -81,6 +82,7 @@ const ScrollProgressBar = () => {
 };
 
 export default function NewsEventDetail() {
+  const { t } = useTranslation();
   const { slug } = useParams();
   const navigate = useNavigate();
   const [article, setArticle] = useState<ArticleDetail | null>(null);
@@ -367,7 +369,7 @@ export default function NewsEventDetail() {
                 <div className="mt-8 pt-8 border-t border-slate-100 animate-in fade-in duration-700">
                   <h3 className="text-2xl font-serif font-bold text-slate-900 mb-8 flex items-center gap-3">
                     <span className="w-8 h-1 bg-daw-green rounded-full" />
-                    GALLERY
+                    {t("ui.gallery", "GALLERY")}
                   </h3>
 
                   {/* 1 PHOTO LAYOUT */}
@@ -592,7 +594,7 @@ export default function NewsEventDetail() {
                     type="text"
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
-                    placeholder="Search articles..."
+                    placeholder={t("newsPage.searchPlaceholder", "Search articles...")}
                     className="w-full bg-white border border-slate-200 rounded-full py-3.5 pl-5 pr-12 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-daw-green/20 focus:border-daw-green transition-all"
                   />
                   <button
@@ -655,7 +657,7 @@ export default function NewsEventDetail() {
               <div className="p-6 md:p-8 bg-slate-50 rounded-2xl md:rounded-3xl border border-slate-100">
                 <h4 className="text-xl font-serif font-bold text-slate-900 mb-6 flex items-center gap-3">
                   <span className="w-6 h-1 bg-daw-green rounded-full" />
-                  Other Posts
+                  {t("ui.otherPosts", "Other Posts")}
                 </h4>
                 <div className="flex flex-col gap-6">
                   {otherPosts.map((post) => (
@@ -698,7 +700,7 @@ export default function NewsEventDetail() {
                     to="/news"
                     className="flex items-center justify-between p-4 bg-white rounded-xl border border-slate-200 hover:border-daw-green hover:shadow-md transition-all group">
                     <span className="text-xs font-bold uppercase tracking-wider text-slate-700 group-hover:text-daw-green transition-colors">
-                      View All News
+                      {t("ui.viewAllNews", "View All News")}
                     </span>
                     <ChevronRight className="w-4 h-4 text-slate-300 group-hover:text-daw-green group-hover:translate-x-1 transition-transform" />
                   </Link>

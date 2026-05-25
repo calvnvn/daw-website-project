@@ -4,6 +4,7 @@ import InteractiveMap, { type MapMarker } from "./InteractiveMap";
 import { useMemo, memo } from "react";
 import { useBusiness } from "@/contexts/BusinessContext";
 import { Loader2 } from "lucide-react"; // Pastikan icon ini di-import
+import { useTranslation } from "react-i18next";
 
 export interface SectionData {
   id: string;
@@ -22,6 +23,7 @@ const DynamicBusinessSection = memo(
     data: SectionData | null | undefined; // 1. TS FIX: Izinkan null/undefined
   }) {
     const { categories, publicProjects } = useBusiness();
+    const { t } = useTranslation();
 
     // 2. GUARD CLAUSE: Mencegah White Screen of Death (Crash)
     if (!data) {
@@ -126,7 +128,7 @@ const DynamicBusinessSection = memo(
                 <div className="flex items-center justify-center gap-4 mb-4">
                   <span className="w-16 h-[2px] bg-gradient-to-l from-daw-green to-transparent rounded-l-full"></span>
                   <h3 className="text-[11px] md:text-xs font-extrabold text-slate-400 uppercase tracking-[0.3em]">
-                    Discover Our Work
+                    {t("ui.discoverOurWork", "Discover Our Work")}
                   </h3>
                   <span className="w-16 h-[2px] bg-gradient-to-r from-daw-green to-transparent rounded-r-full"></span>
                 </div>
