@@ -1,7 +1,6 @@
 import { Routes, Route } from "react-router-dom";
 import { lazy, Suspense } from "react";
 import { Toaster } from "sonner";
-import { AuthProvider } from "./contexts/AuthContext";
 import ProtectedRoute from "./components/ProtectedRoute";
 
 /**
@@ -78,7 +77,7 @@ const PageLoader = () => (
 
 function App() {
   return (
-    <AuthProvider>
+    <>
       <Toaster position="top-center" richColors />
       <Suspense fallback={<PageLoader />}>
         <Routes>
@@ -161,7 +160,7 @@ function App() {
           </Route>
         </Routes>
       </Suspense>
-    </AuthProvider>
+    </>
   );
 }
 
