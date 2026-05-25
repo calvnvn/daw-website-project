@@ -4,13 +4,14 @@ const inquiryController = require("../controllers/inquiryController");
 const { verifyToken, checkPermission } = require("../middleware/authJwt");
 const validate = require("../middleware/validate");
 const { createInquirySchema } = require("../schemas/inquirySchema");
+const { inquiryLimiter } = require("../middleware/rateLimiter");
 
 // PUBLIC
 // Fetch active inquiry categories for form selection
 router.get("/subjects/active", inquiryController.getActiveSubjects);
 
 // Initialize a new contact inquiry and dispatch notification
-router.post("/", validate(createInquirySchema), inquiryController.submitInquiry);
+router.post("/", inquiryLimiter, validate(createInquirySchema), inquiryController.submitInquiry);
 
 // ADMINISTRATIVE
 // Retrieve all inquiry categories including inactive records

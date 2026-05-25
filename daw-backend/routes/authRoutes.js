@@ -4,10 +4,11 @@ const authController = require("../controllers/authController");
 const { verifyToken } = require("../middleware/authJwt");
 const validate = require("../middleware/validate");
 const { loginSchema } = require("../schemas/authSchema");
+const { authLimiter } = require("../middleware/rateLimiter");
 
 // PUBLIC
 // Authenticate user and synchronize identity
-router.post("/login", validate(loginSchema), authController.login);
+router.post("/login", authLimiter, validate(loginSchema), authController.login);
 
 // AUTHENTICATED
 // Fetch session metadata and user profile

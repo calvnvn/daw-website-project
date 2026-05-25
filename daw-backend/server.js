@@ -4,20 +4,20 @@ require("dotenv").config();
 const { z } = require("zod");
 const envSchema = z.object({
   DB_NAME: z
-    .string({ required_error: "DB_NAME wajib didefinisikan di .env" })
-    .min(1, "DB_NAME tidak boleh kosong"),
+    .string({ required_error: "DB_NAME must be defined in .env" })
+    .min(1, "DB_NAME cannot be empty"),
   DB_USER: z
-    .string({ required_error: "DB_USER wajib didefinisikan di .env" })
-    .min(1, "DB_USER tidak boleh kosong"),
+    .string({ required_error: "DB_USER must be defined in .env" })
+    .min(1, "DB_USER cannot be empty"),
   DB_HOST: z
-    .string({ required_error: "DB_HOST wajib didefinisikan di .env" })
-    .min(1, "DB_HOST tidak boleh kosong"),
+    .string({ required_error: "DB_HOST must be defined in .env" })
+    .min(1, "DB_HOST cannot be empty"),
   JWT_SECRET: z
-    .string({ required_error: "JWT_SECRET wajib didefinisikan di .env" })
-    .min(1, "JWT_SECRET tidak boleh kosong"),
+    .string({ required_error: "JWT_SECRET must be defined in .env" })
+    .min(1, "JWT_SECRET cannot be empty"),
   CMS_APPROVAL_CODE: z
-    .string({ required_error: "CMS_APPROVAL_CODE wajib didefinisikan di .env" })
-    .min(1, "CMS_APPROVAL_CODE tidak boleh kosong"),
+    .string({ required_error: "CMS_APPROVAL_CODE must be defined in .env" })
+    .min(1, "CMS_APPROVAL_CODE cannot be empty"),
   JWT_EXPIRES_IN: z
     .string()
     .optional()
@@ -31,7 +31,7 @@ try {
   );
 } catch (error) {
   console.error(
-    "\n🚨 [FATAL INITIALIZATION ERROR]: Konfigurasi Environment (.env) bermasalah!",
+    "\n🚨 [FATAL INITIALIZATION ERROR]: Environment configuration (.env) is invalid!",
   );
   console.error(
     "=========================================================================",
@@ -43,13 +43,14 @@ try {
     "=========================================================================",
   );
   console.error(
-    "Aplikasi dihentikan secara paksa untuk menghindari silent failures.\n",
+    "Application terminated immediately to prevent silent failures.\n",
   );
   process.exit(1);
 }
 
 const express = require("express");
 const cors = require("cors");
+const helmet = require("helmet");
 const yaml = require("js-yaml");
 const fs = require("fs");
 const path = require("path");
@@ -116,9 +117,22 @@ const Achievement = require("./models/Achievement");
 const NewsCategory = require("./models/NewsCategory");
 const NewsArticle = require("./models/NewsArticle");
 
+const { globalLimiter } = require("./middleware/rateLimiter");
+
 const app = express();
 
 // MIDDLEWARE: Security & Request Parsing
+// 1. Helmet (HTTP Security Headers)
+app.use(
+  helmet({
+    // Allow frontend (different port/domain) to render images from /uploads
+    crossOriginResourcePolicy: { policy: "cross-origin" },
+  })
+);
+
+// 2. Global Rate Limiter (Applied to all API routes)
+app.use("/api", globalLimiter);
+
 const corsOptions = {
   origin: process.env.FRONTEND_URL || "http://localhost:5173",
   methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
@@ -133,7 +147,7 @@ app.use(express.urlencoded({ limit: "50mb", extended: true }));
 const uploadPath = path.join(process.cwd(), "public", "uploads");
 if (!fs.existsSync(uploadPath)) {
   console.warn(
-    "Folder uploads tidak ditemukan. Membuat folder baru di:",
+    "Uploads directory not found. Creating a new one at:",
     uploadPath,
   );
   fs.mkdirSync(uploadPath, { recursive: true });
@@ -233,7 +247,7 @@ try {
 
   // console.log("Swagger Docs loaded from openapi.yaml");
 } catch (e) {
-  console.error("Gagal memuat file Swagger YAML:", e.message);
+  console.error("Failed to load Swagger YAML file:", e.message);
 }
 
 // REFERENCE GATHERING: Relational Mapping
