@@ -310,13 +310,17 @@ exports.createNews = async (req, res) => {
         { transaction: t },
       );
 
-      await ErpApprovalService.initiateApproval({
-        notrans,
-        karyawanId: actorId,
-        token: req.owl_token,
-      });
-
       await t.commit();
+
+      try {
+        await ErpApprovalService.initiateApproval({
+          notrans,
+          karyawanId: actorId,
+          token: req.owl_token,
+        });
+      } catch (owlError) {
+        console.error("🚨 [ERP SYNC FAILED]:", owlError.message);
+      }
       
       // Trigger AI translation in background (Non-blocking)
       triggerBackgroundTranslation(newArticle.id, payload);
@@ -417,13 +421,17 @@ exports.updateNews = async (req, res) => {
         { transaction: t },
       );
 
-      await ErpApprovalService.initiateApproval({
-        notrans,
-        karyawanId: actorId,
-        token: req.owl_token,
-      });
-
       await t.commit();
+
+      try {
+        await ErpApprovalService.initiateApproval({
+          notrans,
+          karyawanId: actorId,
+          token: req.owl_token,
+        });
+      } catch (owlError) {
+        console.error("🚨 [ERP SYNC FAILED]:", owlError.message);
+      }
 
       // Trigger AI translation in background (Non-blocking)
       triggerBackgroundTranslation(id, payload);
@@ -512,13 +520,17 @@ exports.deleteNews = async (req, res) => {
         { transaction: t },
       );
 
-      await ErpApprovalService.initiateApproval({
-        notrans,
-        karyawanId: actorId,
-        token: req.owl_token,
-      });
-
       await t.commit();
+
+      try {
+        await ErpApprovalService.initiateApproval({
+          notrans,
+          karyawanId: actorId,
+          token: req.owl_token,
+        });
+      } catch (owlError) {
+        console.error("🚨 [ERP SYNC FAILED]:", owlError.message);
+      }
       return res
         .status(202)
         .json({ message: "Permintaan hapus dikirim.", ticket: notrans });

@@ -170,11 +170,15 @@ export default function NewsForm() {
             published_at: data.published_at
               ? new Date(data.published_at).toISOString().slice(0, 16)
               : "",
-            gallery_images: Array.isArray(data.gallery_images) ? data.gallery_images : [],
+            gallery_images: Array.isArray(data.gallery_images)
+              ? data.gallery_images
+              : [],
           };
           setFormData(normalized);
           setOriginalData(normalized);
-          setGalleryImages(Array.isArray(data.gallery_images) ? data.gallery_images : []);
+          setGalleryImages(
+            Array.isArray(data.gallery_images) ? data.gallery_images : [],
+          );
         } else if (articleRes.reason.name !== "CanceledError") {
           throw articleRes.reason;
         }
@@ -329,7 +333,11 @@ export default function NewsForm() {
       // @ts-expect-error dynamic access
       if (formData[key] !== originalData[key]) return true;
     }
-    if (JSON.stringify(galleryImages) !== JSON.stringify(originalData.gallery_images)) return true;
+    if (
+      JSON.stringify(galleryImages) !==
+      JSON.stringify(originalData.gallery_images)
+    )
+      return true;
     return false;
   };
 
@@ -424,14 +432,20 @@ export default function NewsForm() {
     onDropRejected: () => setIsDragging(false),
   });
 
-  const { getRootProps: getGalleryProps, getInputProps: getGalleryInputProps, isDragActive: isGalleryDragging } = useDropzone({
+  const {
+    getRootProps: getGalleryProps,
+    getInputProps: getGalleryInputProps,
+    isDragActive: isGalleryDragging,
+  } = useDropzone({
     disabled: shouldLockUI || isUploadingGallery,
     onDrop: async (files) => {
-      const validFiles = files.filter(f => f.type.startsWith("image/"));
+      const validFiles = files.filter((f) => f.type.startsWith("image/"));
       if (validFiles.length === 0) return;
-      
+
       setIsUploadingGallery(true);
-      const loadingToast = toast.loading(`Mengunggah ${validFiles.length} foto galeri...`);
+      const loadingToast = toast.loading(
+        `Mengunggah ${validFiles.length} foto galeri...`,
+      );
       const newImages: GalleryImage[] = [];
       let startIdx = galleryImages.length;
 
@@ -440,26 +454,32 @@ export default function NewsForm() {
           const compressed = await compressImage(file);
           const uploadData = new FormData();
           uploadData.append("inline_image", compressed);
-          
+
           const response = await api.post("/news/upload-inline", uploadData);
           if (response.data?.url) {
             newImages.push({
               imageUrl: response.data.url,
               caption: "",
-              orderIndex: startIdx++
+              orderIndex: startIdx++,
             });
           }
         }
-        
+
         if (newImages.length > 0) {
-          setGalleryImages(prev => [...prev, ...newImages]);
-          toast.success(`Berhasil menambahkan ${newImages.length} foto!`, { id: loadingToast });
+          setGalleryImages((prev) => [...prev, ...newImages]);
+          toast.success(`Berhasil menambahkan ${newImages.length} foto!`, {
+            id: loadingToast,
+          });
         } else {
-          toast.error("Tidak ada foto yang berhasil diunggah.", { id: loadingToast });
+          toast.error("Tidak ada foto yang berhasil diunggah.", {
+            id: loadingToast,
+          });
         }
       } catch (err) {
         console.error("Gallery upload error", err);
-        toast.error("Sebagian upload galeri gagal. Periksa koneksi Anda.", { id: loadingToast });
+        toast.error("Sebagian upload galeri gagal. Periksa koneksi Anda.", {
+          id: loadingToast,
+        });
       } finally {
         setIsUploadingGallery(false);
       }
@@ -467,17 +487,17 @@ export default function NewsForm() {
     accept: { "image/jpeg": [], "image/png": [], "image/webp": [] },
   });
 
-  const moveGalleryImage = (index: number, direction: 'left' | 'right') => {
+  const moveGalleryImage = (index: number, direction: "left" | "right") => {
     if (shouldLockUI) return;
-    const newIndex = direction === 'left' ? index - 1 : index + 1;
+    const newIndex = direction === "left" ? index - 1 : index + 1;
     if (newIndex < 0 || newIndex >= galleryImages.length) return;
-    
-    setGalleryImages(prev => {
+
+    setGalleryImages((prev) => {
       const newArr = [...prev];
       const temp = newArr[index];
       newArr[index] = newArr[newIndex];
       newArr[newIndex] = temp;
-      
+
       // Update orderIndex
       return newArr.map((img, i) => ({ ...img, orderIndex: i }));
     });
@@ -485,7 +505,7 @@ export default function NewsForm() {
 
   const removeGalleryImage = (index: number) => {
     if (shouldLockUI) return;
-    setGalleryImages(prev => {
+    setGalleryImages((prev) => {
       const newArr = [...prev];
       newArr.splice(index, 1);
       return newArr.map((img, i) => ({ ...img, orderIndex: i }));
@@ -494,7 +514,7 @@ export default function NewsForm() {
 
   const updateGalleryCaption = (index: number, caption: string) => {
     if (shouldLockUI) return;
-    setGalleryImages(prev => {
+    setGalleryImages((prev) => {
       const newArr = [...prev];
       newArr[index].caption = caption;
       return newArr;
@@ -1128,7 +1148,9 @@ export default function NewsForm() {
                         {isUploadingGallery ? (
                           <RefreshCw className="w-6 h-6 animate-spin" />
                         ) : (
-                          <UploadCloud className={`w-6 h-6 ${isGalleryDragging ? "animate-bounce" : ""}`} />
+                          <UploadCloud
+                            className={`w-6 h-6 ${isGalleryDragging ? "animate-bounce" : ""}`}
+                          />
                         )}
                       </div>
                       <div className="text-center">
@@ -1159,11 +1181,17 @@ export default function NewsForm() {
 
                         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
                           {galleryImages.map((img, idx) => (
-                            <div key={idx} className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm hover:shadow-md transition-shadow group flex flex-col">
+                            <div
+                              key={idx}
+                              className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm hover:shadow-md transition-shadow group flex flex-col">
                               {/* Thumbnail Header */}
                               <div className="relative h-36 bg-slate-100 border-b border-slate-100">
                                 <img
-                                  src={img.imageUrl.startsWith("http") ? img.imageUrl : `${BASE_UPLOAD_URL}/${img.imageUrl}`}
+                                  src={
+                                    img.imageUrl.startsWith("http")
+                                      ? img.imageUrl
+                                      : `${BASE_UPLOAD_URL}/${img.imageUrl}`
+                                  }
                                   alt={`Gallery ${idx}`}
                                   className="w-full h-full object-cover"
                                 />
@@ -1175,34 +1203,42 @@ export default function NewsForm() {
                                     <button
                                       type="button"
                                       disabled={idx === 0}
-                                      onClick={() => moveGalleryImage(idx, 'left')}
+                                      onClick={() =>
+                                        moveGalleryImage(idx, "left")
+                                      }
                                       className="p-1.5 bg-white text-slate-700 hover:text-daw-green rounded-lg shadow disabled:opacity-50"
-                                      title="Geser Kiri"
-                                    >
+                                      title="Geser Kiri">
                                       <ChevronLeft className="w-3.5 h-3.5" />
                                     </button>
                                     <button
                                       type="button"
-                                      disabled={idx === galleryImages.length - 1}
-                                      onClick={() => moveGalleryImage(idx, 'right')}
+                                      disabled={
+                                        idx === galleryImages.length - 1
+                                      }
+                                      onClick={() =>
+                                        moveGalleryImage(idx, "right")
+                                      }
                                       className="p-1.5 bg-white text-slate-700 hover:text-daw-green rounded-lg shadow disabled:opacity-50 rotate-180"
-                                      title="Geser Kanan"
-                                    >
+                                      title="Geser Kanan">
                                       <ChevronLeft className="w-3.5 h-3.5" />
                                     </button>
                                   </div>
                                 )}
                               </div>
-                              
+
                               {/* Metadata Body */}
                               <div className="p-3 flex-1 flex flex-col gap-3">
                                 <div className="space-y-1">
-                                  <label className="text-[9px] font-black uppercase tracking-widest text-slate-400">Caption Hover</label>
+                                  <label className="text-[9px] font-black uppercase tracking-widest text-slate-400">
+                                    Caption Hover
+                                  </label>
                                   <textarea
                                     disabled={shouldLockUI}
                                     maxLength={150}
                                     value={img.caption || ""}
-                                    onChange={(e) => updateGalleryCaption(idx, e.target.value)}
+                                    onChange={(e) =>
+                                      updateGalleryCaption(idx, e.target.value)
+                                    }
                                     placeholder="Opsional keterangan foto..."
                                     className="w-full text-xs p-2 rounded-lg bg-slate-50 border border-slate-200 outline-none resize-none focus:bg-white focus:border-daw-green transition-colors disabled:opacity-60 disabled:bg-slate-100"
                                     rows={2}
@@ -1212,9 +1248,9 @@ export default function NewsForm() {
                                   <button
                                     type="button"
                                     onClick={() => removeGalleryImage(idx)}
-                                    className="w-full py-1.5 text-[10px] font-bold text-red-500 hover:text-red-600 hover:bg-red-50 rounded-lg flex items-center justify-center gap-1 transition-colors"
-                                  >
-                                    <Trash2 className="w-3 h-3" /> Hapus dari Galeri
+                                    className="w-full py-1.5 text-[10px] font-bold text-red-500 hover:text-red-600 hover:bg-red-50 rounded-lg flex items-center justify-center gap-1 transition-colors">
+                                    <Trash2 className="w-3 h-3" /> Hapus dari
+                                    Galeri
                                   </button>
                                 )}
                               </div>
@@ -1318,9 +1354,12 @@ export default function NewsForm() {
                         if (!rawHtml.trim()) {
                           return "<p class='text-slate-300 italic'>Konten akan muncul di sini...</p>";
                         }
-                        
-                        const sanitized = rawHtml.replace(/&nbsp;|\u00A0/g, " ");
-                        
+
+                        const sanitized = rawHtml.replace(
+                          /&nbsp;|\u00A0/g,
+                          " ",
+                        );
+
                         // Helper generator untuk HTML kartu putar premium
                         const getPremiumPlayCard = (videoId: string) => {
                           return `
@@ -1351,18 +1390,26 @@ export default function NewsForm() {
                         };
 
                         let processedHtml = sanitized;
-                        
+
                         // 1. Ubah tag iframe youtube bawaan editor menjadi kartu premium
-                        const iframeRegex = /<iframe[^>]*src="[^"]*youtube\.com\/embed\/([^"?\s>]+)[^"]*"[^>]*><\/iframe>/g;
-                        processedHtml = processedHtml.replace(iframeRegex, (match, videoId) => {
-                          return getPremiumPlayCard(videoId);
-                        });
+                        const iframeRegex =
+                          /<iframe[^>]*src="[^"]*youtube\.com\/embed\/([^"?\s>]+)[^"]*"[^>]*><\/iframe>/g;
+                        processedHtml = processedHtml.replace(
+                          iframeRegex,
+                          (videoId) => {
+                            return getPremiumPlayCard(videoId);
+                          },
+                        );
 
                         // 2. Ubah link youtube mentah yang ditulis di dalam paragraf <p>https://www.youtube.com/... </p>
-                        const pYoutubeRegex = /<p>\s*https?:\/\/(?:www\.)?(?:youtube\.com\/watch\?v=|youtu\.be\/)([^"<\s?&]+)[^<]*<\/p>/g;
-                        processedHtml = processedHtml.replace(pYoutubeRegex, (match, videoId) => {
-                          return getPremiumPlayCard(videoId);
-                        });
+                        const pYoutubeRegex =
+                          /<p>\s*https?:\/\/(?:www\.)?(?:youtube\.com\/watch\?v=|youtu\.be\/)([^"<\s?&]+)[^<]*<\/p>/g;
+                        processedHtml = processedHtml.replace(
+                          pYoutubeRegex,
+                          (videoId) => {
+                            return getPremiumPlayCard(videoId);
+                          },
+                        );
 
                         return processedHtml;
                       })(),

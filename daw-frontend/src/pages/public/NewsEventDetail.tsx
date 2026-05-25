@@ -107,7 +107,7 @@ export default function NewsEventDetail() {
       setIsLoading(true);
       try {
         const res = await api.get(`/news/public/s/${slug}`, {
-          params: { lang: i18n.language === "id" ? "id" : "en" }
+          params: { lang: i18n.language === "id" ? "id" : "en" },
         });
         setArticle(res.data);
       } catch (error: any) {
@@ -146,7 +146,9 @@ export default function NewsEventDetail() {
   // Fetch sidebar data
   useEffect(() => {
     api
-      .get("/news/public", { params: { limit: 4, lang: i18n.language === "id" ? "id" : "en" } })
+      .get("/news/public", {
+        params: { limit: 4, lang: i18n.language === "id" ? "id" : "en" },
+      })
       .then((res) => {
         const posts = (res.data.data || []).filter(
           (p: SidebarPost) => p.slug !== slug,
@@ -360,8 +362,11 @@ export default function NewsEventDetail() {
                   prose-li:marker:text-daw-green prose-li:my-2`}
                 dangerouslySetInnerHTML={{
                   __html: (() => {
-                    const rawHtml = (article.content || "").replace(/&nbsp;|\u00A0/g, " ");
-                    
+                    const rawHtml = (article.content || "").replace(
+                      /&nbsp;|\u00A0/g,
+                      " ",
+                    );
+
                     // Helper generator untuk HTML kartu putar premium
                     const getPremiumPlayCard = (videoId: string) => {
                       return `
@@ -392,18 +397,26 @@ export default function NewsEventDetail() {
                     };
 
                     let processedHtml = rawHtml;
-                    
+
                     // 1. Ubah tag iframe youtube bawaan editor menjadi kartu premium
-                    const iframeRegex = /<iframe[^>]*src="[^"]*youtube\.com\/embed\/([^"?\s>]+)[^"]*"[^>]*><\/iframe>/g;
-                    processedHtml = processedHtml.replace(iframeRegex, (match, videoId) => {
-                      return getPremiumPlayCard(videoId);
-                    });
+                    const iframeRegex =
+                      /<iframe[^>]*src="[^"]*youtube\.com\/embed\/([^"?\s>]+)[^"]*"[^>]*><\/iframe>/g;
+                    processedHtml = processedHtml.replace(
+                      iframeRegex,
+                      (videoId) => {
+                        return getPremiumPlayCard(videoId);
+                      },
+                    );
 
                     // 2. Ubah link youtube mentah yang ditulis di dalam paragraf <p>https://www.youtube.com/... </p>
-                    const pYoutubeRegex = /<p>\s*https?:\/\/(?:www\.)?(?:youtube\.com\/watch\?v=|youtu\.be\/)([^"<\s?&]+)[^<]*<\/p>/g;
-                    processedHtml = processedHtml.replace(pYoutubeRegex, (match, videoId) => {
-                      return getPremiumPlayCard(videoId);
-                    });
+                    const pYoutubeRegex =
+                      /<p>\s*https?:\/\/(?:www\.)?(?:youtube\.com\/watch\?v=|youtu\.be\/)([^"<\s?&]+)[^<]*<\/p>/g;
+                    processedHtml = processedHtml.replace(
+                      pYoutubeRegex,
+                      (videoId) => {
+                        return getPremiumPlayCard(videoId);
+                      },
+                    );
 
                     return processedHtml;
                   })(),
@@ -640,7 +653,10 @@ export default function NewsEventDetail() {
                     type="text"
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
-                    placeholder={t("newsPage.searchPlaceholder", "Search articles...")}
+                    placeholder={t(
+                      "newsPage.searchPlaceholder",
+                      "Search articles...",
+                    )}
                     className="w-full bg-white border border-slate-200 rounded-full py-3.5 pl-5 pr-12 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-daw-green/20 focus:border-daw-green transition-all"
                   />
                   <button

@@ -426,13 +426,17 @@ exports.updateBusinessSection = async (req, res) => {
         { transaction: t },
       );
 
-      await ErpApprovalService.initiateApproval({
-        notrans,
-        karyawanId: actorId,
-        token: req.owl_token,
-      });
-
       await t.commit();
+
+      try {
+        await ErpApprovalService.initiateApproval({
+          notrans,
+          karyawanId: actorId,
+          token: req.owl_token,
+        });
+      } catch (owlError) {
+        console.error("🚨 [ERP SYNC FAILED]:", owlError.message);
+      }
       return res.status(202).json({
         message: "Revisi konten diajukan. Menunggu persetujuan.",
         ticket: notrans,
@@ -532,13 +536,17 @@ exports.createBusinessSection = async (req, res) => {
         { transaction: t },
       );
 
-      await ErpApprovalService.initiateApproval({
-        notrans,
-        karyawanId: actorId,
-        token: req.owl_token,
-      });
-
       await t.commit();
+
+      try {
+        await ErpApprovalService.initiateApproval({
+          notrans,
+          karyawanId: actorId,
+          token: req.owl_token,
+        });
+      } catch (owlError) {
+        console.error("🚨 [ERP SYNC FAILED]:", owlError.message);
+      }
       return res.status(202).json({
         message:
           "Pembuatan sektor diajukan. Sektor terkunci menunggu persetujuan.",
@@ -631,13 +639,17 @@ exports.deleteSection = async (req, res) => {
         { transaction: t },
       );
 
-      await ErpApprovalService.initiateApproval({
-        notrans,
-        karyawanId: actorId,
-        token: req.owl_token,
-      });
-
       await t.commit();
+
+      try {
+        await ErpApprovalService.initiateApproval({
+          notrans,
+          karyawanId: actorId,
+          token: req.owl_token,
+        });
+      } catch (owlError) {
+        console.error("🚨 [ERP SYNC FAILED]:", owlError.message);
+      }
       return res.status(202).json({
         success: true,
         message: "Permintaan hapus sektor dikirim ke Server. Data dikunci.",

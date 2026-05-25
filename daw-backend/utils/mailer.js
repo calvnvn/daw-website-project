@@ -87,11 +87,11 @@ const sendApprovalNotification = async ({
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <link rel="preconnect" href="https://fonts.googleapis.com">
         <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-        <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&family=Playfair+Display:ital,wght@0,600;0,700;1,400&display=swap" rel="stylesheet">
+        <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Lora:ital,wght@0,400..700;1,400..700&display=swap" rel="stylesheet">
         
         <style>
           /* CSS Reset & Base */
-          body, p, h1, h2, h3, td, th { margin: 0; padding: 0; font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+          body, p, h1, h2, h3, td, th { margin: 0; padding: 0; font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
           body { background-color: #f8fafc; color: #334155; -webkit-font-smoothing: antialiased; }
           
           /* Layout */
@@ -104,7 +104,7 @@ const sendApprovalNotification = async ({
           
           /* Hero Section */
           .hero-section { background-color: ${bannerBgColor === DANGER_RED ? "#fef2f2" : bannerBgColor === DAW_YELLOW ? "#fffbeb" : "#f0fdf4"}; padding: 40px 32px; text-align: center; border-bottom: 1px solid #f1f5f9; }
-          .hero-section h1 { font-family: 'Playfair Display', Georgia, serif; color: ${bannerBgColor === DANGER_RED ? "#991b1b" : bannerBgColor === DAW_YELLOW ? "#92400e" : "#166534"}; font-size: 24px; font-weight: 700; margin-bottom: 8px; line-height: 1.3; }
+          .hero-section h1 { font-family: 'Lora', Georgia, serif; color: ${bannerBgColor === DANGER_RED ? "#991b1b" : bannerBgColor === DAW_YELLOW ? "#92400e" : "#166534"}; font-size: 24px; font-weight: 700; margin-bottom: 8px; line-height: 1.3; }
           .hero-section p { font-size: 13px; color: #64748b; font-weight: 500; }
           
           /* Content Body */

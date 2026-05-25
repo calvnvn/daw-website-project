@@ -60,7 +60,7 @@ Normalize editor-generated alignment classes within Tailwind Prose containers */
 .daw-editorial-content h1,
 .daw-editorial-content h2,
 .daw-editorial-content h3 {
-  font-family: "Playfair Display", serif;
+  font-family: var(--font-serif), serif;
   color: #0f172a; /* Equivalent to slate-900 */
   margin-top: 2em;
   margin-bottom: 0.75em;
