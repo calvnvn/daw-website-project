@@ -368,9 +368,8 @@ export default function NewsForm() {
           new Date(formData.published_at).toISOString(),
         );
 
-      if (galleryImages.length > 0) {
-        payload.append("gallery_images", JSON.stringify(galleryImages));
-      }
+      // Send gallery_images even if empty, so backend knows to delete them
+      payload.append("gallery_images", JSON.stringify(galleryImages));
 
       if (rejectedDraft?.notrans)
         payload.append("previous_notrans", rejectedDraft.notrans);

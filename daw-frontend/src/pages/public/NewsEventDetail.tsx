@@ -345,7 +345,7 @@ export default function NewsEventDetail() {
 
               {/* --- PREMIUM GALLERY SECTION --- */}
               {galleryImages && galleryImages.length > 0 && (
-                <div className="mt-16 pt-12 border-t border-slate-100 animate-in fade-in duration-700">
+                <div className="mt-8 pt-8 border-t border-slate-100 animate-in fade-in duration-700">
                   <h3 className="text-2xl font-serif font-bold text-slate-900 mb-8 flex items-center gap-3">
                     <span className="w-8 h-1 bg-daw-green rounded-full" />
                     GALLERY
