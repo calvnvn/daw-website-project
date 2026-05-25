@@ -54,7 +54,7 @@ interface PaginationData {
 }
 
 export default function NewsEvents() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const [articles, setArticles] = useState<Article[]>([]);
   const [categories, setCategories] = useState<CategoryData[]>([]);
   const [trendingKeywords, setTrendingKeywords] = useState<string[]>([]);
@@ -117,6 +117,7 @@ export default function NewsEvents() {
           page: currentPage,
           limit: ITEMS_PER_PAGE,
           sortBy,
+          lang: i18n.language === "id" ? "id" : "en",
         };
         if (searchQuery.trim()) params.search = searchQuery.trim();
         if (activeCategory !== "All") params.category = activeCategory;
@@ -138,7 +139,7 @@ export default function NewsEvents() {
       }
     };
     fetchArticles();
-  }, [currentPage, activeCategory, searchQuery, sortBy]);
+  }, [currentPage, activeCategory, searchQuery, sortBy, i18n.language]);
 
   // Reset page when filter/search/sort changes
   useEffect(() => {

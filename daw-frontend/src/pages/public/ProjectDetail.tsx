@@ -34,7 +34,7 @@ interface ProjectData {
 }
 
 export default function ProjectDetail() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const { slug } = useParams<{ slug: string }>();
   const navigate = useNavigate();
 
@@ -113,16 +113,19 @@ export default function ProjectDetail() {
 
   // Menghindari "Calling State Synchronously"
   useEffect(() => {
-    if (hasFetched.current === slug) return;
+    const fetchKey = `${slug}-${i18n.language}`;
+    if (hasFetched.current === fetchKey) return;
 
     setIsLoading(true);
     window.scrollTo({ top: 0, behavior: "smooth" });
     setSelectedImageIndex(null);
-    hasFetched.current = slug || null;
+    hasFetched.current = fetchKey;
 
     const fetchData = async () => {
       try {
-        const projectRes = await api.get(`/projects/public/s/${slug}`);
+        const projectRes = await api.get(`/projects/public/s/${slug}`, {
+          params: { lang: i18n.language === "id" ? "id" : "en" }
+        });
         const data: ProjectData = projectRes.data;
         setProject(data);
 
@@ -152,7 +155,7 @@ export default function ProjectDetail() {
     };
 
     fetchData();
-  }, [slug]);
+  }, [slug, i18n.language]);
 
   // LIGHTBOX HANDLERS
   const closeLightbox = () => setSelectedImageIndex(null);

@@ -1,7 +1,9 @@
 const NewsArticle = require("../models/NewsArticle");
 const NewsCategory = require("../models/NewsCategory");
 const ApprovalDraft = require("../models/ApprovalDraft");
+const Translation = require("../models/Translation");
 const { deleteSingleFile } = require("../utils/fileRemover");
+const { autoTranslate } = require("../services/openaiService");
 const { Op } = require("sequelize");
 const sequelize = require("../config/database");
 const ErpApprovalService = require("../services/erpApprovalService");
@@ -9,6 +11,39 @@ const { invalidateOldDrafts } = require("../utils/draftCleanup");
 const { generateNotrans } = require("../utils/notransGenerator");
 
 const MODULE_NAME = "NewsArticle";
+
+// ─── BACKGROUND TRANSLATION WORKER ─────────────────────────────────────
+const triggerBackgroundTranslation = async (articleId, payload) => {
+  try {
+    const { title, excerpt, content } = payload;
+    
+    // Process heavy translations asynchronously (Non-blocking)
+    const idTitle = title ? await autoTranslate(title, "Indonesian") : null;
+    const idExcerpt = excerpt ? await autoTranslate(excerpt, "Indonesian") : null;
+    const idContent = content ? await autoTranslate(content, "Indonesian") : null;
+
+    const upsertTranslation = async (field, translatedText) => {
+      if (!translatedText) return;
+      const existing = await Translation.findOne({
+        where: { modelName: MODULE_NAME, recordId: articleId, field, locale: "id" }
+      });
+      if (existing) {
+        await existing.update({ translatedText });
+      } else {
+        await Translation.create({
+          modelName: MODULE_NAME, recordId: articleId, field, locale: "id", translatedText
+        });
+      }
+    };
+
+    // Save outputs to centralized Translation table
+    await upsertTranslation("title", idTitle);
+    await upsertTranslation("excerpt", idExcerpt);
+    await upsertTranslation("content", idContent);
+  } catch (error) {
+    console.error("🚨 Background Translation Error:", error);
+  }
+};
 
 // Utility: Calculates estimated reading time from HTML content using industry-standard 200 WPM.
 const calculateReadTime = (htmlContent) => {
@@ -282,6 +317,10 @@ exports.createNews = async (req, res) => {
       });
 
       await t.commit();
+      
+      // Trigger AI translation in background (Non-blocking)
+      triggerBackgroundTranslation(newArticle.id, payload);
+
       return res.status(202).json({
         message: "Artikel baru diajukan. Data dikunci menunggu persetujuan.",
         ticket: notrans,
@@ -296,6 +335,10 @@ exports.createNews = async (req, res) => {
     );
 
     await t.commit();
+
+    // Trigger AI translation in background (Non-blocking)
+    triggerBackgroundTranslation(newArticle.id, payload);
+
     return res.status(201).json({
       message:
         finalStatus === "Draft"
@@ -381,6 +424,10 @@ exports.updateNews = async (req, res) => {
       });
 
       await t.commit();
+
+      // Trigger AI translation in background (Non-blocking)
+      triggerBackgroundTranslation(id, payload);
+
       return res.status(202).json({
         message: "Revisi diajukan. Data asli dikunci.",
         ticket: notrans,
@@ -397,6 +444,9 @@ exports.updateNews = async (req, res) => {
       { transaction: t },
     );
     await t.commit();
+
+    // Trigger AI translation in background (Non-blocking)
+    triggerBackgroundTranslation(id, payload);
 
     // Purge physical files only after transaction success.
     if (
@@ -517,6 +567,7 @@ exports.getPublicNews = async (req, res) => {
     const search = req.query.search || "";
     const category = req.query.category || "";
     const sortBy = req.query.sortBy || "latest";
+    const lang = req.query.lang || "en";
 
     const whereClause = { status: "Published" };
 
@@ -591,8 +642,31 @@ exports.getPublicNews = async (req, res) => {
       offset,
     });
 
+    let finalRows = rows.map((r) => r.get({ plain: true }));
+
+    // ─── BULK MERGE TRANSLATIONS (IF INDONESIAN) ───
+    if (lang === "id" && finalRows.length > 0) {
+      const articleIds = finalRows.map((r) => r.id);
+      const translations = await Translation.findAll({
+        where: {
+          modelName: MODULE_NAME,
+          recordId: { [Op.in]: articleIds },
+          locale: "id"
+        }
+      });
+      
+      finalRows.forEach((row) => {
+        const titleTrans = translations.find((t) => t.recordId === row.id && t.field === "title");
+        const excerptTrans = translations.find((t) => t.recordId === row.id && t.field === "excerpt");
+        
+        // Overwrite standard English text with localized text
+        if (titleTrans) row.title = titleTrans.translatedText;
+        if (excerptTrans) row.excerpt = excerptTrans.translatedText;
+      });
+    }
+
     res.status(200).json({
-      data: rows,
+      data: finalRows,
       pagination: {
         currentPage: page,
         totalPages: Math.ceil(count / limit),
@@ -612,6 +686,7 @@ exports.getPublicNews = async (req, res) => {
 // Retrieves article details by slug for front-end (read-only, no automatic view increment).
 exports.getPublicNewsBySlug = async (req, res) => {
   try {
+    const lang = req.query.lang || "en";
     const article = await NewsArticle.findOne({
       where: { slug: req.params.slug, status: "Published" },
       include: [
@@ -628,7 +703,56 @@ exports.getPublicNewsBySlug = async (req, res) => {
         .status(404)
         .json({ message: "Article not found or not published" });
 
-    res.status(200).json(article);
+    const result = article.get({ plain: true });
+
+    // ─── LAZY ON-DEMAND TRANSLATION LOGIC ───
+    if (lang === "id") {
+      let titleTrans = await Translation.findOne({ where: { modelName: MODULE_NAME, recordId: result.id, field: "title", locale: "id" } });
+      let excerptTrans = await Translation.findOne({ where: { modelName: MODULE_NAME, recordId: result.id, field: "excerpt", locale: "id" } });
+      let contentTrans = await Translation.findOne({ where: { modelName: MODULE_NAME, recordId: result.id, field: "content", locale: "id" } });
+
+      // If missing completely, generate on-the-fly and save as cache
+      if (!titleTrans || !contentTrans) {
+        console.log(`[Lazy Translation] Translating older article ID: ${result.id}...`);
+        const freshTitle = await autoTranslate(result.title, "Indonesian");
+        const freshExcerpt = await autoTranslate(result.excerpt, "Indonesian");
+        const freshContent = await autoTranslate(result.content, "Indonesian");
+
+        const upsertTranslation = async (field, translatedText) => {
+          if (!translatedText) return;
+          const existing = await Translation.findOne({
+            where: { modelName: MODULE_NAME, recordId: result.id, field, locale: "id" }
+          });
+          if (existing) {
+            await existing.update({ translatedText });
+          } else {
+            await Translation.create({
+              modelName: MODULE_NAME, recordId: result.id, field, locale: "id", translatedText
+            });
+          }
+        };
+
+        if (freshTitle) {
+          await upsertTranslation("title", freshTitle);
+          result.title = freshTitle;
+        }
+        if (freshExcerpt) {
+          await upsertTranslation("excerpt", freshExcerpt);
+          result.excerpt = freshExcerpt;
+        }
+        if (freshContent) {
+          await upsertTranslation("content", freshContent);
+          result.content = freshContent;
+        }
+      } else {
+        // Cache Hit! Instantly merge the translations
+        if (titleTrans) result.title = titleTrans.translatedText;
+        if (excerptTrans) result.excerpt = excerptTrans.translatedText;
+        if (contentTrans) result.content = contentTrans.translatedText;
+      }
+    }
+
+    res.status(200).json(result);
   } catch (error) {
     res.status(500).json({ message: error.message });
   }

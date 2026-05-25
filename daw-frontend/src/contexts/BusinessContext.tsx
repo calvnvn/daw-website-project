@@ -8,6 +8,7 @@ import {
 } from "react";
 import api from "@/lib/api";
 import { toast } from "sonner";
+import { useTranslation } from "react-i18next";
 import { useAuth } from "./AuthContext";
 
 export interface MapCategory {
@@ -80,6 +81,7 @@ const BusinessContext = createContext<BusinessContextType | undefined>(
 
 export const BusinessProvider = ({ children }: { children: ReactNode }) => {
   const { user } = useAuth();
+  const { i18n } = useTranslation();
   const [sections, setSections] = useState<SectionData[]>([]);
   const [categories, setCategories] = useState<MapCategory[]>([]);
   const [publicProjects, setPublicProjects] = useState<any[]>([]);
@@ -132,7 +134,9 @@ export const BusinessProvider = ({ children }: { children: ReactNode }) => {
     try {
       const promises: Promise<any>[] = [
         api.get("/map-categories"), // index 0
-        api.get("/projects/public"), // index 1
+        api.get("/projects/public", {
+          params: { lang: i18n.language === "id" ? "id" : "en" }
+        }), // index 1
       ];
 
       const sectionsIndex = promises.length; // index 2
@@ -183,7 +187,7 @@ export const BusinessProvider = ({ children }: { children: ReactNode }) => {
     } finally {
       setIsLoading(false);
     }
-  }, [user]);
+  }, [user, i18n.language]);
 
   const updateSection = useCallback(
     async (

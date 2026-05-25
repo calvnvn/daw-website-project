@@ -18,10 +18,7 @@ const envSchema = z.object({
   CMS_APPROVAL_CODE: z
     .string({ required_error: "CMS_APPROVAL_CODE must be defined in .env" })
     .min(1, "CMS_APPROVAL_CODE cannot be empty"),
-  JWT_EXPIRES_IN: z
-    .string()
-    .optional()
-    .default("24h"),
+  JWT_EXPIRES_IN: z.string().optional().default("24h"),
 });
 
 try {
@@ -113,6 +110,7 @@ require("./models/Inquiry");
 require("./models/InquirySubject");
 require("./models/InvestmentSettings");
 require("./models/ApprovalDraft");
+require("./models/Translation");
 const Achievement = require("./models/Achievement");
 const NewsCategory = require("./models/NewsCategory");
 const NewsArticle = require("./models/NewsArticle");
@@ -121,24 +119,25 @@ const { globalLimiter } = require("./middleware/rateLimiter");
 
 const app = express();
 
-// MIDDLEWARE: Security & Request Parsing
-// 1. Helmet (HTTP Security Headers)
-app.use(
-  helmet({
-    // Allow frontend (different port/domain) to render images from /uploads
-    crossOriginResourcePolicy: { policy: "cross-origin" },
-  })
-);
-
-// 2. Global Rate Limiter (Applied to all API routes)
-app.use("/api", globalLimiter);
-
 const corsOptions = {
   origin: process.env.FRONTEND_URL || "http://localhost:5173",
   methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
   credentials: true,
 };
 app.use(cors(corsOptions));
+
+// MIDDLEWARE: Security & Request Parsing
+// 1. Helmet (HTTP Security Headers)
+app.use(
+  helmet({
+    // Allow frontend (different port/domain) to render images from /uploads
+    crossOriginResourcePolicy: { policy: "cross-origin" },
+  }),
+);
+
+// 2. Global Rate Limiter (Applied to all API routes)
+app.use("/api", globalLimiter);
+
 app.use(express.json({ limit: "50mb" }));
 app.use(express.urlencoded({ limit: "50mb", extended: true }));
 

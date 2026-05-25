@@ -3,7 +3,7 @@ const rateLimit = require("express-rate-limit");
 // Global Limiter (Prevents DDoS and generic API spamming)
 const globalLimiter = rateLimit({
   windowMs: 10 * 60 * 1000, // 10 minutes
-  max: 150, // Limit each IP to 150 requests per windowMs
+  max: process.env.NODE_ENV === "development" ? 2000 : 150, // Generous limit in development, strict 150 in production
   message: {
     success: false,
     message: "Too many requests from this IP. Please try again later.",

@@ -82,7 +82,7 @@ const ScrollProgressBar = () => {
 };
 
 export default function NewsEventDetail() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const { slug } = useParams();
   const navigate = useNavigate();
   const [article, setArticle] = useState<ArticleDetail | null>(null);
@@ -106,7 +106,9 @@ export default function NewsEventDetail() {
     const fetchArticle = async () => {
       setIsLoading(true);
       try {
-        const res = await api.get(`/news/public/s/${slug}`);
+        const res = await api.get(`/news/public/s/${slug}`, {
+          params: { lang: i18n.language === "id" ? "id" : "en" }
+        });
         setArticle(res.data);
       } catch (error: any) {
         if (error.response?.status === 404) {
@@ -120,7 +122,7 @@ export default function NewsEventDetail() {
       }
     };
     fetchArticle();
-  }, [slug, navigate]);
+  }, [slug, navigate, i18n.language]);
 
   // Increment views once per session to avoid double counting (especially in StrictMode)
   useEffect(() => {
@@ -144,7 +146,7 @@ export default function NewsEventDetail() {
   // Fetch sidebar data
   useEffect(() => {
     api
-      .get("/news/public", { params: { limit: 4 } })
+      .get("/news/public", { params: { limit: 4, lang: i18n.language === "id" ? "id" : "en" } })
       .then((res) => {
         const posts = (res.data.data || []).filter(
           (p: SidebarPost) => p.slug !== slug,
@@ -167,7 +169,7 @@ export default function NewsEventDetail() {
         }
       })
       .catch(console.error);
-  }, [slug]);
+  }, [slug, i18n.language]);
 
   // Auto-scroll to content
   useEffect(() => {

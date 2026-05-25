@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo } from "react";
 import { Link, useSearchParams } from "react-router-dom"; // Tambahkan useSearchParams
+import { useTranslation } from "react-i18next";
 import { ArrowRight, ImageIcon, Filter } from "lucide-react";
 import api from "@/lib/api";
 import { getCleanImageUrl } from "@/lib/utils";
@@ -7,6 +8,7 @@ import { useBusiness } from "@/contexts/BusinessContext";
 import SEO from "@/components/SEO";
 
 export default function PublicProjects() {
+  const { i18n } = useTranslation();
   const [projects, setProjects] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const { sections, isLoading: isSectionsLoading } = useBusiness();
@@ -17,8 +19,11 @@ export default function PublicProjects() {
 
   useEffect(() => {
     const fetchProjects = async () => {
+      setIsLoading(true);
       try {
-        const response = await api.get("/projects/public");
+        const response = await api.get("/projects/public", {
+          params: { lang: i18n.language === "id" ? "id" : "en" }
+        });
         setProjects(response.data);
       } catch (err) {
         console.error("Failed to load projects:", err);
@@ -27,7 +32,7 @@ export default function PublicProjects() {
       }
     };
     fetchProjects();
-  }, []);
+  }, [i18n.language]);
 
   // FIX 2: Indexing Sektor untuk Performa (O(1) lookup)
   const sectorLookup = useMemo(() => {

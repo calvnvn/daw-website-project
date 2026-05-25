@@ -57,7 +57,7 @@ export default function GlobalHeroBanner({
       {/* Text Content */}
       <div className="relative z-10 text-center px-6 max-w-5xl mt-16 animate-in fade-in slide-in-from-bottom-12 duration-1000">
         <ScrollReveal direction="up" delay={0}>
-          <h1 className="text-5xl md:text-7xl lg:text-8xl font-serif font-bold text-white mb-10 leading-[1.1] tracking-tight drop-shadow-lg">
+          <h1 className="text-5xl md:text-6xl lg:text-6xl font-serif font-bold text-white mb-10 leading-[1.1] tracking-tight drop-shadow-lg">
             {title}
           </h1>
         </ScrollReveal>
