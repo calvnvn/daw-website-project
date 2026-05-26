@@ -34,3 +34,22 @@ export const getCleanImageUrl = (path: string | null | undefined): string => {
 
   return `${baseUrl}${normalizedPath}`;
 };
+
+// ERROR EXTRACTION
+// Standardizes the extraction of error messages across different backend & OWL response shapes
+export function getErrorMessage(error: any, fallback = "An unexpected error occurred."): string {
+  if (!error) return fallback;
+  if (typeof error === "string") return error;
+  
+  const data = error.response?.data;
+  if (data) {
+    if (typeof data === "string") return data;
+    if (data.message) return data.message;
+    if (data.response) return data.response;
+    if (data.error) return data.error;
+  }
+  
+  if (error.message) return error.message;
+  return fallback;
+}
+
