@@ -75,7 +75,7 @@ class AchievementService {
       const needsDescTrans = item.description && !descTrans;
 
       if (needsTitleTrans || needsDescTrans) {
-        console.log(`[Lazy Translation] Translating Achievement: ${item.id}...`);
+        // console.log(`[Lazy Translation] Translating Achievement: ${item.id}...`);
         const freshTitle = needsTitleTrans ? await autoTranslate(item.title, "Indonesian") : "";
         const freshDesc = needsDescTrans ? await autoTranslate(item.description, "Indonesian") : "";
         

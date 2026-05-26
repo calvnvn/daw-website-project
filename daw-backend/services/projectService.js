@@ -1,14 +1,11 @@
 const Project = require("../models/Project");
 const BusinessSection = require("../models/BusinessSection");
-const ApprovalDraft = require("../models/ApprovalDraft");
 const Translation = require("../models/Translation");
 const { deleteSingleFile } = require("../utils/fileRemover");
 const { autoTranslate } = require("./openaiService");
 const { Op } = require("sequelize");
 const sequelize = require("../config/database");
-const ErpApprovalService = require("./erpApprovalService");
 const { invalidateOldDrafts } = require("../utils/draftCleanup");
-const { generateNotrans } = require("../utils/notransGenerator");
 const {
   extractImagesFromHtml,
   generateUniqueSlug,
@@ -390,7 +387,7 @@ class ProjectService {
       const needsContentTrans = result.content && !contentTrans;
 
       if (needsTitleTrans || needsExcerptTrans || needsContentTrans) {
-        console.log(`[Lazy Translation] Translating older project ID: ${result.id}...`);
+        // console.log(`[Lazy Translation] Translating older project ID: ${result.id}...`);
         const freshTitle = needsTitleTrans ? await autoTranslate(result.title, "Indonesian") : "";
         const freshExcerpt = needsExcerptTrans ? await autoTranslate(result.excerpt, "Indonesian") : "";
         const freshContent = needsContentTrans ? await autoTranslate(result.content, "Indonesian") : "";
@@ -443,7 +440,7 @@ class ProjectService {
       const needsContentTrans = result.content && !contentTrans;
 
       if (needsTitleTrans || needsExcerptTrans || needsContentTrans) {
-        console.log(`[Lazy Translation] Translating older project ID: ${result.id}...`);
+        // console.log(`[Lazy Translation] Translating older project ID: ${result.id}...`);
         const freshTitle = needsTitleTrans ? await autoTranslate(result.title, "Indonesian") : "";
         const freshExcerpt = needsExcerptTrans ? await autoTranslate(result.excerpt, "Indonesian") : "";
         const freshContent = needsContentTrans ? await autoTranslate(result.content, "Indonesian") : "";

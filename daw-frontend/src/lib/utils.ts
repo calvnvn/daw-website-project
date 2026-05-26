@@ -35,21 +35,40 @@ export const getCleanImageUrl = (path: string | null | undefined): string => {
   return `${baseUrl}${normalizedPath}`;
 };
 
+// TYPE GUARDS
+// Narrow down unknown errors to expected shapes
+export interface ApiError {
+  response?: {
+    data?: {
+      message?: string;
+      response?: string;
+      error?: string;
+    };
+  };
+  message?: string;
+}
+
+export function isApiError(error: unknown): error is ApiError {
+  return typeof error === "object" && error !== null;
+}
+
 // ERROR EXTRACTION
 // Standardizes the extraction of error messages across different backend & OWL response shapes
-export function getErrorMessage(error: any, fallback = "An unexpected error occurred."): string {
+export function getErrorMessage(error: unknown, fallback = "An unexpected error occurred."): string {
   if (!error) return fallback;
   if (typeof error === "string") return error;
   
-  const data = error.response?.data;
-  if (data) {
-    if (typeof data === "string") return data;
-    if (data.message) return data.message;
-    if (data.response) return data.response;
-    if (data.error) return data.error;
+  if (isApiError(error)) {
+    const data = error.response?.data;
+    if (data) {
+      if (typeof data === "string") return data;
+      if (data.message) return data.message;
+      if (data.response) return data.response;
+      if (data.error) return data.error;
+    }
+    if (error.message) return error.message;
   }
   
-  if (error.message) return error.message;
   return fallback;
 }
 

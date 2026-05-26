@@ -67,7 +67,7 @@ class HistoryService {
       });
       
       if (!descTrans) {
-        console.log(`[Lazy Translation] Translating History Timeline: ${item.year}...`);
+        // console.log(`[Lazy Translation] Translating History Timeline: ${item.year}...`);
         const freshDesc = await autoTranslate(item.description, "Indonesian");
         
         if (freshDesc) {

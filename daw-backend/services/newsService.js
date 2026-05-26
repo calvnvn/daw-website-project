@@ -479,7 +479,7 @@ class NewsService {
       const needsContentTrans = result.content && !contentTrans;
 
       if (needsTitleTrans || needsExcerptTrans || needsContentTrans) {
-        console.log(`[Lazy Translation] Translating older article ID: ${result.id}...`);
+        // console.log(`[Lazy Translation] Translating older article ID: ${result.id}...`);
         const freshTitle = needsTitleTrans ? await autoTranslate(result.title, "Indonesian") : "";
         const freshExcerpt = needsExcerptTrans ? await autoTranslate(result.excerpt, "Indonesian") : "";
         const freshContent = needsContentTrans ? await autoTranslate(result.content, "Indonesian") : "";

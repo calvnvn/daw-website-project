@@ -66,7 +66,7 @@ class PhilosophyPillarService {
       const needsTextTrans = item.text && !textTrans;
 
       if (needsTitleTrans || needsTextTrans) {
-        console.log(`[Lazy Translation] Translating Philosophy Pillar: ${item.id}...`);
+        // console.log(`[Lazy Translation] Translating Philosophy Pillar: ${item.id}...`);
         const freshTitle = needsTitleTrans ? await autoTranslate(item.title, "Indonesian") : "";
         const freshText = needsTextTrans ? await autoTranslate(item.text, "Indonesian") : "";
         

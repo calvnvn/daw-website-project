@@ -74,7 +74,7 @@ class ErpApprovalService {
         data: cleanApproverRows,
       };
 
-      console.log(
+      // console.log(
         ">>> [STRICT DEBUG] Payload to /trans/add:",
         JSON.stringify(payloadTransAdd, null, 2),
       );
@@ -87,7 +87,7 @@ class ErpApprovalService {
         },
       );
 
-      console.log(
+      // console.log(
         `>>> [ERP COURIER] ✅ Success: Ticket ${notrans} registered to ERP.`,
       );
       return { success: true, notrans, data: response.data };
@@ -153,7 +153,7 @@ class ErpApprovalService {
         karyawanid: String(karyawanid),
       };
 
-      console.log(
+      // console.log(
         ">>> [ERP COURIER PRE-FLIGHT] Submit Decision Payload:",
         JSON.stringify(payload, null, 2),
       );

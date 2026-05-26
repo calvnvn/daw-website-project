@@ -39,7 +39,7 @@ const commitTempFile = (fileInput) => {
 
       // Execute file system promotion via atomic rename operation
       fs.renameSync(oldPath, newPath);
-      console.log(`✅ [FILE COMMITTED] ${filename} -> ${newFilename}`);
+      // console.log(`✅ [FILE COMMITTED] ${filename} -> ${newFilename}`);
       return newFilename;
     } else {
       console.error(`🚨 [PROMOTION FAIL] File ${filename} raib dari disk!`);

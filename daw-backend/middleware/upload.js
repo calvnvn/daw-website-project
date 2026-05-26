@@ -78,7 +78,7 @@ const optimizeImage = async (req, res, next) => {
 
     // Context-Aware Processing: Favicon (64px, Lossless)
     if (file.fieldname === "favicon") {
-      console.log(`>>> [REFINERY] Processing Favicon: Scaling to 64px`);
+      // console.log(`>>> [REFINERY] Processing Favicon: Scaling to 64px`);
       pipeline = pipeline
         .resize(64, 64, {
           fit: "contain",
@@ -88,7 +88,7 @@ const optimizeImage = async (req, res, next) => {
     }
     // Context-Aware Processing: Logo (Trim, Resize, and Padding)
     else if (file.fieldname === "logo") {
-      console.log(`>>> [REFINERY] Processing Logo: Trimming and optimizing`);
+      // console.log(`>>> [REFINERY] Processing Logo: Trimming and optimizing`);
       pipeline = pipeline
         .trim()
         .resize(1200, null, {

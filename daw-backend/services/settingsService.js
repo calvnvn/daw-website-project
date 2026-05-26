@@ -23,7 +23,7 @@ class SettingsService {
     const filename = fileObj.filename;
 
     if (filename.startsWith("TEMP_")) {
-      console.log(`🛡️ [FILE SYSTEM] File sudah di-karantina oleh Refinery: ${filename}`);
+      // console.log(`🛡️ [FILE SYSTEM] File sudah di-karantina oleh Refinery: ${filename}`);
       return filename;
     }
 

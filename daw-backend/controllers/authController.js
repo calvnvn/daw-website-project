@@ -27,7 +27,7 @@ const handleAuthError = (res, error) => {
 exports.login = async (req, res) => {
   try {
     const { uname, password } = req.body;
-    console.log(`>>> [AUTH] Verifying ${uname} via OWL...`);
+    // console.log(`>>> [AUTH] Verifying ${uname} via OWL...`);
 
     const result = await authService.loginViaERP(uname, password);
 

@@ -73,7 +73,7 @@ class AboutService {
     const needsVisionTrans = formattedInfo.visionText && !visionTrans;
 
     if (needsSpiritTrans || needsMissionTrans || needsVisionTrans) {
-      console.log(`[Lazy Translation] Translating About Info...`);
+      // console.log(`[Lazy Translation] Translating About Info...`);
       const freshSpirit = needsSpiritTrans
         ? await autoTranslate(formattedInfo.spiritText, "Indonesian")
         : "";

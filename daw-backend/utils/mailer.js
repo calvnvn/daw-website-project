@@ -262,7 +262,7 @@ const sendApprovalNotification = async ({
       ],
     });
 
-    console.log(`✉️ [SUCCESS] Notifikasi terkirim ke: ${toEmail}`);
+    // console.log(`✉️ [SUCCESS] Notifikasi terkirim ke: ${toEmail}`);
     return true;
   } catch (error) {
     console.error(`🚨 [MAILER ERROR]:`, error.message);
@@ -451,7 +451,7 @@ const sendInquiryNotification = async ({
       attachments,
     });
 
-    console.log(`✉️ [SUCCESS] Email Inquiry terkirim ke: ${targetEmail}`);
+    // console.log(`✉️ [SUCCESS] Email Inquiry terkirim ke: ${targetEmail}`);
     return true;
   } catch (error) {
     console.error(`🚨 [MAILER ERROR] Gagal mengirim email inquiry:`, error.message);

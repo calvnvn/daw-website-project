@@ -18,7 +18,7 @@ const deleteSingleFile = (fileName) => {
   //   }
   // }
 
-  console.log(`[SAFE MODE] Bypass auto-delete untuk file: ${baseName}`);
+  // console.log(`[SAFE MODE] Bypass auto-delete untuk file: ${baseName}`);
   return;
 };
 

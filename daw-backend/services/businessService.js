@@ -137,7 +137,7 @@ class BusinessService {
       let htmlTrans = await Translation.findOne({ where: { modelName: MODULE_NAME, recordId: sec.id, field: "htmlContent", locale: "id" } });
 
       if (!catTrans || !titleTrans || !htmlTrans) {
-        console.log(`[Lazy Translation] Translating Business Section: ${sec.id}...`);
+        // console.log(`[Lazy Translation] Translating Business Section: ${sec.id}...`);
         const freshCategory = await autoTranslate(sec.category, "Indonesian");
         const freshTitle = await autoTranslate(sec.title, "Indonesian");
         const freshHtml = await autoTranslate(sec.htmlContent, "Indonesian");
@@ -167,7 +167,7 @@ class BusinessService {
           let markerDescTrans = await Translation.findOne({ where: { modelName: MARKER_MODULE, recordId: String(marker.id), field: "desc", locale: "id" } });
 
           if (!markerTitleTrans || !markerDescTrans) {
-            console.log(`[Lazy Translation] Translating Map Marker: ${marker.id}...`);
+            // console.log(`[Lazy Translation] Translating Map Marker: ${marker.id}...`);
             const freshTitle = await autoTranslate(marker.title, "Indonesian");
             const freshDesc = await autoTranslate(marker.desc, "Indonesian");
 
@@ -292,7 +292,7 @@ class BusinessService {
       const isContentChanged = payload.title !== section.title || incomingHtml !== originalHtml || payload.category !== section.category;
 
       if (normalizedRole === "editor" && !isContentChanged) {
-        console.log(`>>> [HYBRID BYPASS] Editor ${actorId} memodifikasi peta tanpa mengubah teks. Direct Commit...`);
+        // console.log(`>>> [HYBRID BYPASS] Editor ${actorId} memodifikasi peta tanpa mengubah teks. Direct Commit...`);
         await section.update({ hasMap: payload.hasMap }, { transaction: t });
         await BusinessMapMarker.destroy({ where: { sectionId: id }, transaction: t });
         
@@ -306,7 +306,7 @@ class BusinessService {
       }
 
       if (normalizedRole === "editor" && isContentChanged) {
-        console.log(`>>> [APPROVAL REQUIRED] Editor ${actorId} mengubah konten teks. Memulai draf...`);
+        // console.log(`>>> [APPROVAL REQUIRED] Editor ${actorId} mengubah konten teks. Memulai draf...`);
         return handleEditorStaging({
           req, res, t,
           moduleName: MODULE_NAME,

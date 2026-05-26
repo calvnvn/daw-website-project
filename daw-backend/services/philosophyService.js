@@ -60,7 +60,7 @@ class PhilosophyService {
     const needsTitleTrans = formatted.philosophyTitle && !titleTrans;
 
     if (needsTitleTrans) {
-      console.log(`[Lazy Translation] Translating Philosophy Title...`);
+      // console.log(`[Lazy Translation] Translating Philosophy Title...`);
       const freshTitle = await autoTranslate(formatted.philosophyTitle, "Indonesian");
       
       if (freshTitle) {

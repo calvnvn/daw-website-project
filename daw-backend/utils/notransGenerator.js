@@ -33,7 +33,7 @@ const generateNotrans = (moduleName) => {
   // EXECUTION
   // Construct and return the final serialized transaction identifier
   const result = `CMS/${mod}/${dateStr}/${randomStr}`;
-  console.log(`>>> [GENERATOR] Created Ticket: ${result}`);
+  // console.log(`>>> [GENERATOR] Created Ticket: ${result}`);
   return result;
 };
 
