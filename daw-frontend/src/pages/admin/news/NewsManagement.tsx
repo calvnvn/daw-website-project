@@ -17,6 +17,7 @@ import { Link } from "react-router-dom";
 import { toast } from "sonner";
 import api from "@/lib/api";
 import { useAuth } from "@/contexts/AuthContext";
+import { getErrorMessage } from "@/lib/utils";
 
 interface NewsCategory {
   id: string;
@@ -78,9 +79,9 @@ export default function NewsManagement() {
       const res = await api.get("/news");
       const data = res.data?.success ? res.data.data : res.data;
       if (Array.isArray(data)) setArticles(data);
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast.error("Gagal memuat data artikel", {
-        description: error.response?.data?.message || "Kesalahan server.",
+        description: getErrorMessage(error) || "Kesalahan server.",
       });
     } finally {
       setIsLoading(false);
@@ -143,7 +144,7 @@ export default function NewsManagement() {
         loading: "Memproses instruksi penghapusan...",
         success: (data: any) => data.message,
         error: (err) =>
-          err.response?.data?.message || "Gagal memproses penghapusan.",
+          getErrorMessage(err) || "Gagal memproses penghapusan.",
       },
     );
   };
@@ -170,7 +171,7 @@ export default function NewsManagement() {
         loading: "Membersihkan notifikasi draf...",
         success: "Notifikasi draf yang ditolak berhasil diabaikan.",
         error: (err) =>
-          err.response?.data?.message || "Gagal mengabaikan draf.",
+          getErrorMessage(err) || "Gagal mengabaikan draf.",
       },
     );
   };
@@ -195,7 +196,7 @@ export default function NewsManagement() {
         );
         return `Artikel berhasil diubah menjadi ${newStatus}`;
       },
-      error: (err) => err.response?.data?.message || "Gagal memperbarui status",
+      error: (err) => getErrorMessage(err) || "Gagal memperbarui status",
     });
   };
 
@@ -212,8 +213,8 @@ export default function NewsManagement() {
       setNewCatName("");
       setNewCatColor("#004B23");
       fetchCategories();
-    } catch (err: any) {
-      toast.error(err.response?.data?.message || "Gagal menambah kategori.");
+    } catch (err: unknown) {
+      toast.error(getErrorMessage(err) || "Gagal menambah kategori.");
     } finally {
       setIsCatSaving(false);
     }
@@ -228,8 +229,8 @@ export default function NewsManagement() {
             await api.delete(`/news-categories/${id}`);
             toast.success("Kategori dihapus.");
             fetchCategories();
-          } catch (err: any) {
-            toast.error(err.response?.data?.message || "Gagal menghapus.");
+          } catch (err: unknown) {
+            toast.error(getErrorMessage(err) || "Gagal menghapus.");
           }
         },
       },

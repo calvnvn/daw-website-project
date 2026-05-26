@@ -17,6 +17,7 @@ import { useAbout } from "@/contexts/AboutContext";
 import type { ManagementItem as ManagementMember } from "@/contexts/AboutContext";
 import { PhotoPreviewer, ManagementImage } from "../AboutSharedComponents";
 import AboutLivePreview from "@/components/admin/about/AboutLivePreview";
+import { getErrorMessage } from "@/lib/utils";
 
 interface ManagementTabProps {
   isEditing: boolean;
@@ -270,9 +271,9 @@ export default function ManagementTab({
         { id: loadingToast },
       );
       setIsPersonModalOpen(false);
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast.error(
-        error.response?.data?.message || "Terjadi kesalahan sistem.",
+        getErrorMessage(error) || "Terjadi kesalahan sistem.",
         { id: loadingToast },
       );
     } finally {
@@ -294,8 +295,8 @@ export default function ManagementTab({
               isEditor ? "Pengajuan hapus dikirim!" : "Anggota dihapus!",
               { id: loadingToast },
             );
-          } catch (error: any) {
-            toast.error(error.response?.data?.message || "Gagal menghapus", {
+          } catch (error: unknown) {
+            toast.error(getErrorMessage(error) || "Gagal menghapus", {
               id: loadingToast,
             });
           }

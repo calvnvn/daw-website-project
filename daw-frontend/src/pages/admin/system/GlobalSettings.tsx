@@ -22,6 +22,7 @@ import { toast } from "sonner";
 import api from "@/lib/api";
 import { getCleanImageUrl } from "@/lib/utils";
 import { useSettings } from "@/contexts/SettingsContext";
+import { getErrorMessage } from "@/lib/utils";
 
 export default function GlobalSettings() {
   const {
@@ -197,11 +198,11 @@ export default function GlobalSettings() {
       toast.success("Notifikasi revisi berhasil diabaikan.", { id: toastId });
 
       await refreshSettings();
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast.error("Gagal mengabaikan draf", {
         id: toastId,
         description:
-          error.response?.data?.message ||
+          getErrorMessage(error) ||
           "Kesalahan komunikasi dengan server.",
       });
     }
@@ -270,10 +271,10 @@ export default function GlobalSettings() {
         isSuperadmin ? "Perubahan live berhasil!" : "Revisi diajukan",
         { id: loadingToast },
       );
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast.error("Gagal Memperbarui", {
         description:
-          error.response?.data?.message || "Periksa koneksi internet.",
+          getErrorMessage(error) || "Periksa koneksi internet.",
         id: loadingToast,
       });
     } finally {

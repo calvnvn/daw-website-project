@@ -13,6 +13,7 @@ import {
 import { useBusiness } from "@/contexts/BusinessContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
+import { getErrorMessage } from "@/lib/utils";
 
 export default function CategoryManager() {
   const { user } = useAuth();
@@ -53,8 +54,8 @@ export default function CategoryManager() {
     try {
       await addCategory({ ...newCat }, "Published");
       setNewCat({ id: "", name: "", color: "#004B23" });
-    } catch (err: any) {
-      toast.error(err.response?.data?.message || "Gagal menambah kategori");
+    } catch (err: unknown) {
+      toast.error(getErrorMessage(err) || "Gagal menambah kategori");
     }
   };
 

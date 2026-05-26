@@ -10,6 +10,7 @@ import api from "@/lib/api";
 import { toast } from "sonner";
 import { useTranslation } from "react-i18next";
 import { useAuth } from "./AuthContext";
+import { getErrorMessage } from "@/lib/utils";
 
 export interface MapCategory {
   id: string;
@@ -101,15 +102,27 @@ export const BusinessProvider = ({ children }: { children: ReactNode }) => {
         if (response.data.hasRejected) {
           setRejectedDraft(response.data.data);
         }
-      } catch (error: any) {
+      } catch (error: unknown) {
         if (
-          error.name === "CanceledError" ||
-          error.message?.includes("canceled")
+          (typeof error === "object" &&
+            error !== null &&
+            "name" in error &&
+            (error as { name?: string }).name === "CanceledError") ||
+          (typeof error === "object" &&
+            error !== null &&
+            "message" in error &&
+            typeof (error as { message?: string }).message === "string" &&
+            (error as { message: string }).message.includes("canceled"))
         ) {
           return;
         }
 
-        if (error.response?.status === 404) {
+        if (
+          typeof error === "object" &&
+          error !== null &&
+          "response" in error &&
+          (error as { response?: { status?: number } }).response?.status === 404
+        ) {
           setRejectedDraft(null);
         } else {
           console.error("[FETCH_REJECTED_ERROR]:", error);
@@ -136,13 +149,13 @@ export const BusinessProvider = ({ children }: { children: ReactNode }) => {
     try {
       const promises: Promise<any>[] = [
         api.get("/map-categories", {
-          params: { lang: i18n.language === "id" ? "id" : "en" }
+          params: { lang: i18n.language === "id" ? "id" : "en" },
         }), // index 0
         api.get("/projects/public", {
-          params: { lang: i18n.language === "id" ? "id" : "en" }
+          params: { lang: i18n.language === "id" ? "id" : "en" },
         }), // index 1
         api.get("/businesses/public", {
-          params: { lang: i18n.language === "id" ? "id" : "en" }
+          params: { lang: i18n.language === "id" ? "id" : "en" },
         }), // index 2
       ];
 
@@ -241,15 +254,18 @@ export const BusinessProvider = ({ children }: { children: ReactNode }) => {
 
         clearRejectedDraft();
         await refreshData();
-      } catch (error: any) {
+      } catch (error: unknown) {
         console.error(
           "🚨 [UPDATE_SECTION_FAILURE]:",
-          error.response?.data || error.message,
+          (typeof error === "object" && error !== null && "response" in error
+            ? (error as any).response
+            : undefined) || getErrorMessage(error),
         );
 
         const errorMessage =
-          error.response?.data?.message ||
-          "Gagal memproses perubahan sektor bisnis.";
+          (typeof error === "object" && error !== null && "response" in error
+            ? (error as any).response?.data?.message
+            : undefined) || "Gagal memproses perubahan sektor bisnis.";
 
         toast.error("Gagal Memperbarui", {
           id: toastId,
@@ -270,8 +286,8 @@ export const BusinessProvider = ({ children }: { children: ReactNode }) => {
         await api.post("/map-categories", data);
         await refreshData();
         toast.success("Kategori baru berhasil ditambahkan!");
-      } catch (error: any) {
-        toast.error(error.response?.data?.message || "Gagal menambah kategori");
+      } catch (error: unknown) {
+        toast.error(getErrorMessage(error) || "Gagal menambah kategori");
         throw error;
       } finally {
         setIsProcessing(false);
@@ -287,7 +303,7 @@ export const BusinessProvider = ({ children }: { children: ReactNode }) => {
         await api.put(`/map-categories/${id}`, data);
         await refreshData();
         toast.success("Kategori berhasil diperbarui!");
-      } catch (error: any) {
+      } catch (error) {
         toast.error("Gagal memperbarui kategori");
         throw error;
       } finally {
@@ -304,7 +320,7 @@ export const BusinessProvider = ({ children }: { children: ReactNode }) => {
         await api.delete(`/map-categories/${id}`);
         await refreshData();
         toast.success("Kategori telah dihapus");
-      } catch (error: any) {
+      } catch (error) {
         toast.error(
           "Gagal menghapus (Kategori mungkin masih digunakan oleh marker)",
         );
@@ -333,11 +349,11 @@ export const BusinessProvider = ({ children }: { children: ReactNode }) => {
         }
 
         await refreshData();
-      } catch (error: any) {
+      } catch (error: unknown) {
         console.error("[ADD_SECTION_ERROR]:", error);
         toast.error("Gagal Membuat Sektor", {
           id: toastId,
-          description: error.response?.data?.message || error.message,
+          description: getErrorMessage(error) || "Gagal Membuat Sektor",
         });
         throw error;
       } finally {
@@ -354,7 +370,7 @@ export const BusinessProvider = ({ children }: { children: ReactNode }) => {
         const res = await api.delete(`/businesses/admin/${id}`);
         await refreshData();
         return res;
-      } catch (error: any) {
+      } catch (error) {
         console.error("[DELETE_SECTION_ERROR]:", error);
         throw error;
       } finally {

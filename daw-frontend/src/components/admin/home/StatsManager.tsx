@@ -15,6 +15,7 @@ import {
 import * as Icons from "lucide-react";
 import { toast } from "sonner";
 import api from "@/lib/api";
+import { getErrorMessage } from "@/lib/utils";
 
 const AVAILABLE_ICONS = [
   { name: "Map", label: "Map / Area" },
@@ -27,7 +28,11 @@ const AVAILABLE_ICONS = [
   { name: "Globe", label: "Globe / Global" },
 ];
 
-export default function StatsManager({ mode = "edit" }: { mode?: "edit" | "preview" }) {
+export default function StatsManager({
+  mode = "edit",
+}: {
+  mode?: "edit" | "preview";
+}) {
   const { stats: initialStats, refreshData, rejectedStatsMap } = useHome();
   const { user } = useAuth();
 
@@ -126,9 +131,9 @@ export default function StatsManager({ mode = "edit" }: { mode?: "edit" | "previ
             await api.patch("/approval/discard", { notrans: draft.notrans });
             toast.success("Notifikasi berhasil diabaikan.", { id: toastId });
             await refreshData(); // Flush Global State
-          } catch (error: any) {
+          } catch (error: unknown) {
             toast.error("Gagal mengabaikan draf.", {
-              description: error.response?.data?.message || "Kesalahan server.",
+              description: getErrorMessage(error, "Kesalahan server."),
               id: toastId,
             });
           }
@@ -238,7 +243,8 @@ export default function StatsManager({ mode = "edit" }: { mode?: "edit" | "previ
             {
               loading: "Memproses...",
               success: (msg) => msg,
-              error: (err) => err.response?.data?.message || "Gagal menghapus.",
+              error: (err: unknown) =>
+                getErrorMessage(err, "Gagal menghapus."),
             },
           );
         },
@@ -361,10 +367,18 @@ export default function StatsManager({ mode = "edit" }: { mode?: "edit" | "previ
           },
         );
       }
-    } catch (error: any) {
-      if (error.name === "CanceledError") return;
+    } catch (error: unknown) {
+      if (
+        typeof error === "object" &&
+        error !== null &&
+        "name" in error &&
+        (error as { name?: string }).name === "CanceledError"
+      ) {
+        return;
+      }
       console.error("Critical Save Error:", error);
       toast.error("Terjadi kesalahan fatal saat menyimpan.", {
+        description: getErrorMessage(error),
         id: loadingToast,
       });
     } finally {

@@ -75,9 +75,9 @@ class ErpApprovalService {
       };
 
       // console.log(
-        ">>> [STRICT DEBUG] Payload to /trans/add:",
-        JSON.stringify(payloadTransAdd, null, 2),
-      );
+      //   ">>> [STRICT DEBUG] Payload to /trans/add:",
+      //   JSON.stringify(payloadTransAdd, null, 2),
+      // );
 
       const response = await dawApi.post(
         "/node/approval/trans/add",
@@ -88,8 +88,8 @@ class ErpApprovalService {
       );
 
       // console.log(
-        `>>> [ERP COURIER] ✅ Success: Ticket ${notrans} registered to ERP.`,
-      );
+      //   `>>> [ERP COURIER] ✅ Success: Ticket ${notrans} registered to ERP.`,
+      // );
       return { success: true, notrans, data: response.data };
     } catch (error) {
       this._handleError(error, "initiateApproval - /trans/add");
@@ -154,9 +154,9 @@ class ErpApprovalService {
       };
 
       // console.log(
-        ">>> [ERP COURIER PRE-FLIGHT] Submit Decision Payload:",
-        JSON.stringify(payload, null, 2),
-      );
+      //   ">>> [ERP COURIER PRE-FLIGHT] Submit Decision Payload:",
+      //   JSON.stringify(payload, null, 2),
+      // );
 
       const response = await dawApi.post(
         "/node/approval/trans/submitApp",

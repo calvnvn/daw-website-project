@@ -110,8 +110,8 @@ export default function NewsEventDetail() {
           params: { lang: i18n.language === "id" ? "id" : "en" },
         });
         setArticle(res.data);
-      } catch (error: any) {
-        if (error.response?.status === 404) {
+      } catch (error: unknown) {
+        if ((typeof error === "object" && error !== null && "response" in error ? (error as any).response?.status : undefined) === 404) {
           toast.error("Article not found");
           navigate("/news");
         } else {

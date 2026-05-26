@@ -14,6 +14,7 @@ import {
 import api from "@/lib/api";
 import { toast } from "sonner";
 import SubjectManagerModal from "./SubjectManagerModal";
+import { getErrorMessage } from "@/lib/utils";
 
 interface Inquiry {
   id: number;
@@ -158,9 +159,9 @@ export default function Inbox() {
       toast.success("Messages deleted permanently!", { id: loadingToast });
       setSelectedMails([]); // Reset centangan
       setSelectedInquiryId(null);
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("Bulk delete error", err);
-      toast.error(err.response?.data?.message || "Failed to delete messages.", {
+      toast.error(getErrorMessage(err) || "Failed to delete messages.", {
         id: loadingToast,
       });
     }
@@ -211,9 +212,9 @@ export default function Inbox() {
       }
 
       toast.success("Message deleted!", { id: loadingToast });
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Delete error:", error);
-      toast.error(error.response?.data?.message || "Failed to delete message", {
+      toast.error(getErrorMessage(error) || "Failed to delete message", {
         id: loadingToast,
       });
     }

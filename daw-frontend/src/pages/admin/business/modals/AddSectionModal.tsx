@@ -2,6 +2,7 @@ import { useState, useMemo } from "react";
 import { Plus, X, Save, Loader2, Send } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
+import { getErrorMessage } from "@/lib/utils";
 
 interface AddSectionModalProps {
   onClose: () => void;
@@ -37,9 +38,9 @@ export default function AddSectionModal({
     try {
       await addSection(trimmedName, `Explore Our ${trimmedName} Operations`);
       onClose();
-    } catch (error: any) {
+    } catch (error: unknown) {
       const errMsg =
-        error.response?.data?.message || "Gagal membuat sektor baru";
+        getErrorMessage(error) || "Gagal membuat sektor baru";
       toast.error(errMsg);
       console.error("[ADD_SECTION_MODAL_ERROR]:", error);
     } finally {

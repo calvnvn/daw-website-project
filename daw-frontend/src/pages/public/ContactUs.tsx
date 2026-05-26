@@ -113,7 +113,7 @@ export default function ContactUs() {
       toast.success(
         t("contactPage.form.success", "Message sent successfully!"),
       );
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Submission error:", error);
       // Feedback error yang lebih informatif menggunakan utilitas getErrorMessage
       toast.error(

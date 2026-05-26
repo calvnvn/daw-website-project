@@ -26,6 +26,7 @@ import { useDropzone } from "react-dropzone";
 import api, { BASE_UPLOAD_URL } from "@/lib/api";
 import { compressImage } from "@/utils/imageHelper";
 import { useAuth } from "@/contexts/AuthContext";
+import { getErrorMessage } from "@/lib/utils";
 
 interface NewsCategory {
   id: string;
@@ -190,8 +191,8 @@ export default function NewsForm() {
           setRejectedDraft(draftRes.value.data.data);
           setShowDraftBanner(true);
         }
-      } catch (error: any) {
-        if (error.name !== "CanceledError") {
+      } catch (error: unknown) {
+        if (!(typeof error === "object" && error !== null && "name" in error && (error as { name?: string }).name === "CanceledError")) {
           toast.error("Gagal memuat data artikel");
           navigate("/admin/news");
         }
@@ -216,10 +217,10 @@ export default function NewsForm() {
       setRejectedDraft(null);
       setShowDraftBanner(false);
       setFormData((prev) => ({ ...prev, is_locked: false, lock_ticket: "" }));
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast.error("Gagal mengabaikan draf", {
         id: toastId,
-        description: error.response?.data?.message,
+        description: getErrorMessage(error),
       });
     } finally {
       setIsDiscarding(false);
@@ -290,10 +291,10 @@ export default function NewsForm() {
             response.data.url,
           );
           toast.success("Gambar disisipkan!", { id: toastId });
-        } catch (err: any) {
+        } catch (err: unknown) {
           toast.error("Upload gagal", {
             id: toastId,
-            description: err.response?.data?.message,
+            description: getErrorMessage(err),
           });
         }
       }
@@ -404,10 +405,10 @@ export default function NewsForm() {
         }
         setTimeout(() => navigate("/admin/news"), 800);
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       toast.error("Gagal menyimpan", {
         id: loadingToast,
-        description: err.response?.data?.message || "Koneksi terganggu.",
+        description: getErrorMessage(err) || "Koneksi terganggu.",
       });
     } finally {
       setIsSaving(false);

@@ -113,9 +113,9 @@ export default function DynamicPage() {
         }
 
         setPageData(data);
-      } catch (error: any) {
-        if (error.name === "CanceledError") return; // Abaikan jika request dibatalkan
-        if (error.response?.status === 404) setIsNotFound(true);
+      } catch (error: unknown) {
+        if ((typeof error === "object" && error !== null && "name" in error && (error as { name?: string }).name === "CanceledError")) return; // Abaikan jika request dibatalkan
+        if ((typeof error === "object" && error !== null && "response" in error ? (error as any).response?.status : undefined) === 404) setIsNotFound(true);
         else setIsError(true);
         console.error("Fetch Page Failure:", error);
       } finally {

@@ -24,6 +24,7 @@ import api from "@/lib/api";
 import { useAuth } from "@/contexts/AuthContext";
 import ReactDiffViewer, { DiffMethod } from "react-diff-viewer-continued";
 import PREVIEW_REGISTRY from "./ModuleRegistry";
+import { getErrorMessage } from "@/lib/utils";
 
 export interface ApprovalDraft {
   notrans: string;
@@ -130,8 +131,8 @@ const DiffModal = ({
           signal: abortController.signal,
         });
         setOldData(response.data);
-      } catch (error: any) {
-        if (error.name !== "CanceledError") {
+      } catch (error: unknown) {
+        if (!(typeof error === "object" && error !== null && "name" in error && (error as { name?: string }).name === "CanceledError")) {
           setOldData({ _system_note: "Gagal menarik data Live dari Server." });
         }
       } finally {
@@ -713,10 +714,10 @@ export default function ApprovalCenter() {
       });
       setSelectedDraft(null);
       fetchApprovals();
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast.error("Eksekusi gagal", {
         description:
-          error.response?.data?.message || "Kesalahan internal server.",
+          getErrorMessage(error) || "Kesalahan internal server.",
         id: toastId,
       });
     } finally {
@@ -755,9 +756,9 @@ export default function ApprovalCenter() {
       });
       setSelectedDraft(null);
       fetchApprovals();
-    } catch (err: any) {
+    } catch (err: unknown) {
       toast.error("Gagal mengirim penolakan", {
-        description: err.response?.data?.message || "Kesalahan internal.",
+        description: getErrorMessage(err) || "Kesalahan internal.",
         id: toastId,
       });
     } finally {
@@ -771,9 +772,9 @@ export default function ApprovalCenter() {
   //     await api.patch('/approval/discard', { notrans });
   //     toast.success("Notifikasi draf berhasil diabaikan.", { id: toastId });
   //     fetchApprovals(); // Refresh UI
-  //   } catch (error: any) {
+  //   } catch (error: unknown) {
   //     toast.error("Gagal mengabaikan draf", {
-  //       description: error.response?.data?.message || "Kesalahan server.",
+  //       description: getErrorMessage(error) || "Kesalahan server.",
   //       id: toastId,
   //     });
   //   }
@@ -842,10 +843,10 @@ export default function ApprovalCenter() {
 
       toast.success("Tiket berhasil dihapus!", { id: toastId });
       fetchApprovals();
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast.error("Gagal melakukan Purge", {
         description:
-          error.response?.data?.message || "ERP OWL menolak permintaan.",
+          getErrorMessage(error) || "ERP OWL menolak permintaan.",
         id: toastId,
       });
     } finally {

@@ -22,6 +22,7 @@ import {
 import { toast } from "sonner";
 import api, { BASE_UPLOAD_URL } from "@/lib/api";
 import { useAuth } from "@/contexts/AuthContext";
+import { getErrorMessage } from "@/lib/utils";
 
 interface EditableSlide extends Omit<HeroSlides, "id"> {
   id: string | number;
@@ -31,7 +32,11 @@ interface EditableSlide extends Omit<HeroSlides, "id"> {
   isDeleting?: boolean;
 }
 
-export default function HeroManager({ mode = "edit" }: { mode?: "edit" | "preview" }) {
+export default function HeroManager({
+  mode = "edit",
+}: {
+  mode?: "edit" | "preview";
+}) {
   const { slides: initialSlides, rejectedSlidesMap, refreshData } = useHome();
   const { user } = useAuth();
 
@@ -183,8 +188,8 @@ export default function HeroManager({ mode = "edit" }: { mode?: "edit" | "previe
             {
               loading: "Memproses...",
               success: (msg) => msg,
-              error: (err) =>
-                err.response?.data?.message || "Gagal menghapus slide.",
+              error: (err: unknown) =>
+                getErrorMessage(err, "Gagal menghapus slide."),
             },
           );
         },
@@ -363,12 +368,10 @@ export default function HeroManager({ mode = "edit" }: { mode?: "edit" | "previe
               ),
             );
           }
-        } catch (itemError: any) {
-          console.error(`Gagal menyimpan slide ${slide.id}:`, itemError);
+        } catch (itemError: unknown) {
           hasError = true;
           toast.error(`Gagal menyimpan slide: ${slide.title || "Baru"}`, {
-            description:
-              itemError.response?.data?.message || "Kesalahan jaringan.",
+            description: getErrorMessage(itemError, "Kesalahan jaringan."),
           });
         }
       }

@@ -16,6 +16,7 @@ import { toast } from "sonner";
 import api from "@/lib/api";
 import { useBusiness } from "@/contexts/BusinessContext";
 import { useAuth } from "@/contexts/AuthContext";
+import { getErrorMessage } from "@/lib/utils";
 
 export interface AdminProject {
   id: string;
@@ -82,11 +83,11 @@ export default function ProjectManagement() {
       const response = await api.get("/projects");
       const data = response.data?.success ? response.data.data : response.data;
       if (Array.isArray(data)) setProjects(data);
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("[FETCH_PROJECTS_ERROR]:", error);
       toast.error("Gagal sinkronisasi data proyek", {
         description:
-          error.response?.data?.message || "Kesalahan koneksi server.",
+          getErrorMessage(error) || "Kesalahan koneksi server.",
       });
     } finally {
       setIsLoading(false);

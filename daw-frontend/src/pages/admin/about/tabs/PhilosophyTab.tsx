@@ -19,6 +19,7 @@ import { useAbout } from "@/contexts/AboutContext";
 import type { PhilosophyPillar } from "@/contexts/AboutContext";
 import { AVAILABLE_ICONS } from "../AboutConstants";
 import AboutLivePreview from "@/components/admin/about/AboutLivePreview";
+import { getErrorMessage } from "@/lib/utils";
 
 interface PhilosophyTabProps {
   isEditing: boolean;
@@ -109,8 +110,8 @@ export default function PhilosophyTab({
         isSuperadmin ? "Headline disimpan!" : "Draf headline diajukan!",
         { id: loadingToast },
       );
-    } catch (error: any) {
-      toast.error(error.response?.data?.message || "Kesalahan jaringan", {
+    } catch (error: unknown) {
+      toast.error(getErrorMessage(error) || "Kesalahan jaringan", {
         id: loadingToast,
       });
     } finally {
@@ -294,8 +295,8 @@ export default function PhilosophyTab({
         { id: loadingToast },
       );
       setIsModalOpen(false);
-    } catch (error: any) {
-      toast.error(error.response?.data?.message || "Sistem error", {
+    } catch (error: unknown) {
+      toast.error(getErrorMessage(error) || "Sistem error", {
         id: loadingToast,
       });
     } finally {
@@ -317,8 +318,8 @@ export default function PhilosophyTab({
               isEditor ? "Pengajuan hapus dikirim!" : "Pilar dihapus!",
               { id: loadingToast },
             );
-          } catch (error: any) {
-            toast.error(error.response?.data?.message || "Gagal", {
+          } catch (error: unknown) {
+            toast.error(getErrorMessage(error) || "Gagal", {
               id: loadingToast,
             });
           }

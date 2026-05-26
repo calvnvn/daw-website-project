@@ -3,6 +3,7 @@ import { Trash2, X, AlertTriangle, Send, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
 import { type SectionData } from "@/contexts/BusinessContext";
+import { getErrorMessage } from "@/lib/utils";
 
 interface DeleteSectionModalProps {
   activeTab: string;
@@ -58,10 +59,10 @@ export default function DeleteSectionModal({
       // 4. Transisi UI
       setActiveTab(fallbackTab);
       onClose();
-    } catch (error: any) {
+    } catch (error: unknown) {
       // Jalur ini sudah benar di kode lo sebelumnya
       const message =
-        error.response?.data?.message || "Gagal memproses penghapusan.";
+        getErrorMessage(error) || "Gagal memproses penghapusan.";
       toast.error("Gagal Menghapus", {
         id: toastId,
         description: message,

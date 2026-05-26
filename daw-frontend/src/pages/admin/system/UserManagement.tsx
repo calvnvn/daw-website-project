@@ -13,6 +13,7 @@ import {
 import api from "@/lib/api";
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
+import { getErrorMessage } from "@/lib/utils";
 
 interface AdminUser {
   id: string;
@@ -137,8 +138,8 @@ export default function UserManagement() {
 
       fetchUsersAndRoles();
       handleCloseModal();
-    } catch (error: any) {
-      toast.error(error.response?.data?.message || "Gagal mendaftarkan user.", {
+    } catch (error: unknown) {
+      toast.error(getErrorMessage(error) || "Gagal mendaftarkan user.", {
         id: loadingToast,
       });
     }
@@ -159,9 +160,9 @@ export default function UserManagement() {
       await api.put(`/users/${user.id}`, { status: newStatus });
       toast.success(`Berhasil ${actionText} user ${user.owl_username}.`);
       fetchUsersAndRoles();
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast.error(
-        error.response?.data?.message || "Gagal mengubah status user.",
+        getErrorMessage(error) || "Gagal mengubah status user.",
       );
     }
   };
@@ -192,10 +193,10 @@ export default function UserManagement() {
             await api.delete(`/users/${id}`);
             toast.success("Akses Dicabut", { id: loadingToast });
             fetchUsersAndRoles();
-          } catch (error: any) {
+          } catch (error: unknown) {
             toast.error("Gagal", {
               id: loadingToast,
-              description: error.response?.data?.message,
+              description: getErrorMessage(error),
             });
           }
         },
@@ -245,11 +246,11 @@ export default function UserManagement() {
           description: `${targetUser?.owl_username} sekarang adalah ${newRole?.name}.`,
         });
         fetchUsersAndRoles();
-      } catch (error: any) {
+      } catch (error: unknown) {
         toast.error("Gagal Update", {
           id: loadingToast,
           description:
-            error.response?.data?.message || "Internal server error.",
+            getErrorMessage(error) || "Internal server error.",
         });
         fetchUsersAndRoles(); // Revert UI
       }

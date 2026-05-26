@@ -104,8 +104,8 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
       }
 
       setRejectedSettings(finalRejectedData);
-    } catch (err: any) {
-      if (err.name !== "CanceledError") {
+    } catch (err: unknown) {
+      if (!(typeof err === "object" && err !== null && "name" in err && (err as { name?: string }).name === "CanceledError")) {
         console.error("🚨 Radar System Failure:", err);
         toast.error("Gagal sinkronisasi radar birokrasi.");
       }

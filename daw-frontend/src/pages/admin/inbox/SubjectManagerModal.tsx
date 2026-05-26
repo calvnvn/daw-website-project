@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 import api from "@/lib/api";
 import { toast } from "sonner";
+import { getErrorMessage } from "@/lib/utils";
 
 interface SubjectManagerModalProps {
   isOpen: boolean;
@@ -107,9 +108,9 @@ export default function SubjectManagerModal({
       setEditingSubjectId(null);
       fetchSubjects();
       onRefresh(); // Supaya tab di Inbox ikut ke-update
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast.error(
-        error.response?.data?.message || "Failed to save subject setup",
+        getErrorMessage(error) || "Failed to save subject setup",
       );
     }
   };
@@ -128,7 +129,7 @@ export default function SubjectManagerModal({
             toast.success("Subject Deleted", { id: loadingToast });
             fetchSubjects();
             onRefresh();
-          } catch (error: any) {
+          } catch (error: unknown) {
             toast.error("Delete Failed", { id: loadingToast });
           }
         },

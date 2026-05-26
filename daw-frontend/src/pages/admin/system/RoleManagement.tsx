@@ -11,6 +11,7 @@ import {
 import api from "@/lib/api";
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
+import { getErrorMessage } from "@/lib/utils";
 
 interface Permission {
   id: string;
@@ -132,8 +133,8 @@ export default function RoleManagement() {
       }
       fetchData();
       handleCloseModal();
-    } catch (error: any) {
-      toast.error(error.response?.data?.message || "Operation failed.", {
+    } catch (error: unknown) {
+      toast.error(getErrorMessage(error) || "Operation failed.", {
         id: loadingToast,
       });
     }
@@ -154,8 +155,8 @@ export default function RoleManagement() {
             await api.delete(`/roles/${id}`);
             toast.success("Role deleted.", { id: loadingToast });
             fetchData();
-          } catch (error: any) {
-            toast.error(error.response?.data?.message || "Delete failed", {
+          } catch (error: unknown) {
+            toast.error(getErrorMessage(error) || "Delete failed", {
               id: loadingToast,
             });
           }

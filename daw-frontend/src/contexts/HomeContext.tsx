@@ -11,6 +11,7 @@ import {
 import api from "@/lib/api";
 import { useAuth } from "./AuthContext"; // 1. Import useAuth
 import { useTranslation } from "react-i18next";
+import { getErrorMessage } from "@/lib/utils";
 
 // TYPE DEFINITIONS (Tetap Sama)
 export interface HeroSlides {
@@ -115,8 +116,8 @@ export function HomeProvider({ children }: { children: ReactNode }) {
             // Tembak jalur Admin
             const response = await api.get(`/homepage/admin?lang=${lang}`, { signal });
             payload = response.data?.data || response.data;
-          } catch (adminError: any) {
-            if (adminError.name === "CanceledError") return;
+          } catch (adminError: unknown) {
+            if ((typeof adminError === "object" && adminError !== null && "name" in adminError && (adminError as { name?: string }).name === "CanceledError")) return;
             console.warn(
               "⚠️ [RETRY] Admin fetch failed, falling back to public data...",
             );
@@ -137,9 +138,9 @@ export function HomeProvider({ children }: { children: ReactNode }) {
 
         // Radar hanya diisi jika payload memiliki data rejectionRadar (biasanya dari admin)
         setRawRejectionRadar(payload?.rejectionRadar || []);
-      } catch (error: any) {
-        if (error.name !== "CanceledError") {
-          console.error("🚨 [FATAL] Gagal menarik data Home:", error.message);
+      } catch (error: unknown) {
+        if (!(typeof error === "object" && error !== null && "name" in error && (error as { name?: string }).name === "CanceledError")) {
+          console.error("🚨 [FATAL] Gagal menarik data Home:", getErrorMessage(error));
           setSlides([]);
           setStats([]);
           setRawRejectionRadar([]);

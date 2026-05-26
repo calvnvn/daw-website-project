@@ -28,6 +28,7 @@ import { compressImage } from "@/utils/imageHelper";
 import { useAuth } from "@/contexts/AuthContext";
 import { useBusiness } from "@/contexts/BusinessContext";
 import DOMPurify from "dompurify";
+import { getErrorMessage } from "@/lib/utils";
 
 interface RejectedDraft {
   notrans: string;
@@ -485,8 +486,8 @@ export default function ProjectForm() {
         ) {
           console.error("Recovery Data Fetch Error:", draftRes.reason);
         }
-      } catch (error: any) {
-        if (error.name !== "CanceledError") {
+      } catch (error: unknown) {
+        if (!(typeof error === "object" && error !== null && "name" in error && (error as { name?: string }).name === "CanceledError")) {
           console.error("Fetch Error:", error);
           toast.error("Gagal memuat data proyek", {
             description: "Mohon periksa koneksi atau hubungi IT.",
@@ -518,11 +519,11 @@ export default function ProjectForm() {
 
       setRejectedDraft(null);
       setShowDraftBanner(false);
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast.error("Gagal mengabaikan draf", {
         id: toastId,
         description:
-          error.response?.data?.message ||
+          getErrorMessage(error) ||
           "Kesalahan komunikasi dengan server.",
       });
     }
@@ -629,11 +630,11 @@ export default function ProjectForm() {
           quill.setSelection(index + 1);
 
           toast.success("Gambar disisipkan!", { id: toastId });
-        } catch (err: any) {
+        } catch (err: unknown) {
           toast.error("Upload gagal", {
             id: toastId,
             description:
-              err.response?.data?.message || "Kesalahan pada server.",
+              getErrorMessage(err) || "Kesalahan pada server.",
           });
         }
       }
@@ -821,11 +822,11 @@ export default function ProjectForm() {
         // Delay sedikit agar user sempat membaca toast sebelum redirect
         setTimeout(() => navigate("/admin/projects"), 800);
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("🚨 [FORM_SAVE_ERROR]:", err);
       toast.error("Gagal melakukan penyimpanan", {
         id: loadingToast,
-        description: err.response?.data?.message || "Koneksi server terganggu.",
+        description: getErrorMessage(err) || "Koneksi server terganggu.",
       });
     } finally {
       setIsSaving(false);

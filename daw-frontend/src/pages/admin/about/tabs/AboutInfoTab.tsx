@@ -12,6 +12,7 @@ import { toast } from "sonner";
 import api from "@/lib/api";
 import { useAbout } from "@/contexts/AboutContext";
 import AboutLivePreview from "@/components/admin/about/AboutLivePreview";
+import { getErrorMessage } from "@/lib/utils";
 
 interface AboutInfoTabProps {
   isEditing: boolean;
@@ -196,8 +197,8 @@ export default function AboutInfoTab({
           : "Draf berhasil diajukan!",
         { id: loadingToast },
       );
-    } catch (error: any) {
-      toast.error(error.response?.data?.message || "Kesalahan jaringan", {
+    } catch (error: unknown) {
+      toast.error(getErrorMessage(error) || "Kesalahan jaringan", {
         id: loadingToast,
       });
     } finally {

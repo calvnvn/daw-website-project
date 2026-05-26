@@ -11,6 +11,7 @@ import {
 import api from "@/lib/api";
 import { useTranslation } from "react-i18next";
 import { useAuth } from "./AuthContext";
+import { getErrorMessage } from "@/lib/utils";
 
 export interface InvestmentSettings {
   id?: number; // Singleton ID 1
@@ -138,12 +139,15 @@ export function InvestmentProvider({ children }: { children: ReactNode }) {
 
         setSettings(payload?.settings || null);
         setCompanies(payload?.companies || []);
-      } catch (error: any) {
-        if (error.name !== "CanceledError" && error.code !== "ERR_CANCELED") {
+      } catch (error: unknown) {
+        if (!(
+          (typeof error === "object" && error !== null && "name" in error && (error as { name?: string }).name === "CanceledError") ||
+          (typeof error === "object" && error !== null && "code" in error && (error as { code?: string }).code === "ERR_CANCELED")
+        )) {
           console.error("🚨 [FATAL] Global Investment Fetch Error:", {
-            message: error.message,
-            status: error.response?.status,
-            data: error.response?.data,
+            message: getErrorMessage(error),
+            status: (typeof error === "object" && error !== null && "response" in error ? (error as any).response?.status : undefined),
+            data: (typeof error === "object" && error !== null && "response" in error ? (error as any).response?.data : undefined),
           });
           setSettings(null);
           setCompanies([]);

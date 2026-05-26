@@ -206,8 +206,11 @@ export default function InvestmentsManager() {
         });
 
         setRejectedAffiliates((prev) => ({ ...prev, ...newRejectedState }));
-      } catch (error: any) {
-        if (error?.name !== "CanceledError" && error?.code !== "ERR_CANCELED") {
+      } catch (error: unknown) {
+        if (!(
+          (typeof error === "object" && error !== null && "name" in error && (error as { name?: string }).name === "CanceledError") ||
+          (typeof error === "object" && error !== null && "code" in error && (error as { code?: string }).code === "ERR_CANCELED")
+        )) {
           console.error("🚨 Gagal memuat kumpulan draf penolakan:", error);
         }
       }

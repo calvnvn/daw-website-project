@@ -18,6 +18,7 @@ import DeleteSectionModal from "./modals/DeleteSectionModal";
 import MapPickerModal from "./modals/MapPickerModal";
 import { useAuth } from "@/contexts/AuthContext";
 import { LockIcon, ShieldAlert } from "lucide-react";
+import { getErrorMessage } from "@/lib/utils";
 
 const normalizeBool = (val: any): boolean => {
   return val === true || val === "true" || val === 1 || val === "1";
@@ -199,11 +200,11 @@ export default function ManageBusinesses() {
       toast.success("Notifikasi revisi berhasil diabaikan.", { id: toastId });
       clearRejectedDraft();
       await refreshData(); // Sinkronisasi state Live dari backend
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast.error("Gagal mengabaikan draf", {
         id: toastId,
         description:
-          error.response?.data?.message ||
+          getErrorMessage(error) ||
           "Kesalahan komunikasi dengan server.",
       });
     }
@@ -267,9 +268,9 @@ export default function ManageBusinesses() {
           : "Revisi diajukan! Menunggu persetujuan.",
         { id: toastId },
       );
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("Save Error:", err);
-      toast.error(err.response?.data?.message || "Gagal menyimpan perubahan.", {
+      toast.error(getErrorMessage(err) || "Gagal menyimpan perubahan.", {
         id: toastId,
       });
     } finally {

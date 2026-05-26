@@ -19,6 +19,7 @@ import { PhotoPreviewer } from "../AboutSharedComponents";
 import { AVAILABLE_ICONS } from "../AboutConstants";
 import { getCleanImageUrl } from "@/lib/utils";
 import AboutLivePreview from "@/components/admin/about/AboutLivePreview";
+import { getErrorMessage } from "@/lib/utils";
 
 interface AchievementTabProps {
   isEditing: boolean;
@@ -250,9 +251,9 @@ export default function AchievementTab({
       await refreshData();
       toast.success("Penghargaan berhasil disimpan!", { id: loadingToast });
       setIsModalOpen(false);
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast.error(
-        error.response?.data?.message || "Terjadi kesalahan sistem.",
+        getErrorMessage(error) || "Terjadi kesalahan sistem.",
         { id: loadingToast },
       );
     } finally {
@@ -271,8 +272,8 @@ export default function AchievementTab({
             await api.delete(`/achievements/${id}`, { timeout: 60000 });
             await refreshData(); // Optimistic data update
             toast.success("Penghargaan dihapus!", { id: loadingToast });
-          } catch (error: any) {
-            toast.error(error.response?.data?.message || "Gagal menghapus", {
+          } catch (error: unknown) {
+            toast.error(getErrorMessage(error) || "Gagal menghapus", {
               id: loadingToast,
             });
           }

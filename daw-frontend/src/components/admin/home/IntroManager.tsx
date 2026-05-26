@@ -15,8 +15,13 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import api from "@/lib/api";
+import { getErrorMessage } from "@/lib/utils";
 
-export default function IntroManager({ mode = "edit" }: { mode?: "edit" | "preview" }) {
+export default function IntroManager({
+  mode = "edit",
+}: {
+  mode?: "edit" | "preview";
+}) {
   // 🚀 Identity Sync: Kasta Pengguna
   const { user } = useAuth();
   const isSuperadmin =
@@ -142,9 +147,9 @@ export default function IntroManager({ mode = "edit" }: { mode?: "edit" | "previ
             toast.success("Notifikasi berhasil diabaikan.", { id: toastId });
             setIsEditing(false);
             await refreshData();
-          } catch (error: any) {
+          } catch (error: unknown) {
             toast.error("Gagal mengabaikan draf.", {
-              description: error.response?.data?.message || "Kesalahan server.",
+              description: getErrorMessage(error, "Kesalahan server."),
               id: toastId,
             });
           }
@@ -211,13 +216,21 @@ export default function IntroManager({ mode = "edit" }: { mode?: "edit" | "previ
           : "Revisi intro diajukan!",
         { id: loadingToast },
       );
-    } catch (error: any) {
-      if (error.name === "CanceledError") return;
+    } catch (error: unknown) {
+      if (
+        typeof error === "object" &&
+        error !== null &&
+        "name" in error &&
+        (error as { name?: string }).name === "CanceledError"
+      ) {
+        return;
+      }
       console.error(error);
       toast.error("Gagal menyimpan data", {
-        description:
-          error.response?.data?.message ||
+        description: getErrorMessage(
+          error,
           "Silakan periksa koneksi atau coba lagi.",
+        ),
         id: loadingToast,
       });
     } finally {

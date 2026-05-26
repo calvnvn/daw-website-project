@@ -45,8 +45,12 @@ const injectToken = (config: InternalAxiosRequestConfig) => {
 };
 
 // Invalidate stale sessions and purge storage on 401 Unauthorized
-const handleAuthError = (error: any) => {
-  if (error.response?.status === 401) {
+const handleAuthError = (error: unknown) => {
+  if (
+    (typeof error === "object" && error !== null && "response" in error
+      ? (error as any).response?.status
+      : undefined) === 401
+  ) {
     // console.warn(
     //   "⚠️ [AUTH] Token expired or invalid. Auto-cleaning storage...",
     // );
