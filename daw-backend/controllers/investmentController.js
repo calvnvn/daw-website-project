@@ -1,667 +1,152 @@
-const sequelize = require("../config/database");
-const InvestmentSettings = require("../models/InvestmentSettings");
-const Affiliate = require("../models/Affiliate");
-const ApprovalDraft = require("../models/ApprovalDraft");
-const { invalidateOldDrafts } = require("../utils/draftCleanup");
-const { deleteSingleFile } = require("../utils/fileRemover");
-const { generateNotrans } = require("../utils/notransGenerator");
-const ErpApprovalService = require("../services/erpApprovalService");
-const JENIS_APP_CMS = process.env.CMS_APPROVAL_CODE;
+const investmentService = require("../services/investmentService");
 
-/**
- * Manages the investment portfolio and affiliate entities,
- * integrating local persistence with external ERP approval workflows.
- */
+const handleServiceError = (res, error, defaultMsg) => {
+  const msg = error.message;
 
-// Normalize global investment textual data
-const processInvestmentPayload = async (req, existingData = {}) => {
-  const { teaserHeadline, teaserBody, sectionIntro } = req.body;
-
-  return {
-    payload: {
-      teaserHeadline: teaserHeadline || existingData.teaserHeadline,
-      teaserBody: teaserBody || existingData.teaserBody,
-      sectionIntro: sectionIntro || existingData.sectionIntro,
-    },
-    filesToDelete: [],
-  };
-};
-
-// Transform affiliate data and manage asset (logo) lifecycle logic
-const processAffiliatePayload = async (req, existingData = {}) => {
-  const { name, desc, category, websiteUrl, removePhoto } = req.body;
-  let filesToDelete = [];
-  let finalLogoUrl = existingData.logoUrl || null;
-
-  if (req.file) {
-    if (existingData.logoUrl) filesToDelete.push(existingData.logoUrl);
-    finalLogoUrl = req.file.filename;
-  } else if (removePhoto === "true" || removePhoto === true) {
-    if (existingData.logoUrl) filesToDelete.push(existingData.logoUrl);
-    finalLogoUrl = null;
+  if (msg.startsWith("NOT_FOUND")) {
+    return res.status(404).json({ success: false, message: msg.split(": ")[1] });
   }
 
-  return {
-    payload: {
-      name: name || existingData.name,
-      desc: desc || existingData.desc,
-      category: category || existingData.category,
-      websiteUrl:
-        websiteUrl !== undefined ? websiteUrl : existingData.websiteUrl,
-      logoUrl: finalLogoUrl,
-    },
-    filesToDelete,
-  };
+  if (msg.startsWith("LOCKED")) {
+    const ticket = msg.split("tiket ")[1];
+    return res.status(423).json({
+      success: false,
+      message: "Akses Dibatasi. Data ini sedang dikunci oleh proses approval ERP.",
+      ticket,
+    });
+  }
+
+  console.error(`🚨 [INVESTMENT ERROR]:`, msg);
+  res.status(500).json({ success: false, message: defaultMsg || msg });
 };
 
-// Retrieve public-facing investment settings and active affiliates
+const getRole = (req) => req.userRole ? req.userRole.toLowerCase().trim() : "";
+const getActorId = (req) => String(req.owl_username || req.karyawanId || "").trim().toLowerCase();
+const getToken = (req) => req.headers["authorization"]?.split(" ")[1] || req.owl_token;
+
 exports.getPublicInvestmentData = async (req, res) => {
   try {
     const lang = req.query.lang || "en";
-    let settings = await InvestmentSettings.findByPk(1);
-    if (!settings) {
-      try {
-        settings = await InvestmentSettings.create({
-          id: 1,
-          teaserHeadline: "Other Investments.",
-          teaserBody: "Beyond our core operations...",
-          sectionIntro: "We continuously look for opportunities...",
-          is_locked: false,
-        });
-      } catch (err) {
-        settings = await InvestmentSettings.findByPk(1);
-      }
-    }
-
-    const companies = await Affiliate.findAll({
-      order: [["id", "ASC"]],
-      attributes: [
-        "id",
-        "name",
-        "desc",
-        "category",
-        "logoUrl",
-        "websiteUrl",
-        "is_locked",
-      ],
-    });
-    const createDrafts = await ApprovalDraft.findAll({
-      where: { module_name: "Affiliate", action: "CREATE", status: "Pending" },
-    });
-    const newDraftIds = createDrafts.map((d) => String(d.target_id));
-
-    // 3. SEMBUNYIKAN HANYA ITEM YANG BENAR-BENAR BARU DIBUAT (Belum di-approve)
-    const filteredCompanies = companies.filter(
-      (c) => !newDraftIds.includes(String(c.id)),
-    );
-
-    if (lang === "en") {
-      return res.status(200).json({ settings, companies: filteredCompanies });
-    }
-
-    // ─── LAZY ON-DEMAND TRANSLATION FOR INVESTMENTS ───
-    const Translation = require("../models/Translation");
-    const { autoTranslate } = require("../services/openaiService");
-
-    // 1. Translate InvestmentSettings
-    let plainSettings = settings.get({ plain: true });
-    const SETTINGS_MODULE = "InvestmentSettings";
-
-    let headlineTrans = await Translation.findOne({ where: { modelName: SETTINGS_MODULE, recordId: "1", field: "teaserHeadline", locale: "id" } });
-    let bodyTrans = await Translation.findOne({ where: { modelName: SETTINGS_MODULE, recordId: "1", field: "teaserBody", locale: "id" } });
-    let introTrans = await Translation.findOne({ where: { modelName: SETTINGS_MODULE, recordId: "1", field: "sectionIntro", locale: "id" } });
-
-    const needsHeadlineTrans = plainSettings.teaserHeadline && !headlineTrans;
-    const needsBodyTrans = plainSettings.teaserBody && !bodyTrans;
-    const needsIntroTrans = plainSettings.sectionIntro && !introTrans;
-
-    if (needsHeadlineTrans || needsBodyTrans || needsIntroTrans) {
-      console.log(`[Lazy Translation] Translating Investment Settings...`);
-      const freshHeadline = needsHeadlineTrans ? await autoTranslate(plainSettings.teaserHeadline, "Indonesian") : "";
-      const freshBody = needsBodyTrans ? await autoTranslate(plainSettings.teaserBody, "Indonesian") : "";
-      const freshIntro = needsIntroTrans ? await autoTranslate(plainSettings.sectionIntro, "Indonesian") : "";
-
-      const upsertSettingsTrans = async (field, translatedText) => {
-        if (!translatedText) return;
-        const existing = await Translation.findOne({
-          where: { modelName: SETTINGS_MODULE, recordId: "1", field, locale: "id" }
-        });
-        if (existing) await existing.update({ translatedText });
-        else await Translation.create({ modelName: SETTINGS_MODULE, recordId: "1", field, locale: "id", translatedText });
-      };
-
-      if (freshHeadline) { await upsertSettingsTrans("teaserHeadline", freshHeadline); plainSettings.teaserHeadline = freshHeadline; }
-      if (freshBody) { await upsertSettingsTrans("teaserBody", freshBody); plainSettings.teaserBody = freshBody; }
-      if (freshIntro) { await upsertSettingsTrans("sectionIntro", freshIntro); plainSettings.sectionIntro = freshIntro; }
-    } else {
-      if (headlineTrans) plainSettings.teaserHeadline = headlineTrans.translatedText;
-      if (bodyTrans) plainSettings.teaserBody = bodyTrans.translatedText;
-      if (introTrans) plainSettings.sectionIntro = introTrans.translatedText;
-    }
-
-    // 2. Translate Affiliates Array
-    const AFFILIATE_MODULE = "Affiliate";
-    const translatedCompanies = [];
-
-    for (let i = 0; i < filteredCompanies.length; i++) {
-      let company = filteredCompanies[i].get({ plain: true });
-
-      let descTrans = await Translation.findOne({ where: { modelName: AFFILIATE_MODULE, recordId: company.id, field: "desc", locale: "id" } });
-
-      const needsDescTrans = company.desc && !descTrans;
-
-      if (needsDescTrans) {
-        console.log(`[Lazy Translation] Translating Affiliate Company: ${company.id}...`);
-        const freshDesc = await autoTranslate(company.desc, "Indonesian");
-
-        const upsertAffiliateTrans = async (field, translatedText) => {
-          if (!translatedText) return;
-          const existing = await Translation.findOne({
-            where: { modelName: AFFILIATE_MODULE, recordId: company.id, field, locale: "id" }
-          });
-          if (existing) await existing.update({ translatedText });
-          else await Translation.create({ modelName: AFFILIATE_MODULE, recordId: company.id, field, locale: "id", translatedText });
-        };
-
-        if (freshDesc) { await upsertAffiliateTrans("desc", freshDesc); company.desc = freshDesc; }
-      } else {
-        if (descTrans) company.desc = descTrans.translatedText;
-      }
-
-      translatedCompanies.push(company);
-    }
-
-    res.status(200).json({ settings: plainSettings, companies: translatedCompanies });
+    const data = await investmentService.getPublicInvestmentData(lang);
+    res.status(200).json(data);
   } catch (error) {
-    console.error("🚨 [GET_PUBLIC_INVESTMENT_ERROR]:", error.message);
-    res.status(500).json({ message: "Gagal mengambil data publik investasi." });
+    handleServiceError(res, error, "Gagal mengambil data publik investasi.");
   }
 };
 
-// Fetch admin-level data with rejection status tracking via cross-collation subqueries
 exports.getAdminInvestmentData = async (req, res) => {
   try {
-    let settings = await InvestmentSettings.findByPk(1);
-    if (!settings) {
-      try {
-        settings = await InvestmentSettings.create({
-          id: 1,
-          teaserHeadline: "Other Investments.",
-          teaserBody: "Beyond our core operations...",
-          sectionIntro: "We continuously look for opportunities...",
-          is_locked: false,
-        });
-      } catch (err) {
-        settings = await InvestmentSettings.findByPk(1);
-      }
-    }
-
-    const companies = await Affiliate.findAll({
-      attributes: {
-        include: [
-          [
-            // Force collation matching to prevent cross-system encoding errors
-            sequelize.literal(`(
-              SELECT COUNT(*)
-              FROM ApprovalDrafts AS ad
-              WHERE ad.target_id COLLATE utf8mb4_unicode_ci = CAST(Affiliate.id AS CHAR) COLLATE utf8mb4_unicode_ci
-                AND ad.status COLLATE utf8mb4_unicode_ci = 'Rejected'
-                AND ad.module_name COLLATE utf8mb4_unicode_ci = 'Affiliate'
-            )`),
-            "has_rejected_count",
-          ],
-        ],
-      },
-      order: [["id", "ASC"]],
-    });
-
-    const settingsDraft = await ApprovalDraft.count({
-      where: {
-        target_id: "1",
-        module_name: "InvestmentSettings",
-        status: "Rejected",
-      },
-    });
-
-    const resultCompanies = companies.map((c) => {
-      const data = c.get({ plain: true });
-      data.has_rejected = data.has_rejected_count > 0;
-      return data;
-    });
-
-    const resultSettings = settings.get({ plain: true });
-    resultSettings.has_rejected = settingsDraft > 0;
-
-    res
-      .status(200)
-      .json({ settings: resultSettings, companies: resultCompanies });
+    const data = await investmentService.getAdminInvestmentData();
+    res.status(200).json(data);
   } catch (error) {
-    console.error("🚨 [GET_ADMIN_INVESTMENT_ERROR]:", error.message);
-    res.status(500).json({ message: "Gagal mengambil data admin investasi." });
+    handleServiceError(res, error, "Gagal mengambil data admin investasi.");
   }
 };
 
 exports.getInvestmentData = async (req, res) => {
   try {
-    let settings = await InvestmentSettings.findOne();
-    if (!settings) {
-      settings = await InvestmentSettings.create({
-        teaserHeadline: "Other Investments.",
-        teaserBody: "Beyond our core operations...",
-        sectionIntro: "We continuously look for opportunities...",
-        is_locked: false,
-      });
-    }
-
-    const companies = await Affiliate.findAll({
-      order: [["id", "ASC"]],
-      attributes: [
-        "id",
-        "name",
-        "desc",
-        "category",
-        "logoUrl",
-        "websiteUrl",
-        "is_locked",
-        "lock_ticket",
-      ],
-    });
-
-    res.status(200).json({ settings, companies });
+    const data = await investmentService.getInvestmentData();
+    res.status(200).json(data);
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    handleServiceError(res, error, "Gagal mengambil data investasi.");
   }
 };
 
-// Update global investment text via ERP staging or direct override
 exports.updateSettings = async (req, res) => {
-  const t = await sequelize.transaction();
   try {
-    const userRole = req.userRole?.toLowerCase();
-    const { status, previous_notrans } = req.body;
-    const actorId = String(req.owl_username || req.karyawanId);
-
-    let settings = await InvestmentSettings.findByPk(1, {
-      transaction: t,
-      lock: t.LOCK.UPDATE,
+    const result = await investmentService.updateSettings({
+      userRole: getRole(req),
+      body: req.body,
+      actorId: getActorId(req),
+      owlToken: getToken(req),
     });
-    if (!settings) {
-      settings = await InvestmentSettings.create({ id: 1 }, { transaction: t });
-    }
 
-    if (settings.is_locked && userRole === "editor") {
-      await t.rollback();
-      return res.status(423).json({
-        success: false,
-        message:
-          "Akses Dibatasi. Pengaturan Investasi sedang dikunci oleh proses approval.",
-        ticket: settings.lock_ticket,
-      });
-    }
-
-    const { payload } = await processInvestmentPayload(req, settings);
-
-    if (userRole === "editor" && status === "Published") {
-      const notrans = await generateNotrans("INV_SET");
-
-      if (previous_notrans) {
-        await ApprovalDraft.update(
-          { status: "Replaced" },
-          { where: { notrans: previous_notrans }, transaction: t },
-        );
-      }
-
-      await ApprovalDraft.create(
-        {
-          notrans,
-          module_name: "InvestmentSettings",
-          action: "UPDATE",
-          target_id: "1",
-          payload: { ...payload, status: "Published" },
-          created_by: actorId,
-          status: "Pending",
-        },
-        { transaction: t },
-      );
-
-      await settings.update(
-        { is_locked: true, lock_ticket: notrans },
-        { transaction: t },
-      );
-
-      await t.commit();
-
-      try {
-        await ErpApprovalService.initiateApproval({
-          notrans,
-          karyawanId: req.karyawanId,
-          token: req.owl_token,
-          moduleName: "InvestmentSettings",
-        });
-      } catch (erpError) {
-        console.error(
-          "⚠️ [ERP_SYNC_WARNING]: Gagal sinkronisasi ke ERP, namun draf lokal aman.",
-          erpError.message,
-        );
-      }
-
+    if (result.isDraft) {
       return res.status(202).json({
         success: true,
         message: "Revisi teks investasi berhasil diajukan.",
-        ticket: notrans,
+        ticket: result.ticket,
       });
     }
 
-    await invalidateOldDrafts("InvestmentSettings", "1", t);
-
-    await settings.update(
-      { ...payload, is_locked: false, lock_ticket: null },
-      { transaction: t },
-    );
-
-    await t.commit();
-    res.status(200).json({
-      success: true,
-      message: "Pengaturan berhasil diperbarui secara langsung.",
-      data: settings,
-    });
+    res.status(200).json({ success: true, message: "Pengaturan berhasil diperbarui secara langsung.", data: result.data });
   } catch (error) {
-    if (t && !t.finished) await t.rollback();
-    console.error("🚨 [UPDATE_SETTINGS_ERROR]:", error.message);
-    res.status(500).json({ success: false, message: error.message });
+    handleServiceError(res, error, "Gagal memperbarui pengaturan investasi.");
   }
 };
 
-// Register new affiliate with conditional ERP staging based on user role
 exports.createAffiliate = async (req, res) => {
-  const t = await sequelize.transaction();
   try {
-    const userRole = req.userRole?.toLowerCase();
-    const { status } = req.body;
-    const actorId = String(req.owl_username || req.karyawanId);
+    const result = await investmentService.createAffiliate({
+      userRole: getRole(req),
+      body: req.body,
+      file: req.file,
+      actorId: getActorId(req),
+      owlToken: getToken(req),
+    });
 
-    const { payload } = await processAffiliatePayload(req, {});
-
-    const isEditor = userRole === "editor";
-    const newCompany = await Affiliate.create(
-      { ...payload, is_locked: isEditor },
-      { transaction: t },
-    );
-
-    if (isEditor && status === "Published") {
-      const notrans = await generateNotrans("AFF");
-
-      await ApprovalDraft.create(
-        {
-          notrans,
-          module_name: "Affiliate",
-          action: "CREATE",
-          target_id: String(newCompany.id),
-          payload: { ...payload, status: "Published" },
-          created_by: actorId,
-          status: "Pending",
-        },
-        { transaction: t },
-      );
-
-      await newCompany.update({ lock_ticket: notrans }, { transaction: t });
-
-      await t.commit();
-
-      try {
-        await ErpApprovalService.initiateApproval({
-          notrans,
-          moduleName: "Affiliate",
-          karyawanId: req.karyawanId,
-          token: req.owl_token,
-        });
-      } catch (erpError) {
-        console.error(
-          "⚠️ [ERP_SYNC_WARNING]: Gagal sinkronisasi ERP saat Create Affiliate.",
-          erpError.message,
-        );
-      }
-
+    if (result.isDraft) {
       return res.status(202).json({
         success: true,
         message: "Permintaan tambah afiliasi baru diajukan.",
-        ticket: notrans,
+        ticket: result.ticket,
       });
     }
 
-    await t.commit();
-    return res.status(201).json({
-      success: true,
-      message: "Affiliate berhasil dibuat secara permanen.",
-      data: newCompany,
-    });
+    res.status(201).json({ success: true, message: "Affiliate berhasil dibuat secara permanen.", data: result.data });
   } catch (error) {
-    if (t && !t.finished) await t.rollback();
-    console.error("🚨 [CREATE_AFFILIATE_ERROR]:", error.message);
-    res.status(500).json({ success: false, message: error.message });
+    handleServiceError(res, error, "Gagal membuat afiliasi.");
   }
 };
 
-// Mutate affiliate record with diff-checking and pessimistic locking logic
 exports.updateAffiliate = async (req, res) => {
-  const t = await sequelize.transaction();
   try {
-    const { id } = req.params;
-    const userRole = req.userRole?.toLowerCase();
-    const { status, previous_notrans } = req.body;
-    const actorId = String(req.owl_username || req.karyawanId);
-
-    const company = await Affiliate.findByPk(id, {
-      transaction: t,
-      lock: t.LOCK.UPDATE,
+    const result = await investmentService.updateAffiliate({
+      id: req.params.id,
+      userRole: getRole(req),
+      body: req.body,
+      file: req.file,
+      actorId: getActorId(req),
+      owlToken: getToken(req),
     });
-    if (!company) {
-      await t.rollback();
-      return res.status(404).json({
-        success: false,
-        message: "Perusahaan afiliasi tidak ditemukan",
-      });
+
+    if (result.noChanges) {
+      return res.status(200).json({ success: true, message: "Tidak ada perubahan data. Permintaan diabaikan." });
     }
 
-    if (company.is_locked && userRole === "editor") {
-      await t.rollback();
-      return res.status(423).json({
-        success: false,
-        message:
-          "Akses Dibatasi. Data afiliasi ini sedang dikunci oleh proses approval.",
-        ticket: company.lock_ticket,
-      });
-    }
-
-    const { payload, filesToDelete } = await processAffiliatePayload(
-      req,
-      company,
-    );
-
-    const isDataChanged =
-      payload.name !== company.name ||
-      payload.desc !== company.desc ||
-      payload.category !== company.category ||
-      payload.websiteUrl !== company.websiteUrl ||
-      filesToDelete.length > 0 ||
-      req.file;
-
-    if (!isDataChanged && userRole === "editor") {
-      await t.rollback();
-      return res.status(200).json({
-        success: true,
-        message: "Tidak ada perubahan data. Permintaan diabaikan.",
-      });
-    }
-
-    if (userRole === "editor" && status === "Published") {
-      const notrans = await generateNotrans("AFF");
-
-      if (previous_notrans) {
-        await ApprovalDraft.update(
-          { status: "Replaced" },
-          { where: { notrans: previous_notrans }, transaction: t },
-        );
-      }
-
-      await ApprovalDraft.create(
-        {
-          notrans,
-          module_name: "Affiliate",
-          action: "UPDATE",
-          target_id: String(id),
-          payload: { ...payload, status: "Published" },
-          created_by: actorId,
-          status: "Pending",
-        },
-        { transaction: t },
-      );
-
-      await company.update(
-        { is_locked: true, lock_ticket: notrans },
-        { transaction: t },
-      );
-
-      await t.commit();
-
-      try {
-        await ErpApprovalService.initiateApproval({
-          notrans,
-          moduleName: "Affiliate",
-          karyawanId: req.karyawanId,
-          token: req.owl_token,
-        });
-      } catch (erpError) {
-        console.error(
-          "⚠️ [ERP_SYNC_WARNING]: Gagal sinkronisasi ERP saat Update Affiliate.",
-          erpError.message,
-        );
-      }
-
+    if (result.isDraft) {
       return res.status(202).json({
         success: true,
         message: "Revisi afiliasi berhasil diajukan.",
-        ticket: notrans,
+        ticket: result.ticket,
       });
     }
 
-    await invalidateOldDrafts("Affiliate", String(id), t);
-
-    await company.update(
-      { ...payload, is_locked: false, lock_ticket: null },
-      { transaction: t },
-    );
-
-    await t.commit();
-
-    if (filesToDelete.length > 0) {
-      filesToDelete.forEach((file) => deleteSingleFile(file));
-    }
-
-    res.status(200).json({
-      success: true,
-      message: "Affiliate berhasil diperbarui secara permanen!",
-      data: company,
-    });
+    res.status(200).json({ success: true, message: "Affiliate berhasil diperbarui secara permanen!", data: result.data });
   } catch (error) {
-    if (t && !t.finished) await t.rollback();
-    console.error("🚨 [UPDATE_AFFILIATE_ERROR]:", error.message);
-    res.status(500).json({ success: false, message: error.message });
+    handleServiceError(res, error, "Gagal memperbarui afiliasi.");
   }
 };
 
-// Execute record deletion with relational and lock validation
 exports.deleteAffiliate = async (req, res) => {
-  const t = await sequelize.transaction();
   try {
-    const { id } = req.params;
-    const userRole = req.userRole?.toLowerCase();
-    const actorId = String(req.owl_username || req.karyawanId);
-
-    const company = await Affiliate.findByPk(id, {
-      transaction: t,
-      lock: t.LOCK.UPDATE,
+    const result = await investmentService.deleteAffiliate({
+      id: req.params.id,
+      userRole: getRole(req),
+      actorId: getActorId(req),
+      owlToken: getToken(req),
     });
 
-    if (!company) {
-      await t.rollback();
-      return res
-        .status(404)
-        .json({ success: false, message: "Data tidak ditemukan" });
-    }
-
-    if (company.is_locked && userRole === "editor") {
-      await t.rollback();
-      return res.status(423).json({
-        success: false,
-        message:
-          "Akses Dibatasi. Data ini sedang dikunci oleh proses approval ERP.",
-        ticket: company.lock_ticket,
-      });
-    }
-
-    const logoToDelete = company.logoUrl;
-
-    if (userRole === "editor") {
-      const notrans = await generateNotrans("AFF_DEL");
-
-      const fullSnapshot = company.get({ plain: true });
-
-      await ApprovalDraft.create(
-        {
-          notrans,
-          module_name: "Affiliate",
-          action: "DELETE",
-          target_id: String(id),
-          payload: { ...fullSnapshot, reason: "Request Delete" },
-          created_by: actorId,
-          status: "Pending",
-        },
-        { transaction: t },
-      );
-
-      await company.update(
-        { is_locked: true, lock_ticket: notrans },
-        { transaction: t },
-      );
-
-      await t.commit();
-
-      try {
-        await ErpApprovalService.initiateApproval({
-          notrans,
-          moduleName: "Affiliate",
-          karyawanId: req.karyawanId,
-          token: req.owl_token,
-        });
-      } catch (erpError) {
-        console.error(
-          "⚠️ [ERP_SYNC_WARNING]: Gagal sinkronisasi ERP saat Delete Affiliate.",
-          erpError.message,
-        );
-      }
-
+    if (result.isDraft) {
       return res.status(202).json({
         success: true,
         message: "Permintaan hapus afiliasi diajukan. Data dikunci sementara.",
-        ticket: notrans,
+        ticket: result.ticket,
       });
     }
 
-    await invalidateOldDrafts("Affiliate", String(id), t);
-    await company.destroy({ transaction: t });
-
-    await t.commit();
-
-    if (logoToDelete) deleteSingleFile(logoToDelete.replace("/uploads/", ""));
-
-    return res.status(200).json({
-      success: true,
-      message: "Affiliate beserta gambarnya berhasil dihapus secara permanen!",
-    });
+    res.status(200).json({ success: true, message: "Affiliate beserta gambarnya berhasil dihapus secara permanen!" });
   } catch (error) {
-    if (t && !t.finished) await t.rollback();
-    console.error("🚨 [DELETE_AFFILIATE_ERROR]:", error.message);
-    res.status(500).json({ success: false, message: error.message });
+    handleServiceError(res, error, "Gagal menghapus afiliasi.");
   }
 };

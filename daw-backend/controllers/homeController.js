@@ -1,1063 +1,218 @@
-const fs = require("fs");
-const path = require("path");
-const HeroSlides = require("../models/HeroSlides");
-const HomeSettings = require("../models/HomeSettings");
-const ImpactStats = require("../models/ImpactStats");
-const ApprovalDraft = require("../models/ApprovalDraft");
-const { deleteSingleFile } = require("../utils/fileRemover");
-const { invalidateOldDrafts } = require("../utils/draftCleanup");
-const { generateNotrans } = require("../utils/notransGenerator");
-const ErpApprovalService = require("../services/erpApprovalService");
-const sequelize = require("../config/database");
-const { Op } = require("sequelize");
-const Translation = require("../models/Translation");
-const { autoTranslate } = require("../services/openaiService");
+const homeService = require("../services/homeService");
 
-const MODULE_NAME = "HomeSettings";
-const NOTRANS_PREFIX = "HOME";
+const handleServiceError = (res, error, defaultMsg) => {
+  const msg = error.message;
 
-// Extract normalized role from middleware payload
-const getRole = (req) =>
-  req.userRole ? req.userRole.toLowerCase().trim() : "";
-
-// Prepend TEMP_ prefix to editor-uploaded files to prevent live leakage before approval
-const applyTempPrefix = (fileObj) => {
-  if (!fileObj || !fileObj.filename) {
-    console.error(
-      "🚨 [TEMP GUARD] Objek file tidak valid atau filename hilang.",
-    );
-    return null;
-  }
-  const filename = fileObj.filename;
-  if (filename.startsWith("TEMP_")) {
-    return filename;
+  if (msg.startsWith("NOT_FOUND")) {
+    return res.status(404).json({ success: false, message: msg.split(": ")[1] });
   }
 
-  const uploadDir = path.join(__dirname, "..", "public", "uploads");
-  const oldPath = fileObj.path || path.join(uploadDir, filename);
-  const newFilename = `TEMP_${filename}`;
-  const newPath = path.join(uploadDir, newFilename);
-
-  try {
-    if (fs.existsSync(oldPath)) {
-      fs.renameSync(oldPath, newPath);
-      console.log(`✅ [TEMP GUARD] Success: ${filename} -> ${newFilename}`);
-      return newFilename;
-    } else {
-      console.warn(`⚠️ [TEMP GUARD] File fisik tidak ditemukan di: ${oldPath}`);
-      return filename;
-    }
-  } catch (err) {
-    console.error(`🚨 [TEMP GUARD ERROR] Gagal me-rename file: ${err.message}`);
-    return filename;
+  if (msg.startsWith("VALIDATION_ERROR")) {
+    return res.status(400).json({ success: false, message: msg.split(": ")[1] });
   }
+
+  if (msg.startsWith("LOCKED")) {
+    const ticket = msg.split("tiket ")[1];
+    return res.status(423).json({
+      success: false,
+      message: "Data sedang dalam proses peninjauan (Locked).",
+      ticket,
+    });
+  }
+
+  console.error(`🚨 [HOME ERROR]:`, msg);
+  res.status(500).json({ success: false, message: defaultMsg || msg });
 };
 
-// Aggregate unified public homepage metadata (Slides, Stats, Settings)
+const getRole = (req) => req.userRole ? req.userRole.toLowerCase().trim() : "";
+const getActorId = (req) => String(req.owl_username || req.karyawanId || "").trim().toLowerCase();
+const getToken = (req) => req.headers["authorization"]?.split(" ")[1] || req.owl_token;
+
 exports.getPublicHomepageData = async (req, res) => {
   try {
-    const results = await Promise.allSettled([
-      HeroSlides.findAll({ order: [["order", "ASC"]] }),
-      ImpactStats.findAll({ order: [["order", "ASC"]] }),
-      HomeSettings.findByPk(1),
-    ]);
-
-    const slides = results[0].status === "fulfilled" ? results[0].value : [];
-    const stats = results[1].status === "fulfilled" ? results[1].value : [];
-    let settings = results[2].status === "fulfilled" ? results[2].value : null;
-
-    if (!settings && results[2].status === "fulfilled") {
-      settings = await HomeSettings.create({
-        id: 1,
-        introHeadline: "A Transformation Company.",
-        introBody: "Welcome to DAW.",
-      });
-    }
-
     const lang = req.query.lang || "en";
-    let finalSlides = slides;
-    let finalStats = stats;
-    let finalSettings = settings;
-
-    if (lang !== "en") {
-      // 1. Terjemahkan Slides (HeroSlides)
-      finalSlides = [];
-      for (let i = 0; i < slides.length; i++) {
-        const item = slides[i].get ? slides[i].get({ plain: true }) : { ...slides[i] };
-        
-        let titleTrans = await Translation.findOne({ where: { modelName: "HeroSlides", recordId: String(item.id), field: "title", locale: "id" } });
-        let subtitleTrans = await Translation.findOne({ where: { modelName: "HeroSlides", recordId: String(item.id), field: "subtitle", locale: "id" } });
-        
-        const needsTitleTrans = item.title && !titleTrans;
-        const needsSubtitleTrans = item.subtitle && !subtitleTrans;
-
-        if (needsTitleTrans || needsSubtitleTrans) {
-          console.log(`[Lazy Translation] Translating HeroSlide: ${item.id}...`);
-          const freshTitle = needsTitleTrans ? await autoTranslate(item.title, "Indonesian") : "";
-          const freshSubtitle = needsSubtitleTrans ? await autoTranslate(item.subtitle, "Indonesian") : "";
-          
-          const upsertTrans = async (field, translatedText) => {
-            if (!translatedText) return;
-            const existing = await Translation.findOne({ where: { modelName: "HeroSlides", recordId: String(item.id), field, locale: "id" } });
-            if (existing) await existing.update({ translatedText });
-            else await Translation.create({ modelName: "HeroSlides", recordId: String(item.id), field, locale: "id", translatedText });
-          };
-          
-          if (freshTitle) { await upsertTrans("title", freshTitle); item.title = freshTitle; }
-          if (freshSubtitle) { await upsertTrans("subtitle", freshSubtitle); item.subtitle = freshSubtitle; }
-        } else {
-          if (titleTrans) item.title = titleTrans.translatedText;
-          if (subtitleTrans) item.subtitle = subtitleTrans.translatedText;
-        }
-        finalSlides.push(item);
-      }
-
-      // 2. Terjemahkan Statistik (ImpactStats)
-      finalStats = [];
-      for (let i = 0; i < stats.length; i++) {
-        const item = stats[i].get ? stats[i].get({ plain: true }) : { ...stats[i] };
-        
-        let labelTrans = await Translation.findOne({ where: { modelName: "ImpactStats", recordId: String(item.id), field: "label", locale: "id" } });
-        let descTrans = await Translation.findOne({ where: { modelName: "ImpactStats", recordId: String(item.id), field: "desc", locale: "id" } });
-        
-        const needsLabelTrans = item.label && !labelTrans;
-        const needsDescTrans = item.desc && !descTrans;
-
-        if (needsLabelTrans || needsDescTrans) {
-          console.log(`[Lazy Translation] Translating ImpactStat: ${item.id}...`);
-          const freshLabel = needsLabelTrans ? await autoTranslate(item.label, "Indonesian") : "";
-          const freshDesc = needsDescTrans ? await autoTranslate(item.desc, "Indonesian") : "";
-          
-          const upsertTrans = async (field, translatedText) => {
-            if (!translatedText) return;
-            const existing = await Translation.findOne({ where: { modelName: "ImpactStats", recordId: String(item.id), field, locale: "id" } });
-            if (existing) await existing.update({ translatedText });
-            else await Translation.create({ modelName: "ImpactStats", recordId: String(item.id), field, locale: "id", translatedText });
-          };
-          
-          if (freshLabel) { await upsertTrans("label", freshLabel); item.label = freshLabel; }
-          if (freshDesc) { await upsertTrans("desc", freshDesc); item.desc = freshDesc; }
-        } else {
-          if (labelTrans) item.label = labelTrans.translatedText;
-          if (descTrans) item.desc = descTrans.translatedText;
-        }
-        finalStats.push(item);
-      }
-
-      // 3. Terjemahkan Sambutan (HomeSettings)
-      if (settings) {
-        const item = settings.get ? settings.get({ plain: true }) : { ...settings };
-        
-        let headlineTrans = await Translation.findOne({ where: { modelName: "HomeSettings", recordId: "1", field: "introHeadline", locale: "id" } });
-        let bodyTrans = await Translation.findOne({ where: { modelName: "HomeSettings", recordId: "1", field: "introBody", locale: "id" } });
-        
-        const needsHeadlineTrans = item.introHeadline && !headlineTrans;
-        const needsBodyTrans = item.introBody && !bodyTrans;
-
-        if (needsHeadlineTrans || needsBodyTrans) {
-          console.log(`[Lazy Translation] Translating HomeSettings...`);
-          const freshHeadline = needsHeadlineTrans ? await autoTranslate(item.introHeadline, "Indonesian") : "";
-          const freshBody = needsBodyTrans ? await autoTranslate(item.introBody, "Indonesian") : "";
-          
-          const upsertTrans = async (field, translatedText) => {
-            if (!translatedText) return;
-            const existing = await Translation.findOne({ where: { modelName: "HomeSettings", recordId: "1", field, locale: "id" } });
-            if (existing) await existing.update({ translatedText });
-            else await Translation.create({ modelName: "HomeSettings", recordId: "1", field, locale: "id", translatedText });
-          };
-          
-          if (freshHeadline) { await upsertTrans("introHeadline", freshHeadline); item.introHeadline = freshHeadline; }
-          if (freshBody) { await upsertTrans("introBody", freshBody); item.introBody = freshBody; }
-        } else {
-          if (headlineTrans) item.introHeadline = headlineTrans.translatedText;
-          if (bodyTrans) item.introBody = bodyTrans.translatedText;
-        }
-        finalSettings = item;
-      }
-    }
-
-    res.status(200).json({
-      success: true,
-      data: {
-        slides: finalSlides,
-        stats: finalStats,
-        settings: finalSettings,
-      },
-    });
+    const data = await homeService.getPublicHomepageData(lang);
+    res.status(200).json({ success: true, data });
   } catch (error) {
-    console.error("🚨 [PUBLIC DISCOVERY ERROR]:", error.message);
-    res
-      .status(500)
-      .json({ success: false, message: "Gagal memuat data publik beranda." });
+    handleServiceError(res, error, "Gagal memuat data publik beranda.");
   }
 };
 
-// Fetch admin payload including contextual lock statuses and active user rejections
 exports.getAdminHomepageData = async (req, res) => {
   try {
-    const lockAttributes = ["is_locked", "lock_ticket"];
-    const actorId = String(req.owl_username || req.karyawanId || "")
-      .trim()
-      .toLowerCase();
-
-    console.log(`🕵️ [RADAR SCAN] Searching rejections for: "${actorId}"`);
-
-    const results = await Promise.allSettled([
-      HeroSlides.findAll({
-        order: [["order", "ASC"]],
-        attributes: { include: lockAttributes },
-      }),
-      ImpactStats.findAll({
-        order: [["order", "ASC"]],
-        attributes: { include: lockAttributes },
-      }),
-      HomeSettings.findByPk(1, { attributes: { include: lockAttributes } }),
-
-      ApprovalDraft.findAll({
-        where: {
-          module_name: [
-            "HeroSlides",
-            "HeroSlide",
-            "ImpactStats",
-            "HomeSettings",
-          ],
-          status: "Rejected",
-          [Op.and]: [
-            sequelize.where(
-              sequelize.fn("LOWER", sequelize.col("created_by")),
-              actorId,
-            ),
-          ],
-        },
-      }),
-    ]);
-
-    const slides = results[0].status === "fulfilled" ? results[0].value : [];
-    const stats = results[1].status === "fulfilled" ? results[1].value : [];
-    let settings = results[2].status === "fulfilled" ? results[2].value : null;
-    const rejections =
-      results[3].status === "fulfilled" ? results[3].value : [];
-
-    console.log(`📡 [RADAR RESULT] Found ${rejections.length} rejected items.`);
-
-    if (!settings && results[2].status === "fulfilled") {
-      settings = await HomeSettings.create({
-        id: 1,
-        introHeadline: "A Transformation Company.",
-        introBody: "Welcome to DAW.",
-      });
-    }
-
     const lang = req.query.lang || "en";
-    let finalSlides = slides;
-    let finalStats = stats;
-    let finalSettings = settings;
-
-    if (lang !== "en") {
-      // 1. Terjemahkan Slides (HeroSlides)
-      finalSlides = [];
-      for (let i = 0; i < slides.length; i++) {
-        const item = slides[i].get ? slides[i].get({ plain: true }) : { ...slides[i] };
-        
-        let titleTrans = await Translation.findOne({ where: { modelName: "HeroSlides", recordId: String(item.id), field: "title", locale: "id" } });
-        let subtitleTrans = await Translation.findOne({ where: { modelName: "HeroSlides", recordId: String(item.id), field: "subtitle", locale: "id" } });
-        
-        const needsTitleTrans = item.title && !titleTrans;
-        const needsSubtitleTrans = item.subtitle && !subtitleTrans;
-
-        if (needsTitleTrans || needsSubtitleTrans) {
-          console.log(`[Lazy Translation] Translating HeroSlide: ${item.id}...`);
-          const freshTitle = needsTitleTrans ? await autoTranslate(item.title, "Indonesian") : "";
-          const freshSubtitle = needsSubtitleTrans ? await autoTranslate(item.subtitle, "Indonesian") : "";
-          
-          const upsertTrans = async (field, translatedText) => {
-            if (!translatedText) return;
-            const existing = await Translation.findOne({ where: { modelName: "HeroSlides", recordId: String(item.id), field, locale: "id" } });
-            if (existing) await existing.update({ translatedText });
-            else await Translation.create({ modelName: "HeroSlides", recordId: String(item.id), field, locale: "id", translatedText });
-          };
-          
-          if (freshTitle) { await upsertTrans("title", freshTitle); item.title = freshTitle; }
-          if (freshSubtitle) { await upsertTrans("subtitle", freshSubtitle); item.subtitle = freshSubtitle; }
-        } else {
-          if (titleTrans) item.title = titleTrans.translatedText;
-          if (subtitleTrans) item.subtitle = subtitleTrans.translatedText;
-        }
-        finalSlides.push(item);
-      }
-
-      // 2. Terjemahkan Statistik (ImpactStats)
-      finalStats = [];
-      for (let i = 0; i < stats.length; i++) {
-        const item = stats[i].get ? stats[i].get({ plain: true }) : { ...stats[i] };
-        
-        let labelTrans = await Translation.findOne({ where: { modelName: "ImpactStats", recordId: String(item.id), field: "label", locale: "id" } });
-        let descTrans = await Translation.findOne({ where: { modelName: "ImpactStats", recordId: String(item.id), field: "desc", locale: "id" } });
-        
-        const needsLabelTrans = item.label && !labelTrans;
-        const needsDescTrans = item.desc && !descTrans;
-
-        if (needsLabelTrans || needsDescTrans) {
-          console.log(`[Lazy Translation] Translating ImpactStat: ${item.id}...`);
-          const freshLabel = needsLabelTrans ? await autoTranslate(item.label, "Indonesian") : "";
-          const freshDesc = needsDescTrans ? await autoTranslate(item.desc, "Indonesian") : "";
-          
-          const upsertTrans = async (field, translatedText) => {
-            if (!translatedText) return;
-            const existing = await Translation.findOne({ where: { modelName: "ImpactStats", recordId: String(item.id), field, locale: "id" } });
-            if (existing) await existing.update({ translatedText });
-            else await Translation.create({ modelName: "ImpactStats", recordId: String(item.id), field, locale: "id", translatedText });
-          };
-          
-          if (freshLabel) { await upsertTrans("label", freshLabel); item.label = freshLabel; }
-          if (freshDesc) { await upsertTrans("desc", freshDesc); item.desc = freshDesc; }
-        } else {
-          if (labelTrans) item.label = labelTrans.translatedText;
-          if (descTrans) item.desc = descTrans.translatedText;
-        }
-        finalStats.push(item);
-      }
-
-      // 3. Terjemahkan Sambutan (HomeSettings)
-      if (settings) {
-        const item = settings.get ? settings.get({ plain: true }) : { ...settings };
-        
-        let headlineTrans = await Translation.findOne({ where: { modelName: "HomeSettings", recordId: "1", field: "introHeadline", locale: "id" } });
-        let bodyTrans = await Translation.findOne({ where: { modelName: "HomeSettings", recordId: "1", field: "introBody", locale: "id" } });
-        
-        const needsHeadlineTrans = item.introHeadline && !headlineTrans;
-        const needsBodyTrans = item.introBody && !bodyTrans;
-
-        if (needsHeadlineTrans || needsBodyTrans) {
-          console.log(`[Lazy Translation] Translating HomeSettings...`);
-          const freshHeadline = needsHeadlineTrans ? await autoTranslate(item.introHeadline, "Indonesian") : "";
-          const freshBody = needsBodyTrans ? await autoTranslate(item.introBody, "Indonesian") : "";
-          
-          const upsertTrans = async (field, translatedText) => {
-            if (!translatedText) return;
-            const existing = await Translation.findOne({ where: { modelName: "HomeSettings", recordId: "1", field, locale: "id" } });
-            if (existing) await existing.update({ translatedText });
-            else await Translation.create({ modelName: "HomeSettings", recordId: "1", field, locale: "id", translatedText });
-          };
-          
-          if (freshHeadline) { await upsertTrans("introHeadline", freshHeadline); item.introHeadline = freshHeadline; }
-          if (freshBody) { await upsertTrans("introBody", freshBody); item.introBody = freshBody; }
-        } else {
-          if (headlineTrans) item.introHeadline = headlineTrans.translatedText;
-          if (bodyTrans) item.introBody = bodyTrans.translatedText;
-        }
-        finalSettings = item;
-      }
-    }
-
-    res.status(200).json({
-      success: true,
-      data: {
-        slides: finalSlides,
-        stats: finalStats,
-        settings: finalSettings,
-        rejectionRadar: rejections,
-      },
-    });
+    const actorId = getActorId(req);
+    const data = await homeService.getAdminHomepageData(actorId, lang);
+    res.status(200).json({ success: true, data });
   } catch (error) {
-    console.error("🚨 [ADMIN DISCOVERY ERROR]:", error.message);
-    res
-      .status(500)
-      .json({ success: false, message: "Gagal memuat data admin beranda." });
+    handleServiceError(res, error, "Gagal memuat data admin beranda.");
   }
 };
 
-// Orchestrate global homepage text updates (Editor Staging vs Admin Overwrite)
 exports.updateSettings = async (req, res) => {
-  const t = await sequelize.transaction();
   try {
-    const userRole = String(req.userRole || "").toLowerCase();
-    const { introHeadline, introBody, status, previous_notrans } = req.body;
-    const safeHeadline = (introHeadline || "").trim();
-    const safeBody = (introBody || "").trim();
-
-    const actorId = String(req.owl_username || req.karyawanId || "")
-      .trim()
-      .toLowerCase();
-
-    let settings = await HomeSettings.findByPk(1, {
-      transaction: t,
-      lock: t.LOCK.UPDATE,
+    const result = await homeService.updateSettings({
+      userRole: getRole(req),
+      body: req.body,
+      actorId: getActorId(req),
+      owlToken: getToken(req),
     });
 
-    if (!settings) {
-      settings = await HomeSettings.create({ id: 1 }, { transaction: t });
-    }
-
-    // Flow: Editor initiates ERP draft workflow
-    if (userRole === "editor") {
-      if (settings.is_locked) {
-        await t.rollback();
-        return res.status(423).json({
-          success: false,
-          message: "Data sedang dalam proses peninjauan (Locked).",
-          ticket: settings.lock_ticket,
-        });
-      }
-
-      const notrans = await generateNotrans(NOTRANS_PREFIX);
-
-      const ticketToClear = previous_notrans || settings.lock_ticket;
-      if (ticketToClear) {
-        await ApprovalDraft.update(
-          { status: "Replaced" },
-          {
-            where: {
-              notrans: ticketToClear,
-              module_name: MODULE_NAME,
-            },
-            transaction: t,
-          },
-        );
-      }
-
-      await ApprovalDraft.create(
-        {
-          notrans,
-          module_name: MODULE_NAME,
-          action: "UPDATE",
-          target_id: "1",
-          payload: {
-            introHeadline: safeHeadline,
-            introBody: safeBody,
-            status: "Published",
-          },
-          created_by: actorId,
-          status: "Pending",
-        },
-        { transaction: t },
-      );
-
-      await settings.update(
-        {
-          is_locked: true,
-          lock_ticket: notrans,
-        },
-        { transaction: t },
-      );
-
-      await t.commit();
-
-      try {
-        await ErpApprovalService.initiateApproval({
-          notrans,
-          moduleName: MODULE_NAME,
-          karyawanId: req.karyawanId,
-          token: req.headers["authorization"]?.split(" ")[1] || req.owl_token,
-        });
-      } catch (owlError) {
-        console.error(
-          `🚨 [ERP SYNC FAILED] Ticket ${notrans}:`,
-          owlError.message,
-        );
-      }
-
+    if (result.isDraft) {
       return res.status(202).json({
         success: true,
         message: "Revisi sambutan beranda diajukan ke ERP OWL.",
-        ticket: notrans,
+        ticket: result.ticket,
       });
     }
 
-    // Flow: Admin performs direct authoritative mutation
-    await ApprovalDraft.update(
-      { status: "Obsolete" },
-      {
-        where: {
-          module_name: MODULE_NAME,
-          status: ["Pending", "Rejected"],
-        },
-        transaction: t,
-      },
-    );
-    await settings.update(
-      {
-        introHeadline: safeHeadline,
-        introBody: safeBody,
-        is_locked: false,
-        lock_ticket: null,
-      },
-      { transaction: t },
-    );
-    await t.commit();
-
-    return res.status(200).json({
+    res.status(200).json({
       success: true,
       message: "Perubahan live berhasil disimpan secara instan!",
     });
   } catch (error) {
-    if (t && !t.finished) await t.rollback();
-    console.error("🚨 [ATOMIC FAILURE]:", error.message);
-    res.status(500).json({ success: false, message: error.message });
+    handleServiceError(res, error, "Gagal memperbarui pengaturan beranda.");
   }
 };
 
-// ================= HERO SLIDES =================
-// Scaffold new slide, conditionally appending TEMP prefix for editor image uploads
 exports.createHeroSlide = async (req, res) => {
-  let newSlide = null;
-  const userRole = getRole(req);
-  const t = await sequelize.transaction();
-
   try {
-    const { title, subtitle, order, status } = req.body;
-    const uploadedImage = req.file ? req.file : null;
+    const result = await homeService.createHeroSlide({
+      userRole: getRole(req),
+      body: req.body,
+      file: req.file,
+      actorId: getActorId(req),
+      owlToken: getToken(req),
+    });
 
-    const slideData = {
-      title,
-      subtitle,
-      order,
-      imageUrl: null,
-      is_locked: false,
-    };
-
-    if (uploadedImage) {
-      slideData.imageUrl =
-        userRole === "editor"
-          ? applyTempPrefix(uploadedImage)
-          : uploadedImage.filename;
-    }
-
-    // Editor: Stage creation request
-    if (userRole === "editor" && status === "Published") {
-      const actorId = String(req.owl_username || req.karyawanId);
-      const notrans = await generateNotrans("HERO");
-
-      await ApprovalDraft.create(
-        {
-          notrans,
-          module_name: "HeroSlides",
-          action: "CREATE",
-          target_id: "0",
-          payload: { ...slideData, status: "Published" },
-          created_by: actorId,
-          status: "Pending",
-        },
-        { transaction: t },
-      );
-
-      slideData.is_locked = true;
-      slideData.lock_ticket = notrans;
-    }
-
-    // Admin: Direct commit
-    const newSlide = await HeroSlides.create(slideData, { transaction: t });
-    if (userRole === "editor" && status === "Published") {
-      await ApprovalDraft.update(
-        { target_id: String(newSlide.id) },
-        { where: { notrans: slideData.lock_ticket }, transaction: t },
-      );
-    }
-    await t.commit();
-    if (userRole === "editor" && status === "Published") {
-      try {
-        await ErpApprovalService.initiateApproval({
-          notrans: slideData.lock_ticket,
-          moduleName: "HeroSlides",
-          karyawanId: req.karyawanId,
-          token: req.headers["authorization"]?.split(" ")[1] || req.owl_token,
-        });
-      } catch (erpErr) {
-        console.error("⚠️ [ERP_SYNC_WARNING]:", erpErr.message);
-      }
-
+    if (result.isDraft) {
       return res.status(202).json({
         success: true,
         message: "Permintaan slide baru diajukan.",
-        ticket: slideData.lock_ticket,
+        ticket: result.ticket,
       });
     }
-    return res
-      .status(201)
-      .json({ success: true, message: "Slide created live", data: newSlide });
+
+    res.status(201).json({ success: true, message: "Slide created live", data: result.data });
   } catch (error) {
-    if (t && !t.finished) await t.rollback();
-    console.error("🚨 ERROR CREATE SLIDE:", error);
-    return res.status(500).json({ success: false, message: error.message });
+    handleServiceError(res, error, "Gagal membuat slide.");
   }
 };
 
-// Orchestrate slide mutation, managing both text data and conditional image replacement staging
 exports.updateHeroSlide = async (req, res) => {
-  const t = await sequelize.transaction();
   try {
-    const { id } = req.params;
-    const userRole = getRole(req);
-    const { title, subtitle, order, status, previous_notrans } = req.body;
-
-    const slide = await HeroSlides.findByPk(id, {
-      transaction: t,
-      lock: t.LOCK.UPDATE,
+    const result = await homeService.updateHeroSlide({
+      id: req.params.id,
+      userRole: getRole(req),
+      body: req.body,
+      file: req.file,
+      actorId: getActorId(req),
+      owlToken: getToken(req),
     });
-    if (!slide) {
-      await t.rollback();
-      return res
-        .status(404)
-        .json({ success: false, message: "Slide not found" });
-    }
 
-    if (userRole === "editor" && slide.is_locked) {
-      await t.rollback();
-      return res.status(423).json({
-        success: false,
-        message:
-          "Akses Dibatasi. Slide ini sedang dikunci oleh proses approval.",
-        ticket: slide.lock_ticket,
-      });
-    }
-
-    let newImageUrl = slide.imageUrl;
-    let oldImageToDelete = null;
-
-    if (req.file) {
-      oldImageToDelete = slide.imageUrl;
-      newImageUrl =
-        userRole === "editor" ? applyTempPrefix(req.file) : req.file.filename;
-    }
-
-    const updatedData = { title, subtitle, order, imageUrl: newImageUrl };
-
-    // Editor: Request mutation approval
-    if (userRole === "editor" && status === "Published") {
-      const actorId = String(req.owl_username || req.karyawanId);
-      const notrans = await generateNotrans("HERO");
-
-      if (previous_notrans) {
-        await ApprovalDraft.update(
-          { status: "Replaced" },
-          { where: { notrans: previous_notrans }, transaction: t },
-        );
-      }
-
-      await ApprovalDraft.create(
-        {
-          notrans,
-          module_name: "HeroSlides",
-          action: "UPDATE",
-          target_id: String(id),
-          payload: { ...updatedData, status: "Published" },
-          created_by: actorId,
-          status: "Pending",
-        },
-        { transaction: t },
-      );
-
-      // 3. Lockng
-      await slide.update(
-        { is_locked: true, lock_ticket: notrans },
-        { transaction: t },
-      );
-
-      await t.commit();
-
-      try {
-        await ErpApprovalService.initiateApproval({
-          notrans,
-          moduleName: "HeroSlides",
-          karyawanId: req.karyawanId,
-          token: req.headers["authorization"]?.split(" ")[1] || req.owl_token,
-        });
-      } catch (owlError) {
-        console.error("🚨 [ERP SYNC FAILED]:", owlError.message);
-      }
-
+    if (result.isDraft) {
       return res.status(202).json({
         success: true,
         message: "Revisi slide berhasil diajukan ke ERP OWL.",
-        ticket: notrans,
+        ticket: result.ticket,
       });
     }
 
-    // Admin: Bypass and finalize
-    await invalidateOldDrafts(id, "HeroSlides", t);
-    await slide.update(
-      {
-        ...updatedData,
-        is_locked: false,
-        lock_ticket: null,
-      },
-      { transaction: t },
-    );
-    await t.commit();
-    if (oldImageToDelete) deleteSingleFile(oldImageToDelete);
-
-    return res
-      .status(200)
-      .json({ success: true, message: "Slide updated live!", data: slide });
+    res.status(200).json({ success: true, message: "Slide updated live!", data: result.data });
   } catch (error) {
-    if (t && !t.finished) await t.rollback();
-    console.error("🚨 ERROR UPDATE SLIDE:", error);
-    return res.status(500).json({ success: false, message: error.message });
+    handleServiceError(res, error, "Gagal memperbarui slide.");
   }
 };
 
-// Enforce safe deletion of slides, restricting editors from direct DB execution
 exports.deleteHeroSlide = async (req, res) => {
-  const t = await sequelize.transaction();
   try {
-    const userRole = getRole(req);
-    const { id } = req.params;
-
-    const slide = await HeroSlides.findByPk(id, {
-      transaction: t,
-      lock: t.LOCK.UPDATE,
+    const result = await homeService.deleteHeroSlide({
+      id: req.params.id,
+      userRole: getRole(req),
+      actorId: getActorId(req),
+      owlToken: getToken(req),
     });
-    if (!slide) {
-      await t.rollback();
-      return res
-        .status(404)
-        .json({ success: false, message: "Slide not found" });
-    }
 
-    if (userRole === "editor" && slide.is_locked) {
-      await t.rollback();
-      return res.status(423).json({
-        success: false,
-        message:
-          "Akses Dibatasi. Slide sedang terkunci dan tidak bisa dihapus.",
-        ticket: slide.lock_ticket,
-      });
-    }
-
-    // Editor: Stage deletion
-    if (userRole === "editor") {
-      const actorId = String(req.owl_username || req.karyawanId);
-      const notrans = await generateNotrans("HERO_DEL");
-      const fullSnapshot = slide.get({ plain: true });
-
-      const ticketToClear = req.body?.previous_notrans;
-
-      if (ticketToClear) {
-        await ApprovalDraft.update(
-          { status: "Replaced" },
-          { where: { notrans: ticketToClear }, transaction: t },
-        );
-      }
-
-      await ApprovalDraft.create(
-        {
-          notrans,
-          module_name: "HeroSlides",
-          action: "DELETE",
-          target_id: String(id),
-          payload: { ...fullSnapshot, reason: "Request Delete" },
-          created_by: actorId,
-          status: "Pending",
-        },
-        { transaction: t },
-      );
-
-      await slide.update(
-        { is_locked: true, lock_ticket: notrans },
-        { transaction: t },
-      );
-
-      await t.commit();
-
-      try {
-        await ErpApprovalService.initiateApproval({
-          notrans,
-          moduleName: "HeroSlides",
-          karyawanId: req.karyawanId,
-          token: req.headers["authorization"]?.split(" ")[1] || req.owl_token,
-        });
-      } catch (owlError) {
-        console.error("🚨 [ERP SYNC FAILED]:", owlError.message);
-      }
-
+    if (result.isDraft) {
       return res.status(202).json({
         success: true,
         message: "Permintaan hapus slide diajukan. Data dikunci sementara.",
-        ticket: notrans,
+        ticket: result.ticket,
       });
     }
-    // Admin: Execute hard delete
-    await invalidateOldDrafts(id, "HeroSlides", t);
-    const imageToDelete = slide.imageUrl;
-    await slide.destroy({ transaction: t });
-    await t.commit();
-    if (imageToDelete) deleteSingleFile(imageToDelete);
 
-    return res
-      .status(200)
-      .json({ success: true, message: "Slide deleted live!" });
+    res.status(200).json({ success: true, message: "Slide deleted live!" });
   } catch (error) {
-    if (t && !t.finished) await t.rollback();
-    return res.status(500).json({ success: false, message: error.message });
+    handleServiceError(res, error, "Gagal menghapus slide.");
   }
 };
 
-// ================= IMPACT STATS =================
-
-// Register new impact metric while enforcing strict cardinality limit (max 4)
 exports.createStat = async (req, res) => {
-  let newStat = null;
-  const userRole = getRole(req);
-  const t = await sequelize.transaction();
-
   try {
-    const { icon, value, label, desc, order, status } = req.body;
+    const result = await homeService.createStat({
+      userRole: getRole(req),
+      body: req.body,
+      actorId: getActorId(req),
+      owlToken: getToken(req),
+    });
 
-    const count = await ImpactStats.count({ transaction: t });
-    if (count >= 4) {
-      await t.rollback();
-      return res.status(400).json({
-        success: false,
-        message:
-          "Maksimal hanya 4 statistik! Hapus statistik lama jika ingin menambah baru.",
-      });
-    }
-
-    const statData = {
-      icon: icon || "Map",
-      value,
-      label,
-      desc,
-      order,
-      is_locked: false,
-    };
-
-    if (userRole === "editor" && status === "Published") {
-      const actorId = String(req.owl_username || req.karyawanId);
-      const notrans = await generateNotrans("STAT");
-
-      await ApprovalDraft.create(
-        {
-          notrans,
-          module_name: "ImpactStats",
-          action: "CREATE",
-          target_id: "0",
-          payload: { ...statData, status: "Published" },
-          created_by: actorId,
-          status: "Pending",
-        },
-        { transaction: t },
-      );
-
-      statData.is_locked = true;
-      statData.lock_ticket = notrans;
-    }
-
-    newStat = await ImpactStats.create(statData, { transaction: t });
-
-    if (userRole === "editor" && status === "Published") {
-      await ApprovalDraft.update(
-        { target_id: String(newStat.id) },
-        { where: { notrans: statData.lock_ticket }, transaction: t },
-      );
-    }
-
-    await t.commit();
-
-    if (userRole === "editor" && status === "Published") {
-      try {
-        await ErpApprovalService.initiateApproval({
-          notrans: statData.lock_ticket,
-          moduleName: "ImpactStats",
-          karyawanId: req.karyawanId,
-          token: req.headers["authorization"]?.split(" ")[1] || req.owl_token,
-        });
-      } catch (erpErr) {
-        console.error("⚠️ [ERP_SYNC_WARNING]:", erpErr.message);
-      }
+    if (result.isDraft) {
       return res.status(202).json({
         success: true,
         message: "Permintaan statistik diajukan.",
-        ticket: statData.lock_ticket,
+        ticket: result.ticket,
       });
     }
 
-    return res
-      .status(201)
-      .json({ success: true, message: "Stat created live", data: newStat });
+    res.status(201).json({ success: true, message: "Stat created live", data: result.data });
   } catch (error) {
-    if (t && !t.finished) await t.rollback();
-    console.error("🚨 ERROR CREATE STAT:", error);
-    return res.status(500).json({ success: false, message: error.message });
+    handleServiceError(res, error, "Gagal membuat statistik.");
   }
 };
 
-// Process stat updates with workflow routing and concurrency locking
 exports.updateStat = async (req, res) => {
-  const t = await sequelize.transaction();
   try {
-    const { id } = req.params;
-    const userRole = getRole(req);
-    const { icon, value, label, desc, order, status, previous_notrans } =
-      req.body;
-
-    const stat = await ImpactStats.findByPk(id, {
-      transaction: t,
-      lock: t.LOCK.UPDATE,
+    const result = await homeService.updateStat({
+      id: req.params.id,
+      userRole: getRole(req),
+      body: req.body,
+      actorId: getActorId(req),
+      owlToken: getToken(req),
     });
-    if (!stat) {
-      await t.rollback();
-      return res
-        .status(404)
-        .json({ success: false, message: "Stat not found" });
-    }
 
-    if (userRole === "editor" && stat.is_locked) {
-      await t.rollback();
-      return res.status(423).json({
-        success: false,
-        message:
-          "Akses Dibatasi. Statistik ini sedang dikunci oleh proses approval.",
-        ticket: stat.lock_ticket,
-      });
-    }
-
-    const updatedData = { icon, value, label, desc, order };
-
-    if (userRole === "editor" && status === "Published") {
-      const actorId = String(req.owl_username || req.karyawanId);
-      const notrans = await generateNotrans("STAT");
-
-      if (previous_notrans) {
-        await ApprovalDraft.update(
-          { status: "Replaced" },
-          { where: { notrans: previous_notrans }, transaction: t },
-        );
-      }
-
-      await ApprovalDraft.create(
-        {
-          notrans,
-          module_name: "ImpactStats",
-          action: "UPDATE",
-          target_id: String(id),
-          payload: { ...updatedData, status: "Published" },
-          created_by: actorId,
-          status: "Pending",
-        },
-        { transaction: t },
-      );
-
-      await stat.update(
-        { is_locked: true, lock_ticket: notrans },
-        { transaction: t },
-      );
-      await t.commit();
-
-      try {
-        await ErpApprovalService.initiateApproval({
-          notrans,
-          moduleName: "ImpactStats",
-          karyawanId: req.karyawanId,
-          token: req.headers["authorization"]?.split(" ")[1] || req.owl_token,
-        });
-      } catch (erpErr) {
-        console.error("🚨 [ERP_SYNC_FAILED]:", erpErr.message);
-      }
-
+    if (result.isDraft) {
       return res.status(202).json({
         success: true,
         message: "Revisi statistik diajukan.",
-        ticket: notrans,
+        ticket: result.ticket,
       });
     }
 
-    await invalidateOldDrafts("ImpactStats", String(id), t);
-    await stat.update(
-      { ...updatedData, is_locked: false, lock_ticket: null },
-      { transaction: t },
-    );
-    await t.commit();
-
-    return res
-      .status(200)
-      .json({ success: true, message: "Statistik updated live!", data: stat });
+    res.status(200).json({ success: true, message: "Statistik updated live!", data: result.data });
   } catch (error) {
-    if (t && !t.finished) await t.rollback();
-    console.error("🚨 ERROR UPDATE STAT:", error);
-    return res.status(500).json({ success: false, message: error.message });
+    handleServiceError(res, error, "Gagal memperbarui statistik.");
   }
 };
 
-// Queue stat metric for permanent deletion
 exports.deleteStat = async (req, res) => {
-  const t = await sequelize.transaction();
   try {
-    const userRole = getRole(req);
-    const { id } = req.params;
-
-    const stat = await ImpactStats.findByPk(id, {
-      transaction: t,
-      lock: t.LOCK.UPDATE,
+    const result = await homeService.deleteStat({
+      id: req.params.id,
+      userRole: getRole(req),
+      actorId: getActorId(req),
+      owlToken: getToken(req),
     });
-    if (!stat) {
-      await t.rollback();
-      return res
-        .status(404)
-        .json({ success: false, message: "Stat not found" });
-    }
 
-    if (userRole === "editor" && stat.is_locked) {
-      await t.rollback();
-      return res.status(423).json({
-        success: false,
-        message: "Akses Dibatasi. Gagal menghapus karena data sedang terkunci.",
-        ticket: stat.lock_ticket,
-      });
-    }
-
-    if (userRole === "editor") {
-      const actorId = String(req.owl_username || req.karyawanId);
-      const notrans = await generateNotrans("STAT_DEL");
-      const fullSnapshot = stat.get({ plain: true });
-
-      await ApprovalDraft.create(
-        {
-          notrans,
-          module_name: "ImpactStats",
-          action: "DELETE",
-          target_id: String(id),
-          payload: { ...fullSnapshot, reason: "Request Delete" },
-          created_by: actorId,
-          status: "Pending",
-        },
-        { transaction: t },
-      );
-
-      await stat.update(
-        { is_locked: true, lock_ticket: notrans },
-        { transaction: t },
-      );
-
-      await t.commit();
-
-      try {
-        await ErpApprovalService.initiateApproval({
-          notrans,
-          moduleName: "ImpactStats",
-          karyawanId: req.karyawanId,
-          token: req.headers["authorization"]?.split(" ")[1] || req.owl_token,
-        });
-      } catch (erpError) {
-        console.error("🚨 [ERP SYNC FAILED]:", erpError.message);
-      }
-
+    if (result.isDraft) {
       return res.status(202).json({
         success: true,
         message: "Permintaan hapus statistik diajukan. Data dikunci sementara.",
-        ticket: notrans,
+        ticket: result.ticket,
       });
     }
 
-    await invalidateOldDrafts(id, "ImpactStats", t);
-    await stat.destroy({ transaction: t });
-    await t.commit();
-    return res
-      .status(200)
-      .json({ success: true, message: "Statistik deleted live!" });
+    res.status(200).json({ success: true, message: "Statistik deleted live!" });
   } catch (error) {
-    if (t && !t.finished) await t.rollback();
-    console.error("🚨 ERROR DELETE STAT:", error);
-    return res.status(500).json({ success: false, message: error.message });
+    handleServiceError(res, error, "Gagal menghapus statistik.");
   }
 };

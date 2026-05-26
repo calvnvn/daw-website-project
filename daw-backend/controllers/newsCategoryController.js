@@ -1,118 +1,56 @@
-const NewsCategory = require("../models/NewsCategory");
-const { Op } = require("sequelize");
+const newsCategoryService = require("../services/newsCategoryService");
 
-// Fetch all categories for admin management
+const handleServiceError = (res, error, defaultMsg) => {
+  const msg = error.message;
+
+  if (msg.startsWith("NOT_FOUND")) {
+    return res.status(404).json({ message: msg.split(": ")[1] });
+  }
+
+  if (msg.startsWith("VALIDATION_ERROR")) {
+    return res.status(400).json({ message: msg.split(": ")[1] });
+  }
+
+  if (msg.startsWith("CONFLICT")) {
+    return res.status(409).json({ message: msg.split(": ")[1] });
+  }
+
+  console.error(`🚨 [NEWS CATEGORY ERROR]:`, msg);
+  res.status(500).json({ message: defaultMsg || msg });
+};
+
 exports.getAllCategories = async (req, res) => {
   try {
-    const categories = await NewsCategory.findAll({
-      order: [["orderIndex", "ASC"], ["name", "ASC"]],
-    });
-    res.status(200).json(categories);
+    const data = await newsCategoryService.getAllCategories();
+    res.status(200).json(data);
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    handleServiceError(res, error, "Gagal memuat kategori.");
   }
 };
 
-// Create a new category
 exports.createCategory = async (req, res) => {
   try {
-    const { name, color, orderIndex } = req.body;
-
-    if (!name || !name.trim()) {
-      return res.status(400).json({ message: "Nama kategori wajib diisi." });
-    }
-
-    const slug = name
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, "-")
-      .replace(/(^-|-$)+/g, "");
-
-    const existing = await NewsCategory.findOne({
-      where: { [Op.or]: [{ name: name.trim() }, { slug }] },
-    });
-
-    if (existing) {
-      return res
-        .status(409)
-        .json({ message: "Kategori dengan nama ini sudah ada." });
-    }
-
-    const category = await NewsCategory.create({
-      name: name.trim(),
-      slug,
-      color: color || "#004B23",
-      orderIndex: orderIndex || 0,
-    });
-
-    res.status(201).json({ message: "Kategori berhasil dibuat.", data: category });
+    const data = await newsCategoryService.createCategory(req.body);
+    res.status(201).json({ message: "Kategori berhasil dibuat.", data });
   } catch (error) {
-    console.error("🚨 Error CREATE NewsCategory:", error.message);
-    res.status(500).json({ message: error.message });
+    handleServiceError(res, error, "Gagal membuat kategori.");
   }
 };
 
-// Update an existing category
 exports.updateCategory = async (req, res) => {
   try {
-    const { id } = req.params;
-    const { name, color, orderIndex } = req.body;
-
-    const category = await NewsCategory.findByPk(id);
-    if (!category) {
-      return res.status(404).json({ message: "Kategori tidak ditemukan." });
-    }
-
-    const updates = {};
-
-    if (name && name.trim() !== category.name) {
-      updates.name = name.trim();
-      updates.slug = name
-        .toLowerCase()
-        .replace(/[^a-z0-9]+/g, "-")
-        .replace(/(^-|-$)+/g, "");
-
-      // Check uniqueness against other categories
-      const duplicate = await NewsCategory.findOne({
-        where: {
-          [Op.or]: [{ name: updates.name }, { slug: updates.slug }],
-          id: { [Op.ne]: id },
-        },
-      });
-
-      if (duplicate) {
-        return res
-          .status(409)
-          .json({ message: "Kategori dengan nama ini sudah ada." });
-      }
-    }
-
-    if (color !== undefined) updates.color = color;
-    if (orderIndex !== undefined) updates.orderIndex = orderIndex;
-
-    await category.update(updates);
-
-    res.status(200).json({ message: "Kategori berhasil diperbarui.", data: category });
+    const data = await newsCategoryService.updateCategory(req.params.id, req.body);
+    res.status(200).json({ message: "Kategori berhasil diperbarui.", data });
   } catch (error) {
-    console.error("🚨 Error UPDATE NewsCategory:", error.message);
-    res.status(500).json({ message: error.message });
+    handleServiceError(res, error, "Gagal memperbarui kategori.");
   }
 };
 
-// Delete a category
 exports.deleteCategory = async (req, res) => {
   try {
-    const { id } = req.params;
-
-    const category = await NewsCategory.findByPk(id);
-    if (!category) {
-      return res.status(404).json({ message: "Kategori tidak ditemukan." });
-    }
-
-    await category.destroy();
-
+    await newsCategoryService.deleteCategory(req.params.id);
     res.status(200).json({ message: "Kategori berhasil dihapus." });
   } catch (error) {
-    console.error("🚨 Error DELETE NewsCategory:", error.message);
-    res.status(500).json({ message: error.message });
+    handleServiceError(res, error, "Gagal menghapus kategori.");
   }
 };

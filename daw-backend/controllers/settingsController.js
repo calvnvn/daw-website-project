@@ -1,281 +1,80 @@
-const fs = require("fs");
-const path = require("path");
-const Settings = require("../models/Settings");
-const ApprovalDraft = require("../models/ApprovalDraft");
-const ErpApprovalService = require("../services/erpApprovalService");
-const { deleteSingleFile } = require("../utils/fileRemover");
-const { invalidateOldDrafts } = require("../utils/draftCleanup");
-const sequelize = require("../config/database");
-const { generateNotrans } = require("../utils/notransGenerator");
-
-const MODULE_NAME = "Settings";
-const NOTRANS_PREFIX = "SET";
-
-const JENIS_APP_CMS = process.env.CMS_APPROVAL_CODE;
+const settingsService = require("../services/settingsService");
 
 /**
- * UTILITY: File Staging Protection
- * Renames uploaded files with a TEMP_ prefix for Editor drafts
- * to prevent them from appearing live before approval.
+ * Handle custom service errors and map them to appropriate HTTP responses
  */
-const applyTempPrefix = (fileObj) => {
-  if (!fileObj || !fileObj.filename) return null;
+const handleServiceError = (res, error, defaultMsg) => {
+  const msg = error.message;
 
-  const filename = fileObj.filename;
-
-  if (filename.startsWith("TEMP_")) {
-    console.log(
-      `🛡️ [FILE SYSTEM] File sudah di-karantina oleh Refinery: ${filename}`,
-    );
-    return filename;
+  if (msg.startsWith("NOT_FOUND")) {
+    return res.status(404).json({ success: false, message: msg.split(": ")[1] });
   }
 
-  const directory = path.join(__dirname, "..", "public", "uploads");
-  const oldPath = fileObj.path || path.join(directory, filename);
-  const newFilename = `TEMP_${filename}`;
-  const newPath = path.join(directory, newFilename);
-
-  try {
-    if (fs.existsSync(oldPath)) {
-      fs.renameSync(oldPath, newPath);
-      console.log(`✅ [FILE SYSTEM] Success: ${filename} -> ${newFilename}`);
-      return newFilename;
-    } else {
-      console.warn(`🚨 [TEMP GUARD] File asli tidak ditemukan di: ${oldPath}`);
-      return filename;
-    }
-  } catch (err) {
-    console.error(
-      `🚨 [TEMP GUARD] Gagal me-rename file ke TEMP_: ${err.message}`,
-    );
-    return filename;
+  if (msg.startsWith("LOCKED")) {
+    const ticket = msg.split("tiket ")[1];
+    return res.status(423).json({
+      success: false,
+      message: "Akses Dibatasi. Pengaturan sedang dikunci oleh antrean approval.",
+      ticket,
+    });
   }
+
+  if (msg.startsWith("FORBIDDEN")) {
+    return res.status(403).json({ success: false, message: msg.split(": ")[1] });
+  }
+
+  console.error(`🚨 [SETTINGS ERROR]:`, msg);
+  res.status(500).json({ success: false, message: defaultMsg || msg });
 };
 
 /**
  * GET: System Settings
- * Retrieves the singleton settings record (ID: 1) and checks
- * for any active 'Rejected' drafts to alert the UI.
+ * Retrieves the singleton settings record (ID: 1) and checks for rejected drafts.
  */
 exports.getSettings = async (req, res) => {
   try {
-    const [settingsInstance, created] = await Settings.findOrCreate({
-      where: { id: 1 },
-      defaults: {
-        companyName: "PT Dharma Agung Wijaya",
-        is_locked: false,
-      },
-    });
-
-    if (created)
-      console.log(">>> [SETTINGS] Initialized default record (ID 1)");
-
-    const settings = settingsInstance.get({ plain: true });
-
-    // Check for recent rejections in the staging vault
-    const rejectedDraft = await ApprovalDraft.findOne({
-      where: {
-        module_name: "Settings",
-        target_id: "1",
-        status: "Rejected",
-      },
-      order: [["createdAt", "DESC"]],
-    });
-
+    const result = await settingsService.getSettings();
     res.status(200).json({
       success: true,
-      data: settings,
-      has_rejected: !!rejectedDraft,
-      rejected_data: rejectedDraft || null,
+      ...result,
     });
   } catch (error) {
-    console.error("🚨 Error GET Settings:", error);
-    res
-      .status(500)
-      .json({ success: false, message: "Gagal mengambil pengaturan sistem." });
+    handleServiceError(res, error, "Gagal mengambil pengaturan sistem.");
   }
 };
 
 /**
  * PUT: Update Settings
- * Orchestrates logic based on user role:
- * 1. Admin: Direct authoritative commit to production.
- * 2. Editor: Stages changes in ApprovalDraft and triggers ERP workflow.
+ * Orchestrates logic based on user role.
  */
 exports.updateSettings = async (req, res) => {
-  const t = await sequelize.transaction();
-  const uploadedLogo = req.files?.["logo"] ? req.files["logo"][0] : null;
-  const uploadedFavicon = req.files?.["favicon"]
-    ? req.files["favicon"][0]
-    : null;
-
-  let tempLogoPath = null;
-  let tempFaviconPath = null;
-
   try {
-    const id = 1;
-    const userRole = req.userRole ? req.userRole.toLowerCase().trim() : "";
     const actorId = String(req.owl_username || req.karyawanId);
-    const { status, previous_notrans, ...textContent } = req.body;
+    const owlToken = req.headers["authorization"]?.split(" ")[1] || req.owl_token;
 
-    // Acquire row-level lock for singleton consistency
-    const settings = await Settings.findByPk(id, {
-      transaction: t,
-      lock: t.LOCK.UPDATE,
+    const result = await settingsService.updateSettings({
+      body: req.body,
+      files: req.files,
+      userRole: req.userRole,
+      actorId,
+      karyawanId: req.karyawanId,
+      owlToken,
     });
-    if (!settings) {
-      await t.rollback();
-      return res
-        .status(404)
-        .json({ success: false, message: "Settings not found." });
-    }
 
-    // Concurrency Guard: Prevent editors from modifying a record under review
-    if (userRole === "editor" && settings.is_locked) {
-      await t.rollback();
-      return res.status(423).json({
-        success: false,
-        message:
-          "Akses Dibatasi. Pengaturan sedang dikunci oleh antrean approval.",
-        ticket: settings.lock_ticket,
-      });
-    }
-
-    let updatePayload = {
-      ...settings.toJSON(),
-      ...textContent,
-    };
-    delete updatePayload.id;
-    delete updatePayload.createdAt;
-    delete updatePayload.updatedAt;
-
-    /**
-     * BRANCH 1: Admin / Superadmin (Direct Live Commit)
-     */
-    if (userRole === "superadmin" || userRole === "admin") {
-      console.log(">>> [SETTINGS] JALUR SUPERADMIN: BYPASSING APPROVAL <<<");
-
-      const oldLogoUrl = settings.logoUrl;
-      const oldFaviconUrl = settings.faviconUrl;
-
-      if (uploadedLogo) updatePayload.logoUrl = uploadedLogo.filename;
-      if (uploadedFavicon) updatePayload.faviconUrl = uploadedFavicon.filename;
-
-      await invalidateOldDrafts("Settings", id, t);
-      await settings.update(
-        {
-          ...updatePayload,
-          is_locked: false,
-          lock_ticket: null,
-        },
-        { transaction: t },
-      );
-      await t.commit();
-      await settings.reload();
-
-      if (uploadedLogo && oldLogoUrl) deleteSingleFile(oldLogoUrl);
-      if (uploadedFavicon && oldFaviconUrl) deleteSingleFile(oldFaviconUrl);
-
-      return res.status(200).json({
-        success: true,
-        message: "Settings diperbarui secara live!",
-        data: settings.get({ plain: true }),
-      });
-    }
-
-    /**
-     * BRANCH 2: Editor (Staging & ERP Sync)
-     */
-    if (userRole === "editor") {
-      console.log(">>> [SETTINGS] JALUR EDITOR: THE BATON PASS PROTOCOL <<<");
-      // Stage files with TEMP_ prefix
-      if (uploadedLogo) {
-        tempLogoPath = applyTempPrefix(uploadedLogo);
-        updatePayload.logoUrl = tempLogoPath;
-      }
-      if (uploadedFavicon) {
-        tempFaviconPath = applyTempPrefix(uploadedFavicon);
-        updatePayload.faviconUrl = tempFaviconPath;
-      }
-
-      // Link previous draft if this is a resubmission
-      if (previous_notrans) {
-        await ApprovalDraft.update(
-          { status: "Replaced" },
-          { where: { notrans: previous_notrans }, transaction: t },
-        );
-      }
-      await invalidateOldDrafts("Settings", id, t);
-
-      const notrans = await generateNotrans("SET");
-
-      // Persist draft and lock live record
-      await ApprovalDraft.create(
-        {
-          notrans,
-          module_name: "Settings",
-          target_id: String(id),
-          action: "UPDATE",
-          payload: updatePayload,
-          created_by: actorId,
-          status: "Pending",
-        },
-        { transaction: t },
-      );
-
-      await settings.update(
-        {
-          is_locked: true,
-          lock_ticket: notrans,
-        },
-        { transaction: t },
-      );
-
-      await t.commit();
-
-      // Initiate external ERP handshake
-      try {
-        await ErpApprovalService.initiateApproval({
-          notrans,
-          moduleName: "Settings",
-          karyawanId: req.karyawanId,
-          token: req.owl_token,
-        });
-      } catch (owlError) {
-        console.error(
-          "🚨 [SETTINGS] ERP Initiate Failed (Local Draft Secured):",
-          owlError.message,
-        );
-      }
-
+    if (result.isDraft) {
       return res.status(202).json({
         success: true,
         message: "Revisi profil diajukan. Data sekarang dikunci.",
-        ticket: notrans,
+        ticket: result.ticket,
       });
     }
 
-    if (t && !t.finished) await t.rollback();
-    return res
-      .status(403)
-      .json({ success: false, message: "Role Anda tidak valid." });
-  } catch (error) {
-    if (t && !t.finished) {
-      console.log(">>> [DATABASE] Rolling back transaction due to error...");
-      await t.rollback();
-    }
-
-    // Rollback physical files if DB operation failed
-    if (tempLogoPath) deleteSingleFile(tempLogoPath);
-    if (tempFaviconPath) deleteSingleFile(tempFaviconPath);
-    if (uploadedLogo && !tempLogoPath) deleteSingleFile(uploadedLogo.filename);
-    if (uploadedFavicon && !tempFaviconPath)
-      deleteSingleFile(uploadedFavicon.filename);
-    console.error("🚨 ERROR UPDATE SETTINGS:", error);
-    res.status(500).json({
-      success: false,
-      message: "Gagal memproses pembaruan pengaturan.",
-      error: error.message,
+    res.status(200).json({
+      success: true,
+      message: "Settings diperbarui secara live!",
+      data: result.data,
     });
+  } catch (error) {
+    handleServiceError(res, error, "Gagal memproses pembaruan pengaturan.");
   }
 };

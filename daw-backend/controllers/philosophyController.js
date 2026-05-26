@@ -1,191 +1,48 @@
-const sequelize = require("../config/database");
-const Philosophy = require("../models/Philosophy");
-const ApprovalDraft = require("../models/ApprovalDraft");
-const ErpApprovalService = require("../services/erpApprovalService");
-const { generateNotrans } = require("../utils/notransGenerator");
-
-const MODULE_NAME = "Philosophy";
-const NOTRANS_PREFIX = "PHL";
-
-// Normalize incoming payload for the singleton philosophy record
-const processPhilosophyPayload = async (req, existingData = {}) => {
-  const { philosophyTitle } = req.body;
-  return {
-    payload: {
-      philosophyTitle:
-        (philosophyTitle !== undefined
-          ? philosophyTitle
-          : existingData.philosophyTitle) || "",
-    },
-  };
-};
+const philosophyService = require("../services/philosophyService");
 
 // Retrieve singleton record with a rejection radar subquery
 exports.getPhilosophy = async (req, res) => {
   try {
-    const data = await Philosophy.findOne({
-      where: { id: 1 },
-      attributes: {
-        include: [
-          [
-            // Collation Guard: Forces charset match to prevent DB cross-collation errors
-            sequelize.literal(`(
-              SELECT COUNT(*) > 0 
-              FROM ApprovalDrafts 
-              WHERE target_id = '1' COLLATE utf8mb4_unicode_ci 
-              AND module_name = '${MODULE_NAME}' 
-              AND status = 'Rejected'
-            )`),
-            "hasRejected",
-          ],
-        ],
-      },
-    });
-
-    if (!data)
-      return res.status(404).json({ message: "Philosophy data not found" });
-
-    let formatted = data.toJSON();
-    formatted.hasRejected = !!formatted.hasRejected;
-
     const lang = req.query.lang || "en";
-    if (lang === "en") {
-      return res.status(200).json(formatted);
-    }
-
-    // ─── LAZY TRANSLATION ───
-    const Translation = require("../models/Translation");
-    const { autoTranslate } = require("../services/openaiService");
-
-    let titleTrans = await Translation.findOne({ where: { modelName: MODULE_NAME, recordId: "1", field: "philosophyTitle", locale: "id" } });
-    
-    const needsTitleTrans = formatted.philosophyTitle && !titleTrans;
-
-    if (needsTitleTrans) {
-      console.log(`[Lazy Translation] Translating Philosophy Title...`);
-      const freshTitle = await autoTranslate(formatted.philosophyTitle, "Indonesian");
-      
-      if (freshTitle) {
-        const existing = await Translation.findOne({ where: { modelName: MODULE_NAME, recordId: "1", field: "philosophyTitle", locale: "id" } });
-        if (existing) await existing.update({ translatedText: freshTitle });
-        else await Translation.create({ modelName: MODULE_NAME, recordId: "1", field: "philosophyTitle", locale: "id", translatedText: freshTitle });
-        formatted.philosophyTitle = freshTitle;
-      }
-    } else {
-      if (titleTrans) formatted.philosophyTitle = titleTrans.translatedText;
-    }
-
-    res.status(200).json(formatted);
+    const data = await philosophyService.getPhilosophy(lang);
+    res.status(200).json(data);
   } catch (error) {
+    if (error.message.startsWith("NOT_FOUND")) {
+      return res.status(404).json({ message: "Philosophy data not found" });
+    }
+    console.error("🚨 [GET PHILOSOPHY ERROR]:", error.message);
     res.status(500).json({ message: error.message });
   }
 };
 
 // Orchestrate update logic (Editor staging vs Admin direct commit)
 exports.updatePhilosophy = async (req, res) => {
-  const t = await sequelize.transaction();
   try {
-    const userRole = req.userRole?.toLowerCase().trim();
-    const actorId = String(req.owl_username || req.karyawanId || "")
-      .trim()
-      .toLowerCase();
-    const { status, previous_notrans } = req.body;
+    const actorId = String(req.owl_username || req.karyawanId || "").trim().toLowerCase();
+    const owlToken = req.headers["authorization"]?.split(" ")[1] || req.owl_token;
 
-    // Acquire pessimistic row lock to prevent concurrent modification
-    let info = await Philosophy.findByPk(1, {
-      transaction: t,
-      lock: t.LOCK.UPDATE,
+    const result = await philosophyService.updatePhilosophy({
+      body: req.body,
+      userRole: req.userRole,
+      actorId,
+      karyawanId: req.karyawanId,
+      owlToken,
     });
-    if (!info) info = await Philosophy.create({ id: 1 }, { transaction: t });
 
-    // Guard: Prevent editors from overriding active approval processes
-    if (info.is_locked && userRole === "editor") {
-      await t.rollback();
+    if (result.isDraft) {
+      return res.status(202).json({ success: true, ticket: result.ticket });
+    }
+
+    res.status(200).json({ success: true, message: result.message });
+  } catch (error) {
+    if (error.message.startsWith("LOCKED")) {
+      const ticket = error.message.split("tiket ")[1];
       return res.status(423).json({
         message: "Philosophy sedang dikunci.",
-        ticket: info.lock_ticket,
+        ticket,
       });
     }
-
-    const { payload } = await processPhilosophyPayload(req, info);
-
-    // Flow 1: Editor initiates staging and ERP sync
-    if (userRole === "editor" && status === "Published") {
-      const notrans = await generateNotrans(NOTRANS_PREFIX);
-      const ticketToClear = previous_notrans || info.lock_ticket;
-
-      // Invalidate replaced draft if resubmitting
-      if (ticketToClear) {
-        await ApprovalDraft.update(
-          { status: "Replaced" },
-          {
-            where: { notrans: ticketToClear, module_name: MODULE_NAME },
-            transaction: t,
-          },
-        );
-      }
-
-      // Stage mutation payload
-      await ApprovalDraft.create(
-        {
-          notrans,
-          module_name: MODULE_NAME,
-          target_id: "1",
-          action: "UPDATE",
-          payload: { ...payload, status: "Published" },
-          created_by: actorId,
-          status: "Pending",
-        },
-        { transaction: t },
-      );
-
-      // Lock live record
-      await info.update(
-        { is_locked: true, lock_ticket: notrans },
-        { transaction: t },
-      );
-      await t.commit();
-
-      // Dispatch to external ERP engine
-      try {
-        await ErpApprovalService.initiateApproval({
-          notrans,
-          moduleName: MODULE_NAME,
-          karyawanId: req.karyawanId,
-          token: req.headers["authorization"]?.split(" ")[1] || req.owl_token,
-        });
-      } catch (e) {
-        console.error("ERP Sync Fail:", e.message);
-      }
-
-      return res.status(202).json({ success: true, ticket: notrans });
-    }
-
-    // Flow 2: Admin overrides staging and performs direct live commit
-    await ApprovalDraft.update(
-      { status: "Obsolete" },
-      {
-        where: {
-          module_name: MODULE_NAME,
-          target_id: "1",
-          status: ["Pending", "Rejected"],
-        },
-        transaction: t,
-      },
-    );
-
-    // Release locks and save live data
-    await info.update(
-      { ...payload, is_locked: false, lock_ticket: null },
-      { transaction: t },
-    );
-    await t.commit();
-
-    res
-      .status(200)
-      .json({ success: true, message: "Philosophy updated live." });
-  } catch (error) {
-    if (t && !t.finished) await t.rollback();
+    console.error("🚨 [UPDATE PHILOSOPHY ERROR]:", error.message);
     res.status(500).json({ message: error.message });
   }
 };
