@@ -80,6 +80,8 @@ export default function OtherInvestmentsTeaser() {
                       <img
                         src={getCleanImageUrl(company.logoUrl)}
                         alt={company.name}
+                        width="200"
+                        height="200"
                         className="max-h-full max-w-full object-contain opacity-90 group-hover:opacity-100 transition-all duration-500 transform group-hover:scale-110"
                         onError={(e) => {
                           e.currentTarget.style.display = "none";

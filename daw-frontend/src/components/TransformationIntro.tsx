@@ -19,6 +19,8 @@ export default function TransformationIntro() {
               <img
                 src={logoDaw}
                 alt="DAW Group Logo"
+                width="455"
+                height="165"
                 className="h-40 md:h-50 w-auto object-contain mb-2 opacity-90"
               />
             </ScrollReveal>
