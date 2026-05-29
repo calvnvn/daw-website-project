@@ -21,7 +21,7 @@ import { toast } from "sonner";
 import { useInvestments } from "@/contexts/InvestmentContext";
 import { useAuth } from "@/contexts/AuthContext";
 import api from "@/lib/api";
-import { getCleanImageUrl } from "@/lib/utils";
+import { getCleanImageUrl, getErrorMessage } from "@/lib/utils";
 
 interface LocalAffiliate {
   id: number | string;
@@ -207,10 +207,18 @@ export default function InvestmentsManager() {
 
         setRejectedAffiliates((prev) => ({ ...prev, ...newRejectedState }));
       } catch (error: unknown) {
-        if (!(
-          (typeof error === "object" && error !== null && "name" in error && (error as { name?: string }).name === "CanceledError") ||
-          (typeof error === "object" && error !== null && "code" in error && (error as { code?: string }).code === "ERR_CANCELED")
-        )) {
+        if (
+          !(
+            (typeof error === "object" &&
+              error !== null &&
+              "name" in error &&
+              (error as { name?: string }).name === "CanceledError") ||
+            (typeof error === "object" &&
+              error !== null &&
+              "code" in error &&
+              (error as { code?: string }).code === "ERR_CANCELED")
+          )
+        ) {
           console.error("🚨 Gagal memuat kumpulan draf penolakan:", error);
         }
       }
@@ -293,10 +301,10 @@ export default function InvestmentsManager() {
       });
 
       toast.success("Notifikasi revisi afiliasi diabaikan.", { id: toastId });
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast.error("Gagal mengabaikan draf", {
         id: toastId,
-        description: error.response?.data?.message || "Kesalahan pada server.",
+        description: getErrorMessage(error) || "Kesalahan pada server.",
       });
     }
   };
@@ -359,12 +367,11 @@ export default function InvestmentsManager() {
       setHideDraftBanner(true);
 
       await refreshData();
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast.error("Gagal mengabaikan draf", {
         id: toastId,
         description:
-          error.response?.data?.message ||
-          "Kesalahan komunikasi dengan server.",
+          getErrorMessage(error) || "Kesalahan komunikasi dengan server.",
       });
     }
   };
