@@ -80,10 +80,39 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
     const handleUnauthorized = () => {
       logout();
     };
+
+    // Sinkronisasi Sesi Lintas Tab
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === "daw_token") {
+        if (!e.newValue) {
+          // Token dihapus di tab lain (Logout terdeteksi)
+          setUser(null);
+          if (window.location.pathname !== "/admin/login") {
+            window.location.href = "/admin/login";
+          }
+        } else {
+          // Token ditambahkan/diperbarui di tab lain (Login terdeteksi)
+          const storedUser = localStorage.getItem("daw_user");
+          if (storedUser) {
+            try {
+              setUser(JSON.parse(storedUser));
+              if (window.location.pathname === "/admin/login") {
+                window.location.href = "/admin";
+              }
+            } catch {
+              logout();
+            }
+          }
+        }
+      }
+    };
+
     window.addEventListener("auth:unauthorized", handleUnauthorized);
+    window.addEventListener("storage", handleStorageChange);
 
     return () => {
       window.removeEventListener("auth:unauthorized", handleUnauthorized);
+      window.removeEventListener("storage", handleStorageChange);
     };
   }, [syncUserSession, logout]);
 
