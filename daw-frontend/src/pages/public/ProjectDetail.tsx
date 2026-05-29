@@ -269,7 +269,7 @@ export default function ProjectDetail() {
         {/* DYNAMIC BREADCRUMBS */}
         <div className="bg-slate-50 border-b border-slate-100 py-4 mb-10">
           <div className="container mx-auto px-6 max-w-7xl">
-            <div className="flex items-center gap-2 text-[12px] font-bold tracking-widest uppercase text-slate-400">
+            <div className="flex items-center gap-2 text-[12px] font-bold tracking-widest uppercase text-slate-600">
               <Link to="/" className="hover:text-daw-green transition-colors">
                 Home
               </Link>

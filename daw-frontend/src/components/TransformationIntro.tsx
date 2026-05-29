@@ -24,9 +24,9 @@ export default function TransformationIntro() {
             </ScrollReveal>
             <ScrollReveal direction="up" delay={150}>
               <div className="w-50 h-1 bg-daw-green mb-4 rounded-full mx-auto"></div>
-              <h3 className="text-sm font-bold text-slate-400 uppercase tracking-[0.2em] text-center">
+              <p className="text-sm font-bold text-slate-400 uppercase tracking-[0.2em] text-center">
                 {t("intro.tagline", "Our Logo")}
-              </h3>
+              </p>
             </ScrollReveal>
           </div>
 

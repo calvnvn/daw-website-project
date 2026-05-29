@@ -267,7 +267,7 @@ export default function NewsEventDetail() {
             {/* Left Column: Main Article Flow */}
             <div className="lg:col-span-8 w-full min-w-0 overflow-hidden">
               {/* Breadcrumb */}
-              <nav className="flex text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-6 md:mb-8">
+              <nav className="flex text-[10px] font-bold uppercase tracking-widest text-slate-600 mb-6 md:mb-8">
                 <Link to="/" className="hover:text-daw-green transition-colors">
                   Home
                 </Link>
@@ -316,25 +316,29 @@ export default function NewsEventDetail() {
                     {article.author}
                   </span> */}
                   <div className="flex items-center gap-2">
-                    <span className="text-xs font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2 mr-1">
+                    <span className="text-xs font-bold text-slate-600 uppercase tracking-widest flex items-center gap-2 mr-1">
                       <Share2 className="w-4 h-4" /> Share
                     </span>
                     <button
+                      aria-label="Share on Facebook"
                       onClick={() => handleShare("facebook")}
                       className="w-9 h-9 rounded-full bg-slate-50 flex items-center justify-center text-slate-500 hover:bg-[#1877F2] hover:text-white transition-colors">
                       <Facebook className="w-4 h-4" />
                     </button>
                     <button
+                      aria-label="Share on Twitter"
                       onClick={() => handleShare("twitter")}
                       className="w-9 h-9 rounded-full bg-slate-50 flex items-center justify-center text-slate-500 hover:bg-[#1DA1F2] hover:text-white transition-colors">
                       <Twitter className="w-4 h-4" />
                     </button>
                     <button
+                      aria-label="Share on LinkedIn"
                       onClick={() => handleShare("linkedin")}
                       className="w-9 h-9 rounded-full bg-slate-50 flex items-center justify-center text-slate-500 hover:bg-[#0A66C2] hover:text-white transition-colors">
                       <Linkedin className="w-4 h-4" />
                     </button>
                     <button
+                      aria-label="Copy article link"
                       onClick={() => handleShare("copy")}
                       className="w-9 h-9 rounded-full bg-slate-50 flex items-center justify-center text-slate-500 hover:bg-daw-green hover:text-white transition-colors">
                       <LinkIcon className="w-4 h-4" />
@@ -668,6 +672,7 @@ export default function NewsEventDetail() {
                   />
                   <button
                     type="submit"
+                    aria-label="Submit search"
                     className="absolute right-2 top-2 p-2 bg-daw-green text-white rounded-full hover:bg-emerald-800 transition-colors">
                     <Search className="w-4 h-4" />
                   </button>

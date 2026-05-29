@@ -195,9 +195,9 @@ export default function ContactUs() {
                           <MapPin className="w-5 h-5 text-slate-500 group-hover:text-white transition-colors duration-300" />
                         </div>
                         <div>
-                          <h4 className="font-serif font-bold text-slate-900 text-lg mb-2">
+                          <p className="font-serif font-bold text-slate-900 text-lg mb-2">
                             {t("contactPage.info.addressTitle", "Head Office")}
-                          </h4>
+                          </p>
                           <p className="font-sans text-slate-600 text-sm leading-relaxed whitespace-pre-line">
                             {settings?.address}
                           </p>
@@ -209,9 +209,9 @@ export default function ContactUs() {
                           <Phone className="w-5 h-5 text-slate-500 group-hover:text-white transition-colors duration-300" />
                         </div>
                         <div>
-                          <h4 className="font-serif font-bold text-slate-900 text-lg mb-1">
+                          <p className="font-serif font-bold text-slate-900 text-lg mb-1">
                             {t("contactPage.info.phoneTitle", "Phone")}
-                          </h4>
+                          </p>
                           <a
                             href={`tel:${settings?.phone ? settings.phone.replace(/\s+/g, "") : ""}`}
                             className="font-sans text-slate-600 text-sm hover:text-daw-green transition-colors">
@@ -225,9 +225,9 @@ export default function ContactUs() {
                           <Globe className="w-5 h-5 text-slate-500 group-hover:text-white transition-colors duration-300" />
                         </div>
                         <div>
-                          <h4 className="font-serif font-bold text-slate-900 text-lg mb-1">
+                          <p className="font-serif font-bold text-slate-900 text-lg mb-1">
                             {t("contactPage.info.websiteTitle", "Website")}
-                          </h4>
+                          </p>
                           <a
                             href={
                               settings?.website?.startsWith("http")
@@ -246,9 +246,9 @@ export default function ContactUs() {
                           <Mail className="w-5 h-5 text-slate-500 group-hover:text-white transition-colors duration-300" />
                         </div>
                         <div>
-                          <h4 className="font-serif font-bold text-slate-900 text-lg mb-1">
+                          <p className="font-serif font-bold text-slate-900 text-lg mb-1">
                             {t("contactPage.info.emailTitle", "Email Address")}
-                          </h4>
+                          </p>
                           <a
                             href={`mailto:${settings?.email || "info@daw.co.id"}`}
                             className="font-sans text-slate-600 text-sm hover:text-daw-green transition-colors">
@@ -286,9 +286,9 @@ export default function ContactUs() {
                       </div>
 
                       <div className="w-full max-w-sm bg-slate-50 rounded-xl p-5 border border-slate-100 text-left space-y-2">
-                        <h4 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest border-b border-slate-200/60 pb-1.5">
+                        <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest border-b border-slate-200/60 pb-1.5">
                           Submission Summary
-                        </h4>
+                        </p>
                         <div className="space-y-1.5 text-xs">
                           <div className="grid grid-cols-3 gap-1.5">
                             <span className="font-bold text-slate-500">
@@ -342,12 +342,13 @@ export default function ContactUs() {
                         className="space-y-6">
                         {/* --- BAGIAN 1: SUBJECT (Trigger Utama) --- */}
                         <div className="space-y-2 relative z-20">
-                          <label className="text-xs font-bold text-slate-500 uppercase tracking-widest">
+                          <label htmlFor="subject-select" className="text-xs font-bold text-slate-600 uppercase tracking-widest">
                             {t("contactPage.form.subject", "Inquiry Subject")}{" "}
                             <span className="text-daw-green">*</span>
                           </label>
                           <div className="relative">
                             <select
+                              id="subject-select"
                               {...register("subject")}
                               className={`w-full bg-slate-50 border rounded-xl pl-4 pr-10 py-3.5 text-slate-900 font-sans focus:outline-none transition-all appearance-none cursor-pointer ${
                                 errors.subject
@@ -380,9 +381,9 @@ export default function ContactUs() {
                             <div className="mt-4 bg-daw-green/10 border border-daw-green/20 p-4 rounded-xl flex gap-3 animate-in fade-in slide-in-from-top-2 duration-300">
                               <Info className="w-5 h-5 text-daw-green shrink-0 mt-0.5" />
                               <div className="space-y-1">
-                                <h4 className="text-sm font-bold text-slate-900">
+                                <p className="text-sm font-bold text-slate-900">
                                   {selectedSubjectName}
-                                </h4>
+                                </p>
                                 <p className="text-xs font-medium text-slate-600 leading-relaxed">
                                   For information about{" "}
                                   <span className="font-bold text-daw-green">
@@ -398,12 +399,13 @@ export default function ContactUs() {
                         {/* --- BAGIAN 2: DATA DIRI (Name & Email) --- */}
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 relative z-10">
                           <div className="space-y-2">
-                            <label className="text-xs font-bold text-slate-500 uppercase tracking-widest">
+                            <label htmlFor="name-input" className="text-xs font-bold text-slate-600 uppercase tracking-widest">
                               {t("contactPage.form.name", "Full Name")}{" "}
                               <span className="text-daw-green">*</span>
                             </label>
                             <input
                               {...register("name")}
+                              id="name-input"
                               type="text"
                               placeholder={t(
                                 "contactPage.form.namePlaceholder",
@@ -423,12 +425,13 @@ export default function ContactUs() {
                             )}
                           </div>
                           <div className="space-y-2">
-                            <label className="text-xs font-bold text-slate-500 uppercase tracking-widest">
+                            <label htmlFor="email-input" className="text-xs font-bold text-slate-600 uppercase tracking-widest">
                               {t("contactPage.form.email", "Email Address")}{" "}
                               <span className="text-daw-green">*</span>
                             </label>
                             <input
                               {...register("email")}
+                              id="email-input"
                               type="email"
                               placeholder={t(
                                 "contactPage.form.emailPlaceholder",
@@ -459,12 +462,13 @@ export default function ContactUs() {
                           <div className="space-y-6">
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-1">
                               <div className="space-y-2">
-                                <label className="text-xs font-bold text-slate-500 uppercase tracking-widest">
+                                <label htmlFor="phone-input" className="text-xs font-bold text-slate-600 uppercase tracking-widest">
                                   {t("contactPage.form.phone", "Phone Number")}{" "}
                                   <span className="text-daw-green">*</span>
                                 </label>
                                 <input
                                   {...register("phone")}
+                                  id="phone-input"
                                   type="tel"
                                   placeholder={t(
                                     "contactPage.form.phonePlaceholder",
@@ -483,7 +487,7 @@ export default function ContactUs() {
                                 )}
                               </div>
                               <div className="space-y-2">
-                                <label className="text-xs font-bold text-slate-500 uppercase tracking-widest">
+                                <label htmlFor="company-input" className="text-xs font-bold text-slate-600 uppercase tracking-widest">
                                   {t(
                                     "contactPage.form.company",
                                     "Company / Organization (Optional)",
@@ -491,6 +495,7 @@ export default function ContactUs() {
                                 </label>
                                 <input
                                   {...register("company")}
+                                  id="company-input"
                                   type="text"
                                   placeholder={t(
                                     "contactPage.form.companyPlaceholder",
@@ -502,12 +507,13 @@ export default function ContactUs() {
                             </div>
 
                             <div className="space-y-2">
-                              <label className="text-xs font-bold text-slate-500 uppercase tracking-widest">
+                              <label htmlFor="message-input" className="text-xs font-bold text-slate-600 uppercase tracking-widest">
                                 {t("contactPage.form.message", "Message")}{" "}
                                 <span className="text-daw-green">*</span>
                               </label>
                               <textarea
                                 {...register("message")}
+                                id="message-input"
                                 rows={5}
                                 placeholder={t(
                                   "contactPage.form.messagePlaceholder",

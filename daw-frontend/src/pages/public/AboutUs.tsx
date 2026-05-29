@@ -105,7 +105,7 @@ export default function AboutUs() {
                   <ScrollReveal direction="right" delay={100}>
                     <div className="w-full -mx-5 px-5 md:mx-0 md:px-0">
                       <div className="flex flex-row md:flex-col overflow-x-auto snap-x snap-mandatory md:overflow-visible space-x-2 md:space-x-0 md:space-y-2 border-b md:border-b-0 border-slate-100 pb-1 md:pb-0 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] w-full">
-                        <span className="hidden md:block text-[11px] font-bold text-slate-400 uppercase tracking-[0.2em] mb-4 pl-5">
+                        <span className="hidden md:block text-[11px] font-bold text-slate-500 uppercase tracking-[0.2em] mb-4 pl-5">
                           Menu
                         </span>
                         {TABS.map((tab) => (

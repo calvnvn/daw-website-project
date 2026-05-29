@@ -336,6 +336,7 @@ export default function DynamicNavbar() {
                   {t("nav.about", "ABOUT US")}
                 </Link>
                 <button
+                  aria-label="Toggle About Us Submenu"
                   onClick={(e) => {
                     e.preventDefault();
                     toggleMobileAccordion("static-about");
@@ -451,7 +452,7 @@ export default function DynamicNavbar() {
                           {menu.label}
                         </Link>
                         <button
-                          aria-label="Toggle About Us Submenu"
+                          aria-label={`Toggle ${menu.label} Submenu`}
                           onClick={(e) => {
                             e.preventDefault();
                             toggleMobileAccordion(menu.id);

@@ -86,7 +86,7 @@ export default function Footer() {
                     <MapPin className="w-5 h-5 text-daw-green transition-colors" />
                   </div>
                   <div className="space-y-1">
-                    <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500">
+                    <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">
                       {settings?.companyName || "PT Dharma Agung Wijaya"}
                     </p>
                     <p className="text-slate-400 font-light text-sm leading-relaxed max-w-xs whitespace-pre-line">
@@ -99,7 +99,7 @@ export default function Footer() {
 
             {/* Column 2: Sitemap (Quick Links) */}
             <div className="md:col-span-3">
-              <p className="text-[11px] font-black uppercase tracking-[0.3em] text-white/40 mb-8">
+              <p className="text-[11px] font-black uppercase tracking-[0.3em] text-white/60 mb-8">
                 {t("footer.quickLinks", "Navigation")}
               </p>
               <ul className="flex flex-col gap-4">
@@ -181,7 +181,7 @@ export default function Footer() {
 
             {/* Column 3: Sector Presence */}
             <div className="md:col-span-4">
-              <p className="text-[11px] font-black uppercase tracking-[0.3em] text-white/40 mb-8">
+              <p className="text-[11px] font-black uppercase tracking-[0.3em] text-white/60 mb-8">
                 {t("footer.sectorsTitle", "Business Sectors")}
               </p>
               <div className="flex flex-wrap gap-3">

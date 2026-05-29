@@ -1,6 +1,5 @@
 import { useState, useEffect } from "react";
 import { useTranslation } from "react-i18next";
-import { Button } from "@/components/ui/button";
 import { ArrowRight, ChevronDown } from "lucide-react";
 import { Link } from "react-router-dom";
 import { useHome } from "@/contexts/HomeContext";
@@ -142,21 +141,16 @@ export default function Hero() {
             </p>
 
             <div className="flex flex-col sm:flex-row gap-4 animate-fade-in-up animation-delay-400 mt-4">
-              <Link to="/businesses" className="inline-block">
-                <Button
-                  size="lg"
-                  className="group bg-daw-green hover:bg-[#003b1c] text-white rounded-full px-8 py-6.5 text-[13px] tracking-wide font-bold shadow-lg transition-transform hover:-translate-y-1 border-0 flex items-center">
-                  {t("hero.ctaPrimary", "Explore Our Businesses")}
-                  <ArrowRight className="ml-2 h-4 w-4 transition-transform duration-300 group-hover:translate-x-1.5" />
-                </Button>
+              <Link
+                to="/businesses"
+                className="inline-flex h-11 lg:h-12 items-center justify-center gap-2 bg-daw-green hover:bg-[#003b1c] text-white rounded-full px-8 py-6 text-[13px] tracking-wide font-bold shadow-lg transition-transform hover:-translate-y-1 border-0 group">
+                {t("hero.ctaPrimary", "Explore Our Businesses")}
+                <ArrowRight className="ml-2 h-4 w-4 transition-transform duration-300 group-hover:translate-x-1.5" />
               </Link>
-              <Link to="/about?tab=company" className="inline-block">
-                <Button
-                  size="lg"
-                  variant="outline"
-                  className="bg-transparent border-2 border-white/80 text-white hover:bg-daw-yellow hover:text-white rounded-full px-8 py-6 text-[14px] tracking-wide font-bold shadow-lg transition-all duration-300 hover:-translate-y-1 backdrop-blur-sm">
-                  {t("hero.ctaSecondary", "Discover Our Vision")}
-                </Button>
+              <Link
+                to="/about?tab=company"
+                className="inline-flex h-11 lg:h-12 items-center justify-center gap-2 bg-transparent border-2 border-white/80 text-white hover:bg-daw-yellow hover:text-white hover:border-daw-yellow rounded-full px-8 py-6 text-[14px] tracking-wide font-bold shadow-lg transition-all duration-300 hover:-translate-y-1 backdrop-blur-sm">
+                {t("hero.ctaSecondary", "Discover Our Vision")}
               </Link>
             </div>
           </div>

@@ -45,9 +45,9 @@ export default function OurCompany() {
     <div className="space-y-16">
       <ScrollReveal direction="up" delay={0}>
         <div>
-          <h3 className="text-sm font-sans font-bold text-daw-green uppercase tracking-[0.2em] mb-6">
+          <p className="text-sm font-sans font-bold text-daw-green uppercase tracking-[0.2em] mb-6">
             {t("about.company.spiritTitle")}
-          </h3>
+          </p>
           <p className="font-serif italic text-3xl md:text-4xl text-slate-800 leading-[1.4]">
             {aboutData?.spiritText
               ? renderHighlightedText(aboutData.spiritText)
@@ -64,9 +64,9 @@ export default function OurCompany() {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-12 lg:gap-16">
         <ScrollReveal direction="up" delay={200}>
           <div>
-            <h3 className="text-sm font-sans font-bold text-slate-400 uppercase tracking-widest mb-4">
+            <p className="text-sm font-sans font-bold text-slate-500 uppercase tracking-widest mb-4">
               {t("about.company.missionTitle")}
-            </h3>
+            </p>
             <p className="font-serif text-2xl text-slate-900 leading-relaxed">
               {aboutData?.missionText
                 ? renderHighlightedText(aboutData.missionText)
@@ -77,9 +77,9 @@ export default function OurCompany() {
 
         <ScrollReveal direction="up" delay={300}>
           <div>
-            <h3 className="text-sm font-sans font-bold text-slate-400 uppercase tracking-widest mb-4">
+            <p className="text-sm font-sans font-bold text-slate-500 uppercase tracking-widest mb-4">
               {t("about.company.visionTitle")}
-            </h3>
+            </p>
             <p className="font-serif text-2xl text-slate-900 leading-relaxed">
               {aboutData?.visionText
                 ? renderHighlightedText(aboutData.visionText)
