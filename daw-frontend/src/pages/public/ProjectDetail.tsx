@@ -358,7 +358,10 @@ export default function ProjectDetail() {
                     [&_img]:w-full [&_img]:h-auto [&_img]:rounded-2xl [&_img]:shadow-md [&_img]:my-10 [&_img]:border [&_img]:border-slate-100
                   "
                   dangerouslySetInnerHTML={{
-                    __html: DOMPurify.sanitize(cleanContent),
+                    __html: DOMPurify.sanitize(cleanContent, {
+                      ADD_TAGS: ['iframe'],
+                      ADD_ATTR: ['allow', 'allowfullscreen', 'frameborder', 'scrolling', 'target']
+                    }),
                   }}
                 />
               </ScrollReveal>

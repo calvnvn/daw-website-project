@@ -22,6 +22,7 @@ import SEO from "@/components/SEO";
 import GlobalHeroBanner from "@/components/ui/GlobalHeroBanner";
 import bannerImg from "@/assets/about-banner.jpg";
 import api, { BASE_UPLOAD_URL } from "@/lib/api";
+import DOMPurify from "dompurify";
 
 interface CategoryData {
   id: string;
@@ -367,6 +368,12 @@ export default function NewsEventDetail() {
                       " ",
                     );
 
+                    // DOMPurify Sanitization
+                    const cleanHtml = DOMPurify.sanitize(rawHtml, {
+                      ADD_TAGS: ['iframe'],
+                      ADD_ATTR: ['allow', 'allowfullscreen', 'frameborder', 'scrolling', 'target']
+                    });
+
                     // Helper generator untuk HTML kartu putar premium
                     const getPremiumPlayCard = (videoId: string) => {
                       return `
@@ -396,7 +403,7 @@ export default function NewsEventDetail() {
                       `;
                     };
 
-                    let processedHtml = rawHtml;
+                    let processedHtml = cleanHtml;
 
                     // 1. Ubah tag iframe youtube bawaan editor menjadi kartu premium
                     const iframeRegex =

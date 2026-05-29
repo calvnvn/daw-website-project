@@ -51,7 +51,7 @@ const MODEL_MAPPING = {
 
 function getModelByModuleName(moduleName) {
   if (!moduleName) return null;
-  const normalizedName = moduleName.toLowerCase() === "settings" ? "HomeSettings" : moduleName;
+  const normalizedName = moduleName;
   const standardKey = Object.keys(MODEL_MAPPING).find((k) => k.toLowerCase() === normalizedName.toLowerCase());
   return MODEL_MAPPING[standardKey] || null;
 }
@@ -392,7 +392,7 @@ class ApprovalService {
   }
 
   async executeModelUpdate(module, targetId, payload, action, transaction) {
-    const effectiveModule = module.toLowerCase() === "settings" ? "HomeSettings" : module;
+    const effectiveModule = module;
     const Model = getModelByModuleName(effectiveModule);
     if (!Model) throw new Error(`Mapping Model untuk modul '${module}' tidak ditemukan.`);
 

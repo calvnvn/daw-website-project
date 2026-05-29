@@ -30,7 +30,7 @@ const ApprovalDraft = sequelize.define(
       allowNull: false,
     },
     status: {
-      type: DataTypes.ENUM("Pending", "Approved", "Rejected"),
+      type: DataTypes.ENUM("Pending", "Approved", "Rejected", "Discarded"),
       defaultValue: "Pending",
     },
     rejection_reason: {
