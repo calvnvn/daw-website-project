@@ -22,6 +22,8 @@ import {
   ChevronLeft,
   Eye,
   Layout,
+  Share2,
+  ChevronRight,
 } from "lucide-react";
 import api, { BASE_UPLOAD_URL } from "@/lib/api";
 import imageCompression from "browser-image-compression";
@@ -555,6 +557,43 @@ export default function PageBuilder() {
     }
   };
 
+  // Generate ToC for Preview
+  const previewToc = useMemo(() => {
+    if (!formData.content) return [];
+    try {
+      const parser = new DOMParser();
+      const virtualDoc = parser.parseFromString(formData.content, "text/html");
+      const headings = Array.from(virtualDoc.querySelectorAll("h2, h3"));
+      const items: { id: string; text: string; level: number }[] = [];
+      const idTracker: Record<string, number> = {};
+
+      headings.forEach((heading, index) => {
+        const text = heading.textContent || "";
+        let baseId =
+          text
+            .toLowerCase()
+            .replace(/[^a-z0-9]+/g, "-")
+            .replace(/(^-|-$)+/g, "") || `sec-${index}`;
+
+        if (idTracker[baseId] !== undefined) {
+          idTracker[baseId] += 1;
+          baseId = `${baseId}-${idTracker[baseId]}`;
+        } else {
+          idTracker[baseId] = 0;
+        }
+
+        items.push({
+          id: baseId,
+          text,
+          level: heading.tagName === "H2" ? 2 : 3,
+        });
+      });
+      return items;
+    } catch {
+      return [];
+    }
+  }, [formData.content]);
+
   return (
     <div
       className={`grid grid-cols-1 gap-8 items-start animate-in fade-in duration-500 pb-20 ${
@@ -809,13 +848,6 @@ export default function PageBuilder() {
                 </div>
               ) : (
                 <>
-                  <button
-                    type="button"
-                    disabled={isSaving || (!hasDataChanged && !isSuperadmin)}
-                    onClick={(e) => handleSubmit(e, "Draft")}
-                    className="bg-slate-100 hover:bg-slate-200 text-slate-700 px-4 py-2 rounded-xl text-xs font-bold transition-all disabled:opacity-50 disabled:cursor-not-allowed border border-slate-200">
-                    {isSaving ? "..." : "Simpan Draf"}
-                  </button>
                   <button
                     type="button"
                     disabled={isSaving || (!hasDataChanged && !isSuperadmin)}
@@ -1455,39 +1487,102 @@ export default function PageBuilder() {
                       </div>
                     </section>
 
-                    {/* Content Area Simulation */}
-                    <div className="px-8 py-12 max-w-[720px] mx-auto">
-                      <article
-                        className={`w-full text-left
-                [&>*:first-child]:mt-0
-                prose prose-slate prose-lg max-w-none
-                prose-p:leading-[1.8] prose-p:text-slate-600 prose-p:mb-5 
-                prose-headings:font-serif prose-headings:text-slate-900 
-                prose-h2:text-3xl prose-h2:mt-10 prose-h2:mb-8
-                prose-headings:tracking-tight prose-headings:font-bold
-                prose-h3:text-2xl prose-h3:mt-10
-                [&_img]:rounded-[2rem] [&_img]:my-5
-                [&_iframe]:rounded-[1.5rem] [&_iframe]:shadow-2xl [&_iframe]:my-5
-                ${
-                  formData.showDropCap
-                    ? `prose-p:first-of-type:first-letter:text-[5rem] 
-                       prose-p:first-of-type:first-letter:font-serif 
-                       prose-p:first-of-type:first-letter:font-black 
-                       prose-p:first-of-type:first-letter:text-daw-green 
-                       prose-p:first-of-type:first-letter:mr-4 
-                       prose-p:first-of-type:first-letter:float-left 
-                       prose-p:first-of-type:first-letter:leading-[0.7] 
-                       prose-p:first-of-type:first-letter:mt-2
-                       prose-p:first-of-type:first-letter:drop-shadow-sm`
-                    : ""
-                }
-                prose-li:marker:text-daw-green prose-li:my-2`}
-                        dangerouslySetInnerHTML={{
-                          __html:
-                            formData.content.replace(/&nbsp;|\u00A0/g, " ") ||
-                            "<p class='text-slate-300 italic'>Konten akan muncul di sini...</p>",
-                        }}
-                      />
+                    {/* Full Layout Container Simulation */}
+                    <div className="bg-white relative z-20 shadow-[0_-20px_40px_rgba(0,0,0,0.05)] pt-12 pb-24">
+                      <div className="container mx-auto px-6 max-w-[90rem]">
+                        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12 items-start">
+                          
+                          {/* Sidebar Navigation: Table of Contents Preview */}
+                          <aside className="hidden lg:block lg:col-span-3 sticky top-6 self-start w-full max-w-[280px]">
+                            {previewToc.length > 0 && (
+                              <div className="pr-4 flex flex-col">
+                                <h4 className="text-[10px] font-black uppercase text-slate-400 tracking-[0.25em] mb-8 flex items-center gap-3">
+                                  <span className="w-8 h-[2px] bg-slate-200 rounded-full"></span>
+                                  Table of Contents
+                                </h4>
+                                <nav className="flex flex-col relative border-l-2 border-slate-100 ml-1">
+                                  {previewToc.map((item, idx) => (
+                                    <button
+                                      key={idx}
+                                      className={`group text-left py-3 pr-4 relative transition-all duration-300 ease-out flex items-center w-full text-slate-400 hover:text-slate-700 hover:bg-slate-50/80
+                                      ${item.level === 3 ? "pl-8 text-[12px]" : "pl-5 text-[13px] font-bold"}`}>
+                                      <span className="line-clamp-2 leading-[1.4] w-full tracking-tight">
+                                        {item.text}
+                                      </span>
+                                    </button>
+                                  ))}
+                                </nav>
+                              </div>
+                            )}
+                          </aside>
+
+                          {/* Dynamic Content Area */}
+                          <div className="lg:col-span-9 xl:col-span-6 min-w-0 w-full overflow-hidden">
+                            <div className="max-w-[720px] mx-auto">
+                              <article
+                                className={`w-full text-left
+                        [&>*:first-child]:mt-0
+                        prose prose-slate prose-lg max-w-none
+                        prose-p:leading-[1.8] prose-p:text-slate-600 prose-p:mb-5 
+                        prose-headings:font-serif prose-headings:text-slate-900 
+                        prose-h2:text-3xl prose-h2:mt-10 prose-h2:mb-8
+                        prose-headings:tracking-tight prose-headings:font-bold
+                        prose-h3:text-2xl prose-h3:mt-10
+                        [&_img]:rounded-[2rem] [&_img]:my-5
+                        [&_iframe]:rounded-[1.5rem] [&_iframe]:shadow-2xl [&_iframe]:my-5
+                        ${
+                          formData.showDropCap
+                            ? `prose-p:first-of-type:first-letter:text-[5rem] 
+                              prose-p:first-of-type:first-letter:font-serif 
+                              prose-p:first-of-type:first-letter:font-black 
+                              prose-p:first-of-type:first-letter:text-daw-green 
+                              prose-p:first-of-type:first-letter:mr-4 
+                              prose-p:first-of-type:first-letter:float-left 
+                              prose-p:first-of-type:first-letter:leading-[0.7] 
+                              prose-p:first-of-type:first-letter:mt-2
+                              prose-p:first-of-type:first-letter:drop-shadow-sm`
+                            : ""
+                        }
+                        prose-li:marker:text-daw-green prose-li:my-2`}
+                                dangerouslySetInnerHTML={{
+                                  __html:
+                                    formData.content.replace(/&nbsp;|\u00A0/g, " ") ||
+                                    "<p class='text-slate-300 italic'>Konten akan muncul di sini...</p>",
+                                }}
+                              />
+                            </div>
+                          </div>
+
+                          {/* Supplementary Widget Preview */}
+                          {formData.sidebarLinks.length > 0 ? (
+                            <aside className="lg:col-span-12 xl:col-span-3 sticky top-6">
+                              <div className="p-8 bg-slate-50 rounded-[2rem] border border-slate-100 shadow-sm">
+                                <h4 className="text-lg font-serif font-bold text-slate-900 mb-4 flex items-center gap-2">
+                                  <Share2 className="w-5 h-5 text-daw-green" /> Inside this Topic
+                                </h4>
+                                <p className="text-xs text-slate-500 leading-relaxed mb-6">
+                                  Discover more about this topic.
+                                </p>
+                                <div className="flex flex-col gap-2">
+                                  {formData.sidebarLinks.map((link, index) => (
+                                    <div
+                                      key={`preview-link-${index}`}
+                                      className="flex items-center justify-between p-4 bg-white rounded-xl border border-slate-200 cursor-pointer hover:border-daw-green hover:shadow-md transition-all group">
+                                      <span className="text-xs font-bold uppercase tracking-wider text-slate-700 group-hover:text-daw-green transition-colors">
+                                        {link.label || "Untitled Link"}
+                                      </span>
+                                      <ChevronRight className="w-4 h-4 text-slate-300 group-hover:text-daw-green group-hover:translate-x-1 transition-transform" />
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            </aside>
+                          ) : (
+                            <div className="hidden xl:block xl:col-span-3" />
+                          )}
+
+                        </div>
+                      </div>
                     </div>
                   </div>
                 </div>
