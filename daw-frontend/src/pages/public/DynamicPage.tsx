@@ -7,6 +7,7 @@ import api, { API_URL } from "@/lib/api";
 import ScrollReveal from "@/components/ScrollReveal";
 import { getCleanImageUrl } from "@/lib/utils";
 import SEO from "@/components/SEO";
+import { t } from "i18next";
 
 interface PageData {
   id: string;
@@ -114,8 +115,19 @@ export default function DynamicPage() {
 
         setPageData(data);
       } catch (error: unknown) {
-        if ((typeof error === "object" && error !== null && "name" in error && (error as { name?: string }).name === "CanceledError")) return; // Abaikan jika request dibatalkan
-        if ((typeof error === "object" && error !== null && "response" in error ? (error as any).response?.status : undefined) === 404) setIsNotFound(true);
+        if (
+          typeof error === "object" &&
+          error !== null &&
+          "name" in error &&
+          (error as { name?: string }).name === "CanceledError"
+        )
+          return; // Abaikan jika request dibatalkan
+        if (
+          (typeof error === "object" && error !== null && "response" in error
+            ? (error as any).response?.status
+            : undefined) === 404
+        )
+          setIsNotFound(true);
         else setIsError(true);
         console.error("Fetch Page Failure:", error);
       } finally {
@@ -365,7 +377,7 @@ export default function DynamicPage() {
           {/* Scroll Down Indicator */}
           <div className="absolute bottom-12 left-1/2 -translate-x-1/2 flex flex-col items-center gap-2 text-white/50 animate-bounce">
             <span className="text-[10px] font-bold tracking-widest uppercase">
-              Scroll to Explore
+              {t("ui.scroll", "Scroll to Explore")}
             </span>
             <ChevronRight className="rotate-90 w-4 h-4" />
           </div>

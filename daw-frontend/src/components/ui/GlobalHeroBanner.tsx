@@ -2,6 +2,7 @@ import { ChevronRight } from "lucide-react"; // useMemo dihapus dari import
 import { useHome } from "@/contexts/HomeContext";
 import { getCleanImageUrl } from "@/lib/utils";
 import ScrollReveal from "@/components/ScrollReveal";
+import { t } from "i18next";
 
 interface GlobalHeroBannerProps {
   title: string;
@@ -75,7 +76,7 @@ export default function GlobalHeroBanner({
       {/* Scroll Down Indicator */}
       <div className="absolute bottom-12 left-1/2 -translate-x-1/2 flex flex-col items-center gap-2 text-white/50 animate-bounce">
         <span className="text-[10px] font-bold tracking-widest uppercase">
-          Scroll to Explore
+          {t("ui.scroll", "Scroll to Explore")}
         </span>
         <ChevronRight className="rotate-90 w-4 h-4" />
       </div>
