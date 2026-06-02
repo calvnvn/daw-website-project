@@ -9,6 +9,8 @@ const dompurify = createDOMPurify(window);
 const sequelize = require("../config/database");
 const Page = require("../models/Page");
 const ApprovalDraft = require("../models/ApprovalDraft");
+const Translation = require("../models/Translation");
+const { autoTranslate } = require("./openaiService");
 const { deleteSingleFile } = require("../utils/fileRemover");
 const { generateUniqueSlug, handleEditorStaging } = require("../utils/editorHelper");
 
@@ -43,10 +45,85 @@ class PageService {
     });
   }
 
-  async getPageBySlug(slug) {
+  async triggerBackgroundTranslation(pageId, payload) {
+    try {
+      const { title, subtitle, content } = payload;
+
+      const idTitle = title ? await autoTranslate(title, "Indonesian") : null;
+      const idSubtitle = subtitle ? await autoTranslate(subtitle, "Indonesian") : null;
+      const idContent = content ? await autoTranslate(content, "Indonesian") : null;
+
+      const upsertTranslation = async (field, translatedText) => {
+        if (translatedText === null || translatedText === undefined) return;
+        const existing = await Translation.findOne({
+          where: { modelName: MODULE_NAME, recordId: String(pageId), field, locale: "id" },
+        });
+        if (existing) {
+          await existing.update({ translatedText });
+        } else {
+          await Translation.create({
+            modelName: MODULE_NAME,
+            recordId: String(pageId),
+            field,
+            locale: "id",
+            translatedText,
+          });
+        }
+      };
+
+      await upsertTranslation("title", idTitle);
+      await upsertTranslation("subtitle", idSubtitle);
+      await upsertTranslation("content", idContent);
+    } catch (error) {
+      console.error("🚨 Background Translation Error (Page):", error);
+    }
+  }
+
+  async getPageBySlug(slug, lang = "en") {
     const page = await Page.findOne({ where: { slug } });
     if (!page) throw new Error("NOT_FOUND: Page not found");
-    return page;
+
+    const result = page.get({ plain: true });
+
+    if (lang === "id") {
+      let titleTrans = await Translation.findOne({ where: { modelName: MODULE_NAME, recordId: String(result.id), field: "title", locale: "id" } });
+      let subtitleTrans = await Translation.findOne({ where: { modelName: MODULE_NAME, recordId: String(result.id), field: "subtitle", locale: "id" } });
+      let contentTrans = await Translation.findOne({ where: { modelName: MODULE_NAME, recordId: String(result.id), field: "content", locale: "id" } });
+
+      const needsTitleTrans = result.title && !titleTrans;
+      const needsSubtitleTrans = result.subtitle && !subtitleTrans;
+      const needsContentTrans = result.content && !contentTrans;
+
+      if (needsTitleTrans || needsSubtitleTrans || needsContentTrans) {
+        const freshTitle = needsTitleTrans ? await autoTranslate(result.title, "Indonesian") : "";
+        const freshSubtitle = needsSubtitleTrans ? await autoTranslate(result.subtitle, "Indonesian") : "";
+        const freshContent = needsContentTrans ? await autoTranslate(result.content, "Indonesian") : "";
+
+        const upsertTranslation = async (field, translatedText) => {
+          if (!translatedText) return;
+          const existing = await Translation.findOne({
+            where: { modelName: MODULE_NAME, recordId: String(result.id), field, locale: "id" },
+          });
+          if (existing) {
+            await existing.update({ translatedText });
+          } else {
+            await Translation.create({
+              modelName: MODULE_NAME, recordId: String(result.id), field, locale: "id", translatedText,
+            });
+          }
+        };
+
+        if (freshTitle) { await upsertTranslation("title", freshTitle); result.title = freshTitle; }
+        if (freshSubtitle) { await upsertTranslation("subtitle", freshSubtitle); result.subtitle = freshSubtitle; }
+        if (freshContent) { await upsertTranslation("content", freshContent); result.content = freshContent; }
+      } else {
+        if (titleTrans) result.title = titleTrans.translatedText;
+        if (subtitleTrans) result.subtitle = subtitleTrans.translatedText;
+        if (contentTrans) result.content = contentTrans.translatedText;
+      }
+    }
+
+    return result;
   }
 
   async createPage({ req, res, userRole, body, file, actorId }) {
@@ -77,10 +154,12 @@ class PageService {
           req, res, t, moduleName: MODULE_NAME, notransPrefix: NOTRANS_PREFIX, action: "CREATE",
           targetId: newPage.id, payload: { ...pageData, status: "Published" }, recordToLock: newPage,
           previousNotrans: previous_notrans, successMessage: "Permintaan pembuatan halaman dikirim. Data dikunci.",
+          onSuccessCallback: (id, payload) => this.triggerBackgroundTranslation(id, payload),
         });
       }
 
       await t.commit();
+      this.triggerBackgroundTranslation(newPage.id, pageData);
       return res.status(201).json({ success: true, message: "Page created successfully", page: newPage });
     } catch (error) {
       if (t && !t.finished) await t.rollback();
@@ -136,12 +215,14 @@ class PageService {
           req, res, t, moduleName: MODULE_NAME, notransPrefix: NOTRANS_PREFIX, action: "UPDATE",
           targetId: id, payload: { ...updatedData, status: "Published" }, recordToLock: page,
           previousNotrans: ticketToClear, successMessage: "Revisi dikirim.",
+          onSuccessCallback: (id, payload) => this.triggerBackgroundTranslation(id, payload),
         });
       }
 
       await ApprovalDraft.update({ status: "Obsolete" }, { where: { module_name: MODULE_NAME, target_id: String(id), status: ["Pending", "Rejected"] }, transaction: t });
       await page.update({ ...updatedData, status: status || page.status, is_locked: false, lock_ticket: null }, { transaction: t });
       await t.commit();
+      this.triggerBackgroundTranslation(id, updatedData);
 
       if (oldHeroToDelete && (userRole === "superadmin" || status === "Draft")) {
         deleteSingleFile(oldHeroToDelete);

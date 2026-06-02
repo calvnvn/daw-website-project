@@ -34,7 +34,8 @@ exports.getAllPages = async (req, res) => {
 
 exports.getPageBySlug = async (req, res) => {
   try {
-    const data = await pageService.getPageBySlug(req.params.slug);
+    const lang = req.query.lang || "en";
+    const data = await pageService.getPageBySlug(req.params.slug, lang);
     res.status(200).json(data);
   } catch (error) {
     handleServiceError(res, error, "Error fetching page");
