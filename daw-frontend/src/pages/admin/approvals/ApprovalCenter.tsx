@@ -132,7 +132,14 @@ const DiffModal = ({
         });
         setOldData(response.data);
       } catch (error: unknown) {
-        if (!(typeof error === "object" && error !== null && "name" in error && (error as { name?: string }).name === "CanceledError")) {
+        if (
+          !(
+            typeof error === "object" &&
+            error !== null &&
+            "name" in error &&
+            (error as { name?: string }).name === "CanceledError"
+          )
+        ) {
           setOldData({ _system_note: "Gagal menarik data Live dari Server." });
         }
       } finally {
@@ -586,7 +593,7 @@ export default function ApprovalCenter() {
     new Set(),
   );
   const [isBulkApproving, setIsBulkApproving] = useState(false);
-  const [isPurging, setIsPurging] = useState<string | null>(null); // Menyimpan notrans yang sedang di-purge
+  // const [isPurging, setIsPurging] = useState<string | null>(null); // Menyimpan notrans yang sedang di-purge
 
   // ENGINE STATES (Search, Filter, Pagination)
   const [activeTab, setActiveTab] = useState<"my_queue" | "history" | "all">(
@@ -716,8 +723,7 @@ export default function ApprovalCenter() {
       fetchApprovals();
     } catch (error: unknown) {
       toast.error("Eksekusi gagal", {
-        description:
-          getErrorMessage(error) || "Kesalahan internal server.",
+        description: getErrorMessage(error) || "Kesalahan internal server.",
         id: toastId,
       });
     } finally {
@@ -826,33 +832,32 @@ export default function ApprovalCenter() {
     fetchApprovals();
   };
 
-  const handleForcePurge = async (draft: ApprovalDraft) => {
-    if (!isSuperadmin) return toast.error("Akses ditolak.");
-
-    setIsPurging(draft.notrans);
-    const toastId = toast.loading("Membersihkan antrean ERP (Force Purge)...");
-
-    try {
-      await api.post("/approval/force-purge", {
-        notrans: draft.notrans,
-        kodeapp: draft.kodeapp,
-        nourut: draft.nourut,
-        level: draft.level,
-        komentar: "SYSTEM OVERRIDE: Purging Orphaned Ticket",
-      });
-
-      toast.success("Tiket berhasil dihapus!", { id: toastId });
-      fetchApprovals();
-    } catch (error: unknown) {
-      toast.error("Gagal melakukan Purge", {
-        description:
-          getErrorMessage(error) || "ERP OWL menolak permintaan.",
-        id: toastId,
-      });
-    } finally {
-      setIsPurging(null);
-    }
-  };
+  // const handleForcePurge = async (draft: ApprovalDraft) => {
+  //   if (!isSuperadmin) return toast.error("Akses ditolak.");
+  // 
+  //   setIsPurging(draft.notrans);
+  //   const toastId = toast.loading("Membersihkan antrean ERP (Force Purge)...");
+  // 
+  //   try {
+  //     await api.post("/approval/force-purge", {
+  //       notrans: draft.notrans,
+  //       kodeapp: draft.kodeapp,
+  //       nourut: draft.nourut,
+  //       level: draft.level,
+  //       komentar: "SYSTEM OVERRIDE: Purging Orphaned Ticket",
+  //     });
+  // 
+  //     toast.success("Tiket berhasil dihapus!", { id: toastId });
+  //     fetchApprovals();
+  //   } catch (error: unknown) {
+  //     toast.error("Gagal melakukan Purge", {
+  //       description: getErrorMessage(error) || "ERP OWL menolak permintaan.",
+  //       id: toastId,
+  //     });
+  //   } finally {
+  //     setIsPurging(null);
+  //   }
+  // };
 
   // 5. DERIVED DATA PIPELINE
   const { filteredDrafts, paginatedDrafts, totalPages } = useMemo(() => {
@@ -1254,19 +1259,7 @@ export default function ApprovalCenter() {
 
                           {/* KOLOM 4: AKSI EKSKLUSIF */}
                           <td className="px-6 py-4 text-right pr-8">
-                            {isGhost && isSuperadmin ? (
-                              <button
-                                onClick={() => handleForcePurge(draft)}
-                                disabled={isPurging === draft.notrans}
-                                className="inline-flex items-center justify-center gap-2 px-5 py-2.5 bg-slate-900 text-white hover:bg-red-600 text-xs font-black uppercase tracking-widest rounded-xl transition-all shadow-lg active:scale-95 disabled:opacity-50">
-                                {isPurging === draft.notrans ? (
-                                  <Loader2 className="w-4 h-4 animate-spin" />
-                                ) : (
-                                  <AlertTriangle className="w-4 h-4" />
-                                )}
-                                Force Purge
-                              </button>
-                            ) : draft.isMyQueue ? (
+                            {draft.isMyQueue ? (
                               <button
                                 onClick={() => setSelectedDraft(draft)}
                                 className="inline-flex items-center justify-center gap-2 px-6 py-2.5 bg-daw-green text-white hover:bg-[#003b1c] text-xs font-black uppercase tracking-widest rounded-xl transition-all shadow-md shadow-daw-green/20 active:scale-95 transform hover:-translate-y-0.5">

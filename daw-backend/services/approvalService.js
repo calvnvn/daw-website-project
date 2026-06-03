@@ -320,24 +320,24 @@ class ApprovalService {
     }
   }
 
-  async forcePurgeGhostTicket({ notrans, nourut, level, komentar, tokenOWL, nikApprover }) {
-    const owlResponse = await ErpApprovalService.getPendingList({ karyawanid: nikApprover, token: tokenOWL, limit: 100 });
-    const pendingTasks = owlResponse?.data?.rows || [];
-    const targetTicket = pendingTasks.find((t) => (t.notransaksi || t.notrans || "").trim().toLowerCase() === notrans.toLowerCase());
-
-    if (!targetTicket) throw new Error("NOT_FOUND: Tiket tidak ditemukan di antrean ERP Anda.");
-
-    await ErpApprovalService.submitDecision({
-      status: "2",
-      nourut: nourut,
-      notrans: notrans,
-      level: Number(level),
-      komentar: komentar || "SYSTEM PURGE: Local Draft Missing",
-      nextApp: "",
-      token: tokenOWL,
-      karyawanid: nikApprover,
-    });
-  }
+  // async forcePurgeGhostTicket({ notrans, nourut, level, komentar, tokenOWL, nikApprover }) {
+  //   const owlResponse = await ErpApprovalService.getPendingList({ karyawanid: nikApprover, token: tokenOWL, limit: 100 });
+  //   const pendingTasks = owlResponse?.data?.rows || [];
+  //   const targetTicket = pendingTasks.find((t) => (t.notransaksi || t.notrans || "").trim().toLowerCase() === notrans.toLowerCase());
+  // 
+  //   if (!targetTicket) throw new Error("NOT_FOUND: Tiket tidak ditemukan di antrean ERP Anda.");
+  // 
+  //   await ErpApprovalService.submitDecision({
+  //     status: "2",
+  //     nourut: nourut,
+  //     notrans: notrans,
+  //     level: Number(level),
+  //     komentar: komentar || "SYSTEM PURGE: Local Draft Missing",
+  //     nextApp: "",
+  //     token: tokenOWL,
+  //     karyawanid: nikApprover,
+  //   });
+  // }
 
   // ─── UTILITIES ───
 

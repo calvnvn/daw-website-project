@@ -21,12 +21,12 @@ router.post(
 );
 
 // Purge orphaned transaction tickets
-router.post(
-  "/force-purge",
-  verifyToken,
-  checkPermission("manage_approvals"),
-  approvalController.forcePurgeGhostTicket,
-);
+// router.post(
+//   "/force-purge",
+//   verifyToken,
+//   checkPermission("manage_approvals"),
+//   approvalController.forcePurgeGhostTicket,
+// );
 
 // Retrieve baseline data for state comparison
 router.get(

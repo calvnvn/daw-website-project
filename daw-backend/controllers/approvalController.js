@@ -121,23 +121,23 @@ exports.discardDraft = async (req, res) => {
   }
 };
 
-exports.forcePurgeGhostTicket = async (req, res) => {
-  try {
-    const { notrans, nourut, level, komentar } = req.body;
-    await approvalService.forcePurgeGhostTicket({
-      notrans,
-      nourut,
-      level,
-      komentar,
-      tokenOWL: req.owl_token,
-      nikApprover: String(req.karyawanId),
-    });
-
-    res.status(200).json({
-      success: true,
-      message: "Tiket yatim piatu berhasil dimusnahkan dari antrean ERP.",
-    });
-  } catch (error) {
-    handleServiceError(res, error, "Gagal membersihkan tiket dari ERP DAW.");
-  }
-};
+// exports.forcePurgeGhostTicket = async (req, res) => {
+//   try {
+//     const { notrans, nourut, level, komentar } = req.body;
+//     await approvalService.forcePurgeGhostTicket({
+//       notrans,
+//       nourut,
+//       level,
+//       komentar,
+//       tokenOWL: req.owl_token,
+//       nikApprover: String(req.karyawanId),
+//     });
+// 
+//     res.status(200).json({
+//       success: true,
+//       message: "Tiket yatim piatu berhasil dimusnahkan dari antrean ERP.",
+//     });
+//   } catch (error) {
+//     handleServiceError(res, error, "Gagal membersihkan tiket dari ERP DAW.");
+//   }
+// };
