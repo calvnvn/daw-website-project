@@ -1,18 +1,5 @@
 /**
  * InvestmentsManager — Orchestrator Component
- *
- * This is the parent component that:
- * 1. Calls the custom hook (useInvestmentManager) for all logic
- * 2. Renders the top-level layout (banners, header, tabs)
- * 3. Delegates tab content to SettingsTab and CompaniesTab
- *
- * Architecture:
- * ┌─────────────────────────────────────────┐
- * │  InvestmentsManager (this file ~200 LOC)│
- * │  ├── useInvestmentManager (hook ~350)   │
- * │  ├── SettingsTab (Tab 1 ~120)           │
- * │  └── CompaniesTab (Tab 2 ~300)          │
- * └─────────────────────────────────────────┘
  */
 import {
   Save,
@@ -38,34 +25,40 @@ export default function InvestmentsManager() {
 
   const {
     isSuperadmin,
-    activeTab, setActiveTab,
-    isEditing, setIsEditing,
+    activeTab,
+    setActiveTab,
+    isEditing,
+    setIsEditing,
     isSaving,
     isSettingsOverrideMode,
-    currentLockState, lockStyles,
-    pageContent, setPageContent,
+    currentLockState,
+    lockStyles,
+    pageContent,
+    setPageContent,
     rejectedSettings,
     hideDraftBanner,
-    localCompanies, sortedCompanies,
+    localCompanies,
+    sortedCompanies,
     rejectedAffiliates,
-    localCategories, setLocalCategories,
-    showNewCategoryForm, setShowNewCategoryForm,
-    newCategoryData, setNewCategoryData,
-    editingCategoryId, setEditingCategoryId,
+    localCategories,
+    setLocalCategories,
+    showNewCategoryForm,
+    setShowNewCategoryForm,
+    newCategoryData,
+    setNewCategoryData,
+    editingCategoryId,
+    setEditingCategoryId,
     handleSave,
     handleRestoreSettingsDraft,
     handleDiscardDraft,
     handleRestoreAffiliateDraft,
     handleDiscardAffiliateDraft,
-    addCompany, removeCompany, updateCompany, handleLogoChange,
+    addCompany,
+    removeCompany,
+    updateCompany,
+    handleLogoChange,
     refreshData,
   } = mgr;
-
-  const hasSettingsChanged = JSON.stringify(pageContent) !== JSON.stringify({
-    teaserHeadline: mgr.pageContent.teaserHeadline,
-    teaserBody: mgr.pageContent.teaserBody,
-    sectionIntro: mgr.pageContent.sectionIntro,
-  });
 
   return (
     <div className="max-w-6xl mx-auto space-y-6 animate-in fade-in duration-500 pb-12">
@@ -119,16 +112,28 @@ export default function InvestmentsManager() {
                 ⚠️ Revisi Ditolak: Catatan Peninjau
               </h4>
               <p className="text-xs text-red-800 leading-relaxed font-medium bg-white/60 p-3 rounded-md border border-red-200/50 shadow-inner">
-                "{rejectedSettings.rejection_reason || "Silakan perbaiki data sesuai arahan."}"
+                "
+                {rejectedSettings.rejection_reason ||
+                  "Silakan perbaiki data sesuai arahan."}
+                "
               </p>
               <div className="pt-2 flex flex-col sm:flex-row sm:items-center gap-3">
-                <button onClick={handleRestoreSettingsDraft} disabled={!isEditing}
-                  title={!isEditing ? "Buka mode edit untuk memulihkan data" : "Pulihkan draf yang ditolak"}
+                <button
+                  onClick={handleRestoreSettingsDraft}
+                  disabled={!isEditing}
+                  title={
+                    !isEditing
+                      ? "Buka mode edit untuk memulihkan data"
+                      : "Pulihkan draf yang ditolak"
+                  }
                   className="flex items-center justify-center gap-2 bg-red-600 hover:bg-red-700 disabled:bg-red-300 disabled:cursor-not-allowed text-white px-5 py-2.5 rounded-lg text-xs font-bold transition-all shadow-sm active:scale-95">
-                  <RotateCcw className={`w-3.5 h-3.5 ${isEditing ? "" : "opacity-50"}`} />
+                  <RotateCcw
+                    className={`w-3.5 h-3.5 ${isEditing ? "" : "opacity-50"}`}
+                  />
                   PULIHKAN DATA
                 </button>
-                <button onClick={handleDiscardDraft}
+                <button
+                  onClick={handleDiscardDraft}
                   className="flex items-center justify-center gap-2 bg-white border border-red-200 text-red-600 hover:bg-red-50 px-4 py-2.5 rounded-lg text-xs font-bold transition-all shadow-sm active:scale-95">
                   <X className="w-3.5 h-3.5" />
                   ABAIKAN NOTIFIKASI
@@ -151,14 +156,15 @@ export default function InvestmentsManager() {
             <h1 className="text-2xl font-serif font-black text-slate-900 tracking-tight">
               Investments Manager
             </h1>
-            {(localCompanies.some((c) => c.is_locked)) && (
+            {localCompanies.some((c) => c.is_locked) && (
               <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-blue-50 text-blue-600 rounded-full text-[10px] font-black uppercase tracking-tighter border border-blue-100 animate-pulse">
                 <Clock className="w-3 h-3" /> PENDING
               </span>
             )}
           </div>
           <p className="text-sm text-slate-500 mt-1">
-            Kelola ekosistem investasi, konten teks promosi, dan logo perusahaan afiliasi secara terpusat.
+            Kelola ekosistem investasi, konten teks promosi, dan logo perusahaan
+            afiliasi secara terpusat.
           </p>
         </div>
 
@@ -166,41 +172,68 @@ export default function InvestmentsManager() {
           <button
             onClick={() => {
               if (currentLockState)
-                return toast.error("Akses Dibatasi", { description: "Data teks sedang dalam antrean approval." });
+                return toast.error("Akses Dibatasi", {
+                  description: "Data teks sedang dalam antrean approval.",
+                });
               setIsEditing(!isEditing);
             }}
             disabled={isSaving || currentLockState}
             className={`flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl font-black text-[11px] uppercase tracking-widest transition-all border shadow-sm ${
-              currentLockState ? "bg-slate-50 text-slate-300 border-slate-200 cursor-not-allowed"
-                : isEditing ? "bg-amber-50 text-amber-700 border-amber-200 ring-4 ring-amber-500/5 hover:bg-amber-100"
-                : "bg-white text-slate-600 border-slate-200 hover:bg-slate-50 hover:border-slate-300"
+              currentLockState
+                ? "bg-slate-50 text-slate-300 border-slate-200 cursor-not-allowed"
+                : isEditing
+                  ? "bg-amber-50 text-amber-700 border-amber-200 ring-4 ring-amber-500/5 hover:bg-amber-100"
+                  : "bg-white text-slate-600 border-slate-200 hover:bg-slate-50 hover:border-slate-300"
             }`}>
-            {currentLockState ? <Lock className="w-4 h-4 text-slate-400" />
-              : isEditing ? <Unlock className="w-4 h-4 text-amber-500" />
-              : <Lock className="w-4 h-4 text-slate-400" />}
+            {currentLockState ? (
+              <Lock className="w-4 h-4 text-slate-400" />
+            ) : isEditing ? (
+              <Unlock className="w-4 h-4 text-amber-500" />
+            ) : (
+              <Lock className="w-4 h-4 text-slate-400" />
+            )}
             <span>
-              {currentLockState ? "Locked"
-                : isSettingsOverrideMode && isEditing && activeTab === "content" ? "Override Mode"
-                : isEditing ? "Editing Mode" : "Locked"}
+              {currentLockState
+                ? "Locked"
+                : isSettingsOverrideMode && isEditing && activeTab === "content"
+                  ? "Override Mode"
+                  : isEditing
+                    ? "Editing Mode"
+                    : "Locked"}
             </span>
           </button>
 
-          <button onClick={handleSave}
-            disabled={isSaving || !isEditing || currentLockState ||
-              (activeTab === "companies" && !localCompanies.some((c) => c.isDirty || c.isNew))}
+          <button
+            onClick={handleSave}
+            disabled={
+              isSaving ||
+              !isEditing ||
+              currentLockState ||
+              (activeTab === "companies" &&
+                !localCompanies.some((c) => c.isDirty || c.isNew))
+            }
             className={`flex-1 sm:flex-none flex items-center justify-center gap-2 px-6 py-2.5 rounded-xl font-black text-[11px] uppercase tracking-widest transition-all shadow-lg active:scale-95 disabled:cursor-not-allowed disabled:shadow-none ${
-              isSaving ? "bg-slate-300 text-slate-700"
-                : currentLockState ? "bg-slate-200 text-slate-500"
-                : isSuperadmin ? "bg-daw-green hover:bg-[#003b1c] text-white shadow-daw-green/20"
-                : "bg-blue-600 hover:bg-blue-700 text-white shadow-blue-600/20"
+              isSaving
+                ? "bg-slate-300 text-slate-700"
+                : currentLockState
+                  ? "bg-slate-200 text-slate-500"
+                  : isSuperadmin
+                    ? "bg-daw-green hover:bg-[#003b1c] text-white shadow-daw-green/20"
+                    : "bg-blue-600 hover:bg-blue-700 text-white shadow-blue-600/20"
             }`}>
-            {isSaving ? <Loader2 className="w-4 h-4 animate-spin" />
-              : isSuperadmin ? <Save className="w-4 h-4" />
-              : <Send className="w-4 h-4" />}
+            {isSaving ? (
+              <Loader2 className="w-4 h-4 animate-spin" />
+            ) : isSuperadmin ? (
+              <Save className="w-4 h-4" />
+            ) : (
+              <Send className="w-4 h-4" />
+            )}
             <span>
-              {isSaving ? "Memproses..."
-                : isSuperadmin ? "Publish Live"
-                : "Request Approval"}
+              {isSaving
+                ? "Memproses..."
+                : isSuperadmin
+                  ? "Publish Live"
+                  : "Request Approval"}
             </span>
           </button>
         </div>
@@ -208,26 +241,40 @@ export default function InvestmentsManager() {
 
       {/* TABS NAVIGATION */}
       <div className="flex items-end overflow-x-auto border border-slate-200 border-b-0 shadow-sm bg-white rounded-t-xl px-2 pt-2 hide-scrollbar">
-        <button onClick={() => !isSaving && setActiveTab("content")}
+        <button
+          onClick={() => !isSaving && setActiveTab("content")}
           className={`flex items-center gap-2 px-6 py-3 font-bold text-sm uppercase tracking-wider border-b-2 transition-colors whitespace-nowrap ${
             isSaving ? "cursor-wait opacity-80" : ""
           } ${activeTab === "content" ? "border-daw-green text-daw-green bg-green-50/30" : "border-transparent text-slate-400 hover:text-slate-700 hover:bg-slate-50"}`}>
           <Type className="w-4 h-4" />
           <span>Page Content</span>
           <div className="flex items-center gap-1 ml-1">
-            {rejectedSettings && (<span title="Revisi Diperlukan"><div className="w-2 h-2 rounded-full bg-red-500 animate-pulse ring-2 ring-white" /></span>)}
+            {rejectedSettings && (
+              <span title="Revisi Diperlukan">
+                <div className="w-2 h-2 rounded-full bg-red-500 animate-pulse ring-2 ring-white" />
+              </span>
+            )}
           </div>
         </button>
 
-        <button onClick={() => !isSaving && setActiveTab("companies")}
+        <button
+          onClick={() => !isSaving && setActiveTab("companies")}
           className={`flex items-center gap-2 px-6 py-3 font-bold text-sm uppercase tracking-wider border-b-2 transition-colors whitespace-nowrap ${
             isSaving ? "cursor-wait opacity-80" : ""
           } ${activeTab === "companies" ? "border-daw-green text-daw-green bg-green-50/30" : "border-transparent text-slate-400 hover:text-slate-700 hover:bg-slate-50"}`}>
           <Building className="w-4 h-4" />
           <span>Affiliated Companies</span>
           <div className="flex items-center gap-1 ml-1">
-            {localCompanies.some((c) => c.has_rejected) && (<span title="Revisi Diperlukan"><div className="w-2 h-2 rounded-full bg-red-500 animate-pulse ring-2 ring-white" /></span>)}
-            {localCompanies.some((c) => c.is_locked && !c.has_rejected) && (<span title="Pending Approval"><Lock className="w-3 h-3 text-blue-500" /></span>)}
+            {localCompanies.some((c) => c.has_rejected) && (
+              <span title="Revisi Diperlukan">
+                <div className="w-2 h-2 rounded-full bg-red-500 animate-pulse ring-2 ring-white" />
+              </span>
+            )}
+            {localCompanies.some((c) => c.is_locked && !c.has_rejected) && (
+              <span title="Pending Approval">
+                <Lock className="w-3 h-3 text-blue-500" />
+              </span>
+            )}
           </div>
         </button>
       </div>
@@ -242,7 +289,9 @@ export default function InvestmentsManager() {
             isSuperadmin={isSuperadmin}
             currentLockState={currentLockState}
             lockStyles={lockStyles}
-            settingsIsLocked={mgr.isSettingsLockedForEditor || mgr.isSettingsOverrideMode}
+            settingsIsLocked={
+              mgr.isSettingsLockedForEditor || mgr.isSettingsOverrideMode
+            }
           />
         )}
 
