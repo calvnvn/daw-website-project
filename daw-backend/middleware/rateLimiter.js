@@ -1,7 +1,10 @@
 const rateLimit = require("express-rate-limit");
 
+// Dummy middleware untuk mematikan rate limiter
+const dummyLimiter = (req, res, next) => next();
+
 // Global Limiter (Prevents DDoS and generic API spamming)
-const globalLimiter = rateLimit({
+const globalLimiter = dummyLimiter; /* rateLimit({
   windowMs: 10 * 60 * 1000, // 10 minutes
   max: process.env.NODE_ENV === "development" ? 2000 : 150, // Generous limit in development, strict 150 in production
   message: {
@@ -10,10 +13,10 @@ const globalLimiter = rateLimit({
   },
   standardHeaders: true, // Return rate limit info in the `RateLimit-*` headers
   legacyHeaders: false, // Disable the `X-RateLimit-*` headers
-});
+}); */
 
 // Auth Limiter (Prevents login brute-force attacks)
-const authLimiter = rateLimit({
+const authLimiter = dummyLimiter; /* rateLimit({
   windowMs: 5 * 60 * 1000, // 5 minutes
   max: 15, // Limit each IP to 10 login requests per windowMs
   message: {
@@ -23,10 +26,10 @@ const authLimiter = rateLimit({
   },
   standardHeaders: true,
   legacyHeaders: false,
-});
+}); */
 
 // Inquiry Limiter (Prevents contact form spamming)
-const inquiryLimiter = rateLimit({
+const inquiryLimiter = dummyLimiter; /* rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
   max: 3, // Limit each IP to 3 contact form submissions per windowMs
   message: {
@@ -35,7 +38,7 @@ const inquiryLimiter = rateLimit({
   },
   standardHeaders: true,
   legacyHeaders: false,
-});
+}); */
 
 module.exports = {
   globalLimiter,

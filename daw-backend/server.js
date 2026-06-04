@@ -115,7 +115,7 @@ const Achievement = require("./models/Achievement");
 const NewsCategory = require("./models/NewsCategory");
 const NewsArticle = require("./models/NewsArticle");
 
-const { globalLimiter } = require("./middleware/rateLimiter");
+// const { globalLimiter } = require("./middleware/rateLimiter");
 
 const app = express();
 
@@ -135,8 +135,20 @@ app.use(
     contentSecurityPolicy: {
       directives: {
         ...helmet.contentSecurityPolicy.getDefaultDirectives(),
-        "img-src": ["'self'", "data:", "https://img.youtube.com", "https://i.ytimg.com", "https://*.youtube.com", "https://*.uploads"],
-        "frame-src": ["'self'", "https://www.youtube.com", "https://youtube.com", "https://www.youtube-nocookie.com"],
+        "img-src": [
+          "'self'",
+          "data:",
+          "https://img.youtube.com",
+          "https://i.ytimg.com",
+          "https://*.youtube.com",
+          "https://*.uploads",
+        ],
+        "frame-src": [
+          "'self'",
+          "https://www.youtube.com",
+          "https://youtube.com",
+          "https://www.youtube-nocookie.com",
+        ],
       },
     },
   }),

@@ -53,9 +53,34 @@ class AuthService {
     }
 
     const owlData = owlResponse.data;
+
+    // 🔍 [DIAGNOSTIC] Temporary logging to debug first-time login OWL response shape
+    console.log("🦉 [OWL DEBUG] HTTP Status:", owlResponse.status);
+    console.log("🦉 [OWL DEBUG] Response keys:", Object.keys(owlData));
+    console.log(
+      "🦉 [OWL DEBUG] owlData.data:",
+      owlData.data ? "(token present)" : owlData.data,
+    );
+    console.log("🦉 [OWL DEBUG] owlData.error:", owlData.error);
+    console.log("🦉 [OWL DEBUG] owlData.message:", owlData.message);
+    console.log(
+      "🦉 [OWL DEBUG] owlData.token:",
+      owlData.token ? "(token present)" : owlData.token,
+    );
+    console.log(
+      "🦉 [OWL DEBUG] Full response:",
+      JSON.stringify(owlData, null, 2),
+    );
+
     const tokenDiterima = owlData.data;
 
     if (!tokenDiterima || owlData.error) {
+      console.error("🦉 [OWL TOKEN FAIL] Token extraction failed.", {
+        hasData: !!owlData.data,
+        dataType: typeof owlData.data,
+        errorField: owlData.error,
+        allKeys: Object.keys(owlData),
+      });
       throw new Error("AUTH_FAILED: Gagal mendapatkan token akses dari OWL.");
     }
 
