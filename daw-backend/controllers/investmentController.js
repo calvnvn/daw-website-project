@@ -24,6 +24,10 @@ const getRole = (req) => req.userRole ? req.userRole.toLowerCase().trim() : "";
 const getActorId = (req) => String(req.owl_username || req.karyawanId || "").trim().toLowerCase();
 const getToken = (req) => req.headers["authorization"]?.split(" ")[1] || req.owl_token;
 
+// ==========================================
+// PUBLIC
+// ==========================================
+
 exports.getPublicInvestmentData = async (req, res) => {
   try {
     const lang = req.query.lang || "en";
@@ -33,6 +37,10 @@ exports.getPublicInvestmentData = async (req, res) => {
     handleServiceError(res, error, "Gagal mengambil data publik investasi.");
   }
 };
+
+// ==========================================
+// ADMIN DATA
+// ==========================================
 
 exports.getAdminInvestmentData = async (req, res) => {
   try {
@@ -51,6 +59,64 @@ exports.getInvestmentData = async (req, res) => {
     handleServiceError(res, error, "Gagal mengambil data investasi.");
   }
 };
+
+// ==========================================
+// CATEGORY CRUD
+// ==========================================
+
+exports.getCategories = async (req, res) => {
+  try {
+    const data = await investmentService.getAllCategories();
+    res.status(200).json({ success: true, data });
+  } catch (error) {
+    handleServiceError(res, error, "Gagal mengambil kategori investasi.");
+  }
+};
+
+exports.createCategory = async (req, res) => {
+  try {
+    const result = await investmentService.createCategory({
+      userRole: getRole(req),
+      body: req.body,
+      actorId: getActorId(req),
+      owlToken: getToken(req),
+    });
+    res.status(201).json({ success: true, message: "Kategori berhasil dibuat.", data: result.data });
+  } catch (error) {
+    handleServiceError(res, error, "Gagal membuat kategori.");
+  }
+};
+
+exports.updateCategory = async (req, res) => {
+  try {
+    const result = await investmentService.updateCategory({
+      id: req.params.id,
+      userRole: getRole(req),
+      body: req.body,
+      actorId: getActorId(req),
+      owlToken: getToken(req),
+    });
+    res.status(200).json({ success: true, message: "Kategori berhasil diperbarui.", data: result.data });
+  } catch (error) {
+    handleServiceError(res, error, "Gagal memperbarui kategori.");
+  }
+};
+
+exports.deleteCategory = async (req, res) => {
+  try {
+    await investmentService.deleteCategory({
+      id: req.params.id,
+      userRole: getRole(req),
+    });
+    res.status(200).json({ success: true, message: "Kategori berhasil dihapus." });
+  } catch (error) {
+    handleServiceError(res, error, "Gagal menghapus kategori.");
+  }
+};
+
+// ==========================================
+// SETTINGS
+// ==========================================
 
 exports.updateSettings = async (req, res) => {
   try {
@@ -74,6 +140,10 @@ exports.updateSettings = async (req, res) => {
     handleServiceError(res, error, "Gagal memperbarui pengaturan investasi.");
   }
 };
+
+// ==========================================
+// AFFILIATE CRUD
+// ==========================================
 
 exports.createAffiliate = async (req, res) => {
   try {

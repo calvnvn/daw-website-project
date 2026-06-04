@@ -8,43 +8,38 @@ import {
   Coffee,
   X,
   Maximize2,
+  Building2,
 } from "lucide-react";
 import ScrollReveal from "@/components/ScrollReveal";
 import { useInvestments } from "@/contexts/InvestmentContext";
 import { getCleanImageUrl } from "@/lib/utils";
+import type { AffiliateCategory } from "@/contexts/InvestmentContext";
+
+const ICON_MAP: Record<string, React.ReactNode> = {
+  Coffee: <Coffee className="w-5 h-5" />,
+  Globe2: <Globe2 className="w-5 h-5" />,
+  GraduationCap: <GraduationCap className="w-5 h-5" />,
+  Briefcase: <Briefcase className="w-5 h-5" />,
+  Building: <Building2 className="w-5 h-5" />,
+};
 
 export default function InvestmentsSection() {
   const { t } = useTranslation();
-  const [hoveredCategory, setHoveredCategory] = useState<string | null>(null);
+  const [hoveredCategory, setHoveredCategory] = useState<number | null>(null);
   const [selectedCompany, setSelectedCompany] = useState<any | null>(null);
-  const { publicSettings: settings, publicCompanies: companies, isLoading } = useInvestments();
-  const sortedCompanies = useMemo(() => {
-    if (!companies) return [];
+  const { publicSettings: settings, publicCategories: categories, isLoading } = useInvestments();
 
-    return [...companies].sort((a, b) => {
-      // Prioritas 1: Kelompokkan berdasarkan Sektor (Sesuai urutan yang kamu minta)
-      const categoryWeight: Record<string, number> = {
-        finance: 3,
-        fnb: 1,
-        steel: 2,
-        edu: 4,
-      };
+  // Flatten all companies for the constellation grid
+  const allCompanies = useMemo(() => {
+    if (!categories) return [];
+    return categories.flatMap((cat) => (cat.affiliates || []).map((a) => ({ ...a, categoryId: cat.id, categoryName: cat.name })));
+  }, [categories]);
 
-      const weightA = categoryWeight[a.category] || 99;
-      const weightB = categoryWeight[b.category] || 99;
-
-      if (weightA !== weightB) return weightA - weightB;
-
-      // Prioritas 2: Urutkan berdasarkan Abjad Nama (A - Z)
-      return (a.name || "").localeCompare(b.name || "");
-    });
-  }, [companies]);
-  const categories = [
-    { id: "fnb", icon: <Coffee className="w-5 h-5" />, key: "fnb" },
-    { id: "steel", icon: <Briefcase className="w-5 h-5" />, key: "steel" },
-    { id: "finance", icon: <Globe2 className="w-5 h-5" />, key: "finance" },
-    { id: "edu", icon: <GraduationCap className="w-5 h-5" />, key: "edu" },
-  ];
+  // Find the parent category for the selected company
+  const selectedCategoryName = useMemo(() => {
+    if (!selectedCompany) return "";
+    return selectedCompany.categoryName || "";
+  }, [selectedCompany]);
 
   if (isLoading)
     return (
@@ -79,7 +74,7 @@ export default function InvestmentsSection() {
 
           <ScrollReveal direction="up" delay={200}>
             <div className="flex flex-col space-y-2">
-              {categories.map((cat) => (
+              {(categories || []).map((cat: AffiliateCategory) => (
                 <div
                   key={cat.id}
                   onMouseEnter={() => setHoveredCategory(cat.id)}
@@ -98,18 +93,25 @@ export default function InvestmentsSection() {
                         ? "bg-emerald-500/20 text-emerald-400"
                         : "bg-white/5 text-slate-400"
                     }`}>
-                    {cat.icon}
+                    {ICON_MAP[cat.icon] || <Briefcase className="w-5 h-5" />}
                   </div>
 
                   <div className="flex-1">
                     <h4
-                      className={`font-serif text-lg transition-colors duration-500 ${
+                      className={`font-serif text-lg transition-colors duration-500 capitalize ${
                         hoveredCategory === cat.id
                           ? "text-white"
                           : "text-slate-300"
                       }`}>
-                      {t(`businessesPage.investments.categories.${cat.key}`)}
+                      {cat.name}
                     </h4>
+                    {cat.description && (
+                      <p className={`text-xs mt-0.5 transition-colors duration-500 ${
+                        hoveredCategory === cat.id ? "text-slate-300" : "text-slate-500"
+                      }`}>
+                        {cat.description}
+                      </p>
+                    )}
                   </div>
 
                   <ArrowRight
@@ -129,8 +131,8 @@ export default function InvestmentsSection() {
         <div className="lg:col-span-7 relative">
           <ScrollReveal direction="left" delay={300}>
             <div className="grid grid-cols-2 md:grid-cols-3 gap-4 md:gap-6 p-6 md:p-8 rounded-[2.5rem] bg-white/5 border border-white/10 backdrop-blur-xl shadow-2xl">
-              {sortedCompanies.map((company) => {
-                const isHovered = hoveredCategory === company.category;
+              {allCompanies.map((company) => {
+                const isHovered = hoveredCategory === company.categoryId;
                 const isAnyHovered = hoveredCategory !== null;
 
                 const opacityClass = isAnyHovered
@@ -148,7 +150,7 @@ export default function InvestmentsSection() {
                     key={company.id}
                     onClick={() => setSelectedCompany(company)}
                     className={`group/card relative flex flex-col items-center justify-center aspect-square md:aspect-[4/3] rounded-2xl p-4 cursor-pointer hover:-translate-y-1.5 transition-all duration-700 ease-[cubic-bezier(0.4,0,0.2,1)] overflow-hidden ${opacityClass} ${borderClass}`}>
-                    {/* --- NEW: VISUAL HINT OVERLAY (HOVER EFFECT) --- */}
+                    {/* --- VISUAL HINT OVERLAY --- */}
                     <div className="absolute inset-0 bg-emerald-950/60 opacity-0 group-hover/card:opacity-100 transition-opacity duration-500 z-10 flex items-center justify-center backdrop-blur-[2px]">
                       <div className="bg-emerald-500 text-white p-3 rounded-full shadow-[0_0_20px_rgba(16,185,129,0.5)] transform translate-y-8 group-hover/card:translate-y-0 transition-transform duration-500 ease-[cubic-bezier(0.4,0,0.2,1)]">
                         <Maximize2 className="w-5 h-5" />
@@ -184,7 +186,7 @@ export default function InvestmentsSection() {
                 );
               })}
 
-              {sortedCompanies.length === 0 && (
+              {allCompanies.length === 0 && (
                 <div className="col-span-full text-center text-slate-400 italic py-10">
                   {t("businessesPage.investments.noCompanies")}
                 </div>
@@ -194,33 +196,26 @@ export default function InvestmentsSection() {
         </div>
       </div>
 
-      {/* --- LEVEL UP: PREMIUM ENLARGE LOGO MODAL (DARK DAW GREEN EDITION) --- */}
+      {/* --- PREMIUM ENLARGE LOGO MODAL --- */}
       {selectedCompany && (
         <div
           className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-[#000a03]/95 animate-in fade-in duration-200"
           onClick={() => setSelectedCompany(null)}>
           <div
-            // GANTI: Box menggunakan solid background agar tidak mentransparansi elemen di belakangnya
             className="relative bg-[#001a0a] border border-daw-green/30 p-8 md:p-14 rounded-[3rem] shadow-[0_30px_60px_-15px_rgba(0,0,0,0.5)] max-w-sm md:max-w-lg w-full flex flex-col items-center animate-in zoom-in-95 slide-in-from-bottom-4 duration-400 ease-out"
             onClick={(e) => e.stopPropagation()}>
-            {/* Ambient Lighting - Disederhanakan: Pakai radial gradient saja (lebih ringan dari blur filter) */}
             <div className="absolute inset-0 bg-[radial-gradient(circle_at_0%_0%,rgba(0,75,35,0.15)_0%,transparent_50%)] pointer-events-none"></div>
             <div className="absolute inset-0 bg-[radial-gradient(circle_at_100%_100%,rgba(0,75,35,0.1)_0%,transparent_50%)] pointer-events-none"></div>
 
-            {/* Interactive Close Button */}
             <button
               onClick={() => setSelectedCompany(null)}
               className="absolute top-6 right-6 p-2.5 rounded-full bg-white/5 hover:bg-daw-green/20 border border-white/10 hover:border-daw-green/40 text-emerald-100/50 hover:text-white transition-all duration-200 group z-20">
               <X className="w-5 h-5 group-hover:rotate-90 transition-transform duration-200" />
             </button>
 
-            {/* Logo Container with Pulsating Rings */}
             <div className="relative w-36 h-36 md:w-52 md:h-52 mb-8 mt-2 z-10 flex items-center justify-center">
-              {/* Ring statis (Pengganti ping animation jika masih dirasa berat) */}
               <div className="absolute inset-0 rounded-full border border-daw-green/20"></div>
               <div className="absolute -inset-3 rounded-full border border-daw-green/5"></div>
-
-              {/* Core Logo Wrapper */}
               <div className="relative w-full h-full rounded-full bg-white flex items-center justify-center shadow-2xl overflow-hidden p-8 border border-white/10 transition-transform duration-300 hover:scale-105 active:scale-95">
                 {selectedCompany?.logoUrl ? (
                   <img
@@ -237,7 +232,6 @@ export default function InvestmentsSection() {
               </div>
             </div>
 
-            {/* Typography Section */}
             <h3 className="text-3xl md:text-4xl font-serif font-bold text-white mb-4 text-center z-10 tracking-tight">
               {selectedCompany?.name}
             </h3>
@@ -254,10 +248,8 @@ export default function InvestmentsSection() {
             )}
 
             {/* Premium Category Badge */}
-            <div className="z-10 px-6 py-2 rounded-full bg-daw-green/20 border border-daw-green/40 text-emerald-300 text-[10px] md:text-xs font-bold uppercase tracking-[0.2em]">
-              {t(
-                `businessesPage.investments.categories.${selectedCompany?.category}`,
-              )}
+            <div className="z-10 px-6 py-2 rounded-full bg-daw-green/20 border border-daw-green/40 text-emerald-300 text-[10px] md:text-xs font-bold uppercase tracking-[0.2em] capitalize">
+              {selectedCategoryName}
             </div>
           </div>
         </div>

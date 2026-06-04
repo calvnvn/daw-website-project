@@ -22,11 +22,22 @@ export interface InvestmentSettings {
   lock_ticket?: string | null;
 }
 
+export interface AffiliateCategory {
+  id: number;
+  name: string;
+  description: string | null;
+  icon: string;
+  is_locked?: boolean;
+  lock_ticket?: string | null;
+  affiliates?: Affiliate[];
+}
+
 export interface Affiliate {
   id: number;
   name: string;
   desc: string;
-  category: "fnb" | "steel" | "finance" | "edu";
+  category: string;
+  category_id: number | null;
   logoUrl: string | null;
   websiteUrl: string | null;
   is_locked?: boolean;
@@ -38,7 +49,8 @@ interface InvestmentContextType {
   settings: InvestmentSettings | null;
   publicSettings: InvestmentSettings | null;
   companies: Affiliate[];
-  publicCompanies: Affiliate[];
+  publicCategories: AffiliateCategory[];
+  categories: AffiliateCategory[];
   rejectedSettings: any | null;
   isLoading: boolean;
   refreshData: () => Promise<void>;
@@ -48,7 +60,8 @@ export const InvestmentContext = createContext<InvestmentContextType>({
   settings: null,
   publicSettings: null,
   companies: [],
-  publicCompanies: [],
+  publicCategories: [],
+  categories: [],
   rejectedSettings: null,
   isLoading: true,
   refreshData: async () => {},
@@ -60,7 +73,8 @@ export function InvestmentProvider({ children }: { children: ReactNode }) {
   const [settings, setSettings] = useState<InvestmentSettings | null>(null);
   const [publicSettings, setPublicSettings] = useState<InvestmentSettings | null>(null);
   const [companies, setCompanies] = useState<Affiliate[]>([]);
-  const [publicCompanies, setPublicCompanies] = useState<Affiliate[]>([]);
+  const [publicCategories, setPublicCategories] = useState<AffiliateCategory[]>([]);
+  const [categories, setCategories] = useState<AffiliateCategory[]>([]);
   const [rejectedSettings, setRejectedSettings] = useState<any | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -88,7 +102,7 @@ export function InvestmentProvider({ children }: { children: ReactNode }) {
         });
         const publicPayload = publicResponse.data?.data || publicResponse.data;
         setPublicSettings(publicPayload?.settings || null);
-        setPublicCompanies(publicPayload?.companies || []);
+        setPublicCategories(publicPayload?.categories || []);
 
         if (canAccessAdmin) {
           try {
@@ -139,6 +153,7 @@ export function InvestmentProvider({ children }: { children: ReactNode }) {
 
         setSettings(payload?.settings || null);
         setCompanies(payload?.companies || []);
+        setCategories(payload?.categories || []);
       } catch (error: unknown) {
         if (!(
           (typeof error === "object" && error !== null && "name" in error && (error as { name?: string }).name === "CanceledError") ||
@@ -151,6 +166,7 @@ export function InvestmentProvider({ children }: { children: ReactNode }) {
           });
           setSettings(null);
           setCompanies([]);
+          setCategories([]);
           setRejectedSettings(null);
         }
       } finally {
@@ -171,12 +187,13 @@ export function InvestmentProvider({ children }: { children: ReactNode }) {
       settings,
       publicSettings,
       companies,
-      publicCompanies,
+      publicCategories,
+      categories,
       rejectedSettings,
       isLoading,
       refreshData: () => fetchData(),
     }),
-    [settings, publicSettings, companies, publicCompanies, rejectedSettings, isLoading, fetchData],
+    [settings, publicSettings, companies, publicCategories, categories, rejectedSettings, isLoading, fetchData],
   );
 
   return (

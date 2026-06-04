@@ -834,10 +834,10 @@ export default function ApprovalCenter() {
 
   // const handleForcePurge = async (draft: ApprovalDraft) => {
   //   if (!isSuperadmin) return toast.error("Akses ditolak.");
-  // 
+  //
   //   setIsPurging(draft.notrans);
   //   const toastId = toast.loading("Membersihkan antrean ERP (Force Purge)...");
-  // 
+  //
   //   try {
   //     await api.post("/approval/force-purge", {
   //       notrans: draft.notrans,
@@ -846,7 +846,7 @@ export default function ApprovalCenter() {
   //       level: draft.level,
   //       komentar: "SYSTEM OVERRIDE: Purging Orphaned Ticket",
   //     });
-  // 
+  //
   //     toast.success("Tiket berhasil dihapus!", { id: toastId });
   //     fetchApprovals();
   //   } catch (error: unknown) {

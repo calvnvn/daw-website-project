@@ -74,13 +74,13 @@ class AuthService {
 
     const tokenDiterima = owlData.data;
 
-    if (!tokenDiterima || owlData.error) {
-      console.error("🦉 [OWL TOKEN FAIL] Token extraction failed.", {
-        hasData: !!owlData.data,
-        dataType: typeof owlData.data,
-        errorField: owlData.error,
-        allKeys: Object.keys(owlData),
-      });
+    // Jika OWL mengembalikan error (misal: "Account Not Found!" atau error lainnya)
+    if (owlData.error) {
+      const owlMessage = owlData.response || owlData.message || "Unknown OWL error.";
+      throw new Error(`AUTH_FAILED: Gagal Login via OWL: ${owlMessage}`);
+    }
+
+    if (!tokenDiterima) {
       throw new Error("AUTH_FAILED: Gagal mendapatkan token akses dari OWL.");
     }
 

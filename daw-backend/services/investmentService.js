@@ -1,6 +1,7 @@
 const sequelize = require("../config/database");
 const InvestmentSettings = require("../models/InvestmentSettings");
 const Affiliate = require("../models/Affiliate");
+const AffiliateCategory = require("../models/AffiliateCategory");
 const ApprovalDraft = require("../models/ApprovalDraft");
 const Translation = require("../models/Translation");
 const { invalidateOldDrafts } = require("../utils/draftCleanup");
@@ -23,7 +24,7 @@ class InvestmentService {
   }
 
   async processAffiliatePayload(body, file, existingData = {}) {
-    const { name, desc, category, websiteUrl, removePhoto } = body;
+    const { name, desc, category_id, websiteUrl, removePhoto } = body;
     let filesToDelete = [];
     let finalLogoUrl = existingData.logoUrl || null;
 
@@ -39,13 +40,106 @@ class InvestmentService {
       payload: {
         name: name || existingData.name,
         desc: desc || existingData.desc,
-        category: category || existingData.category,
+        category_id: category_id !== undefined ? (category_id || null) : existingData.category_id,
         websiteUrl: websiteUrl !== undefined ? websiteUrl : existingData.websiteUrl,
         logoUrl: finalLogoUrl,
       },
       filesToDelete,
     };
   }
+
+  // ==========================================
+  // CATEGORY CRUD OPERATIONS
+  // ==========================================
+
+  async getAllCategories() {
+    return AffiliateCategory.findAll({
+      order: [["name", "ASC"]],
+      include: [{
+        model: Affiliate,
+        as: "affiliates",
+        attributes: ["id"],
+      }],
+    });
+  }
+
+  async createCategory({ userRole, body, actorId, owlToken }) {
+    const t = await sequelize.transaction();
+    try {
+      const { name, description, icon } = body;
+      if (!name || !name.trim()) {
+        await t.rollback();
+        throw new Error("NOT_FOUND: Nama kategori tidak boleh kosong");
+      }
+
+      const newCategory = await AffiliateCategory.create(
+        { name: name.trim(), description: description || null, icon: icon || "Briefcase", is_locked: false },
+        { transaction: t },
+      );
+
+      await t.commit();
+      return { success: true, isDraft: false, data: newCategory };
+    } catch (error) {
+      if (t && !t.finished) await t.rollback();
+      throw error;
+    }
+  }
+
+  async updateCategory({ id, userRole, body, actorId, owlToken }) {
+    const t = await sequelize.transaction();
+    try {
+      const category = await AffiliateCategory.findByPk(id, { transaction: t, lock: t.LOCK.UPDATE });
+      if (!category) {
+        await t.rollback();
+        throw new Error("NOT_FOUND: Kategori tidak ditemukan");
+      }
+
+      const { name, description, icon } = body;
+      await category.update(
+        {
+          name: name !== undefined ? name.trim() : category.name,
+          description: description !== undefined ? description : category.description,
+          icon: icon !== undefined ? icon : category.icon,
+        },
+        { transaction: t },
+      );
+
+      await t.commit();
+      return { success: true, isDraft: false, data: category };
+    } catch (error) {
+      if (t && !t.finished) await t.rollback();
+      throw error;
+    }
+  }
+
+  async deleteCategory({ id, userRole }) {
+    const t = await sequelize.transaction();
+    try {
+      const category = await AffiliateCategory.findByPk(id, { transaction: t, lock: t.LOCK.UPDATE });
+      if (!category) {
+        await t.rollback();
+        throw new Error("NOT_FOUND: Kategori tidak ditemukan");
+      }
+
+      // Cek apakah masih ada affiliate yang terhubung
+      const affiliateCount = await Affiliate.count({ where: { category_id: id }, transaction: t });
+      if (affiliateCount > 0) {
+        await t.rollback();
+        throw new Error(`NOT_FOUND: Tidak bisa menghapus. Masih ada ${affiliateCount} perusahaan terhubung di kategori ini.`);
+      }
+
+      await category.destroy({ transaction: t });
+      await t.commit();
+      return { success: true };
+    } catch (error) {
+      if (t && !t.finished) await t.rollback();
+      throw error;
+    }
+  }
+
+  // ==========================================
+  // PUBLIC DATA (with Translation)
+  // ==========================================
 
   async getPublicInvestmentData(lang = "en") {
     let settings = await InvestmentSettings.findByPk(1);
@@ -59,20 +153,34 @@ class InvestmentService {
       }
     }
 
-    const companies = await Affiliate.findAll({
-      order: [["id", "ASC"]],
-      attributes: ["id", "name", "desc", "category", "logoUrl", "websiteUrl", "is_locked"],
+    // Fetch categories with their affiliated companies
+    const categories = await AffiliateCategory.findAll({
+      order: [["name", "ASC"]],
+      include: [{
+        model: Affiliate,
+        as: "affiliates",
+        attributes: ["id", "name", "desc", "logoUrl", "websiteUrl", "is_locked"],
+        where: { is_locked: false },
+        required: false,
+      }],
     });
 
+    // Filter out draft-created affiliates
     const createDrafts = await ApprovalDraft.findAll({
       where: { module_name: "Affiliate", action: "CREATE", status: "Pending" },
     });
-    const newDraftIds = createDrafts.map((d) => String(d.target_id));
+    const newDraftIds = new Set(createDrafts.map((d) => String(d.target_id)));
 
-    const filteredCompanies = companies.filter((c) => !newDraftIds.includes(String(c.id)));
+    // Build nested structure: categories -> companies
+    const nestedCategories = categories.map((cat) => {
+      const plain = cat.get({ plain: true });
+      plain.affiliates = (plain.affiliates || []).filter((a) => !newDraftIds.has(String(a.id)));
+      return plain;
+    });
 
-    if (lang === "en") return { settings, companies: filteredCompanies };
+    if (lang === "en") return { settings, categories: nestedCategories };
 
+    // === TRANSLATION PIPELINE ===
     let plainSettings = settings.get({ plain: true });
     const SETTINGS_MODULE = "InvestmentSettings";
 
@@ -101,30 +209,51 @@ class InvestmentService {
       if (introTrans) plainSettings.sectionIntro = introTrans.translatedText;
     }
 
+    // Translate each category's name & description, and each affiliate's desc
+    const CATEGORY_MODULE = "AffiliateCategory";
     const AFFILIATE_MODULE = "Affiliate";
-    const translatedCompanies = [];
 
-    for (let i = 0; i < filteredCompanies.length; i++) {
-      let company = filteredCompanies[i].get({ plain: true });
-      let descTrans = await Translation.findOne({ where: { modelName: AFFILIATE_MODULE, recordId: String(company.id), field: "desc", locale: "id" } });
+    const upsertTrans = async (modelName, recordId, field, translatedText) => {
+      if (!translatedText) return;
+      const existing = await Translation.findOne({ where: { modelName, recordId: String(recordId), field, locale: "id" } });
+      if (existing) await existing.update({ translatedText });
+      else await Translation.create({ modelName, recordId: String(recordId), field, locale: "id", translatedText });
+    };
 
-      if (company.desc && !descTrans) {
-        const freshDesc = await autoTranslate(company.desc, "Indonesian");
-        const upsertAffiliateTrans = async (field, translatedText) => {
-          if (!translatedText) return;
-          const existing = await Translation.findOne({ where: { modelName: AFFILIATE_MODULE, recordId: String(company.id), field, locale: "id" } });
-          if (existing) await existing.update({ translatedText });
-          else await Translation.create({ modelName: AFFILIATE_MODULE, recordId: String(company.id), field, locale: "id", translatedText });
-        };
-        if (freshDesc) { await upsertAffiliateTrans("desc", freshDesc); company.desc = freshDesc; }
-      } else {
-        if (descTrans) company.desc = descTrans.translatedText;
+    for (let i = 0; i < nestedCategories.length; i++) {
+      const cat = nestedCategories[i];
+
+      // Translate category name
+      let catNameTrans = await Translation.findOne({ where: { modelName: CATEGORY_MODULE, recordId: String(cat.id), field: "name", locale: "id" } });
+      if (cat.name && !catNameTrans) {
+        const fresh = await autoTranslate(cat.name, "Indonesian");
+        if (fresh) { await upsertTrans(CATEGORY_MODULE, cat.id, "name", fresh); cat.name = fresh; }
+      } else if (catNameTrans) { cat.name = catNameTrans.translatedText; }
+
+      // Translate category description
+      let catDescTrans = await Translation.findOne({ where: { modelName: CATEGORY_MODULE, recordId: String(cat.id), field: "description", locale: "id" } });
+      if (cat.description && !catDescTrans) {
+        const fresh = await autoTranslate(cat.description, "Indonesian");
+        if (fresh) { await upsertTrans(CATEGORY_MODULE, cat.id, "description", fresh); cat.description = fresh; }
+      } else if (catDescTrans) { cat.description = catDescTrans.translatedText; }
+
+      // Translate affiliates within this category
+      for (let j = 0; j < (cat.affiliates || []).length; j++) {
+        const company = cat.affiliates[j];
+        let descTrans = await Translation.findOne({ where: { modelName: AFFILIATE_MODULE, recordId: String(company.id), field: "desc", locale: "id" } });
+        if (company.desc && !descTrans) {
+          const fresh = await autoTranslate(company.desc, "Indonesian");
+          if (fresh) { await upsertTrans(AFFILIATE_MODULE, company.id, "desc", fresh); company.desc = fresh; }
+        } else if (descTrans) { company.desc = descTrans.translatedText; }
       }
-      translatedCompanies.push(company);
     }
 
-    return { settings: plainSettings, companies: translatedCompanies };
+    return { settings: plainSettings, categories: nestedCategories };
   }
+
+  // ==========================================
+  // ADMIN DATA (CMS)
+  // ==========================================
 
   async getAdminInvestmentData() {
     let settings = await InvestmentSettings.findByPk(1);
@@ -137,6 +266,10 @@ class InvestmentService {
         settings = await InvestmentSettings.findByPk(1);
       }
     }
+
+    const categories = await AffiliateCategory.findAll({
+      order: [["name", "ASC"]],
+    });
 
     const companies = await Affiliate.findAll({
       attributes: {
@@ -169,7 +302,7 @@ class InvestmentService {
     const resultSettings = settings.get({ plain: true });
     resultSettings.has_rejected = settingsDraft > 0;
 
-    return { settings: resultSettings, companies: resultCompanies };
+    return { settings: resultSettings, companies: resultCompanies, categories };
   }
 
   async getInvestmentData() {
@@ -182,11 +315,15 @@ class InvestmentService {
 
     const companies = await Affiliate.findAll({
       order: [["id", "ASC"]],
-      attributes: ["id", "name", "desc", "category", "logoUrl", "websiteUrl", "is_locked", "lock_ticket"],
+      attributes: ["id", "name", "desc", "category", "category_id", "logoUrl", "websiteUrl", "is_locked", "lock_ticket"],
     });
 
     return { settings, companies };
   }
+
+  // ==========================================
+  // SETTINGS MUTATIONS
+  // ==========================================
 
   async updateSettings({ userRole, body, actorId, owlToken }) {
     const t = await sequelize.transaction();
@@ -234,6 +371,10 @@ class InvestmentService {
       throw error;
     }
   }
+
+  // ==========================================
+  // AFFILIATE MUTATIONS
+  // ==========================================
 
   async createAffiliate({ userRole, body, file, actorId, owlToken }) {
     const t = await sequelize.transaction();
@@ -284,7 +425,7 @@ class InvestmentService {
       }
 
       const { payload, filesToDelete } = await this.processAffiliatePayload(body, file, company);
-      const isDataChanged = payload.name !== company.name || payload.desc !== company.desc || payload.category !== company.category || payload.websiteUrl !== company.websiteUrl || filesToDelete.length > 0 || file;
+      const isDataChanged = payload.name !== company.name || payload.desc !== company.desc || payload.category_id !== company.category_id || payload.websiteUrl !== company.websiteUrl || filesToDelete.length > 0 || file;
 
       if (!isDataChanged && userRole === "editor") {
         await t.rollback();

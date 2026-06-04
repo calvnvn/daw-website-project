@@ -105,7 +105,8 @@ require("./models/HomeSettings");
 require("./models/ImpactStats");
 require("./models/Page");
 require("./models/Menu");
-require("./models/Affiliate");
+const AffiliateCategory = require("./models/AffiliateCategory");
+const Affiliate = require("./models/Affiliate");
 require("./models/Inquiry");
 require("./models/InquirySubject");
 require("./models/InvestmentSettings");
@@ -322,6 +323,18 @@ NewsArticle.belongsTo(NewsCategory, {
 Achievement.belongsTo(NewsArticle, {
   foreignKey: "news_article_id",
   as: "newsArticle",
+});
+
+AffiliateCategory.hasMany(Affiliate, {
+  foreignKey: "category_id",
+  sourceKey: "id",
+  as: "affiliates",
+});
+
+Affiliate.belongsTo(AffiliateCategory, {
+  foreignKey: "category_id",
+  targetKey: "id",
+  as: "categoryData",
 });
 
 // EXECUTION: Server Bootstrap

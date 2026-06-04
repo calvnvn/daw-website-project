@@ -8,8 +8,9 @@ import { getCleanImageUrl } from "@/lib/utils";
 export default function OtherInvestmentsTeaser() {
   const { t } = useTranslation();
 
-  const { publicSettings: settings, publicCompanies: companies } = useInvestments();
-  const displayCompanies = (companies || []).slice(0, 6);
+  const { publicSettings: settings, publicCategories } = useInvestments();
+  const companies = (publicCategories || []).flatMap((cat) => cat.affiliates || []);
+  const displayCompanies = companies.slice(0, 6);
 
   return (
     <section className="py-24 lg:py-32 bg-[#081C15] relative overflow-hidden rounded-t-[50px] lg:rounded-t-[100px] shadow-[inset_0_25px_80px_rgba(0,0,0,0.4)]">

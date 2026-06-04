@@ -5,8 +5,14 @@ const Affiliate = sequelize.define("Affiliate", {
   name: { type: DataTypes.STRING, allowNull: false },
   desc: { type: DataTypes.STRING },
   category: {
-    type: DataTypes.ENUM("fnb", "steel", "finance", "edu"),
-    defaultValue: "fnb",
+    type: DataTypes.STRING,
+    defaultValue: "Other",
+    comment: "Legacy column – akan di-deprecate setelah migrasi ke category_id selesai",
+  },
+  category_id: {
+    type: DataTypes.INTEGER,
+    allowNull: true,
+    comment: "FK ke tabel AffiliateCategories",
   },
   websiteUrl: {
     type: DataTypes.STRING,
