@@ -110,7 +110,7 @@ class HistoryService {
       if (normalizedRole === "editor" && status === "Published") {
         const notrans = await generateNotrans(NOTRANS_PREFIX);
 
-        await invalidateOldDrafts(TARGET_ID, MODULE_NAME, t); // Note: parameters in original were (TARGET_ID, MODULE_NAME, t)
+        await invalidateOldDrafts(MODULE_NAME, TARGET_ID, t);
 
         await ApprovalDraft.create(
           {

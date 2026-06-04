@@ -392,7 +392,7 @@ class HomeService {
         return { success: true, isDraft: true, ticket: notrans };
       }
 
-      await invalidateOldDrafts(id, "HeroSlides", t);
+      await invalidateOldDrafts("HeroSlides", id, t);
       await slide.update({ ...updatedData, is_locked: false, lock_ticket: null }, { transaction: t });
       await t.commit();
       if (oldImageToDelete) deleteSingleFile(oldImageToDelete);
@@ -435,7 +435,7 @@ class HomeService {
         return { success: true, isDraft: true, ticket: notrans };
       }
 
-      await invalidateOldDrafts(id, "HeroSlides", t);
+      await invalidateOldDrafts("HeroSlides", id, t);
       const imageToDelete = slide.imageUrl;
       await slide.destroy({ transaction: t });
       await t.commit();
@@ -569,7 +569,7 @@ class HomeService {
         return { success: true, isDraft: true, ticket: notrans };
       }
 
-      await invalidateOldDrafts(id, "ImpactStats", t);
+      await invalidateOldDrafts("ImpactStats", id, t);
       await stat.destroy({ transaction: t });
       await t.commit();
       
