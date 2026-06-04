@@ -65,6 +65,7 @@ class ErpApprovalService {
         level: Number(row.level),
         karyawanid: String(row.karyawanid),
         jenispersetujuan: row.jenispersetujuan || CMS_CODE,
+        namakaryawan: row.namakaryawan || "",
       }));
 
       const payloadTransAdd = {
@@ -90,7 +91,7 @@ class ErpApprovalService {
       // console.log(
       //   `>>> [ERP COURIER] ✅ Success: Ticket ${notrans} registered to ERP.`,
       // );
-      return { success: true, notrans, data: response.data };
+      return { success: true, notrans, data: response.data, roadmap: cleanApproverRows };
     } catch (error) {
       this._handleError(error, "initiateApproval - /trans/add");
     }

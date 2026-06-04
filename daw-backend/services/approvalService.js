@@ -235,6 +235,7 @@ class ApprovalService {
           this._notifyActor({ type: "APPROVED", draftData });
           return { message: "Persetujuan Final Berhasil. Data telah dipublikasikan!" };
         } else {
+          await draftData.update({ current_level: currentLevel + 1 }, { transaction: t });
           await t.commit();
           this._notifyActor({ type: "NEW_REQUEST", pureNextApp, draftData });
           return { message: `Disetujui di Level ${currentLevel}. Menunggu persetujuan level selanjutnya.` };

@@ -37,6 +37,15 @@ const ApprovalDraft = sequelize.define(
       type: DataTypes.TEXT,
       allowNull: true,
     },
+    current_level: {
+      type: DataTypes.INTEGER,
+      defaultValue: 1,
+      allowNull: false,
+    },
+    approver_roadmap: {
+      type: DataTypes.JSON,
+      allowNull: true,
+    },
   },
   {
     timestamps: true,

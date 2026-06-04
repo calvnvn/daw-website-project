@@ -99,11 +99,18 @@ const handleEditorStaging = async ({
   await t.commit();
 
   try {
-    await ErpApprovalService.initiateApproval({
+    const erpResult = await ErpApprovalService.initiateApproval({
       notrans,
       karyawanId: actorId,
       token: req.owl_token,
     });
+
+    if (erpResult && erpResult.roadmap) {
+      await ApprovalDraft.update(
+        { approver_roadmap: erpResult.roadmap },
+        { where: { notrans: notrans } }
+      );
+    }
   } catch (owlError) {
     console.error("🚨 [ERP SYNC FAILED]:", owlError.message);
   }

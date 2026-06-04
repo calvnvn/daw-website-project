@@ -9,12 +9,10 @@ import {
   Loader2,
   ShieldAlert,
   LayoutTemplate,
-  Code2,
   Search,
   ChevronRight,
   AlertTriangle,
   ChevronLeft,
-  Database,
   Trash2,
   PenTool,
   Globe,
@@ -46,6 +44,8 @@ export interface ApprovalDraft {
   isMyQueue: boolean;
   owlStatus?: string | null;
   _isGhost?: boolean;
+  current_level?: number;
+  approver_roadmap?: string | any[];
 }
 
 const isHtmlString = (str: any): boolean => {
@@ -71,19 +71,92 @@ const sanitizeForDiff = (data: any) => {
   return cleanData;
 };
 
-const separateDataTypes = (sanitizedData: any) => {
-  const meta: Record<string, any> = {};
-  const html: Record<string, string> = {};
+// COMPONENT: APPROVAL TRACKER (SISTEM PANTAU)
+const ApprovalTracker = ({ draft }: { draft: ApprovalDraft }) => {
+  if (!draft.approver_roadmap) return null;
 
-  Object.entries(sanitizedData).forEach(([key, value]) => {
-    if (isHtmlString(value)) {
-      html[key] = value as string;
-    } else {
-      meta[key] = value;
-    }
-  });
+  let roadmap = [];
+  try {
+    roadmap =
+      typeof draft.approver_roadmap === "string"
+        ? JSON.parse(draft.approver_roadmap)
+        : draft.approver_roadmap;
+  } catch (e) {
+    return null;
+  }
 
-  return { meta, html };
+  if (!Array.isArray(roadmap) || roadmap.length === 0) return null;
+
+  const currentLevel = draft.current_level || 1;
+
+  return (
+    <div className="bg-slate-50 border-b border-slate-200 px-6 py-4 lg:px-8">
+      <h3 className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-4 flex items-center gap-2">
+        <Clock className="w-4 h-4" /> Sistem Pantau (Jejak Persetujuan)
+      </h3>
+      <div className="flex flex-col sm:flex-row gap-4 justify-between relative">
+        {/* Connector Line for Desktop */}
+        <div className="hidden sm:block absolute top-4 left-[10%] right-[10%] h-[2px] bg-slate-200 z-0" />
+        
+        {roadmap.map((step: any, index: number) => {
+          const stepLevel = Number(step.level);
+
+          let statusConfig = {
+            color: "text-slate-400",
+            bg: "bg-slate-100 border-slate-200",
+            icon: <Clock className="w-4 h-4" />,
+            label: "Menunggu Giliran",
+          };
+
+          if (draft.status === "Rejected" && stepLevel === currentLevel) {
+            statusConfig = {
+              color: "text-rose-600",
+              bg: "bg-rose-50 border-rose-200",
+              icon: <X className="w-4 h-4" />,
+              label: "Ditolak (Berhenti Di Sini)",
+            };
+          } else if (stepLevel < currentLevel || draft.status === "Approved") {
+            statusConfig = {
+              color: "text-daw-green",
+              bg: "bg-emerald-50 border-emerald-200",
+              icon: <Check className="w-4 h-4" />,
+              label: "Telah Disetujui",
+            };
+          } else if (stepLevel === currentLevel && draft.status === "Pending") {
+            statusConfig = {
+              color: "text-blue-600",
+              bg: "bg-blue-50 border-blue-200 ring-2 ring-blue-500/20",
+              icon: <Loader2 className="w-4 h-4 animate-spin" />,
+              label: "Posisi Saat Ini",
+            };
+          }
+
+          return (
+            <div key={index} className="flex-1 flex flex-col relative z-10">
+              <div className="flex flex-row sm:flex-col items-center gap-3 sm:gap-2">
+                <div
+                  className={`w-8 h-8 rounded-full border flex items-center justify-center shrink-0 shadow-sm transition-all ${statusConfig.bg} ${statusConfig.color}`}>
+                  {statusConfig.icon}
+                </div>
+                <div className="flex flex-col sm:items-center text-left sm:text-center">
+                  <p className="text-[10px] font-black uppercase text-slate-400">
+                    Level {stepLevel}
+                  </p>
+                  <p className="text-xs font-bold text-slate-800">
+                    {step.namakaryawan || `NIK: ${step.karyawanid}`}
+                  </p>
+                  <p
+                    className={`text-[10px] font-bold mt-0.5 ${statusConfig.color}`}>
+                    {statusConfig.label}
+                  </p>
+                </div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
 };
 
 // COMPONENT: MODAL DIFF VIEWER
@@ -106,7 +179,6 @@ const DiffModal = ({
   const [isRejecting, setIsRejecting] = useState(false);
   const [oldData, setOldData] = useState<any>(null);
   const [loadingOld, setLoadingOld] = useState(true);
-  const [activeTab, setActiveTab] = useState<"visual" | "code">("visual");
 
   // 🚀 FITUR BARU: Layout Controller untuk mencegah layout terpotong
   const [previewLayout, setPreviewLayout] = useState<"split" | "stacked">(
@@ -168,17 +240,6 @@ const DiffModal = ({
     return changes;
   }, [oldData, displayPayload, draft.action]);
 
-  // PEMISAHAN DATA: METADATA VS HTML CONTENT
-  const { oldMeta, newMeta, oldHtml, newHtml } = useMemo(() => {
-    const safeOldData = sanitizeForDiff(oldData || {});
-    const safeNewData = sanitizeForDiff(displayPayload || {});
-
-    const { meta: oMeta, html: oHtml } = separateDataTypes(safeOldData);
-    const { meta: nMeta, html: nHtml } = separateDataTypes(safeNewData);
-
-    return { oldMeta: oMeta, newMeta: nMeta, oldHtml: oHtml, newHtml: nHtml };
-  }, [oldData, displayPayload]);
-
   const isBrandNewData = draft.action === "CREATE";
   const isDeleteAction = draft.action === "DELETE";
 
@@ -190,7 +251,7 @@ const DiffModal = ({
           <div>
             <h2 className="text-lg lg:text-xl font-black text-slate-900 flex items-center gap-2 tracking-tight">
               <FileText className="w-5 h-5 lg:w-6 lg:h-6 text-daw-green" />
-              Tinjauan Perubahan: {draft.module_name}
+              Detail Draf: {draft.module_name}
             </h2>
             <div className="flex items-center gap-2 mt-1.5 lg:mt-2">
               <span
@@ -205,26 +266,6 @@ const DiffModal = ({
           </div>
 
           <div className="flex items-center gap-4 w-full sm:w-auto">
-            <div className="flex bg-slate-200/70 p-1.5 rounded-xl w-full sm:w-auto">
-              <button
-                onClick={() => setActiveTab("visual")}
-                className={`flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 lg:px-6 py-2 rounded-lg text-xs lg:text-sm font-bold transition-all ${
-                  activeTab === "visual"
-                    ? "bg-white text-daw-green shadow-sm"
-                    : "text-slate-500 hover:text-slate-700"
-                }`}>
-                <LayoutTemplate className="w-4 h-4" /> Visual & Meta
-              </button>
-              <button
-                onClick={() => setActiveTab("code")}
-                className={`flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 lg:px-6 py-2 rounded-lg text-xs lg:text-sm font-bold transition-all ${
-                  activeTab === "code"
-                    ? "bg-white text-blue-600 shadow-sm"
-                    : "text-slate-500 hover:text-slate-700"
-                }`}>
-                <Code2 className="w-4 h-4" /> Raw JSON
-              </button>
-            </div>
             <button
               onClick={onClose}
               disabled={isSubmitting}
@@ -234,19 +275,24 @@ const DiffModal = ({
           </div>
         </div>
 
+        {/* APPROVAL TRACKER (PANTAU) */}
+        {draft.status !== "Orphaned" && (
+          <ApprovalTracker draft={draft} />
+        )}
+
         {/* INSIGHT BANNER */}
-        {!loadingOld && activeTab === "visual" && changedFields.length > 0 && (
+        {!loadingOld && changedFields.length > 0 && (
           <div className="bg-amber-50/80 border-b border-amber-100 px-6 lg:px-8 py-3 shrink-0 flex items-center gap-3 overflow-x-auto custom-scrollbar">
             <Sparkles className="w-4 h-4 text-amber-500 animate-pulse shrink-0" />
             <span className="text-xs font-bold text-amber-800 shrink-0">
-              Insight Analisis:
+              Perubahan Data Terdeteksi:
             </span>
             <div className="flex gap-1.5 flex-nowrap">
               {changedFields.map((field) => (
                 <span
                   key={field}
                   className="px-2 py-0.5 bg-amber-200/50 text-amber-700 border border-amber-300 rounded text-[10px] font-bold font-mono shadow-sm whitespace-nowrap">
-                  {field}
+                  {field.replace(/_/g, " ")}
                 </span>
               ))}
             </div>
@@ -255,58 +301,24 @@ const DiffModal = ({
 
         {/* BODY KONTEN */}
         <div className="flex-1 overflow-y-auto bg-slate-100/50 p-4 lg:p-6 relative custom-scrollbar">
+          {(draft.status === "Approved" || draft.status === "Rejected") && (
+            <div className="mb-6 bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex flex-col items-center justify-center text-center">
+              <Check className="w-10 h-10 text-daw-green mb-2" />
+              <h3 className="font-bold text-slate-800">
+                Tiket Ini Sudah Diselesaikan ({draft.status})
+              </h3>
+              <p className="text-xs text-slate-500 mt-1">
+                Data dan visualisasi di bawah ini hanya untuk keperluan arsip
+                atau melihat riwayat.
+              </p>
+            </div>
+          )}
           {loadingOld ? (
             <div className="absolute inset-0 bg-white/70 z-10 flex flex-col items-center justify-center ">
               <Loader2 className="w-10 h-10 animate-spin text-daw-green mb-3" />
               <p className="text-sm font-bold text-slate-600 tracking-wide">
-                Menganalisis Perubahan Server...
+                Mengambil data dari server...
               </p>
-            </div>
-          ) : activeTab === "code" ? (
-            // RAW JSON TAB
-            <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden p-6">
-              {isBrandNewData ? (
-                <div className="bg-emerald-50 p-8 rounded-xl border border-dashed border-emerald-200">
-                  <p className="text-sm font-black text-emerald-700 mb-4 flex items-center gap-2 uppercase tracking-tight">
-                    <Check className="w-5 h-5" /> Pembuatan Data Baru (Payload)
-                  </p>
-                  <pre className="text-xs text-slate-700 overflow-x-auto bg-white p-6 rounded-lg border border-slate-200 shadow-inner">
-                    {JSON.stringify(sanitizeForDiff(displayPayload), null, 2)}
-                  </pre>
-                </div>
-              ) : isDeleteAction ? (
-                <div className="bg-rose-50 p-8 rounded-xl border border-dashed border-rose-200 flex flex-col items-center text-center">
-                  <Trash2 className="w-12 h-12 text-rose-300 mb-3" />
-                  <p className="text-base font-black text-rose-700 uppercase tracking-tight">
-                    Permintaan Penghapusan Data
-                  </p>
-                  <p className="text-sm text-rose-600 mt-2">
-                    Tidak ada perbandingan JSON karena target data akan dihapus
-                    sepenuhnya dari database.
-                  </p>
-                </div>
-              ) : (
-                <ReactDiffViewer
-                  oldValue={JSON.stringify(sanitizeForDiff(oldData), null, 2)}
-                  newValue={JSON.stringify(
-                    sanitizeForDiff(displayPayload),
-                    null,
-                    2,
-                  )}
-                  splitView={true}
-                  compareMethod={DiffMethod.WORDS}
-                  leftTitle="Versi Produksi (Saat Ini)"
-                  rightTitle="Usulan Draf (Perubahan)"
-                  styles={{
-                    variables: {
-                      light: {
-                        addedBackground: "#e6ffed",
-                        removedBackground: "#ffeef0",
-                      },
-                    },
-                  }}
-                />
-              )}
             </div>
           ) : (
             // VISUAL & META TAB
@@ -349,7 +361,7 @@ const DiffModal = ({
                         <div className="bg-slate-50/50 flex flex-col w-full overflow-hidden">
                           <div className="px-6 py-3 bg-slate-100 border-b border-slate-200 flex items-center justify-between sticky top-0 z-10 shadow-sm shrink-0">
                             <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">
-                              Live Version (Server)
+                              Data Saat Ini (Live Website)
                             </span>
                             {!isBrandNewData && (
                               <Globe className="w-3 h-3 text-slate-400" />
@@ -380,8 +392,8 @@ const DiffModal = ({
                             <span
                               className={`text-[10px] font-black uppercase tracking-widest ${isDeleteAction ? "text-rose-700" : "text-blue-700"}`}>
                               {isDeleteAction
-                                ? "Action: DELETE"
-                                : "Proposed Draft"}
+                                ? "Permintaan Hapus Data"
+                                : "Perubahan yang Diajukan"}
                             </span>
                             {isDeleteAction ? (
                               <Trash2 className="w-3 h-3 text-rose-500" />
@@ -394,11 +406,11 @@ const DiffModal = ({
                               <div className="h-full min-h-[300px] flex flex-col items-center justify-center border-2 border-dashed border-rose-200 rounded-2xl text-rose-600 bg-rose-50 text-center px-4 w-full">
                                 <ShieldAlert className="w-10 h-10 mb-3 opacity-50" />
                                 <p className="font-bold text-sm uppercase tracking-tight">
-                                  Halaman Ini Akan Dihapus
+                                  Data Ini Akan Dihapus
                                 </p>
                                 <p className="text-xs mt-2 opacity-80">
-                                  Jika disetujui, data Live di sebelah kiri akan
-                                  dilenyapkan dari database permanen.
+                                  Jika Anda setuju, data saat ini di website
+                                  akan dihapus secara permanen.
                                 </p>
                               </div>
                             ) : (
@@ -414,39 +426,70 @@ const DiffModal = ({
                 );
               })()}
 
-              {/* METADATA DIFF PROTECTOR */}
+              {/* TEXT DIFF PROTECTOR (WORD-LEVEL HIGHLIGHTING) */}
               {!isBrandNewData &&
                 !isDeleteAction &&
-                Object.keys(oldMeta).length > 0 && (
-                  <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-                    <div className="bg-slate-50 px-6 py-3 border-b border-slate-200 text-[10px] font-black text-slate-500 uppercase tracking-widest flex items-center gap-2">
-                      <Database className="w-4 h-4" /> Metadata Analysis
-                    </div>
-                    <div className="p-2 overflow-x-auto">
-                      <ReactDiffViewer
-                        oldValue={JSON.stringify(oldMeta, null, 2)}
-                        newValue={JSON.stringify(newMeta, null, 2)}
-                        splitView={true}
-                      />
-                    </div>
-                  </div>
-                )}
-
-              {/* HTML DIFF PROTECTOR */}
-              {!isBrandNewData &&
-                !isDeleteAction &&
-                (Object.keys(oldHtml).length > 0 ||
-                  Object.keys(newHtml).length > 0) && (
+                changedFields.length > 0 && (
                   <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden mt-6">
                     <div className="bg-slate-50 px-6 py-3 border-b border-slate-200 text-[10px] font-black text-slate-500 uppercase tracking-widest flex items-center gap-2">
-                      <Code2 className="w-4 h-4" /> Rich Text (HTML) Analysis
+                      <PenTool className="w-4 h-4" /> Detail Perubahan Teks
                     </div>
-                    <div className="p-2 overflow-x-auto">
-                      <ReactDiffViewer
-                        oldValue={JSON.stringify(oldHtml, null, 2)}
-                        newValue={JSON.stringify(newHtml, null, 2)}
-                        splitView={true}
-                      />
+                    <div className="flex flex-col divide-y divide-slate-100">
+                      {changedFields.map((field) => {
+                        const getVal = (source: any) => {
+                          const val = source?.[field];
+                          if (val === null || val === undefined || val === "")
+                            return "(Kosong)";
+                          if (Array.isArray(val)) return val.join(", ");
+                          if (typeof val === "object")
+                            return "[Struktur Objek Berubah]";
+                          if (typeof val === "string" && isHtmlString(val)) {
+                            return val.replace(/<[^>]*>?/gm, ""); // Hapus tag HTML agar mudah dibaca per kata
+                          }
+                          return String(val);
+                        };
+
+                        const oldString = getVal(oldData);
+                        const newString = getVal(displayPayload);
+
+                        return (
+                          <div key={field} className="p-4 overflow-x-auto">
+                            <p className="text-xs font-bold text-slate-500 mb-2 uppercase tracking-wide flex items-center gap-2">
+                              Kolom:{" "}
+                              <span className="text-daw-green">
+                                {field.replace(/_/g, " ")}
+                              </span>
+                            </p>
+                            <ReactDiffViewer
+                              oldValue={oldString}
+                              newValue={newString}
+                              splitView={true}
+                              compareMethod={DiffMethod.WORDS}
+                              hideLineNumbers={true}
+                              leftTitle="Data Saat Ini"
+                              rightTitle="Perubahan"
+                              styles={{
+                                variables: {
+                                  light: {
+                                    addedBackground: "#e6ffed",
+                                    removedBackground: "#ffeef0",
+                                    wordAddedBackground: "#acf2bd",
+                                    wordRemovedBackground: "#fdb8c0",
+                                  },
+                                },
+                                line: {
+                                  fontSize: "13px",
+                                  fontFamily: "inherit",
+                                },
+                                wordDiff: {
+                                  padding: "2px",
+                                  borderRadius: "3px",
+                                },
+                              }}
+                            />
+                          </div>
+                        );
+                      })}
                     </div>
                   </div>
                 )}
@@ -457,9 +500,10 @@ const DiffModal = ({
         {/* FOOTER ACTIONS (HARDENED REJECT ENGINE) */}
         <div className="px-6 py-4 lg:px-8 lg:py-5 bg-white border-t border-slate-200 flex flex-col sm:flex-row justify-between items-center gap-4 shrink-0">
           {isReadOnly ? (
-            <div className="w-full flex items-center justify-center p-4 bg-amber-50 border border-amber-200 rounded-xl text-amber-800 text-xs lg:text-sm font-bold gap-3">
-              <ShieldAlert className="w-5 h-5 text-amber-600 shrink-0" />
-              Anda tidak memiliki otoritas (Level) untuk mengeksekusi tiket ini.
+            <div className="w-full flex items-center justify-center p-4 bg-slate-50 border border-slate-200 rounded-xl text-slate-600 text-xs lg:text-sm font-bold gap-3">
+              <Eye className="w-5 h-5 text-slate-400 shrink-0" />
+              Mode Pantau (Anda hanya bisa melihat karena tiket tidak berada di
+              antrean Anda).
             </div>
           ) : (
             <>
