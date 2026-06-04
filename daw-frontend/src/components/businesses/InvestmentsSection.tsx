@@ -1,27 +1,16 @@
 import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
+import * as LucideIcons from "lucide-react";
 import {
   ArrowRight,
   Globe2,
-  Briefcase,
-  GraduationCap,
-  Coffee,
   X,
   Maximize2,
-  Building2,
 } from "lucide-react";
 import ScrollReveal from "@/components/ScrollReveal";
 import { useInvestments } from "@/contexts/InvestmentContext";
 import { getCleanImageUrl } from "@/lib/utils";
 import type { AffiliateCategory } from "@/contexts/InvestmentContext";
-
-const ICON_MAP: Record<string, React.ReactNode> = {
-  Coffee: <Coffee className="w-5 h-5" />,
-  Globe2: <Globe2 className="w-5 h-5" />,
-  GraduationCap: <GraduationCap className="w-5 h-5" />,
-  Briefcase: <Briefcase className="w-5 h-5" />,
-  Building: <Building2 className="w-5 h-5" />,
-};
 
 export default function InvestmentsSection() {
   const { t } = useTranslation();
@@ -93,7 +82,10 @@ export default function InvestmentsSection() {
                         ? "bg-emerald-500/20 text-emerald-400"
                         : "bg-white/5 text-slate-400"
                     }`}>
-                    {ICON_MAP[cat.icon] || <Briefcase className="w-5 h-5" />}
+                    {(() => {
+                      const IconComponent = (LucideIcons as any)[cat.icon] || LucideIcons.Briefcase;
+                      return <IconComponent className="w-5 h-5" />;
+                    })()}
                   </div>
 
                   <div className="flex-1">
