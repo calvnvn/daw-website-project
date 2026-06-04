@@ -18,6 +18,7 @@ import type { ManagementItem as ManagementMember } from "@/contexts/AboutContext
 import { PhotoPreviewer, ManagementImage } from "../AboutSharedComponents";
 import AboutLivePreview from "@/components/admin/about/AboutLivePreview";
 import { getErrorMessage } from "@/lib/utils";
+import ImageAdjustmentModal from "@/components/admin/ImageAdjustmentModal";
 
 interface ManagementTabProps {
   isEditing: boolean;
@@ -57,6 +58,8 @@ export default function ManagementTab({
     previous_notrans: null as string | null,
     originalSnapshot: null as string | null,
   });
+
+  const [currentCropFile, setCurrentCropFile] = useState<File | null>(null);
 
   const openPersonModal = async (person: ManagementMember | null = null) => {
     if (person?.is_locked && !person?.hasRejected && !isSuperadmin) {
@@ -141,9 +144,20 @@ export default function ManagementTab({
 
   const handlePhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
-      const file = e.target.files[0];
-      setPersonForm((prev) => ({ ...prev, photo: file, removePhoto: false }));
+      setCurrentCropFile(e.target.files[0]);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = "";
+      }
     }
+  };
+
+  const onCropSave = (croppedFile: File) => {
+    setPersonForm((prev) => ({
+      ...prev,
+      photo: croppedFile,
+      removePhoto: false,
+    }));
+    setCurrentCropFile(null);
   };
 
   // THE DIFF ENGINE (Blueprint 2.2)
@@ -207,7 +221,7 @@ export default function ManagementTab({
 
     try {
       // PERHATIKAN: Method PATCH, bukan DELETE!
-      await api.patch('/approval/discard', { notrans: rejectedDraft.notrans });
+      await api.patch("/approval/discard", { notrans: rejectedDraft.notrans });
 
       setRejectedDraft(null);
       await refreshData();
@@ -272,10 +286,9 @@ export default function ManagementTab({
       );
       setIsPersonModalOpen(false);
     } catch (error: unknown) {
-      toast.error(
-        getErrorMessage(error) || "Terjadi kesalahan sistem.",
-        { id: loadingToast },
-      );
+      toast.error(getErrorMessage(error) || "Terjadi kesalahan sistem.", {
+        id: loadingToast,
+      });
     } finally {
       setIsSaving(false);
     }
@@ -325,8 +338,12 @@ export default function ManagementTab({
           <div className="flex-1">
             <h4 className="font-bold">Draf Ditolak</h4>
             <p className="text-sm text-red-600/80">
-              Satu atau lebih draf profil kepemimpinan yang Anda ajukan telah ditolak oleh Approver.
-              Silakan klik tombol <b>'Edit'</b> pada baris dengan titik merah <span className="inline-block h-2.5 w-2.5 rounded-full bg-red-500 ring-2 ring-white mx-1" /> untuk melihat revisi terakhir, memulihkan data, atau mengabaikan notifikasi penolakan.
+              Satu atau lebih draf profil kepemimpinan yang Anda ajukan telah
+              ditolak oleh Approver. Silakan klik tombol <b>'Edit'</b> pada
+              baris dengan titik merah{" "}
+              <span className="inline-block h-2.5 w-2.5 rounded-full bg-red-500 ring-2 ring-white mx-1" />{" "}
+              untuk melihat revisi terakhir, memulihkan data, atau mengabaikan
+              notifikasi penolakan.
             </p>
           </div>
         </div>
@@ -713,6 +730,15 @@ export default function ManagementTab({
           </div>
         </div>
       )}
+
+      <ImageAdjustmentModal
+        isOpen={!!currentCropFile}
+        onClose={() => setCurrentCropFile(null)}
+        imageFile={currentCropFile}
+        onSave={onCropSave}
+        aspectRatio={1}
+        title="Sesuaikan Foto Profil"
+      />
     </div>
   );
 }

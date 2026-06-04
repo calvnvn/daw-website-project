@@ -23,6 +23,7 @@ import api from "@/lib/api";
 import { getCleanImageUrl } from "@/lib/utils";
 import { useSettings } from "@/contexts/SettingsContext";
 import { getErrorMessage } from "@/lib/utils";
+import ImageAdjustmentModal from "@/components/admin/ImageAdjustmentModal";
 
 export default function GlobalSettings() {
   const {
@@ -54,6 +55,7 @@ export default function GlobalSettings() {
   const [isDraggingLogo, setIsDraggingLogo] = useState(false);
   const [isDraggingFavicon, setIsDraggingFavicon] = useState(false);
   const [isOptimisticallyLocked, setIsOptimisticallyLocked] = useState(false);
+  const [cropTarget, setCropTarget] = useState<{type: 'logo' | 'favicon', file: File} | null>(null);
 
   const isDataLocked = settings?.is_locked === true || isOptimisticallyLocked;
   const shouldLockUI = isDataLocked && !rejectedSettings && !isSuperadmin;
@@ -704,8 +706,7 @@ export default function GlobalSettings() {
 
                     const file = e.dataTransfer.files?.[0];
                     if (file && file.type.startsWith("image/")) {
-                      setLogoFile(file);
-                      setLogoPreview(URL.createObjectURL(file));
+                      setCropTarget({ type: 'logo', file });
                     } else if (file) {
                       toast.error(
                         "Format file tidak didukung. Gunakan gambar (JPG/PNG/SVG).",
@@ -745,8 +746,8 @@ export default function GlobalSettings() {
                       onChange={(e) => {
                         const file = e.target.files?.[0];
                         if (file) {
-                          setLogoFile(file);
-                          setLogoPreview(URL.createObjectURL(file));
+                          setCropTarget({ type: 'logo', file });
+                          e.target.value = '';
                         }
                       }}
                       className="w-full text-center text-[10px] file:mr-3 file:py-1.5 file:px-4 file:rounded-full file:border-0 file:bg-daw-green/10 file:text-daw-green file:font-bold file:cursor-pointer cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
@@ -777,8 +778,7 @@ export default function GlobalSettings() {
 
                     const file = e.dataTransfer.files?.[0];
                     if (file && file.type.startsWith("image/")) {
-                      setFaviconFile(file);
-                      setFaviconPreview(URL.createObjectURL(file));
+                      setCropTarget({ type: 'favicon', file });
                     } else if (file) {
                       toast.error(
                         "Format file tidak didukung. Gunakan gambar (ICO/PNG).",
@@ -818,8 +818,8 @@ export default function GlobalSettings() {
                       onChange={(e) => {
                         const file = e.target.files?.[0];
                         if (file) {
-                          setFaviconFile(file);
-                          setFaviconPreview(URL.createObjectURL(file));
+                          setCropTarget({ type: 'favicon', file });
+                          e.target.value = '';
                         }
                       }}
                       className="w-full text-center text-[10px] file:mr-3 file:py-1.5 file:px-4 file:rounded-full file:border-0 file:bg-daw-green/10 file:text-daw-green file:font-bold file:cursor-pointer cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
@@ -831,6 +831,25 @@ export default function GlobalSettings() {
           </div>
         </div>
       </div>
+
+      <ImageAdjustmentModal
+        isOpen={!!cropTarget}
+        onClose={() => setCropTarget(null)}
+        imageFile={cropTarget?.file || null}
+        onSave={(croppedFile) => {
+          if (!cropTarget) return;
+          if (cropTarget.type === 'logo') {
+            setLogoFile(croppedFile);
+            setLogoPreview(URL.createObjectURL(croppedFile));
+          } else if (cropTarget.type === 'favicon') {
+            setFaviconFile(croppedFile);
+            setFaviconPreview(URL.createObjectURL(croppedFile));
+          }
+          setCropTarget(null);
+        }}
+        aspectRatio={1}
+        title={`Sesuaikan ${cropTarget?.type === 'logo' ? 'Logo Utama' : 'Ikon Favicon'}`}
+      />
     </div>
   );
 }

@@ -29,6 +29,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useBusiness } from "@/contexts/BusinessContext";
 import DOMPurify from "dompurify";
 import { getErrorMessage } from "@/lib/utils";
+import ImageAdjustmentModal from "@/components/admin/ImageAdjustmentModal";
 
 interface RejectedDraft {
   notrans: string;
@@ -389,6 +390,50 @@ export default function ProjectForm() {
   const [coverFile, setCoverFile] = useState<File | null>(null);
   const [galleryFiles, setGalleryFiles] = useState<File[]>([]);
   const [coverPreview, setCoverPreview] = useState<string | null>(null);
+
+  // --- Image Adjustment Modal State ---
+  const [cropQueue, setCropQueue] = useState<{file: File, type: "cover"|"gallery"}[]>([]);
+  const [currentCropFile, setCurrentCropFile] = useState<File | null>(null);
+  const [currentCropType, setCurrentCropType] = useState<"cover" | "gallery" | null>(null);
+
+  const processCroppedFile = (croppedFile: File) => {
+    if (currentCropType === "cover") {
+      setCoverFile(croppedFile);
+    } else if (currentCropType === "gallery") {
+      setGalleryFiles((prev) => {
+        const newFiles = [croppedFile].filter(
+          (vf) => !prev.some((pf) => pf.name === vf.name),
+        );
+        return [...prev, ...newFiles];
+      });
+    }
+    
+    // Check queue
+    const nextQueue = [...cropQueue];
+    if (nextQueue.length > 0) {
+      const next = nextQueue.shift();
+      setCropQueue(nextQueue);
+      setCurrentCropFile(next!.file);
+      setCurrentCropType(next!.type);
+    } else {
+      setCurrentCropFile(null);
+      setCurrentCropType(null);
+    }
+  };
+
+  const handleCancelCrop = () => {
+    // Check queue
+    const nextQueue = [...cropQueue];
+    if (nextQueue.length > 0) {
+      const next = nextQueue.shift();
+      setCropQueue(nextQueue);
+      setCurrentCropFile(next!.file);
+      setCurrentCropType(next!.type);
+    } else {
+      setCurrentCropFile(null);
+      setCurrentCropType(null);
+    }
+  };
 
   // Pratinjau Slug Otomatis (Hanya untuk UI, validasi akhir di Backend)
   const generatedSlug = useMemo(() => {
@@ -847,7 +892,12 @@ export default function ProjectForm() {
         toast.error("Ukuran gambar sampul maksimal 10MB.");
         return;
       }
-      setCoverFile(files[0]);
+      if (!currentCropFile) {
+        setCurrentCropFile(files[0]);
+        setCurrentCropType("cover");
+      } else {
+        setCropQueue(prev => [...prev, { file: files[0], type: "cover" }]);
+      }
     },
     accept: { "image/jpeg": [], "image/png": [], "image/webp": [] },
     multiple: false,
@@ -867,15 +917,15 @@ export default function ProjectForm() {
         toast.error("Beberapa gambar diabaikan karena lebih dari 10MB.");
       }
 
-      setGalleryFiles((prev) => {
-        const newFiles = validFiles.filter(
-          (vf) => !prev.some((pf) => pf.name === vf.name),
-        );
-        if (newFiles.length < validFiles.length) {
-          toast.warning("Gambar duplikat dibuang dari antrean.");
-        }
-        return [...prev, ...newFiles];
-      });
+      const queueItems = validFiles.map(f => ({ file: f, type: "gallery" as const }));
+      
+      if (!currentCropFile) {
+        setCurrentCropFile(queueItems[0].file);
+        setCurrentCropType(queueItems[0].type);
+        setCropQueue(prev => [...prev, ...queueItems.slice(1)]);
+      } else {
+        setCropQueue(prev => [...prev, ...queueItems]);
+      }
     },
     accept: { "image/jpeg": [], "image/png": [], "image/webp": [] },
     multiple: true,
@@ -1420,6 +1470,15 @@ export default function ProjectForm() {
           </div>
         </div>
       )}
+
+      <ImageAdjustmentModal
+        isOpen={!!currentCropFile}
+        onClose={handleCancelCrop}
+        imageFile={currentCropFile}
+        onSave={processCroppedFile}
+        aspectRatio={currentCropType === "cover" ? 16 / 9 : 3 / 2}
+        title={currentCropType === "cover" ? "Sesuaikan Sampul Proyek" : "Sesuaikan Foto Galeri"}
+      />
     </div>
   );
 }

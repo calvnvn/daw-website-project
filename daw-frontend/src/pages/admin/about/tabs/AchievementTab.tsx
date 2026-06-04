@@ -20,6 +20,7 @@ import { AVAILABLE_ICONS } from "../AboutConstants";
 import { getCleanImageUrl } from "@/lib/utils";
 import AboutLivePreview from "@/components/admin/about/AboutLivePreview";
 import { getErrorMessage } from "@/lib/utils";
+import ImageAdjustmentModal from "@/components/admin/ImageAdjustmentModal";
 
 interface AchievementTabProps {
   isEditing: boolean;
@@ -51,6 +52,7 @@ export default function AchievementTab({
     { id: string; title: string }[]
   >([]);
 
+  const [currentCropFile, setCurrentCropFile] = useState<File | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Fetch published news articles for the linking dropdown
@@ -175,9 +177,16 @@ export default function AchievementTab({
 
   const handlePhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
-      const file = e.target.files[0];
-      setForm((prev) => ({ ...prev, photo: file, removePhoto: false }));
+      setCurrentCropFile(e.target.files[0]);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = "";
+      }
     }
+  };
+
+  const onCropSave = (croppedFile: File) => {
+    setForm((prev) => ({ ...prev, photo: croppedFile, removePhoto: false }));
+    setCurrentCropFile(null);
   };
 
   const hasDataChanged = useMemo(() => {
@@ -252,10 +261,9 @@ export default function AchievementTab({
       toast.success("Penghargaan berhasil disimpan!", { id: loadingToast });
       setIsModalOpen(false);
     } catch (error: unknown) {
-      toast.error(
-        getErrorMessage(error) || "Terjadi kesalahan sistem.",
-        { id: loadingToast },
-      );
+      toast.error(getErrorMessage(error) || "Terjadi kesalahan sistem.", {
+        id: loadingToast,
+      });
     } finally {
       setIsSaving(false);
     }
@@ -659,8 +667,7 @@ export default function AchievementTab({
                     onChange={(e) =>
                       setForm({ ...form, news_article_id: e.target.value })
                     }
-                    className="w-full px-3 py-2.5 border border-slate-200 rounded-lg focus:ring-2 focus:ring-daw-green/20 transition-all text-sm bg-white"
-                  >
+                    className="w-full px-3 py-2.5 border border-slate-200 rounded-lg focus:ring-2 focus:ring-daw-green/20 transition-all text-sm bg-white">
                     <option value="">— Tidak Ada Hubungan Artikel —</option>
                     {publishedArticles.map((art) => (
                       <option key={art.id} value={art.id}>
@@ -739,6 +746,15 @@ export default function AchievementTab({
           </div>
         </div>
       )}
+
+      <ImageAdjustmentModal
+        isOpen={!!currentCropFile}
+        onClose={() => setCurrentCropFile(null)}
+        imageFile={currentCropFile}
+        onSave={onCropSave}
+        aspectRatio={1}
+        title="Sesuaikan Visual Sertifikat/Trofi"
+      />
     </div>
   );
 }

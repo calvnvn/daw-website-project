@@ -27,6 +27,7 @@ import api, { BASE_UPLOAD_URL } from "@/lib/api";
 import { compressImage } from "@/utils/imageHelper";
 import { useAuth } from "@/contexts/AuthContext";
 import { getErrorMessage } from "@/lib/utils";
+import ImageAdjustmentModal from "@/components/admin/ImageAdjustmentModal";
 
 interface NewsCategory {
   id: string;
@@ -71,6 +72,64 @@ export default function NewsForm() {
   const [isDragging, setIsDragging] = useState(false);
   const [galleryImages, setGalleryImages] = useState<GalleryImage[]>([]);
   const [isUploadingGallery, setIsUploadingGallery] = useState(false);
+
+  // --- Image Adjustment Modal State ---
+  const [cropQueue, setCropQueue] = useState<{file: File, type: "cover"|"gallery"}[]>([]);
+  const [currentCropFile, setCurrentCropFile] = useState<File | null>(null);
+  const [currentCropType, setCurrentCropType] = useState<"cover" | "gallery" | null>(null);
+
+  const processCroppedFile = async (croppedFile: File) => {
+    if (currentCropType === "cover") {
+      setCoverFile(croppedFile);
+    } else if (currentCropType === "gallery") {
+      setIsUploadingGallery(true);
+      const loadingToast = toast.loading(`Mengunggah foto galeri...`);
+      try {
+        const compressed = await compressImage(croppedFile);
+        const uploadData = new FormData();
+        uploadData.append("inline_image", compressed);
+
+        const response = await api.post("/news/upload-inline", uploadData);
+        if (response.data?.url) {
+          setGalleryImages((prev) => [
+            ...prev,
+            { imageUrl: response.data.url, caption: "", orderIndex: prev.length },
+          ]);
+          toast.success(`Berhasil menambahkan foto galeri!`, { id: loadingToast });
+        }
+      } catch (err) {
+        toast.error("Gagal mengunggah foto galeri.", { id: loadingToast });
+      } finally {
+        setIsUploadingGallery(false);
+      }
+    }
+    
+    // Check queue
+    const nextQueue = [...cropQueue];
+    if (nextQueue.length > 0) {
+      const next = nextQueue.shift();
+      setCropQueue(nextQueue);
+      setCurrentCropFile(next!.file);
+      setCurrentCropType(next!.type);
+    } else {
+      setCurrentCropFile(null);
+      setCurrentCropType(null);
+    }
+  };
+
+  const handleCancelCrop = () => {
+    // Check queue
+    const nextQueue = [...cropQueue];
+    if (nextQueue.length > 0) {
+      const next = nextQueue.shift();
+      setCropQueue(nextQueue);
+      setCurrentCropFile(next!.file);
+      setCurrentCropType(next!.type);
+    } else {
+      setCurrentCropFile(null);
+      setCurrentCropType(null);
+    }
+  };
 
   const initialFormState = {
     title: "",
@@ -418,11 +477,14 @@ export default function NewsForm() {
   const { getRootProps, getInputProps } = useDropzone({
     disabled: shouldLockUI,
     onDrop: (files) => {
-      if (files[0]) {
-        if (!files[0].type.startsWith("image/")) {
-          return toast.error("Hanya file gambar yang didukung.");
+      const validFiles = files.filter(f => f.type.startsWith("image/"));
+      if (validFiles[0]) {
+        if (!currentCropFile) {
+          setCurrentCropFile(validFiles[0]);
+          setCurrentCropType("cover");
+        } else {
+          setCropQueue(prev => [...prev, { file: validFiles[0], type: "cover" }]);
         }
-        setCoverFile(files[0]);
       }
     },
     accept: { "image/jpeg": [], "image/png": [], "image/webp": [] },
@@ -443,46 +505,14 @@ export default function NewsForm() {
       const validFiles = files.filter((f) => f.type.startsWith("image/"));
       if (validFiles.length === 0) return;
 
-      setIsUploadingGallery(true);
-      const loadingToast = toast.loading(
-        `Mengunggah ${validFiles.length} foto galeri...`,
-      );
-      const newImages: GalleryImage[] = [];
-      let startIdx = galleryImages.length;
-
-      try {
-        for (const file of validFiles) {
-          const compressed = await compressImage(file);
-          const uploadData = new FormData();
-          uploadData.append("inline_image", compressed);
-
-          const response = await api.post("/news/upload-inline", uploadData);
-          if (response.data?.url) {
-            newImages.push({
-              imageUrl: response.data.url,
-              caption: "",
-              orderIndex: startIdx++,
-            });
-          }
-        }
-
-        if (newImages.length > 0) {
-          setGalleryImages((prev) => [...prev, ...newImages]);
-          toast.success(`Berhasil menambahkan ${newImages.length} foto!`, {
-            id: loadingToast,
-          });
-        } else {
-          toast.error("Tidak ada foto yang berhasil diunggah.", {
-            id: loadingToast,
-          });
-        }
-      } catch (err) {
-        console.error("Gallery upload error", err);
-        toast.error("Sebagian upload galeri gagal. Periksa koneksi Anda.", {
-          id: loadingToast,
-        });
-      } finally {
-        setIsUploadingGallery(false);
+      const queueItems = validFiles.map(f => ({ file: f, type: "gallery" as const }));
+      
+      if (!currentCropFile) {
+        setCurrentCropFile(queueItems[0].file);
+        setCurrentCropType(queueItems[0].type);
+        setCropQueue(prev => [...prev, ...queueItems.slice(1)]);
+      } else {
+        setCropQueue(prev => [...prev, ...queueItems]);
       }
     },
     accept: { "image/jpeg": [], "image/png": [], "image/webp": [] },
@@ -1422,6 +1452,15 @@ export default function NewsForm() {
           </div>
         )}
       </div>
+
+      <ImageAdjustmentModal
+        isOpen={!!currentCropFile}
+        onClose={handleCancelCrop}
+        imageFile={currentCropFile}
+        onSave={processCroppedFile}
+        aspectRatio={currentCropType === "cover" ? 16 / 9 : 3 / 2}
+        title={currentCropType === "cover" ? "Sesuaikan Sampul Artikel" : "Sesuaikan Foto Galeri"}
+      />
     </div>
   );
 }

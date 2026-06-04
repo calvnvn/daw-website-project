@@ -23,6 +23,7 @@ import { toast } from "sonner";
 import api, { BASE_UPLOAD_URL } from "@/lib/api";
 import { useAuth } from "@/contexts/AuthContext";
 import { getErrorMessage } from "@/lib/utils";
+import ImageAdjustmentModal from "@/components/admin/ImageAdjustmentModal";
 
 interface EditableSlide extends Omit<HeroSlides, "id"> {
   id: string | number;
@@ -55,6 +56,8 @@ export default function HeroManager({
   const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
 
   const [isOptimisticallyLocked, setIsOptimisticallyLocked] = useState(false);
+
+  const [currentCropFile, setCurrentCropFile] = useState<{file: File, slideId: string | number} | null>(null);
 
   const fileInputRefs = useRef<{ [key: string]: HTMLInputElement | null }>({});
 
@@ -272,13 +275,23 @@ export default function HeroManager({
 
   const handleImageChange = (id: string | number, file: File) => {
     if (!file) return;
-    const currentSlide = slides.find((s) => s.id === id);
+    setCurrentCropFile({ file, slideId: id });
+    if (fileInputRefs.current[id]) {
+      fileInputRefs.current[id]!.value = "";
+    }
+  };
+
+  const onCropSave = (croppedFile: File) => {
+    if (!currentCropFile) return;
+    const { slideId } = currentCropFile;
+    const currentSlide = slides.find((s) => s.id === slideId);
     if (currentSlide?.previewUrl) URL.revokeObjectURL(currentSlide.previewUrl);
 
-    const previewUrl = URL.createObjectURL(file);
+    const previewUrl = URL.createObjectURL(croppedFile);
     setSlides(
-      slides.map((s) => (s.id === id ? { ...s, file, previewUrl } : s)),
+      slides.map((s) => (s.id === slideId ? { ...s, file: croppedFile, previewUrl } : s)),
     );
+    setCurrentCropFile(null);
   };
 
   const getDisplayImageUrl = (slide: EditableSlide) => {
@@ -807,6 +820,15 @@ export default function HeroManager({
           </div>
         )}
       </div>
+
+      <ImageAdjustmentModal
+        isOpen={!!currentCropFile}
+        onClose={() => setCurrentCropFile(null)}
+        imageFile={currentCropFile?.file || null}
+        onSave={onCropSave}
+        aspectRatio={16 / 9}
+        title="Sesuaikan Gambar Spanduk"
+      />
     </div>
   );
 }

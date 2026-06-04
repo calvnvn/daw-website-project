@@ -30,6 +30,8 @@ import imageCompression from "browser-image-compression";
 import { useContent } from "@/contexts/ContentContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { getErrorMessage } from "@/lib/utils";
+import ImageAdjustmentModal from "@/components/admin/ImageAdjustmentModal";
+
 interface Page {
   id: string;
   title: string;
@@ -91,6 +93,7 @@ export default function PageBuilder() {
 
   const [heroFile, setHeroFile] = useState<File | null>(null);
   const [heroImage, setHeroImage] = useState<string>("");
+  const [currentCropFile, setCurrentCropFile] = useState<File | null>(null);
   const quillRef = useRef<ReactQuill>(null);
 
   useEffect(() => {
@@ -505,9 +508,14 @@ export default function PageBuilder() {
     if (file.size > 5 * 1024 * 1024)
       return toast.error("Maksimal ukuran file 5MB.");
 
+    setCurrentCropFile(file);
+  };
+
+  const onCropSave = async (croppedFile: File) => {
+    setCurrentCropFile(null);
     const toastId = toast.loading("Mengompresi asset...");
     try {
-      const compressedFile = await imageCompression(file, {
+      const compressedFile = await imageCompression(croppedFile, {
         maxSizeMB: 0.8,
         maxWidthOrHeight: 1920,
         useWebWorker: true,
@@ -1591,6 +1599,15 @@ export default function PageBuilder() {
           </div>
         </div>
       )}
+
+      <ImageAdjustmentModal
+        isOpen={!!currentCropFile}
+        onClose={() => setCurrentCropFile(null)}
+        imageFile={currentCropFile}
+        onSave={onCropSave}
+        aspectRatio={16 / 9}
+        title="Sesuaikan Gambar Latar (Hero)"
+      />
     </div>
   );
 }

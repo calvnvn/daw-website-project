@@ -13,6 +13,7 @@ import api from "@/lib/api";
 import { getCleanImageUrl } from "@/lib/utils";
 import { CATEGORY_ICONS } from "./InvestmentConstants";
 import type { LocalAffiliate, LocalCategory } from "./InvestmentConstants";
+import ImageAdjustmentModal from "@/components/admin/ImageAdjustmentModal";
 
 // ==========================================
 // LOGO PREVIEWER (Memoized sub-component)
@@ -106,6 +107,8 @@ export default function CompaniesTab({
   handleRestoreAffiliateDraft, handleDiscardAffiliateDraft,
   refreshData,
 }: CompaniesTabProps) {
+  const [currentCropFile, setCurrentCropFile] = React.useState<{file: File, companyId: string | number} | null>(null);
+
   return (
     <div className="space-y-6 animate-in fade-in duration-300">
       {/* HEADER */}
@@ -322,7 +325,12 @@ export default function CompaniesTab({
                               isEditing={isEditing && !isLockedForEditor && !isDeleting && !isNeedsRevision}
                               onRemove={() => { updateCompany(company.id, "removePhoto", true); updateCompany(company.id, "newLogoFile", null); }} />
                             {isEditing && !isLockedForEditor && !isDeleting && !isNeedsRevision && (
-                              <input type="file" accept="image/*" onChange={(e) => e.target.files?.[0] && handleLogoChange(company.id, e.target.files[0])}
+                              <input type="file" accept="image/*" onChange={(e) => {
+                                if (e.target.files?.[0]) {
+                                  setCurrentCropFile({ file: e.target.files[0], companyId: company.id });
+                                  e.target.value = '';
+                                }
+                              }}
                                 className="absolute inset-0 opacity-0 cursor-pointer z-10" />
                             )}
                           </div>
@@ -365,6 +373,20 @@ export default function CompaniesTab({
           </div>
         </div>
       )}
+
+      <ImageAdjustmentModal
+        isOpen={!!currentCropFile}
+        onClose={() => setCurrentCropFile(null)}
+        imageFile={currentCropFile?.file || null}
+        onSave={(croppedFile) => {
+          if (currentCropFile) {
+            handleLogoChange(currentCropFile.companyId, croppedFile);
+          }
+          setCurrentCropFile(null);
+        }}
+        aspectRatio={1}
+        title="Sesuaikan Logo Perusahaan"
+      />
     </div>
   );
 }
