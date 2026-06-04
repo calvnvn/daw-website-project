@@ -11,21 +11,69 @@ import {
   AlertTriangle,
   RotateCcw,
   XCircle,
+  Search,
+  X,
 } from "lucide-react";
 import * as Icons from "lucide-react";
 import { toast } from "sonner";
 import api from "@/lib/api";
 import { getErrorMessage } from "@/lib/utils";
 
-const AVAILABLE_ICONS = [
-  { name: "Map", label: "Map / Area" },
-  { name: "Zap", label: "Zap / Energy" },
-  { name: "Factory", label: "Factory / Mill" },
-  { name: "Settings", label: "Gears / Operations" },
-  { name: "Leaf", label: "Leaf / Sustainability" },
-  { name: "Users", label: "Users / Community" },
-  { name: "Building", label: "Building / Corporate" },
-  { name: "Globe", label: "Globe / Global" },
+const CURATED_ICONS = [
+  "Map",
+  "Zap",
+  "Factory",
+  "Settings",
+  "Leaf",
+  "Users",
+  "Building",
+  "Globe",
+  "TrendingUp",
+  "Award",
+  "Target",
+  "Activity",
+  "Shield",
+  "ShieldCheck",
+  "Trees",
+  "HeartHandshake",
+  "BarChart3",
+  "PieChart",
+  "LineChart",
+  "Monitor",
+  "Cpu",
+  "Server",
+  "Cloud",
+  "Briefcase",
+  "Building2",
+  "Coffee",
+  "GraduationCap",
+  "HeartPulse",
+  "Landmark",
+  "ShoppingBag",
+  "Utensils",
+  "Wrench",
+  "Smartphone",
+  "Truck",
+  "Plane",
+  "Ship",
+  "ShoppingCart",
+  "Database",
+  "Lightbulb",
+  "Camera",
+  "Film",
+  "Music",
+  "BookOpen",
+  "Microscope",
+  "Atom",
+  "Stethoscope",
+  "Wheat",
+  "Droplets",
+  "Wind",
+  "Sun",
+  "Gem",
+  "Coins",
+  "Banknote",
+  "Wallet",
 ];
 
 export default function StatsManager({
@@ -50,6 +98,13 @@ export default function StatsManager({
   const [isEditing, setIsEditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
+
+  // Icon Picker Modal State
+  const [isIconPickerOpen, setIsIconPickerOpen] = useState(false);
+  const [activePickerStatId, setActivePickerStatId] = useState<
+    string | number | null
+  >(null);
+  const [iconSearchQuery, setIconSearchQuery] = useState("");
 
   const hasLockedItems = stats.some((s) => s.is_locked);
 
@@ -243,8 +298,7 @@ export default function StatsManager({
             {
               loading: "Memproses...",
               success: (msg) => msg,
-              error: (err: unknown) =>
-                getErrorMessage(err, "Gagal menghapus."),
+              error: (err: unknown) => getErrorMessage(err, "Gagal menghapus."),
             },
           );
         },
@@ -584,10 +638,33 @@ export default function StatsManager({
                   <label className="block text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-1 text-center">
                     Icon
                   </label>
-                  <div
-                    className={`aspect-square rounded-lg border flex items-center justify-center shadow-sm ${isOverrideThisRow ? "bg-amber-50 border-amber-200 text-amber-600" : "bg-white border-slate-200 text-daw-green"}`}>
-                    <IconComponent className="w-7 h-7 stroke-[1.5px]" />
-                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (isEditing && !shouldLockThisRowUI) {
+                        setActivePickerStatId(stat.id);
+                        setIconSearchQuery("");
+                        setIsIconPickerOpen(true);
+                      }
+                    }}
+                    disabled={!isEditing || shouldLockThisRowUI}
+                    className={`w-full aspect-square rounded-lg border flex flex-col items-center justify-center transition-all relative ${
+                      isOverrideThisRow
+                        ? "bg-amber-50 border-amber-200 text-amber-600"
+                        : isEditing && !shouldLockThisRowUI
+                          ? "bg-white border-slate-200 text-daw-green hover:border-daw-green hover:shadow-md cursor-pointer group"
+                          : "bg-slate-50 border-slate-200 text-slate-400 cursor-not-allowed"
+                    }`}
+                    title={
+                      isEditing && !shouldLockThisRowUI ? "Ganti Ikon" : ""
+                    }>
+                    <IconComponent className="w-7 h-7 stroke-[1.5px] group-hover:scale-110 transition-transform" />
+                    {isEditing && !shouldLockThisRowUI && (
+                      <span className="absolute bottom-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <Icons.Edit2 className="w-3 h-3 text-daw-green" />
+                      </span>
+                    )}
+                  </button>
                 </div>
 
                 {/* DETAILS AREA */}
@@ -613,40 +690,20 @@ export default function StatsManager({
                     )}
                   </div>
 
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <label className="block text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-1">
-                        Value
-                      </label>
-                      <input
-                        type="text"
-                        value={stat.value || ""}
-                        disabled={!isEditing || shouldLockThisRowUI}
-                        onChange={(e) =>
-                          updateStatField(stat.id, "value", e.target.value)
-                        }
-                        className={`w-full px-3 py-1.5 text-sm font-bold rounded-md transition-all ${isEditing && !shouldLockThisRowUI ? "bg-white border border-slate-200 focus:ring-2 focus:ring-daw-green/10" : "bg-transparent border-transparent"}`}
-                        placeholder="E.g., 500+"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-1">
-                        Select Icon
-                      </label>
-                      <select
-                        value={stat.icon}
-                        disabled={!isEditing || shouldLockThisRowUI}
-                        onChange={(e) =>
-                          updateStatField(stat.id, "icon", e.target.value)
-                        }
-                        className={`w-full px-2 py-1.5 text-[11px] font-medium rounded-md appearance-none transition-all ${isEditing && !shouldLockThisRowUI ? "bg-white border border-slate-200" : "bg-transparent border-transparent"}`}>
-                        {AVAILABLE_ICONS.map((i) => (
-                          <option key={i.name} value={i.name}>
-                            {i.label}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
+                  <div>
+                    <label className="block text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-1">
+                      Value
+                    </label>
+                    <input
+                      type="text"
+                      value={stat.value || ""}
+                      disabled={!isEditing || shouldLockThisRowUI}
+                      onChange={(e) =>
+                        updateStatField(stat.id, "value", e.target.value)
+                      }
+                      className={`w-full px-3 py-1.5 text-sm font-bold rounded-md transition-all ${isEditing && !shouldLockThisRowUI ? "bg-white border border-slate-200 focus:ring-2 focus:ring-daw-green/10 outline-none" : "bg-transparent border-transparent"}`}
+                      placeholder="E.g., 500+"
+                    />
                   </div>
 
                   <div>
@@ -698,6 +755,111 @@ export default function StatsManager({
           </div>
         )}
       </div>
+
+      {/* ICON PICKER MODAL */}
+      {isIconPickerOpen && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/40  animate-in fade-in duration-200">
+          <div
+            className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl overflow-hidden flex flex-col animate-in zoom-in-95 duration-200"
+            onClick={(e) => e.stopPropagation()}>
+            {/* Modal Header */}
+            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 bg-slate-50/50">
+              <div>
+                <h3 className="font-bold text-slate-800 text-lg flex items-center gap-2">
+                  <Icons.Shapes className="w-5 h-5 text-daw-green" /> Pilih Ikon
+                  Statistik
+                </h3>
+                <p className="text-xs text-slate-500 mt-1">
+                  Pilih ikon visual yang merepresentasikan pencapaian
+                </p>
+              </div>
+              <button
+                onClick={() => setIsIconPickerOpen(false)}
+                className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-xl transition-colors">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div className="p-6 flex-1 flex flex-col max-h-[65vh]">
+              {/* Search Bar */}
+              <div className="relative mb-6 shrink-0">
+                <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                <input
+                  type="text"
+                  placeholder="Cari ikon... (contoh: Map, Zap, Users)"
+                  value={iconSearchQuery}
+                  onChange={(e) => setIconSearchQuery(e.target.value)}
+                  className="w-full pl-10 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:bg-white focus:ring-2 focus:ring-daw-green/20 focus:border-daw-green outline-none transition-all"
+                  autoFocus
+                />
+              </div>
+
+              {/* Icons Grid */}
+              <div className="flex-1 overflow-y-auto min-h-0 pr-2 scrollbar-thin scrollbar-thumb-slate-200 scrollbar-track-transparent">
+                <div className="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 gap-3 pb-4">
+                  {CURATED_ICONS.filter((name) =>
+                    name.toLowerCase().includes(iconSearchQuery.toLowerCase()),
+                  ).map((iconName) => {
+                    const IconComp =
+                      (Icons as any)[iconName] || Icons.HelpCircle;
+                    const isActive =
+                      stats.find((s) => s.id === activePickerStatId)?.icon ===
+                      iconName;
+
+                    return (
+                      <button
+                        key={iconName}
+                        onClick={() => {
+                          if (activePickerStatId) {
+                            updateStatField(
+                              activePickerStatId,
+                              "icon",
+                              iconName,
+                            );
+                          }
+                          setIsIconPickerOpen(false);
+                        }}
+                        title={iconName}
+                        className={`aspect-square flex flex-col items-center justify-center rounded-xl border transition-all ${
+                          isActive
+                            ? "bg-daw-green border-daw-green text-white shadow-lg shadow-daw-green/20 scale-110 z-10"
+                            : "bg-white border-slate-200 text-slate-500 hover:border-daw-green hover:text-daw-green hover:bg-emerald-50 hover:shadow-md"
+                        }`}>
+                        <IconComp
+                          className={`w-6 h-6 mb-1.5 ${isActive ? "stroke-[2px]" : "stroke-[1.5px]"}`}
+                        />
+                        <span className="text-[9px] font-medium max-w-full truncate px-1 opacity-70">
+                          {iconName}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+                {CURATED_ICONS.filter((name) =>
+                  name.toLowerCase().includes(iconSearchQuery.toLowerCase()),
+                ).length === 0 && (
+                  <div className="flex flex-col items-center justify-center py-12 text-slate-400">
+                    <Icons.SearchX className="w-10 h-10 mb-3 text-slate-300" />
+                    <p className="text-sm font-medium">
+                      Tidak ada ikon yang cocok dengan "{iconSearchQuery}"
+                    </p>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Modal Footer */}
+            <div className="px-6 py-4 border-t border-slate-100 bg-slate-50 flex justify-end shrink-0">
+              <button
+                onClick={() => setIsIconPickerOpen(false)}
+                className="px-6 py-2.5 bg-white border border-slate-200 text-slate-600 rounded-xl text-sm font-bold hover:bg-slate-100 transition-colors">
+                Batal
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
