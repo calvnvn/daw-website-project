@@ -64,34 +64,25 @@ class AchievementService {
     }
 
     // Lazy Translation Pipeline
+    const safeTranslate = async (moduleName, id, field, sourceValue) => {
+      let transRecord = await Translation.findOne({ where: { modelName: moduleName, recordId: String(id), field, locale: "id" } });
+      if (!sourceValue || !String(sourceValue).trim()) {
+        if (transRecord) await transRecord.destroy();
+        return sourceValue;
+      }
+      if (!transRecord) {
+        const fresh = await autoTranslate(sourceValue, "Indonesian");
+        if (fresh) await Translation.create({ modelName: moduleName, recordId: String(id), field, locale: "id", translatedText: fresh });
+        return fresh || sourceValue;
+      }
+      return transRecord.translatedText;
+    };
+
     const translatedAchievements = [];
     for (let i = 0; i < formattedData.length; i++) {
       let item = formattedData[i];
-      
-      let titleTrans = await Translation.findOne({ where: { modelName: MODULE_NAME, recordId: String(item.id), field: "title", locale: "id" } });
-      let descTrans = await Translation.findOne({ where: { modelName: MODULE_NAME, recordId: String(item.id), field: "description", locale: "id" } });
-      
-      const needsTitleTrans = item.title && !titleTrans;
-      const needsDescTrans = item.description && !descTrans;
-
-      if (needsTitleTrans || needsDescTrans) {
-        // console.log(`[Lazy Translation] Translating Achievement: ${item.id}...`);
-        const freshTitle = needsTitleTrans ? await autoTranslate(item.title, "Indonesian") : "";
-        const freshDesc = needsDescTrans ? await autoTranslate(item.description, "Indonesian") : "";
-        
-        const upsertAchvTrans = async (field, translatedText) => {
-          if (!translatedText) return;
-          const existing = await Translation.findOne({ where: { modelName: MODULE_NAME, recordId: String(item.id), field, locale: "id" } });
-          if (existing) await existing.update({ translatedText });
-          else await Translation.create({ modelName: MODULE_NAME, recordId: String(item.id), field, locale: "id", translatedText });
-        };
-
-        if (freshTitle) { await upsertAchvTrans("title", freshTitle); item.title = freshTitle; }
-        if (freshDesc) { await upsertAchvTrans("description", freshDesc); item.description = freshDesc; }
-      } else {
-        if (titleTrans) item.title = titleTrans.translatedText;
-        if (descTrans) item.description = descTrans.translatedText;
-      }
+      item.title = await safeTranslate(MODULE_NAME, item.id, "title", item.title);
+      item.description = await safeTranslate(MODULE_NAME, item.id, "description", item.description);
       translatedAchievements.push(item);
     }
 
@@ -300,6 +291,8 @@ class AchievementService {
         { ...payload, is_locked: false, lock_ticket: null },
         { transaction: t },
       );
+      
+      await Translation.destroy({ where: { modelName: MODULE_NAME, recordId: String(id) }, transaction: t });
 
       await t.commit();
 
@@ -391,6 +384,7 @@ class AchievementService {
       // Admin path
       await invalidateOldDrafts(MODULE_NAME, id, t);
       await achievement.destroy({ transaction: t });
+      await Translation.destroy({ where: { modelName: MODULE_NAME, recordId: String(id) }, transaction: t });
       await t.commit();
 
       if (imageToDelete) deleteSingleFile(imageToDelete);

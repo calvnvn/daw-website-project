@@ -104,6 +104,8 @@ class InvestmentService {
         { transaction: t },
       );
 
+      // 🧹 Bersihkan cache terjemahan
+      await Translation.destroy({ where: { modelName: "AffiliateCategory", recordId: String(id) }, transaction: t });
       await t.commit();
       return { success: true, isDraft: false, data: category };
     } catch (error) {
@@ -129,6 +131,8 @@ class InvestmentService {
       }
 
       await category.destroy({ transaction: t });
+      // 🧹 Bersihkan cache terjemahan
+      await Translation.destroy({ where: { modelName: "AffiliateCategory", recordId: String(id) }, transaction: t });
       await t.commit();
       return { success: true };
     } catch (error) {
@@ -181,70 +185,37 @@ class InvestmentService {
     if (lang === "en") return { settings, categories: nestedCategories };
 
     // === TRANSLATION PIPELINE ===
-    let plainSettings = settings.get({ plain: true });
-    const SETTINGS_MODULE = "InvestmentSettings";
-
-    let headlineTrans = await Translation.findOne({ where: { modelName: SETTINGS_MODULE, recordId: "1", field: "teaserHeadline", locale: "id" } });
-    let bodyTrans = await Translation.findOne({ where: { modelName: SETTINGS_MODULE, recordId: "1", field: "teaserBody", locale: "id" } });
-    let introTrans = await Translation.findOne({ where: { modelName: SETTINGS_MODULE, recordId: "1", field: "sectionIntro", locale: "id" } });
-
-    if ((plainSettings.teaserHeadline && !headlineTrans) || (plainSettings.teaserBody && !bodyTrans) || (plainSettings.sectionIntro && !introTrans)) {
-      const freshHeadline = plainSettings.teaserHeadline && !headlineTrans ? await autoTranslate(plainSettings.teaserHeadline, "Indonesian") : "";
-      const freshBody = plainSettings.teaserBody && !bodyTrans ? await autoTranslate(plainSettings.teaserBody, "Indonesian") : "";
-      const freshIntro = plainSettings.sectionIntro && !introTrans ? await autoTranslate(plainSettings.sectionIntro, "Indonesian") : "";
-
-      const upsertSettingsTrans = async (field, translatedText) => {
-        if (!translatedText) return;
-        const existing = await Translation.findOne({ where: { modelName: SETTINGS_MODULE, recordId: "1", field, locale: "id" } });
-        if (existing) await existing.update({ translatedText });
-        else await Translation.create({ modelName: SETTINGS_MODULE, recordId: "1", field, locale: "id", translatedText });
-      };
-
-      if (freshHeadline) { await upsertSettingsTrans("teaserHeadline", freshHeadline); plainSettings.teaserHeadline = freshHeadline; }
-      if (freshBody) { await upsertSettingsTrans("teaserBody", freshBody); plainSettings.teaserBody = freshBody; }
-      if (freshIntro) { await upsertSettingsTrans("sectionIntro", freshIntro); plainSettings.sectionIntro = freshIntro; }
-    } else {
-      if (headlineTrans) plainSettings.teaserHeadline = headlineTrans.translatedText;
-      if (bodyTrans) plainSettings.teaserBody = bodyTrans.translatedText;
-      if (introTrans) plainSettings.sectionIntro = introTrans.translatedText;
-    }
-
-    // Translate each category's name & description, and each affiliate's desc
-    const CATEGORY_MODULE = "AffiliateCategory";
-    const AFFILIATE_MODULE = "Affiliate";
-
-    const upsertTrans = async (modelName, recordId, field, translatedText) => {
-      if (!translatedText) return;
-      const existing = await Translation.findOne({ where: { modelName, recordId: String(recordId), field, locale: "id" } });
-      if (existing) await existing.update({ translatedText });
-      else await Translation.create({ modelName, recordId: String(recordId), field, locale: "id", translatedText });
+    const safeTranslate = async (moduleName, id, field, sourceValue) => {
+      let transRecord = await Translation.findOne({ where: { modelName: moduleName, recordId: String(id), field, locale: "id" } });
+      if (!sourceValue || !String(sourceValue).trim()) {
+        if (transRecord) {
+          await transRecord.destroy();
+        }
+        return sourceValue;
+      }
+      if (!transRecord) {
+        const fresh = await autoTranslate(sourceValue, "Indonesian");
+        if (fresh) {
+          await Translation.create({ modelName: moduleName, recordId: String(id), field, locale: "id", translatedText: fresh });
+        }
+        return fresh || sourceValue;
+      }
+      return transRecord.translatedText;
     };
+
+    let plainSettings = settings.get({ plain: true });
+    plainSettings.teaserHeadline = await safeTranslate("InvestmentSettings", "1", "teaserHeadline", plainSettings.teaserHeadline);
+    plainSettings.teaserBody = await safeTranslate("InvestmentSettings", "1", "teaserBody", plainSettings.teaserBody);
+    plainSettings.sectionIntro = await safeTranslate("InvestmentSettings", "1", "sectionIntro", plainSettings.sectionIntro);
 
     for (let i = 0; i < nestedCategories.length; i++) {
       const cat = nestedCategories[i];
+      cat.name = await safeTranslate("AffiliateCategory", cat.id, "name", cat.name);
+      cat.description = await safeTranslate("AffiliateCategory", cat.id, "description", cat.description);
 
-      // Translate category name
-      let catNameTrans = await Translation.findOne({ where: { modelName: CATEGORY_MODULE, recordId: String(cat.id), field: "name", locale: "id" } });
-      if (cat.name && !catNameTrans) {
-        const fresh = await autoTranslate(cat.name, "Indonesian");
-        if (fresh) { await upsertTrans(CATEGORY_MODULE, cat.id, "name", fresh); cat.name = fresh; }
-      } else if (catNameTrans) { cat.name = catNameTrans.translatedText; }
-
-      // Translate category description
-      let catDescTrans = await Translation.findOne({ where: { modelName: CATEGORY_MODULE, recordId: String(cat.id), field: "description", locale: "id" } });
-      if (cat.description && !catDescTrans) {
-        const fresh = await autoTranslate(cat.description, "Indonesian");
-        if (fresh) { await upsertTrans(CATEGORY_MODULE, cat.id, "description", fresh); cat.description = fresh; }
-      } else if (catDescTrans) { cat.description = catDescTrans.translatedText; }
-
-      // Translate affiliates within this category
       for (let j = 0; j < (cat.affiliates || []).length; j++) {
         const company = cat.affiliates[j];
-        let descTrans = await Translation.findOne({ where: { modelName: AFFILIATE_MODULE, recordId: String(company.id), field: "desc", locale: "id" } });
-        if (company.desc && !descTrans) {
-          const fresh = await autoTranslate(company.desc, "Indonesian");
-          if (fresh) { await upsertTrans(AFFILIATE_MODULE, company.id, "desc", fresh); company.desc = fresh; }
-        } else if (descTrans) { company.desc = descTrans.translatedText; }
+        company.desc = await safeTranslate("Affiliate", company.id, "desc", company.desc);
       }
     }
 
@@ -363,6 +334,7 @@ class InvestmentService {
 
       await invalidateOldDrafts("InvestmentSettings", "1", t);
       await settings.update({ ...payload, is_locked: false, lock_ticket: null }, { transaction: t });
+      await Translation.destroy({ where: { modelName: "InvestmentSettings", recordId: "1" }, transaction: t });
       await t.commit();
       
       return { success: true, isDraft: false, data: settings };
@@ -453,6 +425,7 @@ class InvestmentService {
 
       await invalidateOldDrafts("Affiliate", String(id), t);
       await company.update({ ...payload, is_locked: false, lock_ticket: null }, { transaction: t });
+      await Translation.destroy({ where: { modelName: "Affiliate", recordId: String(id) }, transaction: t });
       await t.commit();
 
       if (filesToDelete.length > 0) filesToDelete.forEach((f) => deleteSingleFile(f));
@@ -499,6 +472,7 @@ class InvestmentService {
 
       await invalidateOldDrafts("Affiliate", String(id), t);
       await company.destroy({ transaction: t });
+      await Translation.destroy({ where: { modelName: "Affiliate", recordId: String(id) }, transaction: t });
       await t.commit();
 
       if (logoToDelete) deleteSingleFile(logoToDelete.replace("/uploads/", ""));

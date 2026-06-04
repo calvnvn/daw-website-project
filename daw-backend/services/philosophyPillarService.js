@@ -55,34 +55,25 @@ class PhilosophyPillarService {
     if (lang === "en") return formattedPillars;
 
     // ─── LAZY TRANSLATION ───
+    const safeTranslate = async (moduleName, id, field, sourceValue) => {
+      let transRecord = await Translation.findOne({ where: { modelName: moduleName, recordId: String(id), field, locale: "id" } });
+      if (!sourceValue || !String(sourceValue).trim()) {
+        if (transRecord) await transRecord.destroy();
+        return sourceValue;
+      }
+      if (!transRecord) {
+        const fresh = await autoTranslate(sourceValue, "Indonesian");
+        if (fresh) await Translation.create({ modelName: moduleName, recordId: String(id), field, locale: "id", translatedText: fresh });
+        return fresh || sourceValue;
+      }
+      return transRecord.translatedText;
+    };
+
     const translatedPillars = [];
     for (let i = 0; i < formattedPillars.length; i++) {
       let item = formattedPillars[i];
-      
-      let titleTrans = await Translation.findOne({ where: { modelName: MODULE_NAME, recordId: String(item.id), field: "title", locale: "id" } });
-      let textTrans = await Translation.findOne({ where: { modelName: MODULE_NAME, recordId: String(item.id), field: "text", locale: "id" } });
-      
-      const needsTitleTrans = item.title && !titleTrans;
-      const needsTextTrans = item.text && !textTrans;
-
-      if (needsTitleTrans || needsTextTrans) {
-        // console.log(`[Lazy Translation] Translating Philosophy Pillar: ${item.id}...`);
-        const freshTitle = needsTitleTrans ? await autoTranslate(item.title, "Indonesian") : "";
-        const freshText = needsTextTrans ? await autoTranslate(item.text, "Indonesian") : "";
-        
-        const upsertPillarTrans = async (field, translatedText) => {
-          if (!translatedText) return;
-          const existing = await Translation.findOne({ where: { modelName: MODULE_NAME, recordId: String(item.id), field, locale: "id" } });
-          if (existing) await existing.update({ translatedText });
-          else await Translation.create({ modelName: MODULE_NAME, recordId: String(item.id), field, locale: "id", translatedText });
-        };
-
-        if (freshTitle) { await upsertPillarTrans("title", freshTitle); item.title = freshTitle; }
-        if (freshText) { await upsertPillarTrans("text", freshText); item.text = freshText; }
-      } else {
-        if (titleTrans) item.title = titleTrans.translatedText;
-        if (textTrans) item.text = textTrans.translatedText;
-      }
+      item.title = await safeTranslate(MODULE_NAME, item.id, "title", item.title);
+      item.text = await safeTranslate(MODULE_NAME, item.id, "text", item.text);
       translatedPillars.push(item);
     }
 
@@ -233,6 +224,7 @@ class PhilosophyPillarService {
         { ...payload, is_locked: false, lock_ticket: null },
         { transaction: t }
       );
+      await Translation.destroy({ where: { modelName: MODULE_NAME, recordId: String(id) }, transaction: t });
       await t.commit();
 
       return { success: true, isDraft: false };
@@ -309,6 +301,7 @@ class PhilosophyPillarService {
         }
       );
       await pillar.destroy({ transaction: t });
+      await Translation.destroy({ where: { modelName: MODULE_NAME, recordId: String(id) }, transaction: t });
       await t.commit();
 
       return { success: true, isDraft: false };

@@ -58,65 +58,23 @@ class AboutService {
     }
 
     // Lazy Translation Pipeline
-    let spiritTrans = await Translation.findOne({
-      where: { modelName: MODULE_NAME, recordId: "1", field: "spiritText", locale: "id" },
-    });
-    let missionTrans = await Translation.findOne({
-      where: { modelName: MODULE_NAME, recordId: "1", field: "missionText", locale: "id" },
-    });
-    let visionTrans = await Translation.findOne({
-      where: { modelName: MODULE_NAME, recordId: "1", field: "visionText", locale: "id" },
-    });
-
-    const needsSpiritTrans = formattedInfo.spiritText && !spiritTrans;
-    const needsMissionTrans = formattedInfo.missionText && !missionTrans;
-    const needsVisionTrans = formattedInfo.visionText && !visionTrans;
-
-    if (needsSpiritTrans || needsMissionTrans || needsVisionTrans) {
-      // console.log(`[Lazy Translation] Translating About Info...`);
-      const freshSpirit = needsSpiritTrans
-        ? await autoTranslate(formattedInfo.spiritText, "Indonesian")
-        : "";
-      const freshMission = needsMissionTrans
-        ? await autoTranslate(formattedInfo.missionText, "Indonesian")
-        : "";
-      const freshVision = needsVisionTrans
-        ? await autoTranslate(formattedInfo.visionText, "Indonesian")
-        : "";
-
-      const upsertAboutTrans = async (field, translatedText) => {
-        if (!translatedText) return;
-        const existing = await Translation.findOne({
-          where: { modelName: MODULE_NAME, recordId: "1", field, locale: "id" },
-        });
-        if (existing) await existing.update({ translatedText });
-        else
-          await Translation.create({
-            modelName: MODULE_NAME,
-            recordId: "1",
-            field,
-            locale: "id",
-            translatedText,
-          });
-      };
-
-      if (freshSpirit) {
-        await upsertAboutTrans("spiritText", freshSpirit);
-        formattedInfo.spiritText = freshSpirit;
+    const safeTranslate = async (moduleName, id, field, sourceValue) => {
+      let transRecord = await Translation.findOne({ where: { modelName: moduleName, recordId: String(id), field, locale: "id" } });
+      if (!sourceValue || !String(sourceValue).trim()) {
+        if (transRecord) await transRecord.destroy();
+        return sourceValue;
       }
-      if (freshMission) {
-        await upsertAboutTrans("missionText", freshMission);
-        formattedInfo.missionText = freshMission;
+      if (!transRecord) {
+        const fresh = await autoTranslate(sourceValue, "Indonesian");
+        if (fresh) await Translation.create({ modelName: moduleName, recordId: String(id), field, locale: "id", translatedText: fresh });
+        return fresh || sourceValue;
       }
-      if (freshVision) {
-        await upsertAboutTrans("visionText", freshVision);
-        formattedInfo.visionText = freshVision;
-      }
-    } else {
-      if (spiritTrans) formattedInfo.spiritText = spiritTrans.translatedText;
-      if (missionTrans) formattedInfo.missionText = missionTrans.translatedText;
-      if (visionTrans) formattedInfo.visionText = visionTrans.translatedText;
-    }
+      return transRecord.translatedText;
+    };
+
+    formattedInfo.spiritText = await safeTranslate(MODULE_NAME, "1", "spiritText", formattedInfo.spiritText);
+    formattedInfo.missionText = await safeTranslate(MODULE_NAME, "1", "missionText", formattedInfo.missionText);
+    formattedInfo.visionText = await safeTranslate(MODULE_NAME, "1", "visionText", formattedInfo.visionText);
 
     return formattedInfo;
   }
@@ -207,6 +165,7 @@ class AboutService {
         { ...payload, is_locked: false, lock_ticket: null },
         { transaction: t },
       );
+      await Translation.destroy({ where: { modelName: MODULE_NAME, recordId: "1" }, transaction: t });
       await t.commit();
 
       return { success: true, isDraft: false, message: "About Info updated live." };

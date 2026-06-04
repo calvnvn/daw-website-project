@@ -53,34 +53,21 @@ class PhilosophyService {
     if (lang === "en") return formatted;
 
     // ─── LAZY TRANSLATION PIPELINE ───
-    let titleTrans = await Translation.findOne({ 
-      where: { modelName: MODULE_NAME, recordId: "1", field: "philosophyTitle", locale: "id" } 
-    });
-    
-    const needsTitleTrans = formatted.philosophyTitle && !titleTrans;
-
-    if (needsTitleTrans) {
-      // console.log(`[Lazy Translation] Translating Philosophy Title...`);
-      const freshTitle = await autoTranslate(formatted.philosophyTitle, "Indonesian");
-      
-      if (freshTitle) {
-        const existing = await Translation.findOne({ 
-          where: { modelName: MODULE_NAME, recordId: "1", field: "philosophyTitle", locale: "id" } 
-        });
-        
-        if (existing) {
-          await existing.update({ translatedText: freshTitle });
-        } else {
-          await Translation.create({ 
-            modelName: MODULE_NAME, recordId: "1", field: "philosophyTitle", locale: "id", translatedText: freshTitle 
-          });
-        }
-        
-        formatted.philosophyTitle = freshTitle;
+    const safeTranslate = async (moduleName, id, field, sourceValue) => {
+      let transRecord = await Translation.findOne({ where: { modelName: moduleName, recordId: String(id), field, locale: "id" } });
+      if (!sourceValue || !String(sourceValue).trim()) {
+        if (transRecord) await transRecord.destroy();
+        return sourceValue;
       }
-    } else {
-      if (titleTrans) formatted.philosophyTitle = titleTrans.translatedText;
-    }
+      if (!transRecord) {
+        const fresh = await autoTranslate(sourceValue, "Indonesian");
+        if (fresh) await Translation.create({ modelName: moduleName, recordId: String(id), field, locale: "id", translatedText: fresh });
+        return fresh || sourceValue;
+      }
+      return transRecord.translatedText;
+    };
+
+    formatted.philosophyTitle = await safeTranslate(MODULE_NAME, "1", "philosophyTitle", formatted.philosophyTitle);
 
     return formatted;
   }
@@ -182,6 +169,7 @@ class PhilosophyService {
         { ...payload, is_locked: false, lock_ticket: null },
         { transaction: t }
       );
+      await Translation.destroy({ where: { modelName: MODULE_NAME, recordId: "1" }, transaction: t });
       
       await t.commit();
 

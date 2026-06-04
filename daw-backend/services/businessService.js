@@ -128,64 +128,33 @@ class BusinessService {
 
     if (lang === "en") return rawSections;
 
+    const safeTranslate = async (moduleName, id, field, sourceValue) => {
+      let transRecord = await Translation.findOne({ where: { modelName: moduleName, recordId: String(id), field, locale: "id" } });
+      if (!sourceValue || !String(sourceValue).trim()) {
+        if (transRecord) await transRecord.destroy();
+        return sourceValue;
+      }
+      if (!transRecord) {
+        const fresh = await autoTranslate(sourceValue, "Indonesian");
+        if (fresh) await Translation.create({ modelName: moduleName, recordId: String(id), field, locale: "id", translatedText: fresh });
+        return fresh || sourceValue;
+      }
+      return transRecord.translatedText;
+    };
+
     const translatedSections = [];
     for (let i = 0; i < rawSections.length; i++) {
       let sec = rawSections[i].get({ plain: true });
 
-      let catTrans = await Translation.findOne({ where: { modelName: MODULE_NAME, recordId: sec.id, field: "category", locale: "id" } });
-      let titleTrans = await Translation.findOne({ where: { modelName: MODULE_NAME, recordId: sec.id, field: "title", locale: "id" } });
-      let htmlTrans = await Translation.findOne({ where: { modelName: MODULE_NAME, recordId: sec.id, field: "htmlContent", locale: "id" } });
-
-      if (!catTrans || !titleTrans || !htmlTrans) {
-        // console.log(`[Lazy Translation] Translating Business Section: ${sec.id}...`);
-        const freshCategory = await autoTranslate(sec.category, "Indonesian");
-        const freshTitle = await autoTranslate(sec.title, "Indonesian");
-        const freshHtml = await autoTranslate(sec.htmlContent, "Indonesian");
-
-        const upsertTranslation = async (field, translatedText) => {
-          if (!translatedText) return;
-          const existing = await Translation.findOne({
-            where: { modelName: MODULE_NAME, recordId: sec.id, field, locale: "id" }
-          });
-          if (existing) await existing.update({ translatedText });
-          else await Translation.create({ modelName: MODULE_NAME, recordId: sec.id, field, locale: "id", translatedText });
-        };
-
-        if (freshCategory) { await upsertTranslation("category", freshCategory); sec.category = freshCategory; }
-        if (freshTitle) { await upsertTranslation("title", freshTitle); sec.title = freshTitle; }
-        if (freshHtml) { await upsertTranslation("htmlContent", freshHtml); sec.htmlContent = freshHtml; }
-      } else {
-        if (catTrans) sec.category = catTrans.translatedText;
-        if (titleTrans) sec.title = titleTrans.translatedText;
-        if (htmlTrans) sec.htmlContent = htmlTrans.translatedText;
-      }
+      sec.category = await safeTranslate(MODULE_NAME, sec.id, "category", sec.category);
+      sec.title = await safeTranslate(MODULE_NAME, sec.id, "title", sec.title);
+      sec.htmlContent = await safeTranslate(MODULE_NAME, sec.id, "htmlContent", sec.htmlContent);
 
       if (sec.mapMarkers && sec.mapMarkers.length > 0) {
         for (let j = 0; j < sec.mapMarkers.length; j++) {
           let marker = sec.mapMarkers[j];
-          let markerTitleTrans = await Translation.findOne({ where: { modelName: MARKER_MODULE, recordId: String(marker.id), field: "title", locale: "id" } });
-          let markerDescTrans = await Translation.findOne({ where: { modelName: MARKER_MODULE, recordId: String(marker.id), field: "desc", locale: "id" } });
-
-          if (!markerTitleTrans || !markerDescTrans) {
-            // console.log(`[Lazy Translation] Translating Map Marker: ${marker.id}...`);
-            const freshTitle = await autoTranslate(marker.title, "Indonesian");
-            const freshDesc = await autoTranslate(marker.desc, "Indonesian");
-
-            const upsertMarkerTrans = async (field, translatedText) => {
-              if (!translatedText) return;
-              const existing = await Translation.findOne({
-                where: { modelName: MARKER_MODULE, recordId: String(marker.id), field, locale: "id" }
-              });
-              if (existing) await existing.update({ translatedText });
-              else await Translation.create({ modelName: MARKER_MODULE, recordId: String(marker.id), field, locale: "id", translatedText });
-            };
-
-            if (freshTitle) { await upsertMarkerTrans("title", freshTitle); marker.title = freshTitle; }
-            if (freshDesc) { await upsertMarkerTrans("desc", freshDesc); marker.desc = freshDesc; }
-          } else {
-            if (markerTitleTrans) marker.title = markerTitleTrans.translatedText;
-            if (markerDescTrans) marker.desc = markerDescTrans.translatedText;
-          }
+          marker.title = await safeTranslate(MARKER_MODULE, marker.id, "title", marker.title);
+          marker.desc = await safeTranslate(MARKER_MODULE, marker.id, "desc", marker.desc);
         }
       }
 
@@ -332,6 +301,7 @@ class BusinessService {
         await BusinessMapMarker.bulkCreate(newMarkers, { transaction: t });
       }
       
+      await Translation.destroy({ where: { modelName: MODULE_NAME, recordId: String(id) }, transaction: t });
       await t.commit();
       
       if (filesToDelete && filesToDelete.length > 0) {
@@ -409,6 +379,7 @@ class BusinessService {
       await invalidateOldDrafts(MODULE_NAME, id, t);
       await BusinessMapMarker.destroy({ where: { sectionId: id }, transaction: t });
       await section.destroy({ transaction: t });
+      await Translation.destroy({ where: { modelName: MODULE_NAME, recordId: String(id) }, transaction: t });
       await t.commit();
 
       if (filesToDelete.length > 0) filesToDelete.forEach((file) => deleteSingleFile(file));

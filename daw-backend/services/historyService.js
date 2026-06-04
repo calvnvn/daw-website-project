@@ -59,26 +59,24 @@ class HistoryService {
     if (lang === "en") return formatted;
 
     // ─── LAZY TRANSLATION ───
+    const safeTranslate = async (moduleName, id, field, sourceValue) => {
+      let transRecord = await Translation.findOne({ where: { modelName: moduleName, recordId: String(id), field, locale: "id" } });
+      if (!sourceValue || !String(sourceValue).trim()) {
+        if (transRecord) await transRecord.destroy();
+        return sourceValue;
+      }
+      if (!transRecord) {
+        const fresh = await autoTranslate(sourceValue, "Indonesian");
+        if (fresh) await Translation.create({ modelName: moduleName, recordId: String(id), field, locale: "id", translatedText: fresh });
+        return fresh || sourceValue;
+      }
+      return transRecord.translatedText;
+    };
+
     const translatedHistories = [];
     for (let i = 0; i < formatted.length; i++) {
       let item = formatted[i];
-      let descTrans = await Translation.findOne({ 
-        where: { modelName: MODULE_NAME, recordId: String(item.id), field: "description", locale: "id" } 
-      });
-      
-      if (!descTrans) {
-        // console.log(`[Lazy Translation] Translating History Timeline: ${item.year}...`);
-        const freshDesc = await autoTranslate(item.description, "Indonesian");
-        
-        if (freshDesc) {
-           await Translation.create({ 
-             modelName: MODULE_NAME, recordId: String(item.id), field: "description", locale: "id", translatedText: freshDesc 
-           });
-           item.description = freshDesc;
-        }
-      } else {
-        item.description = descTrans.translatedText;
-      }
+      item.description = await safeTranslate(MODULE_NAME, item.id, "description", item.description);
       translatedHistories.push(item);
     }
 
@@ -170,6 +168,7 @@ class HistoryService {
         await History.bulkCreate(historyData, { transaction: t });
       }
 
+      await Translation.destroy({ where: { modelName: MODULE_NAME }, transaction: t });
       await t.commit();
       return { success: true, isDraft: false };
     } catch (error) {

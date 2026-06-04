@@ -14,6 +14,7 @@ const MapCategory = require("../models/MapCategory");
 const BusinessSection = require("../models/BusinessSection");
 const BusinessMapMarker = require("../models/BusinessMapMarker");
 const ApprovalDraft = require("../models/ApprovalDraft");
+const Translation = require("../models/Translation");
 const Philosophy = require("../models/Philosophy");
 const PhilosophyPillar = require("../models/PhilosophyPillar");
 const HeroSlides = require("../models/HeroSlides");
@@ -426,6 +427,20 @@ class ApprovalService {
     if (singletonModules.includes(effectiveModule)) {
       await Model.update(scrubbedPayload, { where: { id: 1 }, transaction });
       return filesToTrash;
+    }
+
+    // 🧹 [CACHE INVALIDATION] - Bersihkan cache terjemahan untuk record yang terupdate/dihapus
+    try {
+      if (effectiveModule === "History") {
+        await Translation.destroy({ where: { modelName: effectiveModule }, transaction });
+      } else if (targetId && targetId !== "ALL_TREE") {
+        await Translation.destroy({
+          where: { modelName: effectiveModule, recordId: String(targetId) },
+          transaction
+        });
+      }
+    } catch (err) {
+      console.error("Gagal membersihkan cache terjemahan:", err);
     }
 
     switch (effectiveModule) {

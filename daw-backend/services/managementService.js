@@ -71,30 +71,25 @@ class ManagementService {
 
     if (lang === "en") return formattedData;
 
+    const safeTranslate = async (moduleName, id, field, sourceValue) => {
+      let transRecord = await Translation.findOne({ where: { modelName: moduleName, recordId: String(id), field, locale: "id" } });
+      if (!sourceValue || !String(sourceValue).trim()) {
+        if (transRecord) await transRecord.destroy();
+        return sourceValue;
+      }
+      if (!transRecord) {
+        const fresh = await autoTranslate(sourceValue, "Indonesian");
+        if (fresh) await Translation.create({ modelName: moduleName, recordId: String(id), field, locale: "id", translatedText: fresh });
+        return fresh || sourceValue;
+      }
+      return transRecord.translatedText;
+    };
+
     const translatedManagements = [];
     for (let i = 0; i < formattedData.length; i++) {
       let item = formattedData[i];
-      
-      let roleTrans = await Translation.findOne({ where: { modelName: MODULE_NAME, recordId: String(item.id), field: "role", locale: "id" } });
-      let descTrans = await Translation.findOne({ where: { modelName: MODULE_NAME, recordId: String(item.id), field: "description", locale: "id" } });
-      
-      if ((item.role && !roleTrans) || (item.description && !descTrans)) {
-        const freshRole = item.role && !roleTrans ? await autoTranslate(item.role, "Indonesian") : "";
-        const freshDesc = item.description && !descTrans ? await autoTranslate(item.description, "Indonesian") : "";
-        
-        const upsertMgtTrans = async (field, translatedText) => {
-          if (!translatedText) return;
-          const existing = await Translation.findOne({ where: { modelName: MODULE_NAME, recordId: String(item.id), field, locale: "id" } });
-          if (existing) await existing.update({ translatedText });
-          else await Translation.create({ modelName: MODULE_NAME, recordId: String(item.id), field, locale: "id", translatedText });
-        };
-
-        if (freshRole) { await upsertMgtTrans("role", freshRole); item.role = freshRole; }
-        if (freshDesc) { await upsertMgtTrans("description", freshDesc); item.description = freshDesc; }
-      } else {
-        if (roleTrans) item.role = roleTrans.translatedText;
-        if (descTrans) item.description = descTrans.translatedText;
-      }
+      item.role = await safeTranslate(MODULE_NAME, item.id, "role", item.role);
+      item.description = await safeTranslate(MODULE_NAME, item.id, "description", item.description);
       translatedManagements.push(item);
     }
 
@@ -181,6 +176,7 @@ class ManagementService {
 
       await ApprovalDraft.update({ status: "Obsolete" }, { where: { module_name: MODULE_NAME, target_id: String(id), status: ["Pending", "Rejected"] }, transaction: t });
       await person.update({ ...payload, is_locked: false, lock_ticket: null }, { transaction: t });
+      await Translation.destroy({ where: { modelName: MODULE_NAME, recordId: String(id) }, transaction: t });
       await t.commit();
 
       if (filesToDelete.length > 0) filesToDelete.forEach((f) => deleteSingleFile(f));
@@ -230,6 +226,7 @@ class ManagementService {
 
       await invalidateOldDrafts(MODULE_NAME, id, t);
       await person.destroy({ transaction: t });
+      await Translation.destroy({ where: { modelName: MODULE_NAME, recordId: String(id) }, transaction: t });
       await t.commit();
       
       if (photoToDelete) deleteSingleFile(photoToDelete);

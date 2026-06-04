@@ -22,31 +22,22 @@ class ProjectService {
     try {
       const { title, excerpt, content } = payload;
 
-      const idTitle = title ? await autoTranslate(title, "Indonesian") : null;
-      const idExcerpt = excerpt ? await autoTranslate(excerpt, "Indonesian") : null;
-      const idContent = content ? await autoTranslate(content, "Indonesian") : null;
-
-      const upsertTranslation = async (field, translatedText) => {
-        if (!translatedText) return;
-        const existing = await Translation.findOne({
-          where: { modelName: MODULE_NAME, recordId: String(projectId), field, locale: "id" },
-        });
-        if (existing) {
-          await existing.update({ translatedText });
-        } else {
-          await Translation.create({
-            modelName: MODULE_NAME,
-            recordId: String(projectId),
-            field,
-            locale: "id",
-            translatedText,
-          });
+      const safeTranslateBG = async (field, sourceValue) => {
+        let transRecord = await Translation.findOne({ where: { modelName: MODULE_NAME, recordId: String(projectId), field, locale: "id" } });
+        if (!sourceValue || !String(sourceValue).trim()) {
+           if (transRecord) await transRecord.destroy();
+           return;
+        }
+        const fresh = await autoTranslate(sourceValue, "Indonesian");
+        if (fresh) {
+           if (transRecord) await transRecord.update({ translatedText: fresh });
+           else await Translation.create({ modelName: MODULE_NAME, recordId: String(projectId), field, locale: "id", translatedText: fresh });
         }
       };
 
-      await upsertTranslation("title", idTitle);
-      await upsertTranslation("excerpt", idExcerpt);
-      await upsertTranslation("content", idContent);
+      if (title !== undefined) await safeTranslateBG("title", title);
+      if (excerpt !== undefined) await safeTranslateBG("excerpt", excerpt);
+      if (content !== undefined) await safeTranslateBG("content", content);
     } catch (error) {
       console.error("🚨 Background Translation Error:", error);
     }
@@ -320,6 +311,7 @@ class ProjectService {
 
       await invalidateOldDrafts(MODULE_NAME, id, t);
       await project.destroy({ transaction: t });
+      await Translation.destroy({ where: { modelName: MODULE_NAME, recordId: String(id) }, transaction: t });
       await t.commit();
 
       if (project.cover_image) deleteSingleFile(project.cover_image);
@@ -378,42 +370,23 @@ class ProjectService {
     const result = project.get({ plain: true });
 
     if (lang === "id") {
-      let titleTrans = await Translation.findOne({ where: { modelName: MODULE_NAME, recordId: String(result.id), field: "title", locale: "id" } });
-      let excerptTrans = await Translation.findOne({ where: { modelName: MODULE_NAME, recordId: String(result.id), field: "excerpt", locale: "id" } });
-      let contentTrans = await Translation.findOne({ where: { modelName: MODULE_NAME, recordId: String(result.id), field: "content", locale: "id" } });
+      const safeTranslate = async (moduleName, id, field, sourceValue) => {
+        let transRecord = await Translation.findOne({ where: { modelName: moduleName, recordId: String(id), field, locale: "id" } });
+        if (!sourceValue || !String(sourceValue).trim()) {
+          if (transRecord) await transRecord.destroy();
+          return sourceValue;
+        }
+        if (!transRecord) {
+          const fresh = await autoTranslate(sourceValue, "Indonesian");
+          if (fresh) await Translation.create({ modelName: moduleName, recordId: String(id), field, locale: "id", translatedText: fresh });
+          return fresh || sourceValue;
+        }
+        return transRecord.translatedText;
+      };
 
-      const needsTitleTrans = result.title && !titleTrans;
-      const needsExcerptTrans = result.excerpt && !excerptTrans;
-      const needsContentTrans = result.content && !contentTrans;
-
-      if (needsTitleTrans || needsExcerptTrans || needsContentTrans) {
-        // console.log(`[Lazy Translation] Translating older project ID: ${result.id}...`);
-        const freshTitle = needsTitleTrans ? await autoTranslate(result.title, "Indonesian") : "";
-        const freshExcerpt = needsExcerptTrans ? await autoTranslate(result.excerpt, "Indonesian") : "";
-        const freshContent = needsContentTrans ? await autoTranslate(result.content, "Indonesian") : "";
-
-        const upsertTranslation = async (field, translatedText) => {
-          if (!translatedText) return;
-          const existing = await Translation.findOne({
-            where: { modelName: MODULE_NAME, recordId: String(result.id), field, locale: "id" },
-          });
-          if (existing) {
-            await existing.update({ translatedText });
-          } else {
-            await Translation.create({
-              modelName: MODULE_NAME, recordId: String(result.id), field, locale: "id", translatedText,
-            });
-          }
-        };
-
-        if (freshTitle) { await upsertTranslation("title", freshTitle); result.title = freshTitle; }
-        if (freshExcerpt) { await upsertTranslation("excerpt", freshExcerpt); result.excerpt = freshExcerpt; }
-        if (freshContent) { await upsertTranslation("content", freshContent); result.content = freshContent; }
-      } else {
-        if (titleTrans) result.title = titleTrans.translatedText;
-        if (excerptTrans) result.excerpt = excerptTrans.translatedText;
-        if (contentTrans) result.content = contentTrans.translatedText;
-      }
+      result.title = await safeTranslate(MODULE_NAME, result.id, "title", result.title);
+      result.excerpt = await safeTranslate(MODULE_NAME, result.id, "excerpt", result.excerpt);
+      result.content = await safeTranslate(MODULE_NAME, result.id, "content", result.content);
     }
 
     return result;
@@ -431,42 +404,23 @@ class ProjectService {
     const result = project.get({ plain: true });
 
     if (lang === "id") {
-      let titleTrans = await Translation.findOne({ where: { modelName: MODULE_NAME, recordId: String(result.id), field: "title", locale: "id" } });
-      let excerptTrans = await Translation.findOne({ where: { modelName: MODULE_NAME, recordId: String(result.id), field: "excerpt", locale: "id" } });
-      let contentTrans = await Translation.findOne({ where: { modelName: MODULE_NAME, recordId: String(result.id), field: "content", locale: "id" } });
+      const safeTranslate = async (moduleName, id, field, sourceValue) => {
+        let transRecord = await Translation.findOne({ where: { modelName: moduleName, recordId: String(id), field, locale: "id" } });
+        if (!sourceValue || !String(sourceValue).trim()) {
+          if (transRecord) await transRecord.destroy();
+          return sourceValue;
+        }
+        if (!transRecord) {
+          const fresh = await autoTranslate(sourceValue, "Indonesian");
+          if (fresh) await Translation.create({ modelName: moduleName, recordId: String(id), field, locale: "id", translatedText: fresh });
+          return fresh || sourceValue;
+        }
+        return transRecord.translatedText;
+      };
 
-      const needsTitleTrans = result.title && !titleTrans;
-      const needsExcerptTrans = result.excerpt && !excerptTrans;
-      const needsContentTrans = result.content && !contentTrans;
-
-      if (needsTitleTrans || needsExcerptTrans || needsContentTrans) {
-        // console.log(`[Lazy Translation] Translating older project ID: ${result.id}...`);
-        const freshTitle = needsTitleTrans ? await autoTranslate(result.title, "Indonesian") : "";
-        const freshExcerpt = needsExcerptTrans ? await autoTranslate(result.excerpt, "Indonesian") : "";
-        const freshContent = needsContentTrans ? await autoTranslate(result.content, "Indonesian") : "";
-
-        const upsertTranslation = async (field, translatedText) => {
-          if (!translatedText) return;
-          const existing = await Translation.findOne({
-            where: { modelName: MODULE_NAME, recordId: String(result.id), field, locale: "id" },
-          });
-          if (existing) {
-            await existing.update({ translatedText });
-          } else {
-            await Translation.create({
-              modelName: MODULE_NAME, recordId: String(result.id), field, locale: "id", translatedText,
-            });
-          }
-        };
-
-        if (freshTitle) { await upsertTranslation("title", freshTitle); result.title = freshTitle; }
-        if (freshExcerpt) { await upsertTranslation("excerpt", freshExcerpt); result.excerpt = freshExcerpt; }
-        if (freshContent) { await upsertTranslation("content", freshContent); result.content = freshContent; }
-      } else {
-        if (titleTrans) result.title = titleTrans.translatedText;
-        if (excerptTrans) result.excerpt = excerptTrans.translatedText;
-        if (contentTrans) result.content = contentTrans.translatedText;
-      }
+      result.title = await safeTranslate(MODULE_NAME, result.id, "title", result.title);
+      result.excerpt = await safeTranslate(MODULE_NAME, result.id, "excerpt", result.excerpt);
+      result.content = await safeTranslate(MODULE_NAME, result.id, "content", result.content);
     }
 
     return result;
