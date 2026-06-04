@@ -443,8 +443,20 @@ const DiffModal = ({
                           if (Array.isArray(val)) return val.join(", ");
                           if (typeof val === "object")
                             return "[Struktur Objek Berubah]";
-                          if (typeof val === "string" && isHtmlString(val)) {
-                            return val.replace(/<[^>]*>?/gm, ""); // Hapus tag HTML agar mudah dibaca per kata
+                          if (typeof val === "string") {
+                            let text = val;
+                            if (isHtmlString(val)) {
+                              text = text.replace(/<[^>]*>?/gm, ""); // Hapus tag HTML
+                            }
+                            // Ganti HTML Entity umum (terutama &nbsp;) menjadi spasi biasa
+                            text = text
+                              .replace(/&nbsp;/g, " ")
+                              .replace(/&amp;/g, "&")
+                              .replace(/&lt;/g, "<")
+                              .replace(/&gt;/g, ">")
+                              .replace(/&quot;/g, '"')
+                              .replace(/&#39;/g, "'");
+                            return text;
                           }
                           return String(val);
                         };
