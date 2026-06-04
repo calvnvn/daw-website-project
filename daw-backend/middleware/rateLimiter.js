@@ -15,7 +15,7 @@ const globalLimiter = rateLimit({
 // Auth Limiter (Prevents login brute-force attacks)
 const authLimiter = rateLimit({
   windowMs: 5 * 60 * 1000, // 5 minutes
-  max: 10, // Limit each IP to 10 login requests per windowMs
+  max: 15, // Limit each IP to 10 login requests per windowMs
   message: {
     success: false,
     message:
