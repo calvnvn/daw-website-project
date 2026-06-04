@@ -14,12 +14,12 @@ const globalLimiter = rateLimit({
 
 // Auth Limiter (Prevents login brute-force attacks)
 const authLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 5, // Limit each IP to 5 login requests per windowMs
+  windowMs: 5 * 60 * 1000, // 5 minutes
+  max: 10, // Limit each IP to 10 login requests per windowMs
   message: {
     success: false,
     message:
-      "Too many login attempts. Access temporarily blocked for 15 minutes.",
+      "Too many login attempts. Access temporarily blocked for 5 minutes.",
   },
   standardHeaders: true,
   legacyHeaders: false,
