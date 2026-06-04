@@ -155,7 +155,7 @@ app.use(
 );
 
 // 2. Global Rate Limiter (Applied to all API routes)
-app.use("/api", globalLimiter);
+// app.use("/api", globalLimiter);
 
 app.use(express.json({ limit: "50mb" }));
 app.use(express.urlencoded({ limit: "50mb", extended: true }));
