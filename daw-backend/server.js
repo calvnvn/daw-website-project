@@ -63,30 +63,30 @@ const sequelize = require("./config/database");
 const { startCleanupTask } = require("./utils/cleanupWorker");
 
 // INITIALIZATION: Route Modules
-const authRoutes = require("./routes/authRoutes");
-const settingsRoutes = require("./routes/settingsRoutes");
-const projectRoutes = require("./routes/projectRoutes");
-const historyRoutes = require("./routes/historyRoutes");
 const aboutRoutes = require("./routes/aboutRoutes");
-const managementRoutes = require("./routes/managementRoutes");
-const investmentRoutes = require("./routes/investmentRoutes");
+const achievementRoutes = require("./routes/achievementRoutes");
+const approvalRoutes = require("./routes/approvalRoutes");
+const authRoutes = require("./routes/authRoutes");
+const businessRoutes = require("./routes/businessRoutes");
+const dashboardRoutes = require("./routes/dashboardRoutes");
+const historyRoutes = require("./routes/historyRoutes");
 const homeRoutes = require("./routes/homeRoutes");
 const inquiryRoutes = require("./routes/inquiryRoutes");
-const userRoutes = require("./routes/userRoutes");
-const roleRoutes = require("./routes/roleRoutes");
-const dashboardRoutes = require("./routes/dashboardRoutes");
-const businessRoutes = require("./routes/businessRoutes");
-const pageRoutes = require("./routes/pageRoutes");
-const menuRoutes = require("./routes/menuRoutes");
-const sitemapRoutes = require("./routes/sitemapRoutes");
+const investmentRoutes = require("./routes/investmentRoutes");
+const managementRoutes = require("./routes/managementRoutes");
 const mapCategoryRoutes = require("./routes/mapCategoryRoutes");
-const approvalRoutes = require("./routes/approvalRoutes");
-const philosophyRoutes = require("./routes/philosophyRoutes");
-const philosophyPillarRoutes = require("./routes/philosophyPillarRoutes");
-const achievementRoutes = require("./routes/achievementRoutes");
+const menuRoutes = require("./routes/menuRoutes");
 const newsRoutes = require("./routes/newsRoutes");
 const newsCategoryRoutes = require("./routes/newsCategoryRoutes");
+const pageRoutes = require("./routes/pageRoutes");
+const philosophyRoutes = require("./routes/philosophyRoutes");
+const philosophyPillarRoutes = require("./routes/philosophyPillarRoutes");
+const projectRoutes = require("./routes/projectRoutes");
+const roleRoutes = require("./routes/roleRoutes");
+const settingsRoutes = require("./routes/settingsRoutes");
+const sitemapRoutes = require("./routes/sitemapRoutes");
 const translationRoutes = require("./routes/translationRoutes");
+const userRoutes = require("./routes/userRoutes");
 
 // INITIALIZATION: Model Registry
 const User = require("./models/User");
@@ -201,30 +201,30 @@ app.use(
 
 // EXECUTION: API Router Registration
 // Map logical resource domains to dedicated route handlers
-app.use("/api/auth", authRoutes);
-app.use("/api/users", userRoutes);
-app.use("/api/roles", roleRoutes);
-app.use("/api/projects", projectRoutes);
-app.use("/api/settings", settingsRoutes);
 app.use("/api/about", aboutRoutes);
+app.use("/api/achievements", achievementRoutes);
+app.use("/api/approval", approvalRoutes);
+app.use("/api/auth", authRoutes);
+app.use("/api/businesses", businessRoutes);
+app.use("/api/dashboard", dashboardRoutes);
 app.use("/api/history", historyRoutes);
-app.use("/api/management", managementRoutes);
-app.use("/api/investments", investmentRoutes);
 app.use("/api/homepage", homeRoutes);
 app.use("/api/inquiries", inquiryRoutes);
-app.use("/api/dashboard", dashboardRoutes);
-app.use("/api/businesses", businessRoutes);
+app.use("/api/investments", investmentRoutes);
+app.use("/api/management", managementRoutes);
 app.use("/api/map-categories", mapCategoryRoutes);
-app.use("/api/pages", pageRoutes);
 app.use("/api/menus", menuRoutes);
-app.use("/api/approval", approvalRoutes);
-app.use("/api/philosophy", philosophyRoutes);
-app.use("/api/philosophy-pillars", philosophyPillarRoutes);
-app.use("/", sitemapRoutes);
-app.use("/api/achievements", achievementRoutes);
 app.use("/api/news", newsRoutes);
 app.use("/api/news-categories", newsCategoryRoutes);
+app.use("/api/pages", pageRoutes);
+app.use("/api/philosophy", philosophyRoutes);
+app.use("/api/philosophy-pillars", philosophyPillarRoutes);
+app.use("/api/projects", projectRoutes);
+app.use("/api/roles", roleRoutes);
+app.use("/api/settings", settingsRoutes);
 app.use("/api/translation", translationRoutes);
+app.use("/api/users", userRoutes);
+app.use("/", sitemapRoutes);
 
 // Mount core health check endpoint
 app.get("/", (req, res) => {
