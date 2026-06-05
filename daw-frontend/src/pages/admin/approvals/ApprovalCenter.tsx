@@ -53,6 +53,49 @@ const isHtmlString = (str: any): boolean => {
   return /<[a-z][\s\S]*>/i.test(str);
 };
 
+const isMeaningfulTextField = (key: string, val: any): boolean => {
+  const skippedFields = [
+    "order",
+    "orderIndex",
+    "parentId",
+    "isActive",
+    "templateType",
+    "showDropCap",
+    "lat",
+    "lng",
+    "category_id",
+    "type",
+    "externalLink",
+    "pageId",
+    "is_locked",
+    "lock_ticket",
+  ];
+  if (skippedFields.includes(key)) return false;
+
+  if (
+    key.includes("image") ||
+    key.includes("photo") ||
+    key.includes("url") ||
+    key.includes("file") ||
+    key.includes("gallery") ||
+    key.includes("existing_gallery") ||
+    key.includes("sidebarLinks")
+  ) {
+    return false;
+  }
+
+  if (val && typeof val === "object") return false;
+
+  if (
+    typeof val === "string" &&
+    (val.startsWith("/uploads/") || val.includes("/uploads/"))
+  ) {
+    return false;
+  }
+
+  return true;
+};
+
 const sanitizeForDiff = (data: any) => {
   if (!data || typeof data !== "object") return {};
   const cleanData = { ...data };
@@ -90,6 +133,178 @@ const sanitizeForDiff = (data: any) => {
   return cleanData;
 };
 
+// ─── HUMAN-READABLE LABEL DICTIONARIES ───
+const MODULE_LABELS: Record<string, string> = {
+  Project: "Proyek Portfolio",
+  NewsArticle: "Artikel Berita",
+  Management: "Manajemen & Direksi",
+  BusinessSection: "Sektor Bisnis",
+  BusinessMapMarker: "Penanda Lokasi Peta",
+  MapCategory: "Kategori Peta",
+  ImpactStats: "Statistik Dampak",
+  HeroSlides: "Banner Utama Website",
+  HomeSettings: "Pengaturan Halaman Utama",
+  InvestmentSettings: "Pengaturan Investasi",
+  Affiliate: "Perusahaan Afiliasi",
+  Page: "Halaman Konten",
+  PAGE: "Halaman Konten",
+  Menu: "Menu Navigasi",
+  MENU: "Menu Navigasi",
+  Achievement: "Penghargaan",
+  Philosophy: "Filosofi Perusahaan",
+  PhilosophyPillar: "Pilar Filosofi",
+  History: "Sejarah Perusahaan",
+  AboutInfo: "Informasi Tentang Kami",
+  Settings: "Pengaturan Umum",
+};
+
+const ACTION_LABELS: Record<
+  string,
+  { label: string; color: string; bg: string }
+> = {
+  CREATE: {
+    label: "Buat Baru",
+    color: "text-emerald-700",
+    bg: "bg-emerald-100 border-emerald-200",
+  },
+  UPDATE: {
+    label: "Perbarui",
+    color: "text-blue-700",
+    bg: "bg-blue-100 border-blue-200",
+  },
+  DELETE: {
+    label: "Hapus",
+    color: "text-rose-700",
+    bg: "bg-rose-100 border-rose-200",
+  },
+};
+
+const FIELD_LABELS: Record<string, string> = {
+  title: "Judul",
+  name: "Nama",
+  excerpt: "Ringkasan",
+  content: "Isi Konten",
+  cover_image: "Gambar Sampul",
+  gallery: "Galeri Foto",
+  seo_title: "Judul SEO",
+  meta_description: "Deskripsi Meta SEO",
+  slug: "Alamat URL",
+  status: "Status Publikasi",
+  category: "Kategori",
+  category_id: "Kategori",
+  role: "Jabatan",
+  description: "Deskripsi",
+  photoUrl: "Foto Profil",
+  label: "Label Menu",
+  author: "Penulis",
+  published_at: "Tanggal Terbit",
+  order: "Urutan Tampil",
+  level: "Tingkat Jabatan",
+  spiritText: "Teks Semangat",
+  missionText: "Teks Misi",
+  visionText: "Teks Visi",
+  introHeadline: "Judul Pengantar",
+  introBody: "Isi Pengantar",
+  heroTitle: "Judul Banner",
+  heroSubtitle: "Subjudul Banner",
+  lat: "Koordinat Lintang",
+  lng: "Koordinat Bujur",
+  locationName: "Nama Lokasi",
+  address: "Alamat",
+  type: "Jenis",
+  isActive: "Status Aktif",
+  templateType: "Jenis Template Halaman",
+  subtitle: "Subjudul",
+  metaDescription: "Deskripsi Meta SEO",
+  showDropCap: "Huruf Kapital Besar",
+  sidebarLinks: "Tautan Sidebar",
+  text: "Teks",
+  year: "Tahun",
+  icon: "Ikon",
+  value: "Nilai",
+  suffix: "Satuan",
+  desc: "Deskripsi Singkat",
+  philosophyTitle: "Judul Filosofi",
+  url: "Tautan URL",
+  image: "Gambar",
+  buttonText: "Teks Tombol",
+  buttonLink: "Tautan Tombol",
+  parentId: "Menu Induk",
+  externalLink: "Tautan Eksternal",
+  pageId: "Halaman Tujuan",
+  orderIndex: "Urutan Menu",
+  existing_gallery: "Galeri Tersimpan",
+  // Translation fields
+  terjemahan_id_title: "Terjemahan (ID): Judul",
+  terjemahan_id_excerpt: "Terjemahan (ID): Ringkasan",
+  terjemahan_id_content: "Terjemahan (ID): Isi Konten",
+  terjemahan_id_name: "Terjemahan (ID): Nama",
+  terjemahan_id_role: "Terjemahan (ID): Jabatan",
+  terjemahan_id_description: "Terjemahan (ID): Deskripsi",
+  terjemahan_id_label: "Terjemahan (ID): Label",
+  terjemahan_id_subtitle: "Terjemahan (ID): Subjudul",
+  terjemahan_id_introHeadline: "Terjemahan (ID): Judul Pengantar",
+  terjemahan_id_introBody: "Terjemahan (ID): Isi Pengantar",
+  terjemahan_id_spiritText: "Terjemahan (ID): Teks Semangat",
+  terjemahan_id_missionText: "Terjemahan (ID): Teks Misi",
+  terjemahan_id_visionText: "Terjemahan (ID): Teks Visi",
+  terjemahan_id_philosophyTitle: "Terjemahan (ID): Judul Filosofi",
+  terjemahan_id_text: "Terjemahan (ID): Teks",
+  terjemahan_id_locationName: "Terjemahan (ID): Nama Lokasi",
+  terjemahan_id_address: "Terjemahan (ID): Alamat",
+  terjemahan_id_desc: "Terjemahan (ID): Deskripsi",
+};
+
+const getFieldLabel = (field: string): string => {
+  if (FIELD_LABELS[field]) return FIELD_LABELS[field];
+  // Fallback: prettify any terjemahan_id_ prefix
+  if (field.startsWith("terjemahan_id_")) {
+    const rawField = field.replace("terjemahan_id_", "");
+    return `Terjemahan (ID): ${
+      FIELD_LABELS[rawField] ||
+      rawField
+        .replace(/([A-Z])/g, " $1")
+        .replace(/_/g, " ")
+        .trim()
+    }`;
+  }
+  // Fallback: prettify snake_case/camelCase
+  return field
+    .replace(/([A-Z])/g, " $1")
+    .replace(/_/g, " ")
+    .replace(/^\w/, (c) => c.toUpperCase())
+    .trim();
+};
+
+const getModuleLabel = (moduleName: string): string => {
+  return MODULE_LABELS[moduleName] || moduleName;
+};
+
+const getActionInfo = (action: string) => {
+  return (
+    ACTION_LABELS[action] || {
+      label: action,
+      color: "text-slate-700",
+      bg: "bg-slate-100 border-slate-200",
+    }
+  );
+};
+
+const getHumanTargetName = (draft: ApprovalDraft): string => {
+  const p = draft.payload;
+  if (!p) return `#${draft.target_id?.slice(0, 8) || "N/A"}`;
+  return (
+    p.title ||
+    p.name ||
+    p.label ||
+    p.introHeadline ||
+    p.heroTitle ||
+    p.locationName ||
+    p.philosophyTitle ||
+    `#${draft.target_id?.slice(0, 8) || "N/A"}`
+  );
+};
+
 // COMPONENT: APPROVAL TRACKER (SISTEM PANTAU)
 const ApprovalTracker = ({ draft }: { draft: ApprovalDraft }) => {
   if (!draft.approver_roadmap) return null;
@@ -110,13 +325,17 @@ const ApprovalTracker = ({ draft }: { draft: ApprovalDraft }) => {
 
   return (
     <div className="bg-slate-50 border-b border-slate-200 px-6 py-4 lg:px-8">
-      <h3 className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-4 flex items-center gap-2">
-        <Clock className="w-4 h-4" /> Sistem Pantau (Jejak Persetujuan)
+      <h3 className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-1 flex items-center gap-2">
+        <Clock className="w-4 h-4" /> Jejak Persetujuan (PANTAU)
       </h3>
+      <p className="text-[10px] text-slate-400 mb-4 leading-relaxed">
+        Menunjukkan siapa saja yang harus menyetujui dan sudah sampai tahap
+        mana.
+      </p>
       <div className="flex flex-col sm:flex-row gap-4 justify-between relative">
         {/* Connector Line for Desktop */}
         <div className="hidden sm:block absolute top-4 left-[10%] right-[10%] h-[2px] bg-slate-200 z-0" />
-        
+
         {roadmap.map((step: any, index: number) => {
           const stepLevel = Number(step.level);
 
@@ -125,6 +344,7 @@ const ApprovalTracker = ({ draft }: { draft: ApprovalDraft }) => {
             bg: "bg-slate-100 border-slate-200",
             icon: <Clock className="w-4 h-4" />,
             label: "Menunggu Giliran",
+            tooltip: `Tahap ${stepLevel}: Menunggu giliran persetujuan dari ${step.namakaryawan || `NIK ${step.karyawanid}`}`,
           };
 
           if (draft.status === "Rejected" && stepLevel === currentLevel) {
@@ -133,6 +353,7 @@ const ApprovalTracker = ({ draft }: { draft: ApprovalDraft }) => {
               bg: "bg-rose-50 border-rose-200",
               icon: <X className="w-4 h-4" />,
               label: "Ditolak (Berhenti Di Sini)",
+              tooltip: `Tahap ${stepLevel}: Ditolak oleh ${step.namakaryawan || `NIK ${step.karyawanid}`}. Proses persetujuan dihentikan.`,
             };
           } else if (stepLevel < currentLevel || draft.status === "Approved") {
             statusConfig = {
@@ -140,18 +361,23 @@ const ApprovalTracker = ({ draft }: { draft: ApprovalDraft }) => {
               bg: "bg-emerald-50 border-emerald-200",
               icon: <Check className="w-4 h-4" />,
               label: "Telah Disetujui",
+              tooltip: `Tahap ${stepLevel}: Telah disetujui oleh ${step.namakaryawan || `NIK ${step.karyawanid}`}.`,
             };
           } else if (stepLevel === currentLevel && draft.status === "Pending") {
             statusConfig = {
               color: "text-blue-600",
               bg: "bg-blue-50 border-blue-200 ring-2 ring-blue-500/20",
               icon: <Loader2 className="w-4 h-4 animate-spin" />,
-              label: "Posisi Saat Ini",
+              label: "Sedang Ditinjau",
+              tooltip: `Tahap ${stepLevel}: Saat ini sedang menunggu keputusan dari ${step.namakaryawan || `NIK ${step.karyawanid}`}.`,
             };
           }
 
           return (
-            <div key={index} className="flex-1 flex flex-col relative z-10">
+            <div
+              key={index}
+              className="flex-1 flex flex-col relative z-10"
+              title={statusConfig.tooltip}>
               <div className="flex flex-row sm:flex-col items-center gap-3 sm:gap-2">
                 <div
                   className={`w-8 h-8 rounded-full border flex items-center justify-center shrink-0 shadow-sm transition-all ${statusConfig.bg} ${statusConfig.color}`}>
@@ -159,7 +385,7 @@ const ApprovalTracker = ({ draft }: { draft: ApprovalDraft }) => {
                 </div>
                 <div className="flex flex-col sm:items-center text-left sm:text-center">
                   <p className="text-[10px] font-black uppercase text-slate-400">
-                    Level {stepLevel}
+                    Tahap {stepLevel}
                   </p>
                   <p className="text-xs font-bold text-slate-800">
                     {step.namakaryawan || `NIK: ${step.karyawanid}`}
@@ -203,6 +429,19 @@ const DiffModal = ({
   const [previewLayout, setPreviewLayout] = useState<"split" | "stacked">(
     "split",
   );
+  const [previewLang, setPreviewLang] = useState<"en" | "id">("en");
+
+  const getPreviewData = () => {
+    const base = { ...displayPayload };
+    if (previewLang === "id") {
+      if (base._translations?.id) {
+        Object.entries(base._translations.id).forEach(([key, val]) => {
+          base[key] = val;
+        });
+      }
+    }
+    return base;
+  };
 
   const minRejectChars = 5;
 
@@ -253,7 +492,9 @@ const DiffModal = ({
     const allKeys = new Set([...Object.keys(safeOld), ...Object.keys(safeNew)]);
     allKeys.forEach((key) => {
       if (JSON.stringify(safeOld[key]) !== JSON.stringify(safeNew[key])) {
-        changes.push(key);
+        if (isMeaningfulTextField(key, safeNew[key] ?? safeOld[key])) {
+          changes.push(key);
+        }
       }
     });
     return changes;
@@ -270,13 +511,13 @@ const DiffModal = ({
           <div>
             <h2 className="text-lg lg:text-xl font-black text-slate-900 flex items-center gap-2 tracking-tight">
               <FileText className="w-5 h-5 lg:w-6 lg:h-6 text-daw-green" />
-              Detail Draf: {draft.module_name}
+              Detail Draf: {getModuleLabel(draft.module_name)}
             </h2>
             <div className="flex items-center gap-2 mt-1.5 lg:mt-2">
               <span
-                className={`px-2.5 py-0.5 rounded-md text-[10px] font-black uppercase tracking-widest text-white shadow-sm
-                ${isBrandNewData ? "bg-emerald-500" : isDeleteAction ? "bg-rose-500" : "bg-blue-500"}`}>
-                {draft.action}
+                className={`px-2.5 py-0.5 rounded-md text-[10px] font-black uppercase tracking-widest border shadow-sm
+                ${getActionInfo(draft.action).bg} ${getActionInfo(draft.action).color}`}>
+                {getActionInfo(draft.action).label}
               </span>
               <span className="text-[11px] lg:text-xs text-slate-500 font-mono">
                 Tiket: <strong>{draft.notrans}</strong>
@@ -295,9 +536,7 @@ const DiffModal = ({
         </div>
 
         {/* APPROVAL TRACKER (PANTAU) */}
-        {draft.status !== "Orphaned" && (
-          <ApprovalTracker draft={draft} />
-        )}
+        {draft.status !== "Orphaned" && <ApprovalTracker draft={draft} />}
 
         {/* INSIGHT BANNER */}
         {!loadingOld && changedFields.length > 0 && (
@@ -310,8 +549,8 @@ const DiffModal = ({
               {changedFields.map((field) => (
                 <span
                   key={field}
-                  className="px-2 py-0.5 bg-amber-200/50 text-amber-700 border border-amber-300 rounded text-[10px] font-bold font-mono shadow-sm whitespace-nowrap">
-                  {field.replace(/_/g, " ")}
+                  className="px-2 py-0.5 bg-amber-200/50 text-amber-700 border border-amber-300 rounded text-[10px] font-bold shadow-sm whitespace-nowrap">
+                  {getFieldLabel(field)}
                 </span>
               ))}
             </div>
@@ -408,12 +647,29 @@ const DiffModal = ({
                         <div className="bg-white flex flex-col w-full overflow-hidden">
                           <div
                             className={`px-6 py-3 border-b flex items-center justify-between sticky top-0 z-10 shadow-sm shrink-0 ${isDeleteAction ? "bg-rose-100 border-rose-200" : "bg-blue-50 border-blue-100"}`}>
-                            <span
-                              className={`text-[10px] font-black uppercase tracking-widest ${isDeleteAction ? "text-rose-700" : "text-blue-700"}`}>
-                              {isDeleteAction
-                                ? "Permintaan Hapus Data"
-                                : "Perubahan yang Diajukan"}
-                            </span>
+                            <div className="flex items-center gap-3">
+                              <span
+                                className={`text-[10px] font-black uppercase tracking-widest ${isDeleteAction ? "text-rose-700" : "text-blue-700"}`}>
+                                {isDeleteAction
+                                  ? "Permintaan Hapus Data"
+                                  : "Perubahan yang Diajukan"}
+                              </span>
+                              {!isDeleteAction &&
+                                displayPayload?._translations?.id && (
+                                  <div className="flex bg-slate-100 p-0.5 rounded-lg border border-slate-200 text-[9px] font-bold shrink-0">
+                                    <button
+                                      onClick={() => setPreviewLang("en")}
+                                      className={`px-2 py-0.5 rounded-md transition-all ${previewLang === "en" ? "bg-white text-slate-800 shadow-sm border border-slate-200/50" : "text-slate-500 hover:text-slate-700"}`}>
+                                      EN (English)
+                                    </button>
+                                    <button
+                                      onClick={() => setPreviewLang("id")}
+                                      className={`px-2 py-0.5 rounded-md transition-all ${previewLang === "id" ? "bg-daw-green text-white shadow-sm" : "text-slate-500 hover:text-slate-700"}`}>
+                                      ID (Indonesia)
+                                    </button>
+                                  </div>
+                                )}
+                            </div>
                             {isDeleteAction ? (
                               <Trash2 className="w-3 h-3 text-rose-500" />
                             ) : (
@@ -434,7 +690,7 @@ const DiffModal = ({
                               </div>
                             ) : (
                               <div className="ring-4 ring-blue-50/50 rounded-xl p-2 bg-white w-full">
-                                <PreviewComponent data={displayPayload} />
+                                <PreviewComponent data={getPreviewData()} />
                               </div>
                             )}
                           </div>
@@ -444,6 +700,46 @@ const DiffModal = ({
                   </div>
                 );
               })()}
+
+              {/* RINGKASAN PERUBAHAN BANNER */}
+              {!isBrandNewData &&
+                !isDeleteAction &&
+                changedFields.length > 0 && (
+                  <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-100 rounded-2xl p-5 mb-6 shadow-sm">
+                    <h4 className="text-xs font-black text-blue-800 uppercase tracking-widest mb-2 flex items-center gap-1.5">
+                      <Sparkles className="w-4 h-4 text-blue-500" /> Ringkasan
+                      Perubahan Konten
+                    </h4>
+                    <p className="text-xs text-slate-600 leading-relaxed">
+                      Pengaju konten mengajukan perubahan pada beberapa
+                      informasi penting. Berikut adalah bagian yang diubah:
+                    </p>
+                    <ul className="mt-3 space-y-1.5">
+                      {changedFields.map((field) => {
+                        const isTrans = field.startsWith("terjemahan_id_");
+                        return (
+                          <li
+                            key={field}
+                            className="text-xs text-slate-700 flex items-center gap-2">
+                            <span className="w-1.5 h-1.5 rounded-full bg-blue-400 shrink-0" />
+                            <span>
+                              <strong>{getFieldLabel(field)}</strong>
+                              {isTrans ? (
+                                <span className="text-[9px] ml-2 px-1.5 py-0.5 bg-emerald-100 text-emerald-700 border border-emerald-200 font-bold rounded">
+                                  Terjemahan Manual (Bahasa Indonesia)
+                                </span>
+                              ) : null}
+                            </span>
+                          </li>
+                        );
+                      })}
+                    </ul>
+                    <p className="text-[11px] text-slate-400 mt-4 italic">
+                      💡 Silakan periksa perbandingan teks kata demi kata pada
+                      bagian bawah halaman ini untuk melihat detail perubahan.
+                    </p>
+                  </div>
+                )}
 
               {/* TEXT DIFF PROTECTOR (WORD-LEVEL HIGHLIGHTING) */}
               {!isBrandNewData &&
@@ -488,7 +784,7 @@ const DiffModal = ({
                             <p className="text-xs font-bold text-slate-500 mb-2 uppercase tracking-wide flex items-center gap-2">
                               Kolom:{" "}
                               <span className="text-daw-green">
-                                {field.replace(/_/g, " ")}
+                                {getFieldLabel(field)}
                               </span>
                             </p>
                             <ReactDiffViewer
@@ -560,6 +856,7 @@ const DiffModal = ({
                     <div className="flex gap-2">
                       <button
                         onClick={() => onReject(draft, rejectReason)}
+                        title="Konfirmasi penolakan draf ini"
                         disabled={
                           rejectReason.trim().length < minRejectChars ||
                           isSubmitting
@@ -599,12 +896,12 @@ const DiffModal = ({
                   className="w-full sm:w-auto px-8 lg:px-10 py-3.5 bg-daw-green hover:bg-[#003b1c] disabled:opacity-50 text-white text-sm font-black tracking-tight uppercase rounded-2xl transition-all flex justify-center items-center gap-2 shadow-xl shadow-daw-green/20 active:scale-95 transform hover:-translate-y-0.5">
                   {isSubmitting ? (
                     <>
-                      <Loader2 className="w-5 h-5 animate-spin" /> Meneruskan ke
-                      ERP...
+                      <Loader2 className="w-5 h-5 animate-spin" /> Memproses
+                      persetujuan...
                     </>
                   ) : (
                     <>
-                      <Check className="w-5 h-5" /> Setujui & Sinkronkan
+                      <Check className="w-5 h-5" /> Setujui & Terbitkan
                     </>
                   )}
                 </button>
@@ -1176,12 +1473,12 @@ export default function ApprovalCenter() {
               )}
             </div>
             <h3 className="text-xl font-black text-slate-800 tracking-tight">
-              {searchQuery ? "Tidak Ada Hasil" : "Antrean Bersih, Manajer!"}
+              {searchQuery ? "Tidak Ada Hasil" : "Antrean Bersih, Approver!"}
             </h3>
             <p className="text-sm text-slate-500 mt-2 font-medium">
               {searchQuery
                 ? `Pencarian "${searchQuery}" tidak ditemukan.`
-                : "Semua draf telah dieksekusi. Nikmati kopi Anda."}
+                : "Semua draf telah dieksekusi."}
             </p>
           </div>
         ) : (
@@ -1197,7 +1494,10 @@ export default function ApprovalCenter() {
                     <LayoutTemplate className="w-4 h-4 text-slate-500" />
                   </div>
                   <h3 className="text-sm font-black text-slate-700 uppercase tracking-widest">
-                    MODUL: <span className="text-daw-green">{moduleName}</span>
+                    MODUL:{" "}
+                    <span className="text-daw-green">
+                      {getModuleLabel(moduleName)}
+                    </span>
                   </h3>
                 </div>
                 <span className="bg-white border border-slate-200 text-slate-500 text-[10px] font-bold px-3 py-1 rounded-full shadow-sm">
@@ -1257,39 +1557,51 @@ export default function ApprovalCenter() {
                                   {draft.notrans}
                                 </span>
                                 <span
-                                  className={`text-[9px] font-black px-2 py-0.5 rounded border uppercase tracking-widest ${
-                                    draft.action === "DELETE"
-                                      ? "bg-rose-100 text-rose-700 border-rose-200"
-                                      : draft.action === "CREATE"
-                                        ? "bg-emerald-100 text-emerald-700 border-emerald-200"
-                                        : "bg-blue-100 text-blue-700 border-blue-200"
-                                  }`}>
-                                  {draft.action}
+                                  className={`text-[9px] font-black px-2 py-0.5 rounded border uppercase tracking-widest ${getActionInfo(draft.action).bg} ${getActionInfo(draft.action).color}`}>
+                                  {getActionInfo(draft.action).label}
                                 </span>
                               </div>
 
                               {/* 🚀 THE BATON-PASS VISUALIZER */}
-                              <div className="flex items-center gap-1.5 mt-1 text-[10px] font-bold font-mono">
-                                <span className="text-slate-400">EDITOR</span>
+                              <div className="flex items-center gap-1.5 mt-1 text-[10px] font-bold">
+                                <span
+                                  className="text-slate-400"
+                                  title="Data diubah oleh pengaju konten">
+                                  Pengaju
+                                </span>
                                 <ChevronRight className="w-3 h-3 text-slate-300" />
                                 {isGhost ? (
-                                  <span className="text-red-500 bg-red-50 px-1.5 py-0.5 rounded border border-red-200 animate-pulse">
-                                    DESYNC
+                                  <span
+                                    className="text-red-500 bg-red-50 px-1.5 py-0.5 rounded border border-red-200 animate-pulse"
+                                    title="Terdapat ketidaksesuaian data dengan sistem utama">
+                                    Bermasalah
                                   </span>
                                 ) : draft.isMyQueue ? (
-                                  <span className="text-amber-600 bg-amber-100 px-1.5 py-0.5 rounded border border-amber-200 shadow-sm animate-pulse">
-                                    YOU (ACT)
+                                  <span
+                                    className="text-amber-600 bg-amber-100 px-1.5 py-0.5 rounded border border-amber-200 shadow-sm animate-pulse"
+                                    title="Menunggu tinjauan dan keputusan Anda untuk tiket ini">
+                                    Giliran Anda ⚡
                                   </span>
                                 ) : draft.owlStatus === "1" ||
                                   draft.owlStatus === "2" ? (
-                                  <span className="text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200">
-                                    YOU (DONE)
+                                  <span
+                                    className="text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200"
+                                    title="Anda telah menyetujui tiket ini">
+                                    Selesai ✓
                                   </span>
                                 ) : (
-                                  <span className="text-slate-400">WAIT</span>
+                                  <span
+                                    className="text-slate-400"
+                                    title="Menunggu persetujuan dari pihak lain sebelum giliran Anda">
+                                    Menunggu
+                                  </span>
                                 )}
                                 <ChevronRight className="w-3 h-3 text-slate-300" />
-                                <span className="text-slate-400">ERP LIVE</span>
+                                <span
+                                  className="text-slate-400"
+                                  title="Data akan terpublikasi secara otomatis setelah semua approver menyetujui">
+                                  Terbitkan
+                                </span>
                               </div>
                             </div>
                           </td>
@@ -1297,15 +1609,21 @@ export default function ApprovalCenter() {
                           {/* KOLOM 2: TARGET IDENTIFIER */}
                           <td className="px-6 py-4">
                             <div className="flex flex-col">
-                              <span className="text-sm font-bold text-slate-700">
+                              <span
+                                className="text-sm font-bold text-slate-700 max-w-[220px] truncate"
+                                title={
+                                  isGhost
+                                    ? "Data Yatim (Tidak Tersinkron)"
+                                    : getHumanTargetName(draft)
+                                }>
                                 {isGhost
-                                  ? "Orphaned Data"
-                                  : `Target ID: #${draft.target_id?.slice(0, 8)}`}
+                                  ? "Data Yatim (Tidak Tersinkron)"
+                                  : getHumanTargetName(draft)}
                               </span>
                               <span className="text-[11px] font-medium text-slate-500 mt-1 flex items-center gap-1">
                                 <Clock className="w-3 h-3" />{" "}
                                 {isGhost
-                                  ? "Waktu Hilang"
+                                  ? "Waktu tidak tersedia"
                                   : timeAgo(draft.createdAt)}
                               </span>
                             </div>
@@ -1326,7 +1644,7 @@ export default function ApprovalCenter() {
                                     : draft.created_by || "Editor Unknown"}
                                 </span>
                                 <span className="text-[10px] text-slate-400 font-medium">
-                                  Divisi Konten
+                                  Pengaju Konten
                                 </span>
                               </div>
                             </div>
@@ -1338,7 +1656,7 @@ export default function ApprovalCenter() {
                               <button
                                 onClick={() => setSelectedDraft(draft)}
                                 className="inline-flex items-center justify-center gap-2 px-6 py-2.5 bg-daw-green text-white hover:bg-[#003b1c] text-xs font-black uppercase tracking-widest rounded-xl transition-all shadow-md shadow-daw-green/20 active:scale-95 transform hover:-translate-y-0.5">
-                                Review & Decide{" "}
+                                Tinjau & Putuskan{" "}
                                 <ChevronRight className="w-4 h-4" />
                               </button>
                             ) : (
@@ -1421,9 +1739,7 @@ export default function ApprovalCenter() {
         </div>
       )}
 
-      {/* ============================================================ */}
       {/* 🚀 FASE 3.3: FLOATING ACTION BAR (Untuk Bulk Action)         */}
-      {/* ============================================================ */}
       {selectedTickets.size > 0 && (
         <div className="fixed bottom-8 left-1/2 -translate-x-1/2 z-40 animate-in slide-in-from-bottom-10 fade-in duration-300">
           <div className="bg-slate-900 text-white px-6 py-4 rounded-2xl shadow-2xl flex items-center gap-6 border border-slate-700">

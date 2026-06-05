@@ -160,7 +160,7 @@ export default function PhilosophyTab({
     const isLockedAndNotRejected = pillar?.is_locked && !pillar?.hasRejected;
     if (isLockedAndNotRejected && !isSuperadmin) {
       return toast.warning("Akses Dibatasi", {
-        description: "Pilar ini sedang dalam peninjauan manajer.",
+        description: "Pilar ini sedang dalam peninjauan approver.",
       });
     }
 
