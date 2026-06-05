@@ -256,21 +256,56 @@ class ApprovalService {
     let cleanTargetId = targetId && typeof targetId === "string" ? targetId.trim() : targetId;
     if (["null", "undefined", ""].includes(cleanTargetId)) cleanTargetId = null;
 
+    let result = null;
     if (module === "BusinessSection") {
-      return await BusinessSection.findByPk(cleanTargetId, { include: [{ model: BusinessMapMarker, as: "mapMarkers" }] });
-    }
-
-    if (["AboutInfo", "HomeSettings", "InvestmentSettings", "Settings"].includes(module)) {
-      return await Model.findByPk(1);
-    }
-
-    if (module === "History") {
+      const record = await BusinessSection.findByPk(cleanTargetId, { include: [{ model: BusinessMapMarker, as: "mapMarkers" }] });
+      result = record ? record.toJSON() : null;
+    } else if (["AboutInfo", "HomeSettings", "InvestmentSettings", "Settings"].includes(module)) {
+      const record = await Model.findByPk(1);
+      result = record ? record.toJSON() : null;
+    } else if (module === "History") {
       const histories = await History.findAll({ order: [["year", "ASC"]] });
-      return { histories: histories.map((h) => ({ year: h.year, text: h.description })) };
+      result = { histories: histories.map((h) => ({ year: h.year, text: h.description })) };
+    } else {
+      if (!cleanTargetId) return null;
+      const record = await Model.findByPk(cleanTargetId);
+      result = record ? record.toJSON() : null;
     }
 
-    if (!cleanTargetId) return null;
-    return await Model.findByPk(cleanTargetId);
+    if (result) {
+      const Translation = require("../models/Translation");
+      if (module === "History") {
+        const trans = await Translation.findAll({
+          where: {
+            modelName: "History",
+            locale: "id"
+          }
+        });
+        const transObj = {};
+        trans.forEach((t) => {
+          if (!transObj[t.recordId]) transObj[t.recordId] = {};
+          transObj[t.recordId][t.field] = t.translatedText;
+        });
+        result._translations = transObj;
+      } else {
+        const trans = await Translation.findAll({
+          where: {
+            modelName: module,
+            recordId: String(cleanTargetId || 1),
+            locale: "id"
+          }
+        });
+        if (trans.length > 0) {
+          const translationMap = {};
+          trans.forEach((t) => {
+            translationMap[t.field] = t.translatedText;
+          });
+          result._translations = { id: translationMap };
+        }
+      }
+    }
+
+    return result;
   }
 
   async getRejectedDraftByTarget({ id, module, actorIds }) {
