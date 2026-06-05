@@ -24,6 +24,7 @@ import {
   Layout,
   Share2,
   ChevronRight,
+  Info,
 } from "lucide-react";
 import api, { BASE_UPLOAD_URL } from "@/lib/api";
 import imageCompression from "browser-image-compression";
@@ -32,6 +33,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { getErrorMessage } from "@/lib/utils";
 import ImageAdjustmentModal from "@/components/admin/ImageAdjustmentModal";
 import MagicTranslationField from "@/components/admin/MagicTranslationField";
+import { HelpTooltip } from "@/components/ui/HelpTooltip";
 
 interface Page {
   id: string;
@@ -58,7 +60,7 @@ interface RejectedDraft {
 }
 
 export default function PageBuilder() {
-  const { pages: rawPages, isLoading, refreshData } = useContent();
+  const { pages: rawPages, flatMenus, isLoading, refreshData } = useContent();
   const pages = rawPages as Page[];
   const { user } = useAuth();
   const isSuperadmin = user?.role === "superadmin" || user?.role === "admin";
@@ -133,6 +135,11 @@ export default function PageBuilder() {
       terjemahanContent !== originalTerjemahanContent
     );
   }, [formData, originalSnapshot, heroFile, terjemahanTitle, originalTerjemahanTitle, terjemahanSubtitle, originalTerjemahanSubtitle, terjemahanContent, originalTerjemahanContent]);
+
+  const isPageRegisteredInMenu = useMemo(() => {
+    if (!editingId || !flatMenus) return false;
+    return flatMenus.some((m: any) => m.pageId === editingId);
+  }, [editingId, flatMenus]);
 
   const imageHandler = useCallback(() => {
     const input = document.createElement("input");
@@ -1020,6 +1027,24 @@ export default function PageBuilder() {
 
                   {/* DYNAMIC WORKSPACE CONTENT */}
                   <div className="p-8 space-y-10">
+                    {/* MISSING LINK WARNING BANNER */}
+                    {editingId && !isPageRegisteredInMenu && (
+                      <div className="bg-amber-50 border-l-4 border-amber-500 p-4 rounded-r-xl shadow-sm animate-in fade-in slide-in-from-top-4 flex items-start gap-3">
+                        <Info className="w-5 h-5 text-amber-500 shrink-0 mt-0.5" />
+                        <div>
+                          <h4 className="text-sm font-bold text-amber-800">
+                            Halaman Belum Muncul di Website
+                          </h4>
+                          <p className="text-xs text-amber-700 mt-1 leading-relaxed">
+                            Meskipun Anda telah menyimpan halaman ini, pengunjung tidak akan bisa melihatnya karena halaman belum ditambahkan ke Menu Navigasi.
+                          </p>
+                          <a href="/admin/content" className="inline-block mt-2 text-xs font-bold text-amber-600 hover:text-amber-800 underline underline-offset-2">
+                            Daftarkan ke Menu Navigasi sekarang →
+                          </a>
+                        </div>
+                      </div>
+                    )}
+
                     {/* SECTION 1: CORE IDENTITY */}
                     <div className="space-y-10">
                       <div className="flex items-center gap-2 border-b border-slate-100 pb-2">
@@ -1288,8 +1313,9 @@ export default function PageBuilder() {
                       <div className="flex justify-between items-center border-b border-slate-100 pb-2">
                         <div className="flex items-center gap-2">
                           <LinkIcon className="w-4 h-4 text-slate-400" />
-                          <h3 className="text-sm font-bold text-slate-900">
+                          <h3 className="text-sm font-bold text-slate-900 flex items-center">
                             Tautan Terkait (Sidebar)
+                            <HelpTooltip content="Ini akan menambahkan daftar tautan (link) kotak di sebelah kanan halaman artikel. Berguna untuk menautkan halaman ini dengan halaman layanan atau berita terkait lainnya." />
                           </h3>
                         </div>
                         <button
@@ -1448,8 +1474,9 @@ export default function PageBuilder() {
                         <span className="text-xl font-serif font-black">A</span>
                       </div>
                       <div className="flex-1">
-                        <p className="text-xs font-bold text-slate-700">
+                        <p className="text-xs font-bold text-slate-700 flex items-center">
                           Drop Cap Typography
+                          <HelpTooltip content="Drop Cap membuat huruf pertama pada artikel ini menjadi sangat besar ala desain koran atau majalah. Ini memperindah tampilan jika halaman berisi banyak paragraf teks (seperti artikel editorial/CEO Message)." position="top" />
                         </p>
                         <p className="text-[10px] text-slate-500 uppercase font-medium">
                           Huruf besar di awal paragraf

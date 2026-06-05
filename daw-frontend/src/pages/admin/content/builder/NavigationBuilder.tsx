@@ -17,6 +17,7 @@ import {
 import api from "@/lib/api";
 import { useContent } from "@/contexts/ContentContext";
 import MagicTranslationField from "@/components/admin/MagicTranslationField";
+import { HelpTooltip } from "@/components/ui/HelpTooltip";
 
 interface Menu {
   id: string;
@@ -444,60 +445,75 @@ export default function NavigationBuilder() {
             </div>
 
             {/* TYPE SELECTION */}
-            <div className="grid grid-cols-3 gap-3">
-              <button
-                type="button"
-                onClick={() =>
-                  setFormData({ ...formData, type: "page", externalLink: "" })
-                }
-                className={`p-3 rounded-xl border-2 flex flex-col items-center gap-1.5 transition-all text-center
-                      ${formData.type === "page" ? "border-blue-500 bg-blue-50/30" : "border-slate-100 hover:border-slate-200"}`}>
-                <FileText
-                  className={`w-5 h-5 ${formData.type === "page" ? "text-blue-500" : "text-slate-400"}`}
-                />
-                <span
-                  className={`text-[9px] font-black uppercase ${formData.type === "page" ? "text-blue-700" : "text-slate-400"}`}>
-                  Internal Page
-                </span>
-              </button>
+            <div className="space-y-2">
+              <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 flex items-center">
+                Pilih Tipe Menu Navigasi
+                <HelpTooltip content="Tipe menu menentukan fungsi dari tombol menu di website. Apakah membuka halaman yang Anda buat (Internal), membuka website lain (External), atau hanya sebagai induk dropdown (Folder)." />
+              </label>
+              <div className="grid grid-cols-3 gap-3">
+                <button
+                  type="button"
+                  onClick={() =>
+                    setFormData({ ...formData, type: "page", externalLink: "" })
+                  }
+                  className={`relative p-3 rounded-xl border-2 flex flex-col items-center gap-1.5 transition-all text-center
+                        ${formData.type === "page" ? "border-blue-500 bg-blue-50/30" : "border-slate-100 hover:border-slate-200"}`}>
+                  <FileText
+                    className={`w-5 h-5 ${formData.type === "page" ? "text-blue-500" : "text-slate-400"}`}
+                  />
+                  <div className="flex items-center gap-1">
+                    <span
+                      className={`text-[9px] font-black uppercase ${formData.type === "page" ? "text-blue-700" : "text-slate-400"}`}>
+                      Internal Page
+                    </span>
+                    <HelpTooltip content="Pilih ini untuk menautkan menu ke halaman (Page) yang sudah Anda buat di menu Page Builder." position="bottom" />
+                  </div>
+                </button>
 
-              <button
-                type="button"
-                onClick={() =>
-                  setFormData({ ...formData, type: "external", pageId: "" })
-                }
-                className={`p-3 rounded-xl border-2 flex flex-col items-center gap-1.5 transition-all text-center
-                      ${formData.type === "external" ? "border-amber-500 bg-amber-50/30" : "border-slate-100 hover:border-slate-200"}`}>
-                <Globe
-                  className={`w-5 h-5 ${formData.type === "external" ? "text-amber-500" : "text-slate-400"}`}
-                />
-                <span
-                  className={`text-[9px] font-black uppercase ${formData.type === "external" ? "text-amber-700" : "text-slate-400"}`}>
-                  External Link
-                </span>
-              </button>
+                <button
+                  type="button"
+                  onClick={() =>
+                    setFormData({ ...formData, type: "external", pageId: "" })
+                  }
+                  className={`relative p-3 rounded-xl border-2 flex flex-col items-center gap-1.5 transition-all text-center
+                        ${formData.type === "external" ? "border-amber-500 bg-amber-50/30" : "border-slate-100 hover:border-slate-200"}`}>
+                  <Globe
+                    className={`w-5 h-5 ${formData.type === "external" ? "text-amber-500" : "text-slate-400"}`}
+                  />
+                  <div className="flex items-center gap-1">
+                    <span
+                      className={`text-[9px] font-black uppercase ${formData.type === "external" ? "text-amber-700" : "text-slate-400"}`}>
+                      External Link
+                    </span>
+                    <HelpTooltip content="Pilih ini jika menu akan mengarahkan pengunjung ke website di luar sistem (misal: Youtube, Google)." position="bottom" />
+                  </div>
+                </button>
 
-              <button
-                type="button"
-                onClick={() =>
-                  setFormData({
-                    ...formData,
-                    type: "folder",
-                    pageId: "",
-                    externalLink: "",
-                    parentId: "",
-                  })
-                }
-                className={`p-3 rounded-xl border-2 flex flex-col items-center gap-1.5 transition-all text-center
-                      ${formData.type === "folder" ? "border-emerald-500 bg-emerald-50/30" : "border-slate-100 hover:border-slate-200"}`}>
-                <Folder
-                  className={`w-5 h-5 ${formData.type === "folder" ? "text-emerald-500 fill-emerald-500/20" : "text-slate-400"}`}
-                />
-                <span
-                  className={`text-[9px] font-black uppercase ${formData.type === "folder" ? "text-emerald-700" : "text-slate-400"}`}>
-                  Dropdown Folder
-                </span>
-              </button>
+                <button
+                  type="button"
+                  onClick={() =>
+                    setFormData({
+                      ...formData,
+                      type: "folder",
+                      pageId: "",
+                      externalLink: "",
+                      parentId: "",
+                    })
+                  }
+                  className={`relative p-3 rounded-xl border-2 flex flex-col items-center gap-1.5 transition-all text-center
+                        ${formData.type === "folder" ? "border-emerald-500 bg-emerald-50/30" : "border-slate-100 hover:border-slate-200"}`}>
+                  <Folder
+                    className={`w-5 h-5 ${formData.type === "folder" ? "text-emerald-500 fill-emerald-500/20" : "text-slate-400"}`}
+                  />
+                  <div className="flex items-center gap-1">
+                    <span
+                      className={`text-[9px] font-black uppercase ${formData.type === "folder" ? "text-emerald-700" : "text-slate-400"}`}>
+                      Dropdown Folder
+                    </span>
+                    <HelpTooltip content="Menu ini tidak bisa di-klik. Fungsinya murni sebagai induk (dropdown) untuk menampung sub-menu di bawahnya." position="bottom" />
+                  </div>
+                </button>
+              </div>
             </div>
 
             {/* CONDITIONAL INPUTS */}
