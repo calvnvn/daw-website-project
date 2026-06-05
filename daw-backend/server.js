@@ -117,7 +117,7 @@ const Achievement = require("./models/Achievement");
 const NewsCategory = require("./models/NewsCategory");
 const NewsArticle = require("./models/NewsArticle");
 
-// const { globalLimiter } = require("./middleware/rateLimiter");
+const { globalLimiter } = require("./middleware/rateLimiter");
 
 const app = express();
 
@@ -157,7 +157,7 @@ app.use(
 );
 
 // 2. Global Rate Limiter (Applied to all API routes)
-// app.use("/api", globalLimiter);
+app.use("/api", globalLimiter);
 
 app.use(express.json({ limit: "50mb" }));
 app.use(express.urlencoded({ limit: "50mb", extended: true }));
