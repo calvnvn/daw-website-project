@@ -571,30 +571,20 @@ export default function NewsManagement() {
             {/* Content Area */}
             <div className="p-6 flex flex-col gap-6 overflow-hidden">
               {/* Add New Form */}
-              <div className="bg-slate-50 border border-slate-100 p-4 rounded-xl shrink-0">
-                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-3">
+              <div className="bg-slate-50 border border-slate-100 p-4 rounded-xl shrink-0 space-y-4">
+                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider">
                   Buat Kategori Baru
                 </label>
+                
+                {/* Row 1: Nama Kategori & Button */}
                 <div className="flex gap-2">
-                  <div className="relative flex-1">
-                    <input
-                      type="text"
-                      placeholder="Misal: CSR, Awards..."
-                      value={newCatName}
-                      onChange={(e) => setNewCatName(e.target.value)}
-                      className="w-full pl-3 pr-4 py-2.5 bg-white border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-daw-green/20 focus:border-daw-green text-sm shadow-sm transition-all"
-                    />
-                  </div>
-
-                  <div className="relative group" title="Pilih Warna Kategori">
-                    <input
-                      type="color"
-                      value={newCatColor}
-                      onChange={(e) => setNewCatColor(e.target.value)}
-                      className="w-[42px] h-[42px] p-1 bg-white border border-slate-200 rounded-lg cursor-pointer shadow-sm group-hover:border-daw-green transition-colors"
-                    />
-                  </div>
-
+                  <input
+                    type="text"
+                    placeholder="Misal: CSR, Awards..."
+                    value={newCatName}
+                    onChange={(e) => setNewCatName(e.target.value)}
+                    className="flex-1 px-3.5 py-2.5 bg-white border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-daw-green/20 focus:border-daw-green text-sm shadow-sm transition-all"
+                  />
                   <button
                     onClick={handleAddCategory}
                     disabled={isCatSaving || !newCatName.trim()}
@@ -605,6 +595,66 @@ export default function NewsManagement() {
                       <Plus className="w-5 h-5" />
                     )}
                   </button>
+                </div>
+
+                {/* Row 2: Color Picker & Presets */}
+                <div className="space-y-3 bg-white p-3 border border-slate-150 rounded-lg">
+                  <div className="flex justify-between items-center">
+                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                      Warna Kategori
+                    </span>
+                    {/* Hex Text Display/Input */}
+                    <div className="flex items-center gap-1.5 border border-slate-200 px-2 py-1 rounded bg-slate-50">
+                      <span className="text-xs font-mono text-slate-400">#</span>
+                      <input
+                        type="text"
+                        value={newCatColor.replace("#", "")}
+                        onChange={(e) => {
+                          const val = e.target.value.replace(/[^a-fA-F0-9]/g, "").substring(0, 6);
+                          setNewCatColor(`#${val}`);
+                        }}
+                        className="w-14 bg-transparent outline-none text-xs font-mono text-slate-700 uppercase"
+                      />
+                      <input
+                        type="color"
+                        value={newCatColor.startsWith("#") && newCatColor.length === 7 ? newCatColor : "#004B23"}
+                        onChange={(e) => setNewCatColor(e.target.value)}
+                        className="w-5 h-5 p-0 bg-transparent border-0 cursor-pointer rounded overflow-hidden"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Preset Colors Grid */}
+                  <div className="flex flex-wrap gap-2.5 pt-1">
+                    {[
+                      { hex: "#004B23", label: "DAW Green" },
+                      { hex: "#1D4ED8", label: "Corporate Blue" },
+                      { hex: "#6D28D9", label: "Premium Purple" },
+                      { hex: "#0F766E", label: "Business Teal" },
+                      { hex: "#BE123C", label: "Alert Rose" },
+                      { hex: "#B45309", label: "Warning Amber" },
+                      { hex: "#4338CA", label: "Modern Indigo" },
+                      { hex: "#334155", label: "General Slate" },
+                    ].map((preset) => (
+                      <button
+                        key={preset.hex}
+                        type="button"
+                        onClick={() => setNewCatColor(preset.hex)}
+                        title={preset.label}
+                        className="w-6 h-6 rounded-full border transition-all hover:scale-110 active:scale-95 flex items-center justify-center"
+                        style={{
+                          backgroundColor: preset.hex,
+                          borderColor: newCatColor.toUpperCase() === preset.hex.toUpperCase() ? "#0f172a" : "rgba(0,0,0,0.1)",
+                          borderWidth: newCatColor.toUpperCase() === preset.hex.toUpperCase() ? "2px" : "1px",
+                          boxShadow: newCatColor.toUpperCase() === preset.hex.toUpperCase() ? "0 0 0 2px rgba(255,255,255,1)" : "none",
+                        }}
+                      >
+                        {newCatColor.toUpperCase() === preset.hex.toUpperCase() && (
+                          <div className="w-1.5 h-1.5 rounded-full bg-white shadow-sm" />
+                        )}
+                      </button>
+                    ))}
+                  </div>
                 </div>
               </div>
 
