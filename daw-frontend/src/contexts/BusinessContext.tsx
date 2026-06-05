@@ -31,6 +31,7 @@ export interface MapMarker {
   boxY: string;
   mapUrl?: string;
   categoryData?: MapCategory;
+  terjemahanDesc?: string;
 }
 
 export interface SectionData {

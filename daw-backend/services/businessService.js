@@ -154,8 +154,8 @@ class BusinessService {
       if (sec.mapMarkers && sec.mapMarkers.length > 0) {
         for (let j = 0; j < sec.mapMarkers.length; j++) {
           let marker = sec.mapMarkers[j];
-          marker.title = await safeTranslate(MARKER_MODULE, marker.id, "title", marker.title);
-          marker.desc = await safeTranslate(MARKER_MODULE, marker.id, "desc", marker.desc);
+          marker.title = await safeTranslate(MODULE_NAME, sec.id, `marker_${j}_title`, marker.title);
+          marker.desc = await safeTranslate(MODULE_NAME, sec.id, `marker_${j}_desc`, marker.desc);
         }
       }
 

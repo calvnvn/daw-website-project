@@ -95,7 +95,7 @@ export function useInvestmentManager() {
         api.get("/translation/manual", {
           params: { modelName: "InvestmentSettings", recordId: "1" },
         }).then((res) => {
-          const data = res.data?.data || {};
+          const data = res.data?.data?.id || {};
           setTerjemahanHeadline(data.teaserHeadline || "");
           setTerjemahanBody(data.teaserBody || "");
           setTerjemahanIntro(data.sectionIntro || "");

@@ -168,11 +168,25 @@ export default function ManageBusinesses() {
       api.get("/translation/manual", {
         params: { modelName: "BusinessSection", recordId: activeTab },
       }).then((res) => {
-        const data = res.data?.data || {};
+        const data = res.data?.data?.id || {};
         setTerjemahanTitle(data.title || "");
         setTerjemahanHtmlContent(data.htmlContent || "");
         setOriginalTerjemahanTitle(data.title || "");
         setOriginalTerjemahanHtmlContent(data.htmlContent || "");
+        setFormData((prev) => ({
+          ...prev,
+          mapMarkers: prev.mapMarkers.map((m, idx) => ({
+            ...m,
+            terjemahanDesc: data[`marker_${idx}_desc`] || "",
+          })),
+        }));
+        setOriginalData((prev) => ({
+          ...prev,
+          mapMarkers: prev.mapMarkers.map((m, idx) => ({
+            ...m,
+            terjemahanDesc: data[`marker_${idx}_desc`] || "",
+          })),
+        }));
       }).catch(() => {
         setTerjemahanTitle("");
         setTerjemahanHtmlContent("");
@@ -285,6 +299,13 @@ export default function ManageBusinesses() {
       const translationPayload: Record<string, any> = {};
       if (terjemahanTitle.trim()) translationPayload.title = terjemahanTitle;
       if (terjemahanHtmlContent.trim()) translationPayload.htmlContent = terjemahanHtmlContent;
+
+      // Include marker translations in translationPayload
+      formData.mapMarkers.forEach((m: any, idx) => {
+        if (m.terjemahanDesc?.trim()) {
+          translationPayload[`marker_${idx}_desc`] = m.terjemahanDesc;
+        }
+      });
 
       const hasTranslations = Object.keys(translationPayload).length > 0;
 
