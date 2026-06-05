@@ -79,16 +79,21 @@ class UserService {
     const targetIsSuperadmin = targetRoleName === "superadmin";
     const isEditingSelf = String(requesterId) === String(targetId);
 
-    // Enforce immutable state for Superadmin records against non-owner modifications
+    // 1. Anti-Self-Demotion / Suspension: Prevent users (especially superadmins) from altering their own critical access vectors
+    if (isEditingSelf && (roleId || status)) {
+      throw new Error("FORBIDDEN: Demi keamanan, Anda tidak diizinkan mengubah Role atau Status akun Anda sendiri.");
+    }
+
+    // 2. Enforce immutable state for Superadmin records against non-owner modifications
     if (targetIsSuperadmin && !isEditingSelf) {
       if (roleId || status || email || name) {
         throw new Error("FORBIDDEN: Akun superadmin tidak bisa diubah oleh administrator lain.");
       }
     }
 
-    // Restrict privilege escalation and status modification for Editor roles
-    if (requesterRole === "editor" && (roleId || status)) {
-      throw new Error("FORBIDDEN: Editor tidak diizinkan mengubah Role atau Status akun.");
+    // 3. Whitelist Privilege Escalation: Strictly restrict Role and Status modifications to superadmins only
+    if (requesterRole !== "superadmin" && (roleId || status)) {
+      throw new Error("FORBIDDEN: Hanya Superadmin yang berwenang mengubah Role atau Status akun.");
     }
 
     // Map and synchronize only defined delta fields to the persistence layer

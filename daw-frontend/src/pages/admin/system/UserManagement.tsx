@@ -57,6 +57,7 @@ export default function UserManagement() {
   const [roles, setRoles] = useState<RoleData[]>([]);
 
   const [searchTerm, setSearchTerm] = useState("");
+  const [activeFilter, setActiveFilter] = useState("all");
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -113,12 +114,23 @@ export default function UserManagement() {
   };
 
   const filteredUsers = users.filter((user) => {
+    // 1. Search Filter
     const searchLower = searchTerm.toLowerCase();
-    return (
+    const matchesSearch =
       (user.name?.toLowerCase() || "").includes(searchLower) ||
       (user.email?.toLowerCase() || "").includes(searchLower) ||
-      (user.owl_username?.toLowerCase() || "").includes(searchLower) // Tambahkan ini!
-    );
+      (user.owl_username?.toLowerCase() || "").includes(searchLower);
+
+    if (!matchesSearch) return false;
+
+    // 2. Tab Filter
+    if (activeFilter === "all") return true;
+    if (activeFilter === "superadmin") return user.roleData?.name?.toLowerCase() === "superadmin";
+    if (activeFilter === "editor") return user.roleData?.name?.toLowerCase() === "editor";
+    if (activeFilter === "pending") return !user.lastLogin;
+    if (activeFilter === "suspended") return user.status === "Suspended";
+
+    return true;
   });
 
   const handleAddUser = async () => {
@@ -256,26 +268,22 @@ export default function UserManagement() {
       }
     };
 
-    // --- LOGIKA KONFIRMASI ---
-    if (newRole?.name === "superadmin") {
-      toast("Elevate to superadmin?", {
-        description: `This grants ${targetUser?.name} full administrative control. Proceed with caution.`,
-        duration: Infinity,
-        action: {
-          label: "Confirm & Promote",
-          onClick: () => executeUpdate(),
+    // --- LOGIKA KONFIRMASI (Friction) ---
+    toast(`Konfirmasi Pengubahan Role`, {
+      description: `Anda akan memberikan akses level ${newRole?.name} kepada ${targetUser?.name || targetUser?.owl_username}. Lanjutkan?`,
+      duration: Infinity,
+      action: {
+        label: "Konfirmasi & Ubah",
+        onClick: () => executeUpdate(),
+      },
+      cancel: {
+        label: "Batal",
+        onClick: () => {
+          toast.dismiss();
+          fetchUsersAndRoles(); // Reset UI dropdown jika dibatalkan
         },
-        cancel: {
-          label: "Abort",
-          onClick: () => {
-            toast.dismiss();
-            fetchUsersAndRoles(); // Reset UI dropdown jika dibatalkan
-          },
-        },
-      });
-    } else {
-      executeUpdate();
-    }
+      },
+    });
   };
 
   const getRoleBadgeColor = (role: string) => {
@@ -330,15 +338,39 @@ export default function UserManagement() {
       </div>
 
       {/* TOOLBAR */}
-      <div className="flex flex-col sm:flex-row gap-4">
-        <div className="relative flex-1 max-w-md">
+      <div className="flex flex-col xl:flex-row gap-4 justify-between items-start xl:items-center">
+        {/* Quick Filter Pills */}
+        <div className="flex flex-wrap gap-2">
+          {[
+            { id: "all", label: "Semua Pengguna" },
+            { id: "superadmin", label: "Superadmin" },
+            { id: "editor", label: "Editor" },
+            { id: "pending", label: "Pending SSO" },
+            { id: "suspended", label: "Suspended" },
+          ].map((filter) => (
+            <button
+              key={filter.id}
+              onClick={() => setActiveFilter(filter.id)}
+              className={`px-3 py-1.5 text-xs font-bold rounded-full transition-all ${
+                activeFilter === filter.id
+                  ? "bg-slate-800 text-white shadow-sm"
+                  : "bg-white text-slate-500 border border-slate-200 hover:bg-slate-50"
+              }`}>
+              {filter.label}
+              {filter.id === "all" && <span className="ml-1.5 opacity-60">({users.length})</span>}
+            </button>
+          ))}
+        </div>
+
+        {/* Search Bar */}
+        <div className="relative w-full xl:w-auto xl:min-w-[280px]">
           <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-            <Search className="w-5 h-5 text-slate-400" />
+            <Search className="w-4 h-4 text-slate-400" />
           </div>
           <input
             type="text"
-            placeholder="Search users by name or email..."
-            className="w-full pl-10 pr-4 py-2.5 bg-white border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-daw-green/20 focus:border-daw-green transition-all"
+            placeholder="Search name, email, or ID..."
+            className="w-full pl-9 pr-4 py-2 text-sm bg-white border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-daw-green/20 focus:border-daw-green transition-all"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
           />
@@ -378,8 +410,11 @@ export default function UserManagement() {
                   const roleName = user.roleData?.name || "Unknown Role";
                   const isSuperadmin = roleName === "superadmin";
 
-                  // DETEKSI STATUS SYNC SSO
-                  const isPendingSync = user.name === "Menunggu Sync Login...";
+                  // DETEKSI STATUS SYNC SSO (Robust)
+                  const isPendingSync = !user.lastLogin;
+
+                  // DETEKSI AKTIVITAS TERAKHIR (Aktif dalam 10 menit)
+                  const isOnline = user.lastLogin && (new Date().getTime() - new Date(user.lastLogin).getTime() < 10 * 60 * 1000);
 
                   return (
                     <tr
@@ -389,21 +424,34 @@ export default function UserManagement() {
                       <td className="px-6 py-4">
                         <div className="flex items-center gap-4">
                           {/* Avatar Cerdas */}
-                          <div
-                            className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 font-black text-sm border shadow-sm
-                            ${isPendingSync ? "bg-slate-100 text-slate-400 border-slate-200" : "bg-gradient-to-br from-slate-800 to-slate-900 text-white border-slate-700"}`}>
-                            {isPendingSync
-                              ? "?"
-                              : user.name.charAt(0).toUpperCase()}
+                          <div className="relative">
+                            <div
+                              className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 font-black text-sm border shadow-sm
+                              ${isPendingSync ? "bg-slate-100 text-slate-400 border-slate-200" : "bg-gradient-to-br from-slate-800 to-slate-900 text-white border-slate-700"}`}>
+                              {isPendingSync
+                                ? "?"
+                                : user.name.charAt(0).toUpperCase()}
+                            </div>
+                            {isOnline && (
+                              <span className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 border-2 border-white rounded-full" title="Online baru-baru ini"></span>
+                            )}
                           </div>
 
                           <div className="flex flex-col">
                             <div className="flex items-center gap-2">
                               <p
-                                className={`text-sm font-bold ${isPendingSync ? "text-slate-400 italic" : "text-slate-900"}`}>
-                                {isPendingSync
-                                  ? "Belum Login (No Data)"
-                                  : user.name}
+                                className={`text-sm font-bold ${isPendingSync ? "text-amber-600 italic flex items-center gap-1.5" : "text-slate-900"}`}>
+                                {isPendingSync ? (
+                                  <>
+                                    <span className="relative flex h-2 w-2">
+                                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
+                                      <span className="relative inline-flex rounded-full h-2 w-2 bg-amber-500"></span>
+                                    </span>
+                                    Menunggu Aktivasi
+                                  </>
+                                ) : (
+                                  user.name
+                                )}
                               </p>
                               {isSelf && (
                                 <span className="bg-daw-green/10 text-daw-green text-[9px] uppercase tracking-wider font-black px-1.5 py-0.5 rounded">
@@ -535,13 +583,13 @@ export default function UserManagement() {
                   <td colSpan={5} className="px-6 py-20 text-center">
                     <div className="flex flex-col items-center justify-center">
                       <div className="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center mb-4">
-                        <Search className="w-8 h-8 text-slate-300" />
+                        <UserPlus className="w-8 h-8 text-slate-300" />
                       </div>
                       <p className="text-sm font-bold text-slate-600">
-                        Tidak ada user ditemukan
+                        {searchTerm || activeFilter !== "all" ? "Tidak ada pengguna yang cocok dengan filter" : "Belum ada user terdaftar"}
                       </p>
                       <p className="text-xs text-slate-400 mt-1">
-                        Coba gunakan kata kunci pencarian yang lain.
+                        {searchTerm || activeFilter !== "all" ? "Coba ubah kata kunci atau hapus filter di atas." : "Daftarkan akses admin baru untuk memulai."}
                       </p>
                     </div>
                   </td>
