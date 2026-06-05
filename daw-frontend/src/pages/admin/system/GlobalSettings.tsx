@@ -24,6 +24,7 @@ import { getCleanImageUrl } from "@/lib/utils";
 import { useSettings } from "@/contexts/SettingsContext";
 import { getErrorMessage } from "@/lib/utils";
 import ImageAdjustmentModal from "@/components/admin/ImageAdjustmentModal";
+import { HelpTooltip } from "@/components/ui/HelpTooltip";
 
 export default function GlobalSettings() {
   const {
@@ -61,14 +62,19 @@ export default function GlobalSettings() {
   const shouldLockUI = isDataLocked && !rejectedSettings && !isSuperadmin;
   const isOverrideMode = isDataLocked && isSuperadmin;
 
-  const lockStyles = shouldLockUI
-    ? "opacity-60 grayscale-[30%] pointer-events-none cursor-not-allowed select-none"
-    : "";
+  const [activeTab, setActiveTab] = useState<"profile" | "contact" | "social">("profile");
 
   const sanitizeUrl = (url: string) => {
     if (!url || url.trim() === "") return "";
     const trimmed = url.trim();
+    if (trimmed === "#" || trimmed === "/") return trimmed;
     return /^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`;
+  };
+
+  const parseGoogleMapsEmbed = (input: string) => {
+    if (!input) return "";
+    const srcMatch = input.match(/src="([^"]+)"/);
+    return srcMatch ? srcMatch[1] : input;
   };
 
   // Sync Optimistic Lock
@@ -287,7 +293,11 @@ export default function GlobalSettings() {
   const handleChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>,
   ) => {
-    setFormData({ ...formData, [e.target.name]: e.target.value });
+    let value = e.target.value;
+    if (e.target.name === "googleMapsUrl") {
+      value = parseGoogleMapsEmbed(value);
+    }
+    setFormData({ ...formData, [e.target.name]: value });
   };
 
   if (isLoading) {
@@ -490,345 +500,342 @@ export default function GlobalSettings() {
         </div>
       </div>
 
-      {/* 3. THE FORM BODY (The Ledger Grid) */}
-      <div
-        className={`grid grid-cols-1 md:grid-cols-3 gap-6 transition-all duration-500 ${lockStyles}`}>
-        <div className="space-y-6 md:col-span-1">
-          <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-            <div className="px-5 py-4 border-b border-slate-100 bg-slate-50/50 flex items-center gap-2">
-              <Building2 className="w-5 h-5 text-daw-green" />
-              <h2 className="font-bold text-sm text-slate-800">
-                Identitas Perusahaan
-              </h2>
-            </div>
-            <div className="p-5 space-y-4">
-              <div>
-                <label
-                  htmlFor="companyName"
-                  className="block text-[10px] font-black text-slate-500 uppercase tracking-wider mb-2">
-                  Company Name
-                </label>
-                <input
-                  id="companyName"
-                  type="text"
-                  name="companyName"
-                  value={formData.companyName}
-                  onChange={handleChange}
-                  disabled={!isEditing || shouldLockUI}
-                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-daw-green/20 focus:border-daw-green text-slate-700 transition-colors disabled:bg-slate-100 disabled:text-slate-400 disabled:cursor-not-allowed"
-                />
-              </div>
-            </div>
-          </div>
+      {/* 3. THE FORM BODY (Tabbed Interface) */}
+      <div className="bg-white rounded-[2rem] border border-slate-200 shadow-sm overflow-hidden flex flex-col md:flex-row transition-all duration-500">
+        
+        {/* TAB NAVIGATION (Sidebar on Desktop, Top on Mobile) */}
+        <div className="w-full md:w-64 bg-slate-50/50 border-b md:border-b-0 md:border-r border-slate-100 p-4 space-y-2 shrink-0">
+          <button
+            type="button"
+            onClick={() => setActiveTab("profile")}
+            className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-left transition-all font-bold text-sm ${
+              activeTab === "profile" 
+                ? "bg-white text-daw-green shadow-sm border border-slate-200" 
+                : "text-slate-500 hover:bg-slate-100/50 hover:text-slate-700 border border-transparent"
+            }`}
+          >
+            <ImageIcon className="w-4 h-4" />
+            Profil & Branding
+          </button>
+          
+          <button
+            type="button"
+            onClick={() => setActiveTab("contact")}
+            className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-left transition-all font-bold text-sm ${
+              activeTab === "contact" 
+                ? "bg-white text-daw-green shadow-sm border border-slate-200" 
+                : "text-slate-500 hover:bg-slate-100/50 hover:text-slate-700 border border-transparent"
+            }`}
+          >
+            <MapPin className="w-4 h-4" />
+            Kontak & Lokasi
+          </button>
 
-          {/* Social Media Card */}
-          <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-            <div className="px-5 py-4 border-b border-slate-100 bg-slate-50/50 flex items-center gap-2">
-              <Share2 className="w-5 h-5 text-daw-green" />
-              <h2 className="font-bold text-sm text-slate-800">
-                Tautan Media Sosial
-              </h2>
-            </div>
-            <div className="p-5 space-y-4">
-              <div>
-                <label
-                  htmlFor="linkedinUrl"
-                  className="block text-[10px] font-black text-slate-500 uppercase tracking-wider mb-2">
-                  LinkedIn URL
-                </label>
-                <input
-                  id="linkedinUrl"
-                  type="url"
-                  name="linkedinUrl"
-                  value={formData.linkedinUrl}
-                  onChange={handleChange}
-                  disabled={!isEditing || shouldLockUI}
-                  placeholder="https://linkedin.com/company/..."
-                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-daw-green/20 focus:border-daw-green text-slate-700 transition-colors disabled:bg-slate-100 disabled:text-slate-400 disabled:cursor-not-allowed"
-                />
-              </div>
-              <div>
-                <label
-                  htmlFor="website"
-                  className="block text-[10px] font-black text-slate-500 uppercase tracking-wider mb-2">
-                  Situs Utama (URL)
-                </label>
-                <div className="relative">
-                  <Globe className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                  <input
-                    id="website"
-                    type="text"
-                    name="website"
-                    value={formData.website}
-                    onChange={handleChange}
-                    disabled={!isEditing || shouldLockUI}
-                    className="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-daw-green/20 focus:border-daw-green text-slate-700 transition-colors disabled:bg-slate-100 disabled:text-slate-400 disabled:cursor-not-allowed"
-                  />
-                </div>
-              </div>
-            </div>
-          </div>
+          <button
+            type="button"
+            onClick={() => setActiveTab("social")}
+            className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-left transition-all font-bold text-sm ${
+              activeTab === "social" 
+                ? "bg-white text-daw-green shadow-sm border border-slate-200" 
+                : "text-slate-500 hover:bg-slate-100/50 hover:text-slate-700 border border-transparent"
+            }`}
+          >
+            <Share2 className="w-4 h-4" />
+            Media Sosial
+          </button>
         </div>
 
-        {/* KOLOM KANAN  */}
-        <div className="space-y-6 md:col-span-2">
-          <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-            <div className="px-5 py-4 border-b border-slate-100 bg-slate-50/50 flex items-center gap-2">
-              <Phone className="w-5 h-5 text-daw-green" />
-              <h2 className="font-bold text-sm text-slate-800">
-                Informasi Kontak Utama
-              </h2>
-            </div>
-            <div className="p-5 space-y-5">
-              <div>
-                <label
-                  htmlFor="address"
-                  className="block text-[10px] font-black text-slate-500 uppercase tracking-wider mb-2 flex items-center gap-1.5">
-                  <MapPin className="w-3.5 h-3.5" /> Alamat Kantor Pusat
-                </label>
-                <textarea
-                  id="address"
-                  name="address"
-                  rows={3}
-                  value={formData.address}
-                  onChange={handleChange}
-                  disabled={!isEditing || shouldLockUI}
-                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-daw-green/20 focus:border-daw-green text-slate-700 resize-none transition-colors leading-relaxed disabled:bg-slate-100 disabled:text-slate-400 disabled:cursor-not-allowed"
-                />
-                <p className="text-[11px] text-slate-400 mt-1.5">
-                  Ditampilkan pada halaman 'Hubungi Kami' dan bagian Footer
-                  website.
-                </p>
+        {/* TAB CONTENT */}
+        <div className="flex-1 p-6 md:p-10 bg-white">
+          
+          {/* TAB 1: PROFILE & BRANDING */}
+          {activeTab === "profile" && (
+            <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+              <div className="border-b border-slate-100 pb-4">
+                <h2 className="text-xl font-bold text-slate-800 flex items-center gap-2">
+                  <Building2 className="w-5 h-5 text-daw-green" />
+                  Identitas Perusahaan
+                </h2>
+                <p className="text-xs text-slate-500 mt-1">Logo dan nama yang merepresentasikan bisnis Anda.</p>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+              <div className="space-y-6 max-w-2xl">
                 <div>
-                  <label
-                    htmlFor="phone"
-                    className="block text-[10px] font-black text-slate-500 uppercase tracking-wider mb-2 flex items-center gap-1.5">
-                    <Phone className="w-3.5 h-3.5" /> Nomor Telepon
+                  <label htmlFor="companyName" className="flex items-center text-[10px] font-black text-slate-500 uppercase tracking-wider mb-2">
+                    Company Name
                   </label>
                   <input
-                    id="phone"
+                    id="companyName"
                     type="text"
-                    name="phone"
-                    value={formData.phone}
+                    name="companyName"
+                    value={formData.companyName}
                     onChange={handleChange}
-                    disabled={!isEditing || shouldLockUI}
-                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-daw-green/20 focus:border-daw-green text-slate-700 transition-colors disabled:bg-slate-100 disabled:text-slate-400 disabled:cursor-not-allowed"
+                    readOnly={!isEditing || shouldLockUI}
+                    className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-daw-green/20 focus:border-daw-green focus:bg-white text-slate-800 font-bold transition-colors read-only:bg-slate-50 read-only:text-slate-500 read-only:focus:ring-0 read-only:focus:border-slate-200 cursor-text"
                   />
                 </div>
-                <div>
-                  <label
-                    htmlFor="email"
-                    className="block text-[10px] font-black text-slate-500 uppercase tracking-wider mb-2 flex items-center gap-1.5">
-                    <Mail className="w-3.5 h-3.5" /> Email Utama
-                  </label>
-                  <input
-                    id="email"
-                    type="email"
-                    name="email"
-                    value={formData.email}
-                    onChange={handleChange}
-                    disabled={!isEditing || shouldLockUI}
-                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-daw-green/20 focus:border-daw-green text-slate-700 transition-colors disabled:bg-slate-100 disabled:text-slate-400 disabled:cursor-not-allowed"
-                  />
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
 
-        {/* AREA BAWAH: Maps & Branding  */}
-        <div className="md:col-span-3 space-y-6">
-          {/* Google Maps Embed Card */}
-          <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-            <div className="px-5 py-4 border-b border-slate-100 bg-slate-50/50 flex items-center gap-2">
-              <Map className="w-5 h-5 text-daw-green" />
-              <h2 className="font-bold text-sm text-slate-800">
-                Integrasi Google Maps
-              </h2>
-            </div>
-            <div className="p-5 space-y-4">
-              <div>
-                <label
-                  htmlFor="googleMapsUrl"
-                  className="block text-[10px] font-black text-slate-500 uppercase tracking-wider mb-2">
-                  Tautan Peta Digital (Iframe Source URL)
-                </label>
-                <input
-                  id="googleMapsUrl"
-                  type="text"
-                  name="googleMapsUrl"
-                  value={formData.googleMapsUrl}
-                  onChange={handleChange}
-                  disabled={!isEditing || shouldLockUI}
-                  placeholder="https://www.google.com/maps/embed?pb=..."
-                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm font-mono focus:outline-none focus:ring-2 focus:ring-daw-green/20 focus:border-daw-green text-slate-700 transition-colors disabled:bg-slate-100 disabled:text-slate-400 disabled:cursor-not-allowed"
-                />
-                <p className="text-[11px] text-slate-400 mt-2">
-                  Buka Google Maps &gt; Bagikan &gt; Sematkan peta &gt; Salin
-                  URL yang ada di dalam atribut <code>src="..."</code>.
-                </p>
-              </div>
-            </div>
-          </div>
-
-          {/* Branding & Identitas Visual Card */}
-          <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-            <div className="px-5 py-4 border-b border-slate-100 bg-slate-50/50 flex items-center gap-2">
-              <ImageIcon className="w-5 h-5 text-daw-green" />
-              <h2 className="font-bold text-sm text-slate-800">
-                Branding & Identitas Visual
-              </h2>
-            </div>
-
-            <div className="p-5 md:p-6 grid grid-cols-1 lg:grid-cols-2 gap-8">
-              {/* BOX UPLOAD LOGO UTAMA */}
-              <div className="space-y-3">
-                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest">
-                  Logo Utama
-                </label>
-                <div
-                  onDragOver={(e) => {
-                    e.preventDefault();
-                    if (isEditing && !shouldLockUI) setIsDraggingLogo(true);
-                  }}
-                  onDragLeave={(e) => {
-                    e.preventDefault();
-                    setIsDraggingLogo(false);
-                  }}
-                  onDrop={(e) => {
-                    e.preventDefault();
-                    setIsDraggingLogo(false);
-                    // 🛡️ Guard Keras: Batalkan jika tidak edit mode atau sedang dilock
-                    if (!isEditing || shouldLockUI) return;
-
-                    const file = e.dataTransfer.files?.[0];
-                    if (file && file.type.startsWith("image/")) {
-                      setCropTarget({ type: 'logo', file });
-                    } else if (file) {
-                      toast.error(
-                        "Format file tidak didukung. Gunakan gambar (JPG/PNG/SVG).",
-                      );
-                    }
-                  }}
-                  className={`border-2 border-dashed rounded-xl p-5 flex flex-col items-center gap-4 transition-all duration-200 ${
-                    isDraggingLogo
-                      ? "border-daw-green bg-daw-green/5 scale-[0.99] ring-4 ring-daw-green/10"
-                      : "border-slate-200 bg-slate-50/50 hover:border-slate-300"
-                  } ${!isEditing || shouldLockUI ? "opacity-70 cursor-not-allowed hover:border-slate-200" : ""}`}>
-                  <div className="h-24 w-full max-w-[240px] flex items-center justify-center bg-white rounded-lg border border-slate-100 p-2 shadow-sm pointer-events-none overflow-hidden bg-[url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI4IiBoZWlnaHQ9IjgiPgo8cmVjdCB3aWR0aD0iNCIgaGVpZ2h0PSI0IiBmaWxsPSIjZjFmMTE1Ij48L3JlY3Q+CjxyZWN0IHg9IjQiIHk9IjQiIHdpZHRoPSI0IiBoZWlnaHQ9IjQiIGZpbGw9IiNmMWYxMTUiPjwvcmVjdD4KPC9zdmc+')]">
-                    {logoPreview ? (
-                      <img
-                        src={logoPreview}
-                        className="max-h-full object-contain drop-shadow-sm"
-                        alt="Logo Preview"
-                      />
-                    ) : (
-                      <span className="text-slate-300 text-xs font-medium">
-                        No Logo Selected
-                      </span>
-                    )}
-                  </div>
-
-                  <div className="text-center w-full">
-                    <p className="text-xs font-bold text-slate-600 mb-1">
-                      {isDraggingLogo
-                        ? "Lepaskan file di sini"
-                        : "Drag & drop logo"}
-                    </p>
-                    <p className="text-[10px] text-slate-400 mb-3">atau</p>
-                    <input
-                      type="file"
-                      accept="image/*"
-                      disabled={!isEditing || shouldLockUI}
-                      onChange={(e) => {
-                        const file = e.target.files?.[0];
-                        if (file) {
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                  {/* BOX UPLOAD LOGO UTAMA */}
+                  <div className="space-y-3">
+                    <label className="flex items-center text-[10px] font-black text-slate-500 uppercase tracking-widest">
+                      Logo Utama
+                      <HelpTooltip content="Gambar logo resmi perusahaan yang akan dipajang di pojok kiri atas dan bagian bawah (footer) website utama. Rekomendasi: Gunakan gambar berlatar transparan (.PNG) agar tidak menutupi warna background." position="top" />
+                    </label>
+                    <div
+                      onDragOver={(e) => {
+                        e.preventDefault();
+                        if (isEditing && !shouldLockUI) setIsDraggingLogo(true);
+                      }}
+                      onDragLeave={(e) => {
+                        e.preventDefault();
+                        setIsDraggingLogo(false);
+                      }}
+                      onDrop={(e) => {
+                        e.preventDefault();
+                        setIsDraggingLogo(false);
+                        if (!isEditing || shouldLockUI) return;
+                        const file = e.dataTransfer.files?.[0];
+                        if (file && file.type.startsWith("image/")) {
                           setCropTarget({ type: 'logo', file });
-                          e.target.value = '';
+                        } else if (file) {
+                          toast.error("Format file tidak didukung. Gunakan gambar (JPG/PNG/SVG).");
                         }
                       }}
-                      className="w-full text-center text-[10px] file:mr-3 file:py-1.5 file:px-4 file:rounded-full file:border-0 file:bg-daw-green/10 file:text-daw-green file:font-bold file:cursor-pointer cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-                    />
-                  </div>
-                </div>
-              </div>
-
-              {/* BOX UPLOAD FAVICON */}
-              <div className="space-y-3">
-                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest">
-                  Ikon Tab (Favicon)
-                </label>
-                <div
-                  onDragOver={(e) => {
-                    e.preventDefault();
-                    if (isEditing && !shouldLockUI) setIsDraggingFavicon(true);
-                  }}
-                  onDragLeave={(e) => {
-                    e.preventDefault();
-                    setIsDraggingFavicon(false);
-                  }}
-                  onDrop={(e) => {
-                    e.preventDefault();
-                    setIsDraggingFavicon(false);
-                    // 🛡️ Guard Keras
-                    if (!isEditing || shouldLockUI) return;
-
-                    const file = e.dataTransfer.files?.[0];
-                    if (file && file.type.startsWith("image/")) {
-                      setCropTarget({ type: 'favicon', file });
-                    } else if (file) {
-                      toast.error(
-                        "Format file tidak didukung. Gunakan gambar (ICO/PNG).",
-                      );
-                    }
-                  }}
-                  className={`border-2 border-dashed rounded-xl p-5 flex flex-col items-center gap-4 transition-all duration-200 ${
-                    isDraggingFavicon
-                      ? "border-daw-green bg-daw-green/5 scale-[0.99] ring-4 ring-daw-green/10"
-                      : "border-slate-200 bg-slate-50/50 hover:border-slate-300"
-                  } ${!isEditing || shouldLockUI ? "opacity-70 cursor-not-allowed hover:border-slate-200" : ""}`}>
-                  <div className="h-24 w-24 flex items-center justify-center bg-white rounded-xl border border-slate-100 p-3 shadow-sm pointer-events-none overflow-hidden bg-[url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI4IiBoZWlnaHQ9IjgiPgo8cmVjdCB3aWR0aD0iNCIgaGVpZ2h0PSI0IiBmaWxsPSIjZjFmMTE1Ij48L3JlY3Q+CjxyZWN0IHg9IjQiIHk9IjQiIHdpZHRoPSI0IiBoZWlnaHQ9IjQiIGZpbGw9IiNmMWYxMTUiPjwvcmVjdD4KPC9zdmc+')]">
-                    {faviconPreview ? (
-                      <img
-                        src={faviconPreview}
-                        className="max-h-full object-contain drop-shadow-sm"
-                        alt="Favicon Preview"
-                      />
-                    ) : (
-                      <span className="text-slate-300 text-[10px] font-medium text-center leading-tight">
-                        No Icon
-                      </span>
-                    )}
+                      className={`relative border-2 border-dashed rounded-2xl p-6 flex flex-col items-center gap-4 transition-all duration-300 ${
+                        isDraggingLogo ? "border-daw-green bg-daw-green/5 scale-[0.99]" : "border-slate-200 bg-slate-50 hover:border-slate-300"
+                      } ${!isEditing || shouldLockUI ? "opacity-60 cursor-not-allowed hover:border-slate-200" : ""}`}
+                    >
+                      <div className="h-28 w-full flex items-center justify-center bg-white rounded-xl border border-slate-100 p-2 shadow-sm pointer-events-none overflow-hidden bg-[url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI4IiBoZWlnaHQ9IjgiPgo8cmVjdCB3aWR0aD0iNCIgaGVpZ2h0PSI0IiBmaWxsPSIjZjFmMTE1Ij48L3JlY3Q+CjxyZWN0IHg9IjQiIHk9IjQiIHdpZHRoPSI0IiBoZWlnaHQ9IjQiIGZpbGw9IiNmMWYxMTUiPjwvcmVjdD4KPC9zdmc+')]">
+                        {logoPreview ? (
+                          <img src={logoPreview} className="max-h-full max-w-full object-contain drop-shadow-sm" alt="Logo Preview" />
+                        ) : (
+                          <span className="text-slate-300 text-xs font-medium">No Logo Selected</span>
+                        )}
+                      </div>
+                      <div className="text-center w-full">
+                        <input
+                          type="file"
+                          accept="image/*"
+                          disabled={!isEditing || shouldLockUI}
+                          onChange={(e) => {
+                            const file = e.target.files?.[0];
+                            if (file) {
+                              setCropTarget({ type: 'logo', file });
+                              e.target.value = '';
+                            }
+                          }}
+                          className="absolute inset-0 w-full h-full opacity-0 cursor-pointer disabled:cursor-not-allowed"
+                        />
+                        <button type="button" disabled={!isEditing || shouldLockUI} className="text-xs font-bold text-daw-green bg-daw-green/10 hover:bg-daw-green hover:text-white transition-colors px-4 py-2 rounded-lg disabled:opacity-50">
+                          {isDraggingLogo ? "Lepaskan file di sini" : "Pilih Logo"}
+                        </button>
+                      </div>
+                    </div>
                   </div>
 
-                  <div className="text-center w-full">
-                    <p className="text-xs font-bold text-slate-600 mb-1">
-                      {isDraggingFavicon
-                        ? "Lepaskan file di sini"
-                        : "Drag & drop ikon"}
-                    </p>
-                    <p className="text-[10px] text-slate-400 mb-3">atau</p>
-                    <input
-                      type="file"
-                      accept="image/png, image/x-icon, image/svg+xml, image/vnd.microsoft.icon"
-                      disabled={!isEditing || shouldLockUI}
-                      onChange={(e) => {
-                        const file = e.target.files?.[0];
-                        if (file) {
+                  {/* BOX UPLOAD FAVICON */}
+                  <div className="space-y-3">
+                    <label className="flex items-center text-[10px] font-black text-slate-500 uppercase tracking-widest">
+                      Ikon Tab (Favicon)
+                      <HelpTooltip content="Favicon adalah ikon kecil yang muncul di tab browser (sebelah judul website). Mengapa penting? Membuat website Anda terlihat tepercaya dan profesional. Gunakan gambar persegi (1:1)." position="top" />
+                    </label>
+                    <div
+                      onDragOver={(e) => {
+                        e.preventDefault();
+                        if (isEditing && !shouldLockUI) setIsDraggingFavicon(true);
+                      }}
+                      onDragLeave={(e) => {
+                        e.preventDefault();
+                        setIsDraggingFavicon(false);
+                      }}
+                      onDrop={(e) => {
+                        e.preventDefault();
+                        setIsDraggingFavicon(false);
+                        if (!isEditing || shouldLockUI) return;
+                        const file = e.dataTransfer.files?.[0];
+                        if (file && file.type.startsWith("image/")) {
                           setCropTarget({ type: 'favicon', file });
-                          e.target.value = '';
+                        } else if (file) {
+                          toast.error("Format file tidak didukung. Gunakan gambar (ICO/PNG).");
                         }
                       }}
-                      className="w-full text-center text-[10px] file:mr-3 file:py-1.5 file:px-4 file:rounded-full file:border-0 file:bg-daw-green/10 file:text-daw-green file:font-bold file:cursor-pointer cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-                    />
+                      className={`relative border-2 border-dashed rounded-2xl p-6 flex flex-col items-center gap-4 transition-all duration-300 ${
+                        isDraggingFavicon ? "border-daw-green bg-daw-green/5 scale-[0.99]" : "border-slate-200 bg-slate-50 hover:border-slate-300"
+                      } ${!isEditing || shouldLockUI ? "opacity-60 cursor-not-allowed hover:border-slate-200" : ""}`}
+                    >
+                      <div className="h-28 w-28 flex items-center justify-center bg-white rounded-xl border border-slate-100 p-3 shadow-sm pointer-events-none overflow-hidden bg-[url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI4IiBoZWlnaHQ9IjgiPgo8cmVjdCB3aWR0aD0iNCIgaGVpZ2h0PSI0IiBmaWxsPSIjZjFmMTE1Ij48L3JlY3Q+CjxyZWN0IHg9IjQiIHk9IjQiIHdpZHRoPSI0IiBoZWlnaHQ9IjQiIGZpbGw9IiNmMWYxMTUiPjwvcmVjdD4KPC9zdmc+')]">
+                        {faviconPreview ? (
+                          <img src={faviconPreview} className="max-h-full max-w-full object-contain drop-shadow-sm" alt="Favicon Preview" />
+                        ) : (
+                          <span className="text-slate-300 text-xs font-medium text-center">No Icon</span>
+                        )}
+                      </div>
+                      <div className="text-center w-full">
+                        <input
+                          type="file"
+                          accept="image/png, image/x-icon, image/svg+xml, image/vnd.microsoft.icon"
+                          disabled={!isEditing || shouldLockUI}
+                          onChange={(e) => {
+                            const file = e.target.files?.[0];
+                            if (file) {
+                              setCropTarget({ type: 'favicon', file });
+                              e.target.value = '';
+                            }
+                          }}
+                          className="absolute inset-0 w-full h-full opacity-0 cursor-pointer disabled:cursor-not-allowed"
+                        />
+                        <button type="button" disabled={!isEditing || shouldLockUI} className="text-xs font-bold text-daw-green bg-daw-green/10 hover:bg-daw-green hover:text-white transition-colors px-4 py-2 rounded-lg disabled:opacity-50">
+                          {isDraggingFavicon ? "Lepaskan file di sini" : "Pilih Ikon"}
+                        </button>
+                      </div>
+                    </div>
                   </div>
                 </div>
               </div>
             </div>
-          </div>
+          )}
+
+          {/* TAB 2: CONTACT & LOCATION */}
+          {activeTab === "contact" && (
+            <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+              <div className="border-b border-slate-100 pb-4">
+                <h2 className="text-xl font-bold text-slate-800 flex items-center gap-2">
+                  <Phone className="w-5 h-5 text-daw-green" />
+                  Informasi Kontak Utama
+                </h2>
+                <p className="text-xs text-slate-500 mt-1">Ditampilkan pada halaman 'Hubungi Kami' dan bagian Footer website.</p>
+              </div>
+
+              <div className="space-y-6 max-w-2xl">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                  <div>
+                    <label htmlFor="phone" className="flex items-center text-[10px] font-black text-slate-500 uppercase tracking-wider mb-2">
+                      <Phone className="w-3.5 h-3.5 mr-1.5" /> Nomor Telepon
+                    </label>
+                    <input
+                      id="phone"
+                      type="text"
+                      name="phone"
+                      value={formData.phone}
+                      onChange={handleChange}
+                      readOnly={!isEditing || shouldLockUI}
+                      className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-daw-green/20 focus:border-daw-green focus:bg-white text-slate-800 font-bold transition-colors read-only:bg-slate-50 read-only:text-slate-500 read-only:focus:ring-0 cursor-text"
+                    />
+                  </div>
+                  <div>
+                    <label htmlFor="email" className="flex items-center text-[10px] font-black text-slate-500 uppercase tracking-wider mb-2">
+                      <Mail className="w-3.5 h-3.5 mr-1.5" /> Email Utama
+                      <HelpTooltip content="Alamat email resmi untuk menerima pertanyaan dari pengunjung website. Segala pesan masuk dari form kontak pengunjung akan otomatis diteruskan ke sistem." position="bottom" />
+                    </label>
+                    <input
+                      id="email"
+                      type="email"
+                      name="email"
+                      value={formData.email}
+                      onChange={handleChange}
+                      readOnly={!isEditing || shouldLockUI}
+                      className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-daw-green/20 focus:border-daw-green focus:bg-white text-slate-800 font-bold transition-colors read-only:bg-slate-50 read-only:text-slate-500 read-only:focus:ring-0 cursor-text"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label htmlFor="address" className="flex items-center text-[10px] font-black text-slate-500 uppercase tracking-wider mb-2">
+                    <MapPin className="w-3.5 h-3.5 mr-1.5" /> Alamat Kantor Pusat
+                  </label>
+                  <textarea
+                    id="address"
+                    name="address"
+                    rows={3}
+                    value={formData.address}
+                    onChange={handleChange}
+                    readOnly={!isEditing || shouldLockUI}
+                    className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-daw-green/20 focus:border-daw-green focus:bg-white text-slate-800 font-medium resize-none transition-colors leading-relaxed read-only:bg-slate-50 read-only:text-slate-500 read-only:focus:ring-0 cursor-text"
+                  />
+                </div>
+
+                <div className="pt-4 border-t border-slate-100">
+                  <label htmlFor="googleMapsUrl" className="flex items-center text-[10px] font-black text-slate-500 uppercase tracking-wider mb-2">
+                    <Map className="w-3.5 h-3.5 mr-1.5" /> Tautan Peta Digital (Google Maps)
+                    <HelpTooltip content={
+                      <div className="space-y-2">
+                        <p>Peta interaktif yang akan tampil di halaman 'Hubungi Kami'.</p>
+                        <p className="font-bold text-amber-300">Cara mengambil:</p>
+                        <ol className="list-decimal pl-4 space-y-1">
+                          <li>Buka Google Maps, cari lokasi.</li>
+                          <li>Klik tombol "Bagikan" &rarr; pilih "Sematkan Peta".</li>
+                          <li>Klik "Salin HTML".</li>
+                          <li>Tempel seluruh kodenya ke kotak ini. Sistem akan otomatis mengambil URL bersihnya!</li>
+                        </ol>
+                      </div>
+                    } position="top" />
+                  </label>
+                  <input
+                    id="googleMapsUrl"
+                    type="text"
+                    name="googleMapsUrl"
+                    value={formData.googleMapsUrl}
+                    onChange={handleChange}
+                    readOnly={!isEditing || shouldLockUI}
+                    placeholder='Tempel (Paste) kode iframe HTML atau URL di sini'
+                    className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-xs font-mono focus:outline-none focus:ring-2 focus:ring-daw-green/20 focus:border-daw-green focus:bg-white text-slate-700 transition-colors read-only:bg-slate-50 read-only:text-slate-500 read-only:focus:ring-0 cursor-text"
+                  />
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* TAB 3: SOCIAL MEDIA */}
+          {activeTab === "social" && (
+            <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+              <div className="border-b border-slate-100 pb-4">
+                <h2 className="text-xl font-bold text-slate-800 flex items-center gap-2">
+                  <Share2 className="w-5 h-5 text-daw-green" />
+                  Tautan Media Sosial & Web
+                </h2>
+                <p className="text-xs text-slate-500 mt-1">Platform publik yang terhubung dengan website utama.</p>
+              </div>
+
+              <div className="space-y-6 max-w-2xl">
+                <div>
+                  <label htmlFor="website" className="flex items-center text-[10px] font-black text-slate-500 uppercase tracking-wider mb-2">
+                    Situs Utama (URL)
+                  </label>
+                  <div className="relative">
+                    <Globe className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                    <input
+                      id="website"
+                      type="text"
+                      name="website"
+                      value={formData.website}
+                      onChange={handleChange}
+                      readOnly={!isEditing || shouldLockUI}
+                      placeholder="contoh: daw.co.id"
+                      className="w-full pl-11 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-daw-green/20 focus:border-daw-green focus:bg-white text-slate-800 font-medium transition-colors read-only:bg-slate-50 read-only:text-slate-500 read-only:focus:ring-0 cursor-text"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label htmlFor="linkedinUrl" className="flex items-center text-[10px] font-black text-slate-500 uppercase tracking-wider mb-2">
+                    LinkedIn URL
+                    <HelpTooltip content="Tautan langsung ke halaman profil LinkedIn perusahaan Anda. Contoh format: https://linkedin.com/company/nama-perusahaan" position="top" />
+                  </label>
+                  <input
+                    id="linkedinUrl"
+                    type="url"
+                    name="linkedinUrl"
+                    value={formData.linkedinUrl}
+                    onChange={handleChange}
+                    readOnly={!isEditing || shouldLockUI}
+                    placeholder="https://linkedin.com/company/..."
+                    className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-daw-green/20 focus:border-daw-green focus:bg-white text-slate-800 font-medium transition-colors read-only:bg-slate-50 read-only:text-slate-500 read-only:focus:ring-0 cursor-text"
+                  />
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
