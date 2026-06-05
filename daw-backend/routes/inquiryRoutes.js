@@ -54,12 +54,28 @@ router.get(
   inquiryController.getAllInquiries,
 );
 
+// Bulk delete inquiry records
+router.delete(
+  "/bulk",
+  verifyToken,
+  checkPermission("manage_inbox"),
+  inquiryController.bulkDeleteInquiries,
+);
+
 // Mutate inquiry read status
 router.put(
   "/:id/read",
   verifyToken,
   checkPermission("manage_inbox"),
   inquiryController.markAsRead,
+);
+
+// Reassign inquiry to another subject
+router.put(
+  "/:id/reassign",
+  verifyToken,
+  checkPermission("manage_inbox"),
+  inquiryController.reassignInquiry,
 );
 
 // Terminate inquiry record

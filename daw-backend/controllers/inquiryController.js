@@ -19,10 +19,16 @@ exports.submitInquiry = async (req, res) => {
   }
 };
 
-// Admin: Retrieve all incoming messages
+// Admin: Retrieve all incoming messages with pagination and filtering
 exports.getAllInquiries = async (req, res) => {
   try {
-    const inquiries = await inquiryService.getAllInquiries();
+    const { page, limit, search, subject } = req.query;
+    const inquiries = await inquiryService.getAllInquiries({
+      page: page ? parseInt(page, 10) : 1,
+      limit: limit ? parseInt(limit, 10) : 50,
+      search,
+      subject
+    });
     res.json(inquiries);
   } catch (error) {
     res.status(500).json({ message: error.message });
@@ -50,6 +56,38 @@ exports.deleteInquiry = async (req, res) => {
     if (error.message === "NOT_FOUND")
       return res.status(404).json({ message: "Not found" });
     res.status(500).json({ message: error.message });
+  }
+};
+
+// Admin: Bulk delete messages
+exports.bulkDeleteInquiries = async (req, res) => {
+  try {
+    const { ids } = req.body;
+    if (!ids || !Array.isArray(ids)) {
+      return res.status(400).json({ message: "Invalid payload, expected array of ids" });
+    }
+    await inquiryService.bulkDeleteInquiries(ids);
+    res.json({ success: true, message: `Deleted ${ids.length} messages` });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// Admin: Reassign/Forward message to another department
+exports.reassignInquiry = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { newSubjectName } = req.body;
+    if (!newSubjectName) {
+      return res.status(400).json({ message: "newSubjectName is required" });
+    }
+    const updatedInquiry = await inquiryService.reassignInquiry(id, newSubjectName);
+    res.json({ success: true, data: updatedInquiry });
+  } catch (error) {
+    if (error.message === "NOT_FOUND") {
+      return res.status(404).json({ message: "Not found" });
+    }
+    res.status(400).json({ message: error.message });
   }
 };
 

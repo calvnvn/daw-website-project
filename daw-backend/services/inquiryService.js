@@ -1,3 +1,4 @@
+const { Op } = require("sequelize");
 const Inquiry = require("../models/Inquiry");
 const InquirySubject = require("../models/InquirySubject");
 const Settings = require("../models/Settings");
@@ -37,8 +38,19 @@ class InquiryService {
       message,
     });
 
-    // Dispatch email notification asynchronously (fire-and-forget)
-    const targetEmail = activeSubject.recipient_email || process.env.SMTP_USER;
+    // Strategi Central Archive Email: Selalu kirimkan salinan ke SMTP Utama
+    const primaryEmail = process.env.SMTP_USER;
+    const departmentEmail = activeSubject.recipient_email;
+
+    let recipients = [primaryEmail];
+    if (
+      departmentEmail &&
+      departmentEmail.trim() !== "" &&
+      departmentEmail !== primaryEmail
+    ) {
+      recipients.push(departmentEmail);
+    }
+    const targetEmail = recipients.join(", ");
 
     sendInquiryNotification({
       targetEmail,
@@ -58,9 +70,35 @@ class InquiryService {
     return newInquiry;
   }
 
-  // Retrieve all inquiries, ordered by newest first.
-  async getAllInquiries() {
-    return await Inquiry.findAll({ order: [["createdAt", "DESC"]] });
+  // Retrieve inquiries with pagination, searching, and filtering
+  async getAllInquiries({ page = 1, limit = 50, search = "", subject = "All" } = {}) {
+    const offset = (page - 1) * limit;
+    const whereClause = {};
+
+    if (search) {
+      whereClause[Op.or] = [
+        { name: { [Op.like]: `%${search}%` } },
+        { message: { [Op.like]: `%${search}%` } },
+      ];
+    }
+
+    if (subject && subject !== "All") {
+      whereClause.subject = subject;
+    }
+
+    const { rows, count } = await Inquiry.findAndCountAll({
+      where: whereClause,
+      order: [["createdAt", "DESC"]],
+      limit: parseInt(limit, 10),
+      offset: parseInt(offset, 10),
+    });
+
+    return {
+      data: rows,
+      total: count,
+      page: parseInt(page, 10),
+      totalPages: Math.ceil(count / limit),
+    };
   }
 
   // Mark a specific inquiry as read.
@@ -79,6 +117,70 @@ class InquiryService {
 
     await inquiry.destroy();
     return true;
+  }
+
+  // Bulk delete inquiries for performance optimization
+  async bulkDeleteInquiries(ids) {
+    if (!Array.isArray(ids) || ids.length === 0) {
+      throw new Error("No IDs provided for bulk deletion");
+    }
+    
+    await Inquiry.destroy({
+      where: {
+        id: { [Op.in]: ids }
+      }
+    });
+    return true;
+  }
+
+  // Reassign an inquiry to a different subject/department
+  async reassignInquiry(id, newSubjectName) {
+    const inquiry = await Inquiry.findByPk(id);
+    if (!inquiry) throw new Error("NOT_FOUND");
+
+    const newSubject = await InquirySubject.findOne({
+      where: { name: newSubjectName, isActive: true },
+    });
+    if (!newSubject) throw new Error("Invalid or inactive subject category.");
+    if (newSubject.is_redirect) throw new Error("Cannot reassign to a redirect subject.");
+
+    await inquiry.update({ subject: newSubject.name });
+
+    // Send a new email to the new department
+    const companySettings = await Settings.findOne();
+    const logoUrl = companySettings?.companyLogo
+      ? `${process.env.BASE_URL}/uploads/${companySettings.companyLogo}`
+      : null;
+
+    const primaryEmail = process.env.SMTP_USER;
+    const departmentEmail = newSubject.recipient_email;
+
+    let recipients = [primaryEmail];
+    if (
+      departmentEmail &&
+      departmentEmail.trim() !== "" &&
+      departmentEmail !== primaryEmail
+    ) {
+      recipients.push(departmentEmail);
+    }
+    const targetEmail = recipients.join(", ");
+
+    sendInquiryNotification({
+      targetEmail,
+      name: inquiry.name,
+      email: inquiry.email,
+      phone: inquiry.phone,
+      company: inquiry.company,
+      subject: `[FORWARDED] ${inquiry.subject}`,
+      message: `--- DITERUSKAN OLEH ADMIN UTAMA ---\n\n${inquiry.message}`,
+      activeSubjectName: newSubject.name,
+      logoUrl,
+      companyName: companySettings?.companyName || "DAW Group",
+    }).catch((err) => {
+      console.error("[MAILER ERROR DURING REASSIGN]:", err.message);
+    });
+
+    return inquiry;
   }
 
   // INQUIRY SUBJECT MANAGEMENT

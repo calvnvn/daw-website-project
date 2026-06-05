@@ -72,7 +72,10 @@ export default function Login() {
       }
     } catch (err: unknown) {
       toast.error("Authentication Failed", {
-        description: getErrorMessage(err, "Invalid credentials or server error"),
+        description: getErrorMessage(
+          err,
+          "Invalid credentials or server error",
+        ),
       });
     } finally {
       setIsLoading(false);
@@ -97,7 +100,7 @@ export default function Login() {
             Admin Portal
           </h1>
           <p className="text-slate-500 text-sm">
-            Sign in using your <strong>OWL Account</strong> to manage content.
+            Sign in using your <strong>Account</strong> to manage content.
           </p>
         </div>
 
@@ -160,14 +163,14 @@ export default function Login() {
                 <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
               ) : (
                 <>
-                  <span>Sign In via OWL</span>
+                  <span>Sign In</span>
                   <ArrowRight className="w-4 h-4 transform group-hover:translate-x-1 transition-transform" />
                 </>
               )}
             </button>
             <div className="mt-6 flex items-center justify-center gap-2 text-[11px] font-bold uppercase tracking-wider text-slate-400">
               <ShieldCheck className="w-3.5 h-3.5" />
-              <span>Authenticated by OWL System</span>
+              <span>Authenticated by DAW System</span>
             </div>
           </div>
         </form>

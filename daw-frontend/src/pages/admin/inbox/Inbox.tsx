@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import {
   Search,
   Mail,
@@ -10,6 +10,9 @@ import {
   Building,
   CheckSquare,
   X,
+  Forward,
+  ChevronDown,
+  Send,
 } from "lucide-react";
 import api from "@/lib/api";
 import { toast } from "sonner";
@@ -20,27 +23,38 @@ interface Inquiry {
   id: number;
   name: string;
   email: string;
-  phone?: string; // null/undefined
-  company?: string; // null/undefined
-  subject?: string; // null/undefined
+  phone?: string;
+  company?: string;
+  subject?: string;
   message: string;
   isRead: boolean;
-  createdAt: string; // Database Sequelize
+  createdAt: string;
 }
 
 export default function Inbox() {
   const [inquiries, setInquiries] = useState<Inquiry[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
   const [selectedInquiryId, setSelectedInquiryId] = useState<number | null>(
     null,
   );
 
   const [isLoading, setIsLoading] = useState(true);
+  const [isFetchingMore, setIsFetchingMore] = useState(false);
   const [filterSubject, setFilterSubject] = useState("All");
   const [selectedMails, setSelectedMails] = useState<number[]>([]);
 
   const [subjects, setSubjects] = useState<any[]>([]);
   const [isSubjectModalOpen, setIsSubjectModalOpen] = useState(false);
+
+  // Pagination & Reassign States
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [isReassignDropdownOpen, setIsReassignDropdownOpen] = useState(false);
+
+  // Debounce Refs
+  const readTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const searchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // FETCH MASTER SUBJECTS
   const fetchSubjects = async () => {
@@ -52,63 +66,100 @@ export default function Inbox() {
     }
   };
 
-  const copyEmailToClipboard = (email: string) => {
-    navigator.clipboard.writeText(email);
-    toast.success("Alamat email berhasil disalin!");
+  const copyEmailToClipboard = async (email: string) => {
+    try {
+      await navigator.clipboard.writeText(email);
+      toast.success("Alamat email berhasil disalin!");
+    } catch (err) {
+      toast.error("Browser Anda memblokir aksi salin ke clipboard.");
+    }
   };
+
   const openWebMail = (provider: "gmail" | "outlook" | "default") => {
     if (!selectedInquiry) return;
-
     const email = selectedInquiry.email;
     const subject = encodeURIComponent("Reply from Dharma Agung Wijaya");
-
-    // Link khusus untuk direct compose
     const urls = {
       gmail: `https://mail.google.com/mail/?view=cm&fs=1&to=${email}&su=${subject}`,
       outlook: `https://outlook.office.com/mail/deeplink/compose?to=${email}&subject=${subject}`,
       default: `mailto:${email}?subject=${subject}`,
     };
-
     window.open(urls[provider], "_blank");
   };
 
-  // FETCH DATA DARI DATABASE
-  useEffect(() => {
-    const fetchInquiries = async () => {
-      setIsLoading(true);
+  // FETCH DATA DARI DATABASE (PAGINATION)
+  const fetchInquiries = useCallback(
+    async (
+      pageNum: number,
+      searchTxt: string,
+      subj: string,
+      append = false,
+    ) => {
+      if (pageNum === 1) setIsLoading(true);
+      else setIsFetchingMore(true);
+
       try {
-        const response = await api.get("/inquiries");
-        const data = response.data;
-        setInquiries(data);
-        if (data.length > 0 && !selectedInquiryId) {
-          setSelectedInquiryId(data[0].id);
+        const response = await api.get("/inquiries", {
+          params: {
+            page: pageNum,
+            limit: 20,
+            search: searchTxt,
+            subject: subj === "All" ? "" : subj,
+          },
+        });
+        const data = response.data.data;
+        setTotalPages(response.data.totalPages);
+
+        if (append) {
+          setInquiries((prev) => [...prev, ...data]);
+        } else {
+          setInquiries(data);
+          if (data.length > 0 && !selectedInquiryId) {
+            setSelectedInquiryId(data[0].id);
+          }
         }
       } catch (error) {
         console.error("Failed to fetch inquiries", error);
         toast.error("Session expired or server error");
       } finally {
         setIsLoading(false);
+        setIsFetchingMore(false);
       }
-    };
-    fetchInquiries();
+    },
+    [selectedInquiryId], // added so it knows when to auto-select
+  );
+
+  useEffect(() => {
     fetchSubjects();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const filteredInquiries = useMemo(() => {
-    return inquiries.filter((inq) => {
-      const matchesSearch =
-        inq.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        inq.message.toLowerCase().includes(searchTerm.toLowerCase());
-      const matchesFilter =
-        filterSubject === "All" || inq.subject === filterSubject;
-      return matchesSearch && matchesFilter;
-    });
-  }, [inquiries, searchTerm, filterSubject]);
+  // Handle Search Debounce
+  useEffect(() => {
+    if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current);
+    searchTimeoutRef.current = setTimeout(() => {
+      setDebouncedSearch(searchTerm);
+      setPage(1); // Reset ke halaman 1 jika mencari
+    }, 500);
+    return () => {
+      if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current);
+    };
+  }, [searchTerm]);
+
+  // Refetch when dependencies change
+  useEffect(() => {
+    fetchInquiries(page, debouncedSearch, filterSubject, page > 1);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [page, debouncedSearch, filterSubject]);
+
+  const handleFilterChange = (subj: string) => {
+    setFilterSubject(subj);
+    setPage(1);
+    setSelectedInquiryId(null);
+  };
 
   const handleSelectAll = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.checked) {
-      setSelectedMails(filteredInquiries.map((inq) => inq.id));
+      setSelectedMails(inquiries.map((inq) => inq.id));
     } else {
       setSelectedMails([]);
     }
@@ -124,41 +175,32 @@ export default function Inbox() {
 
   const bulkDelete = () => {
     if (selectedMails.length === 0) return;
-
     toast("Confirm Bulk Deletion", {
       description: `Are you sure you want to delete ${selectedMails.length} messages?`,
       action: {
         label: "Yes, Delete",
-        onClick: () => executeBulkDelete(), // Jalankan eksekusi jika diklik
+        onClick: () => executeBulkDelete(),
       },
-      cancel: {
-        label: "Cancel",
-        onClick: () => {}, // Tutup toast tanpa aksi
-      },
+      cancel: { label: "Cancel", onClick: () => {} },
     });
   };
 
-  // Fungsi Eksekutor: Menangani API Call (Ghost-Free)
+  // BULK DELETE API
   const executeBulkDelete = async () => {
     const loadingToast = toast.loading(
       `Deleting ${selectedMails.length} messages...`,
     );
-
     try {
-      // Eksekusi paralel lewat instance 'api'
-      const deletePromises = selectedMails.map((id) =>
-        api.delete(`/inquiries/${id}`),
-      );
-      await Promise.all(deletePromises);
+      await api.delete("/inquiries/bulk", { data: { ids: selectedMails } });
 
-      // Update state lokal
       setInquiries((prev) =>
         prev.filter((inq) => !selectedMails.includes(inq.id)),
       );
-
       toast.success("Messages deleted permanently!", { id: loadingToast });
-      setSelectedMails([]); // Reset centangan
-      setSelectedInquiryId(null);
+      if (selectedMails.includes(selectedInquiryId as number)) {
+        setSelectedInquiryId(null);
+      }
+      setSelectedMails([]);
     } catch (err: unknown) {
       console.error("Bulk delete error", err);
       toast.error(getErrorMessage(err) || "Failed to delete messages.", {
@@ -184,48 +226,76 @@ export default function Inbox() {
   const deleteInquiry = (id: number) => {
     toast("Delete Message", {
       description: "Are you sure you want to delete this message permanently?",
-      action: {
-        label: "Yes, Delete",
-        onClick: () => executeDelete(id), // Lempar ID ke eksekutor
-      },
-      cancel: {
-        label: "Cancel",
-        onClick: () => {},
-      },
+      action: { label: "Yes, Delete", onClick: () => executeDelete(id) },
+      cancel: { label: "Cancel", onClick: () => {} },
     });
   };
 
-  // 2. Fungsi Eksekutor (The Logic)
   const executeDelete = async (id: number) => {
     const loadingToast = toast.loading("Deleting message...");
-
     try {
       await api.delete(`/inquiries/${id}`);
-
       const newInquiries = inquiries.filter((inq) => inq.id !== id);
       setInquiries(newInquiries);
-
       if (selectedInquiryId === id) {
         setSelectedInquiryId(
           newInquiries.length > 0 ? newInquiries[0].id : null,
         );
       }
-
       toast.success("Message deleted!", { id: loadingToast });
     } catch (error: unknown) {
-      console.error("Delete error:", error);
       toast.error(getErrorMessage(error) || "Failed to delete message", {
         id: loadingToast,
       });
     }
   };
+
+  // DEBOUNCE SPAM PROTECTION FOR MARK AS READ
   const handleSelectInquiry = (id: number) => {
     setSelectedInquiryId(id);
     const inq = inquiries.find((i) => i.id === id);
-    if (inq && !inq.isRead) markAsRead(id);
+    if (inq && !inq.isRead) {
+      if (readTimeoutRef.current) clearTimeout(readTimeoutRef.current);
+      readTimeoutRef.current = setTimeout(() => {
+        markAsRead(id);
+      }, 1500); // 1.5 detik delay
+    }
   };
 
-  // Format Tanggal
+  // REASSIGN MESSAGE API
+  const executeReassign = async (newSubjectName: string) => {
+    if (!selectedInquiryId) return;
+    const loadingToast = toast.loading(`Forwarding to ${newSubjectName}...`);
+    try {
+      await api.put(`/inquiries/${selectedInquiryId}/reassign`, {
+        newSubjectName,
+      });
+
+      // Update UI (Remove or change category)
+      if (filterSubject !== "All" && filterSubject !== newSubjectName) {
+        setInquiries((prev) => prev.filter((i) => i.id !== selectedInquiryId));
+        setSelectedInquiryId(null);
+      } else {
+        setInquiries((prev) =>
+          prev.map((inq) =>
+            inq.id === selectedInquiryId
+              ? { ...inq, subject: newSubjectName }
+              : inq,
+          ),
+        );
+      }
+
+      setIsReassignDropdownOpen(false);
+      toast.success(`Message forwarded successfully via SMTP!`, {
+        id: loadingToast,
+      });
+    } catch (err: unknown) {
+      toast.error(getErrorMessage(err) || "Failed to forward message", {
+        id: loadingToast,
+      });
+    }
+  };
+
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
     return date.toLocaleDateString("en-GB", {
@@ -247,7 +317,7 @@ export default function Inbox() {
               Contact Inquiries
             </h1>
             <p className="text-sm text-slate-500 mt-1">
-              Kelola pesan yang diterima melalui formulir Hubungi Kami.
+              Kelola pesan masuk dan distribusikan ke departemen yang tepat.
             </p>
           </div>
           <div className="flex items-center gap-3">
@@ -257,7 +327,7 @@ export default function Inbox() {
               <CheckSquare className="w-4 h-4" /> Manage Subjects
             </button>
             <div className="bg-daw-green/10 text-daw-green px-4 py-2 rounded-lg font-bold text-sm flex items-center gap-2">
-              <Mail className="w-4 h-4" /> {unreadCount} Unread
+              <Mail className="w-4 h-4" /> {unreadCount} Unread on this page
             </div>
           </div>
         </div>
@@ -266,7 +336,6 @@ export default function Inbox() {
         <div className="flex-1 bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden flex flex-col md:flex-row min-h-[500px] h-[calc(100vh-200px)] max-h-[700px]">
           {/* LEFT: LIST */}
           <div className="w-full md:w-[350px] lg:w-[400px] border-r border-slate-200 flex flex-col shrink-0 bg-white">
-            {/* SEARCH & BULK ACTION BAR */}
             <div className="p-4 border-b border-slate-100 bg-slate-50/50">
               <div className="relative mb-3">
                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
@@ -284,8 +353,12 @@ export default function Inbox() {
               {/* FILTER TABS */}
               <div className="flex gap-2 overflow-x-auto hide-scrollbar pb-1">
                 <button
-                  onClick={() => setFilterSubject("All")}
-                  className={`px-3 py-1.5 rounded-md text-[10px] uppercase tracking-wider font-bold whitespace-nowrap transition-colors ${filterSubject === "All" ? "bg-daw-green text-white" : "bg-slate-100 text-slate-500 hover:bg-slate-200"}`}>
+                  onClick={() => handleFilterChange("All")}
+                  className={`px-3 py-1.5 rounded-md text-[10px] uppercase tracking-wider font-bold whitespace-nowrap transition-colors ${
+                    filterSubject === "All"
+                      ? "bg-daw-green text-white"
+                      : "bg-slate-100 text-slate-500 hover:bg-slate-200"
+                  }`}>
                   All
                 </button>
                 {subjects
@@ -293,7 +366,7 @@ export default function Inbox() {
                   .map((sub) => (
                     <button
                       key={sub.id}
-                      onClick={() => setFilterSubject(sub.name)}
+                      onClick={() => handleFilterChange(sub.name)}
                       className={`px-3 py-1.5 rounded-md text-[10px] uppercase tracking-wider font-bold whitespace-nowrap transition-colors ${
                         filterSubject === sub.name
                           ? "bg-daw-green text-white"
@@ -301,7 +374,7 @@ export default function Inbox() {
                       }`}>
                       {sub.name}
                     </button>
-                  ))}{" "}
+                  ))}
               </div>
             </div>
 
@@ -313,12 +386,12 @@ export default function Inbox() {
                   className="w-4 h-4 text-daw-green rounded border-slate-300 focus:ring-daw-green cursor-pointer"
                   onChange={handleSelectAll}
                   checked={
-                    filteredInquiries.length > 0 &&
-                    selectedMails.length === filteredInquiries.length
+                    inquiries.length > 0 &&
+                    selectedMails.length === inquiries.length
                   }
                 />
                 <span className="text-[11px] font-bold text-slate-400 uppercase tracking-widest">
-                  Select All Messages
+                  Select Page Messages
                 </span>
               </div>
             </div>
@@ -345,8 +418,8 @@ export default function Inbox() {
             )}
 
             {/* LIST AREA */}
-            <div className="flex-1 overflow-y-auto custom-scrollbar">
-              {isLoading ? (
+            <div className="flex-1 overflow-y-auto custom-scrollbar relative">
+              {isLoading && page === 1 ? (
                 <div className="p-4 space-y-4">
                   {[1, 2, 3, 4].map((n) => (
                     <div key={n} className="animate-pulse flex gap-3">
@@ -359,12 +432,14 @@ export default function Inbox() {
                     </div>
                   ))}
                 </div>
-              ) : filteredInquiries.length > 0 ? (
-                <div className="divide-y divide-slate-100">
-                  {filteredInquiries.map((inq) => (
+              ) : inquiries.length > 0 ? (
+                <div className="divide-y divide-slate-100 pb-16">
+                  {inquiries.map((inq) => (
                     <div
                       key={inq.id}
-                      className={`flex items-start p-4 transition-colors hover:bg-slate-50 group relative cursor-pointer ${selectedInquiryId === inq.id ? "bg-green-50/50" : ""}`}
+                      className={`flex items-start p-4 transition-colors hover:bg-slate-50 group relative cursor-pointer ${
+                        selectedInquiryId === inq.id ? "bg-green-50/50" : ""
+                      }`}
                       onClick={() => handleSelectInquiry(inq.id)}>
                       {selectedInquiryId === inq.id && (
                         <div className="absolute left-0 top-0 bottom-0 w-1 bg-daw-green"></div>
@@ -382,7 +457,11 @@ export default function Inbox() {
                       <div className="flex-1 min-w-0">
                         <div className="flex justify-between items-start mb-1">
                           <h3
-                            className={`text-sm truncate pr-4 ${!inq.isRead ? "font-bold text-slate-900" : "font-medium text-slate-700"}`}>
+                            className={`text-sm truncate pr-4 ${
+                              !inq.isRead
+                                ? "font-bold text-slate-900"
+                                : "font-medium text-slate-700"
+                            }`}>
                             {inq.name}
                           </h3>
                           <span className="text-[10px] text-slate-400 whitespace-nowrap shrink-0">
@@ -390,11 +469,19 @@ export default function Inbox() {
                           </span>
                         </div>
                         <h4
-                          className={`text-xs truncate mb-1 ${!inq.isRead ? "font-semibold text-slate-800" : "text-slate-500"}`}>
+                          className={`text-xs truncate mb-1 ${
+                            !inq.isRead
+                              ? "font-semibold text-slate-800"
+                              : "text-slate-500"
+                          }`}>
                           {inq.subject || "General Inquiry"}
                         </h4>
                         <p
-                          className={`text-xs line-clamp-2 ${!inq.isRead ? "text-slate-600 font-medium" : "text-slate-400"}`}>
+                          className={`text-xs line-clamp-2 ${
+                            !inq.isRead
+                              ? "text-slate-600 font-medium"
+                              : "text-slate-400"
+                          }`}>
                           {inq.message}
                         </p>
                       </div>
@@ -403,6 +490,18 @@ export default function Inbox() {
                       )}
                     </div>
                   ))}
+
+                  {/* LOAD MORE BUTTON */}
+                  {page < totalPages && (
+                    <div className="p-4 flex justify-center">
+                      <button
+                        onClick={() => setPage((p) => p + 1)}
+                        disabled={isFetchingMore}
+                        className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-lg text-xs font-bold transition-colors disabled:opacity-50">
+                        {isFetchingMore ? "Loading..." : "Load More Messages"}
+                      </button>
+                    </div>
+                  )}
                 </div>
               ) : (
                 <div className="flex flex-col items-center justify-center text-center p-12 h-full">
@@ -417,16 +516,6 @@ export default function Inbox() {
                       ? "No messages match your filter."
                       : "You have read all your messages. Great job!"}
                   </p>
-                  {(searchTerm || filterSubject !== "All") && (
-                    <button
-                      onClick={() => {
-                        setSearchTerm("");
-                        setFilterSubject("All");
-                      }}
-                      className="mt-4 text-xs font-bold text-daw-green hover:underline">
-                      Clear Filters
-                    </button>
-                  )}
                 </div>
               )}
             </div>
@@ -448,7 +537,65 @@ export default function Inbox() {
                       </span>
                     )}
                   </div>
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 relative">
+                    {/* DROP DOWN REASSIGN */}
+                    <div className="relative">
+                      <button
+                        onClick={() =>
+                          setIsReassignDropdownOpen(!isReassignDropdownOpen)
+                        }
+                        className="px-3 py-2 text-xs font-bold text-slate-500 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors flex items-center gap-1.5">
+                        <Forward className="w-3.5 h-3.5" /> Teruskan
+                        <ChevronDown className="w-3.5 h-3.5" />
+                      </button>
+
+                      {isReassignDropdownOpen && (
+                        <>
+                          <div
+                            className="fixed inset-0 z-40"
+                            onClick={() =>
+                              setIsReassignDropdownOpen(false)
+                            }></div>
+                          <div className="absolute right-0 top-full mt-2 w-56 bg-white rounded-xl shadow-xl border border-slate-200 z-50 overflow-hidden animate-in fade-in slide-in-from-top-2">
+                            <div className="px-4 py-2 border-b border-slate-100 bg-slate-50">
+                              <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+                                Pilih PIC Subject Tujuan
+                              </span>
+                            </div>
+                            <div className="max-h-48 overflow-y-auto">
+                              {subjects
+                                .filter(
+                                  (s) =>
+                                    s.isActive &&
+                                    !s.is_redirect &&
+                                    s.name !== selectedInquiry.subject,
+                                )
+                                .map((sub) => (
+                                  <button
+                                    key={sub.id}
+                                    onClick={() => executeReassign(sub.name)}
+                                    className="w-full text-left px-4 py-2.5 text-xs font-medium text-slate-700 hover:bg-daw-green/10 hover:text-daw-green transition-colors">
+                                    {sub.name}
+                                  </button>
+                                ))}
+                              {subjects.filter(
+                                (s) =>
+                                  s.isActive &&
+                                  !s.is_redirect &&
+                                  s.name !== selectedInquiry.subject,
+                              ).length === 0 && (
+                                <div className="px-4 py-3 text-xs text-slate-400 text-center">
+                                  Tidak ada subjek lain.
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        </>
+                      )}
+                    </div>
+
+                    <div className="w-px h-6 bg-slate-200 mx-1"></div>
+
                     <button
                       onClick={() => markAsRead(selectedInquiry.id)}
                       className="p-2 text-slate-400 hover:text-daw-green hover:bg-green-50 rounded-lg transition-colors"
@@ -465,13 +612,14 @@ export default function Inbox() {
                 </div>
 
                 <div className="flex-1 overflow-y-auto p-6 md:p-8 lg:p-10 custom-scrollbar bg-slate-50/30">
-                  <div className="max-w-4xl mx-auto space-y-6">
+                  <div className="max-w-4xl mx-auto space-y-8">
+                    {/* METADATA PENGIRIM */}
                     <div className="bg-white p-6 md:p-8 rounded-2xl border border-slate-200 shadow-sm relative overflow-hidden group">
                       <div className="absolute -top-12 -right-12 w-32 h-32 bg-daw-green/5 rounded-full blur-2xl group-hover:bg-daw-green/10 transition-colors duration-500 pointer-events-none"></div>
                       <div className="flex flex-col md:flex-row md:items-start justify-between gap-6 relative z-10">
                         <div className="space-y-4 flex-1">
                           <div className="flex flex-wrap items-center gap-3 text-xs">
-                            <span className="px-3 py-1 bg-slate-100 text-slate-600 font-bold uppercase tracking-wider rounded-md border border-slate-200">
+                            <span className="px-3 py-1 bg-slate-100 text-slate-600 font-bold uppercase tracking-wider rounded-md border border-slate-200 shadow-sm">
                               {selectedInquiry.subject || "General Inquiry"}
                             </span>
                             <span className="flex items-center gap-1.5 text-slate-400 font-medium">
@@ -519,53 +667,61 @@ export default function Inbox() {
                       </div>
                     </div>
 
-                    <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-                      <div className="px-6 md:px-8 py-4 border-b border-slate-100 bg-slate-50/50 flex items-center justify-between">
-                        <h3 className="text-xs font-bold text-slate-500 uppercase tracking-widest flex items-center gap-2">
-                          <MailOpen className="w-4 h-4 text-daw-green" />{" "}
-                          Message Content
-                        </h3>
+                    {/* CHAT BUBBLE UI */}
+                    <div className="flex items-start gap-4 pr-12">
+                      <div className="w-10 h-10 rounded-full bg-daw-green text-white flex items-center justify-center font-bold shadow-md shrink-0 text-lg uppercase">
+                        {selectedInquiry.name.charAt(0)}
                       </div>
-                      <div className="p-6 md:p-8 text-slate-700 leading-relaxed whitespace-pre-wrap font-sans text-[15px]">
-                        {selectedInquiry.message}
+                      <div className="flex-1 bg-white p-5 md:p-6 rounded-2xl rounded-tl-sm border border-slate-200 shadow-sm relative">
+                        {/* Bubble Tail */}
+                        <div className="absolute top-0 -left-2 w-4 h-4 bg-white border-l border-t border-slate-200 transform -rotate-45 translate-x-1 translate-y-3"></div>
+                        <div className="relative z-10 text-slate-700 leading-relaxed whitespace-pre-wrap font-sans text-[15px]">
+                          {selectedInquiry.message}
+                        </div>
                       </div>
                     </div>
 
-                    <div className="bg-slate-900 p-6 md:p-8 rounded-2xl shadow-xl flex flex-col md:flex-row items-center justify-between gap-6 relative overflow-hidden">
-                      <div className="absolute inset-0 opacity-20 pointer-events-none">
-                        <div className="absolute -top-24 -left-24 w-48 h-48 bg-daw-green rounded-full blur-[80px]"></div>
-                      </div>
-                      <div className="relative z-10 text-center md:text-left">
-                        <h4 className="text-white font-bold text-lg mb-1">
-                          Ready to reply?
+                    {/* QUICK REPLY AREA */}
+                    <div className="bg-white p-6 md:p-8 rounded-2xl border border-slate-200 shadow-sm relative overflow-visible mt-8 pl-12 ml-4">
+                      <div className="flex items-center justify-between mb-4">
+                        <h4 className="font-bold text-slate-800 flex items-center gap-2">
+                          <Send className="w-4 h-4 text-daw-green" /> Quick
+                          Reply
                         </h4>
-                        <p className="text-slate-400 text-sm">
-                          Choose your preferred email client below.
-                        </p>
                       </div>
-                      <div className="flex flex-wrap justify-center md:justify-end items-center gap-3 relative z-10 w-full md:w-auto">
+                      <div className="relative">
+                        <textarea
+                          placeholder="Tulis balasan pesan Anda di sini..."
+                          className="w-full bg-slate-50 border border-slate-200 rounded-xl p-4 text-sm focus:outline-none focus:ring-2 focus:ring-daw-green/20 focus:border-daw-green min-h-[120px] resize-y transition-all"
+                          id="replyTextarea"
+                        />
+                      </div>
+                      <div className="mt-4 flex flex-wrap justify-end gap-3">
+                        <button
+                          onClick={() => {
+                            const body =
+                              (
+                                document.getElementById(
+                                  "replyTextarea",
+                                ) as HTMLTextAreaElement
+                              )?.value || "";
+                            const subject = encodeURIComponent(
+                              "Reply from Dharma Agung Wijaya",
+                            );
+                            window.open(
+                              `mailto:${selectedInquiry.email}?subject=${subject}&body=${encodeURIComponent(body)}`,
+                              "_blank",
+                            );
+                          }}
+                          className="inline-flex items-center gap-2 bg-daw-green hover:bg-emerald-600 text-white px-5 py-2.5 rounded-xl font-bold transition-all shadow-md active:scale-95">
+                          <Mail className="w-4 h-4" /> Buka via Default Email
+                          Client
+                        </button>
                         <button
                           onClick={() => openWebMail("gmail")}
-                          className="flex-1 md:flex-none inline-flex items-center justify-center gap-2 bg-white/10 hover:bg-white/20 text-white border border-white/10 px-5 py-2.5 rounded-xl font-medium transition-all  group">
-                          <div className="w-6 h-6 rounded-full bg-red-500 flex items-center justify-center group-hover:scale-110 transition-transform">
-                            <Mail className="w-3.5 h-3.5 text-white" />
-                          </div>{" "}
+                          className="inline-flex items-center gap-2 bg-slate-100 hover:bg-slate-200 text-slate-700 px-5 py-2.5 rounded-xl font-bold transition-all shadow-sm active:scale-95">
+                          <Mail className="w-4 h-4 text-red-500" /> Buka via Web
                           Gmail
-                        </button>
-                        <button
-                          onClick={() => openWebMail("outlook")}
-                          className="flex-1 md:flex-none inline-flex items-center justify-center gap-2 bg-white/10 hover:bg-white/20 text-white border border-white/10 px-5 py-2.5 rounded-xl font-medium transition-all  group">
-                          <div className="w-6 h-6 rounded-full bg-blue-500 flex items-center justify-center group-hover:scale-110 transition-transform">
-                            <Mail className="w-3.5 h-3.5 text-white" />
-                          </div>{" "}
-                          Outlook
-                        </button>
-                        <button
-                          onClick={() =>
-                            copyEmailToClipboard(selectedInquiry.email)
-                          }
-                          className="w-full md:w-auto inline-flex items-center justify-center gap-2 bg-daw-green hover:bg-emerald-500 text-white px-5 py-2.5 rounded-xl font-bold transition-all shadow-[0_0_15px_rgba(16,185,129,0.3)] hover:shadow-[0_0_20px_rgba(16,185,129,0.5)]">
-                          Copy Email
                         </button>
                       </div>
                     </div>
@@ -581,8 +737,8 @@ export default function Inbox() {
                   No Message Selected
                 </h3>
                 <p className="text-sm text-slate-500 max-w-sm">
-                  Select a message from the list on the left to read its
-                  contents.
+                  Pilih pesan dari antrean di sebelah kiri untuk membaca dan
+                  merespons.
                 </p>
               </div>
             )}
@@ -594,7 +750,7 @@ export default function Inbox() {
       <SubjectManagerModal
         isOpen={isSubjectModalOpen}
         onClose={() => setIsSubjectModalOpen(false)}
-        onRefresh={fetchSubjects} // Panggil fetchSubjects milik Inbox untuk update filter tab
+        onRefresh={fetchSubjects}
       />
     </>
   );
