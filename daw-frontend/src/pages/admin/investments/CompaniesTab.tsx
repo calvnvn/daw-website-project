@@ -14,6 +14,7 @@ import { getCleanImageUrl } from "@/lib/utils";
 import { CATEGORY_ICONS } from "./InvestmentConstants";
 import type { LocalAffiliate, LocalCategory } from "./InvestmentConstants";
 import ImageAdjustmentModal from "@/components/admin/ImageAdjustmentModal";
+import MagicTranslationField from "@/components/admin/MagicTranslationField";
 
 // ==========================================
 // LOGO PREVIEWER (Memoized sub-component)
@@ -341,6 +342,15 @@ export default function CompaniesTab({
                             <input type="text" placeholder="Sub-text (Optional)" value={company.desc}
                               onChange={(e) => updateCompany(company.id, "desc", e.target.value)}
                               className={`w-full px-3 py-1.5 text-xs rounded-md outline-none ${isEditing && !isLockedForEditor ? "bg-white border border-slate-300" : "bg-transparent border-transparent text-slate-500"}`} />
+                            
+                            <MagicTranslationField
+                              label="Sub-text (Indonesian)"
+                              value={company.terjemahanDesc || ""}
+                              onChange={(v) => updateCompany(company.id, "terjemahanDesc", v)}
+                              originalText={company.desc}
+                              disabled={!isEditing || isLockedForEditor || isDeleting || isNeedsRevision}
+                            />
+                            
                             <input type="url" placeholder="Website URL (https://)" value={company.websiteUrl || ""}
                               onChange={(e) => updateCompany(company.id, "websiteUrl", e.target.value)}
                               className={`w-full px-3 py-1.5 text-xs rounded-md outline-none ${isEditing && !isLockedForEditor ? "bg-white border border-slate-300" : "bg-transparent border-transparent text-slate-500"}`} />

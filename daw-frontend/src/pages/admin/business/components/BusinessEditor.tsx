@@ -12,6 +12,7 @@ import { useBusiness, type SectionData } from "@/contexts/BusinessContext";
 import "react-quill-new/dist/quill.snow.css";
 import { toast } from "sonner";
 import api, { BASE_UPLOAD_URL } from "@/lib/api";
+import MagicTranslationField from "@/components/admin/MagicTranslationField";
 
 type BusinessFormState = Omit<SectionData, "id">;
 
@@ -21,6 +22,10 @@ interface BusinessEditorProps {
   setFormData: React.Dispatch<React.SetStateAction<BusinessFormState>>;
   isEditing: boolean;
   handleDiscardDraft: () => Promise<void>;
+  terjemahanTitle: string;
+  terjemahanHtmlContent: string;
+  onTerjemahanChange: (field: string, value: string) => void;
+  isFormLocked: boolean;
 }
 
 export default function BusinessEditor({
@@ -29,6 +34,10 @@ export default function BusinessEditor({
   setFormData,
   isEditing,
   handleDiscardDraft,
+  terjemahanTitle,
+  terjemahanHtmlContent,
+  onTerjemahanChange,
+  isFormLocked,
 }: BusinessEditorProps) {
   const { rejectedDraft } = useBusiness();
   const quillRef = useRef<ReactQuill>(null);
@@ -233,6 +242,15 @@ export default function BusinessEditor({
               />
             </div>
 
+            {/* Magic Translate: Title (Indonesian) */}
+            <MagicTranslationField
+              label="Judul Sektor (Indonesian)"
+              value={terjemahanTitle}
+              onChange={(v) => onTerjemahanChange("title", v)}
+              originalText={formData.title}
+              disabled={isFormLocked || !isEditing}
+            />
+
             {/* Editor: ReactQuill */}
             <div className="space-y-2">
               <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-2">
@@ -264,6 +282,16 @@ export default function BusinessEditor({
                   media.
                 </p>
               )}
+
+              {/* Magic Translate: htmlContent (Indonesian) */}
+              <MagicTranslationField
+                label="Narasi Konten (Indonesian)"
+                value={terjemahanHtmlContent}
+                onChange={(v) => onTerjemahanChange("htmlContent", v)}
+                originalText={formData.htmlContent}
+                disabled={isFormLocked || !isEditing}
+                isRichText={true}
+              />
             </div>
           </div>
         </div>

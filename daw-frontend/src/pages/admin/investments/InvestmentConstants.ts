@@ -18,6 +18,8 @@ export interface LocalAffiliate {
   has_rejected?: boolean;
   previous_notrans?: string | null;
   isDirty?: boolean;
+  terjemahanDesc?: string;
+  originalTerjemahanDesc?: string;
 }
 
 export interface LocalCategory {

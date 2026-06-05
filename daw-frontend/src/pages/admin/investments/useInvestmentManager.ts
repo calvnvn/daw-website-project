@@ -54,6 +54,14 @@ export function useInvestmentManager() {
   });
   const [originalContent, setOriginalContent] = useState(pageContent);
 
+  // Translation states for InvestmentSettings
+  const [terjemahanHeadline, setTerjemahanHeadline] = useState("");
+  const [terjemahanBody, setTerjemahanBody] = useState("");
+  const [terjemahanIntro, setTerjemahanIntro] = useState("");
+  const [originalTerjemahanHeadline, setOriginalTerjemahanHeadline] = useState("");
+  const [originalTerjemahanBody, setOriginalTerjemahanBody] = useState("");
+  const [originalTerjemahanIntro, setOriginalTerjemahanIntro] = useState("");
+
   const [localCompanies, setLocalCompanies] = useState<LocalAffiliate[]>([]);
   const [, setOriginalCompanies] = useState<LocalAffiliate[]>([]);
   const [rejectedAffiliates, setRejectedAffiliates] = useState<
@@ -82,21 +90,63 @@ export function useInvestmentManager() {
         };
         setPageContent(content);
         setOriginalContent(content);
+
+        // Fetch manual translations for settings
+        api.get("/translation/manual", {
+          params: { modelName: "InvestmentSettings", recordId: "1" },
+        }).then((res) => {
+          const data = res.data?.data || {};
+          setTerjemahanHeadline(data.teaserHeadline || "");
+          setTerjemahanBody(data.teaserBody || "");
+          setTerjemahanIntro(data.sectionIntro || "");
+          setOriginalTerjemahanHeadline(data.teaserHeadline || "");
+          setOriginalTerjemahanBody(data.teaserBody || "");
+          setOriginalTerjemahanIntro(data.sectionIntro || "");
+        }).catch(() => {
+          setTerjemahanHeadline(""); setTerjemahanBody(""); setTerjemahanIntro("");
+          setOriginalTerjemahanHeadline(""); setOriginalTerjemahanBody(""); setOriginalTerjemahanIntro("");
+        });
       }
 
       if (companies) {
-        const comps = companies.map((c: any) => ({
-          ...c,
-          websiteUrl: c.websiteUrl ?? "",
-          logoUrl: c.logoUrl || null,
-          is_locked: c.is_locked || false,
-          lock_ticket: c.lock_ticket || null,
-          has_rejected: c.has_rejected || false,
-          isDirty: false,
-          removePhoto: false,
-        }));
-        setLocalCompanies(comps);
-        setOriginalCompanies(comps);
+        api.get("/translation/manual", {
+          params: { modelName: "Affiliate", recordId: "ALL" },
+        }).then((res) => {
+          const transData = res.data?.data?.id || {};
+          const comps = companies.map((c: any) => {
+            const companyTrans = transData[c.id] || {};
+            const transDesc = companyTrans.desc || "";
+            return {
+              ...c,
+              websiteUrl: c.websiteUrl ?? "",
+              logoUrl: c.logoUrl || null,
+              is_locked: c.is_locked || false,
+              lock_ticket: c.lock_ticket || null,
+              has_rejected: c.has_rejected || false,
+              isDirty: false,
+              removePhoto: false,
+              terjemahanDesc: transDesc,
+              originalTerjemahanDesc: transDesc,
+            };
+          });
+          setLocalCompanies(comps);
+          setOriginalCompanies(comps);
+        }).catch(() => {
+          const comps = companies.map((c: any) => ({
+            ...c,
+            websiteUrl: c.websiteUrl ?? "",
+            logoUrl: c.logoUrl || null,
+            is_locked: c.is_locked || false,
+            lock_ticket: c.lock_ticket || null,
+            has_rejected: c.has_rejected || false,
+            isDirty: false,
+            removePhoto: false,
+            terjemahanDesc: "",
+            originalTerjemahanDesc: "",
+          }));
+          setLocalCompanies(comps);
+          setOriginalCompanies(comps);
+        });
       }
 
       setHideDraftBanner(false);
@@ -178,6 +228,7 @@ export function useInvestmentManager() {
       setLocalCompanies((prev) =>
         prev.map((c) => {
           if (c.id === companyId) {
+            const restoredTrans = payload._translations?.id?.desc ?? "";
             return {
               ...c,
               name: payload.name ?? c.name,
@@ -189,6 +240,8 @@ export function useInvestmentManager() {
               previous_notrans: draft.notrans,
               isDirty: true,
               has_rejected: false,
+              terjemahanDesc: restoredTrans,
+              originalTerjemahanDesc: restoredTrans,
             };
           }
           return c;
@@ -240,8 +293,13 @@ export function useInvestmentManager() {
   };
 
   const hasSettingsChanged = useCallback(() => {
-    return JSON.stringify(pageContent) !== JSON.stringify(originalContent);
-  }, [pageContent, originalContent]);
+    const formChanged = JSON.stringify(pageContent) !== JSON.stringify(originalContent);
+    const translationChanged =
+      terjemahanHeadline !== originalTerjemahanHeadline ||
+      terjemahanBody !== originalTerjemahanBody ||
+      terjemahanIntro !== originalTerjemahanIntro;
+    return formChanged || translationChanged;
+  }, [pageContent, originalContent, terjemahanHeadline, originalTerjemahanHeadline, terjemahanBody, originalTerjemahanBody, terjemahanIntro, originalTerjemahanIntro]);
 
   const handleRestoreSettingsDraft = useCallback(() => {
     if (!rejectedSettings?.payload) {
@@ -334,6 +392,15 @@ export function useInvestmentManager() {
       if (comp.newLogoFile) formData.append("logo", comp.newLogoFile);
       if (comp.removePhoto) formData.append("removePhoto", "true");
 
+      if (comp.terjemahanDesc !== undefined && comp.terjemahanDesc !== null) {
+        const transPayload = {
+          id: {
+            desc: comp.terjemahanDesc
+          }
+        };
+        formData.append("_translations", JSON.stringify(transPayload));
+      }
+
       const config = { timeout: 60000 };
 
       const request = comp.isNew
@@ -366,10 +433,19 @@ export function useInvestmentManager() {
   };
 
   const handleSaveSettings = async () => {
+    // Build translation payload
+    const translationPayload: Record<string, string> = {};
+    if (terjemahanHeadline.trim()) translationPayload.teaserHeadline = terjemahanHeadline;
+    if (terjemahanBody.trim()) translationPayload.teaserBody = terjemahanBody;
+    if (terjemahanIntro.trim()) translationPayload.sectionIntro = terjemahanIntro;
+
+    const hasTranslations = Object.keys(translationPayload).length > 0;
+
     const payload = {
       ...pageContent,
       status: "Published",
       previous_notrans: rejectedSettings?.notrans || null,
+      ...(hasTranslations ? { _translations: { id: translationPayload } } : {}),
     };
 
     await api.put("/investments/settings", payload, { timeout: 60000 });
@@ -546,6 +622,11 @@ export function useInvestmentManager() {
     pageContent, setPageContent,
     rejectedSettings,
     hideDraftBanner,
+
+    // Settings translations
+    terjemahanHeadline, setTerjemahanHeadline,
+    terjemahanBody, setTerjemahanBody,
+    terjemahanIntro, setTerjemahanIntro,
 
     // Companies
     localCompanies,

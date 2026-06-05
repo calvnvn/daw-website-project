@@ -7,6 +7,7 @@ const Translation = require("../models/Translation");
 const { invalidateOldDrafts } = require("../utils/draftCleanup");
 const { deleteSingleFile } = require("../utils/fileRemover");
 const { generateNotrans } = require("../utils/notransGenerator");
+const { saveManualTranslations } = require("../utils/translationHelper");
 const ErpApprovalService = require("./erpApprovalService");
 const { autoTranslate } = require("./openaiService");
 
@@ -319,7 +320,7 @@ class InvestmentService {
 
         await ApprovalDraft.create({
           notrans, module_name: "InvestmentSettings", action: "UPDATE", target_id: "1",
-          payload: { ...payload, status: "Published" }, created_by: actorId, status: "Pending",
+          payload: { ...payload, _translations: body._translations, status: "Published" }, created_by: actorId, status: "Pending",
         }, { transaction: t });
 
         await settings.update({ is_locked: true, lock_ticket: notrans }, { transaction: t });
@@ -334,7 +335,11 @@ class InvestmentService {
 
       await invalidateOldDrafts("InvestmentSettings", "1", t);
       await settings.update({ ...payload, is_locked: false, lock_ticket: null }, { transaction: t });
+      // Flush old AI cache, then write manual overrides if provided
       await Translation.destroy({ where: { modelName: "InvestmentSettings", recordId: "1" }, transaction: t });
+      if (body._translations) {
+        await saveManualTranslations("InvestmentSettings", "1", body._translations, t);
+      }
       await t.commit();
       
       return { success: true, isDraft: false, data: settings };
@@ -410,7 +415,7 @@ class InvestmentService {
 
         await ApprovalDraft.create({
           notrans, module_name: "Affiliate", action: "UPDATE", target_id: String(id),
-          payload: { ...payload, status: "Published" }, created_by: actorId, status: "Pending",
+          payload: { ...payload, _translations: body._translations, status: "Published" }, created_by: actorId, status: "Pending",
         }, { transaction: t });
 
         await company.update({ is_locked: true, lock_ticket: notrans }, { transaction: t });
@@ -425,7 +430,11 @@ class InvestmentService {
 
       await invalidateOldDrafts("Affiliate", String(id), t);
       await company.update({ ...payload, is_locked: false, lock_ticket: null }, { transaction: t });
+      // Flush old AI cache, then write manual overrides if provided
       await Translation.destroy({ where: { modelName: "Affiliate", recordId: String(id) }, transaction: t });
+      if (body._translations) {
+        await saveManualTranslations("Affiliate", String(id), body._translations, t);
+      }
       await t.commit();
 
       if (filesToDelete.length > 0) filesToDelete.forEach((f) => deleteSingleFile(f));

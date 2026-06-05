@@ -66,6 +66,12 @@ export default function ManageBusinesses() {
   const [isMapModalOpen, setIsMapModalOpen] = useState(false);
   const [pendingTab, setPendingTab] = useState<string | null>(null);
 
+  // --- 2B. TRANSLATION STATES (Magic Translate) ---
+  const [terjemahanTitle, setTerjemahanTitle] = useState("");
+  const [terjemahanHtmlContent, setTerjemahanHtmlContent] = useState("");
+  const [originalTerjemahanTitle, setOriginalTerjemahanTitle] = useState("");
+  const [originalTerjemahanHtmlContent, setOriginalTerjemahanHtmlContent] = useState("");
+
   const isMobile = typeof window !== "undefined" && window.innerWidth < 768;
 
   // --- 3. DERIVED STATES & AUTHORITY (Blueprint Logic: 1 & 5) ---
@@ -103,8 +109,13 @@ export default function ManageBusinesses() {
     delete (baseData as any).is_locked;
     delete (baseData as any).lock_ticket;
 
-    return JSON.stringify(currentData) !== JSON.stringify(baseData);
-  }, [formData, originalData]);
+    const formChanged = JSON.stringify(currentData) !== JSON.stringify(baseData);
+    const translationChanged =
+      terjemahanTitle !== originalTerjemahanTitle ||
+      terjemahanHtmlContent !== originalTerjemahanHtmlContent;
+
+    return formChanged || translationChanged;
+  }, [formData, originalData, terjemahanTitle, originalTerjemahanTitle, terjemahanHtmlContent, originalTerjemahanHtmlContent]);
 
   // --- 5. LIFECYCLE & SYNCHRONIZATION (Blueprint Logic: 3) ---
 
@@ -152,6 +163,22 @@ export default function ManageBusinesses() {
 
       setFormData(normalizedData);
       setOriginalData(normalizedData);
+
+      // Fetch manual translations for this section
+      api.get("/translation/manual", {
+        params: { modelName: "BusinessSection", recordId: activeTab },
+      }).then((res) => {
+        const data = res.data?.data || {};
+        setTerjemahanTitle(data.title || "");
+        setTerjemahanHtmlContent(data.htmlContent || "");
+        setOriginalTerjemahanTitle(data.title || "");
+        setOriginalTerjemahanHtmlContent(data.htmlContent || "");
+      }).catch(() => {
+        setTerjemahanTitle("");
+        setTerjemahanHtmlContent("");
+        setOriginalTerjemahanTitle("");
+        setOriginalTerjemahanHtmlContent("");
+      });
     }
   }, [activeTab, sections, currentSection, isEditing]);
 
@@ -254,10 +281,18 @@ export default function ManageBusinesses() {
     );
 
     try {
+      // Build translation payload
+      const translationPayload: Record<string, any> = {};
+      if (terjemahanTitle.trim()) translationPayload.title = terjemahanTitle;
+      if (terjemahanHtmlContent.trim()) translationPayload.htmlContent = terjemahanHtmlContent;
+
+      const hasTranslations = Object.keys(translationPayload).length > 0;
+
       await updateSection(activeTab, {
         ...formData,
         previous_notrans: rejectedDraft?.notrans,
-      });
+        ...(hasTranslations ? { _translations: { id: translationPayload } } : {}),
+      } as any);
 
       clearRejectedDraft();
       setIsEditing(false);
@@ -469,6 +504,13 @@ export default function ManageBusinesses() {
                   setFormData={setFormData}
                   isEditing={isEditing && !shouldLockUI}
                   handleDiscardDraft={handleDiscardDraft}
+                  terjemahanTitle={terjemahanTitle}
+                  terjemahanHtmlContent={terjemahanHtmlContent}
+                  onTerjemahanChange={(field, value) => {
+                    if (field === "title") setTerjemahanTitle(value);
+                    if (field === "htmlContent") setTerjemahanHtmlContent(value);
+                  }}
+                  isFormLocked={shouldLockUI}
                 />
 
                 <MapManager

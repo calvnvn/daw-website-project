@@ -3,6 +3,7 @@
  * Handles the page content text editing (teaser headline, body, section intro).
  */
 import { Lock, ShieldAlert } from "lucide-react";
+import MagicTranslationField from "@/components/admin/MagicTranslationField";
 
 interface SettingsTabProps {
   pageContent: {
@@ -20,6 +21,10 @@ interface SettingsTabProps {
   currentLockState: boolean;
   lockStyles: string;
   settingsIsLocked?: boolean;
+  terjemahanHeadline: string;
+  terjemahanBody: string;
+  terjemahanIntro: string;
+  onTerjemahanChange: (field: string, value: string) => void;
 }
 
 export default function SettingsTab({
@@ -30,6 +35,10 @@ export default function SettingsTab({
   currentLockState,
   lockStyles,
   settingsIsLocked,
+  terjemahanHeadline,
+  terjemahanBody,
+  terjemahanIntro,
+  onTerjemahanChange,
 }: SettingsTabProps) {
   return (
     <div className="space-y-8 animate-in fade-in duration-300">
@@ -71,6 +80,16 @@ export default function SettingsTab({
               }`}
             />
           </div>
+
+          {/* Magic Translate: Teaser Headline */}
+          <MagicTranslationField
+            label="Teaser Headline (Indonesian)"
+            value={terjemahanHeadline}
+            onChange={(v) => onTerjemahanChange("teaserHeadline", v)}
+            originalText={pageContent.teaserHeadline}
+            disabled={!isEditing || currentLockState}
+          />
+
           <div>
             <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">
               Teaser Body Text
@@ -92,6 +111,15 @@ export default function SettingsTab({
               }`}
             />
           </div>
+
+          {/* Magic Translate: Teaser Body */}
+          <MagicTranslationField
+            label="Teaser Body (Indonesian)"
+            value={terjemahanBody}
+            onChange={(v) => onTerjemahanChange("teaserBody", v)}
+            originalText={pageContent.teaserBody}
+            disabled={!isEditing || currentLockState}
+          />
         </div>
       </div>
 
@@ -121,6 +149,15 @@ export default function SettingsTab({
             }`}
           />
         </div>
+
+        {/* Magic Translate: Section Intro */}
+        <MagicTranslationField
+          label="Ecosystem Intro (Indonesian)"
+          value={terjemahanIntro}
+          onChange={(v) => onTerjemahanChange("sectionIntro", v)}
+          originalText={pageContent.sectionIntro}
+          disabled={!isEditing || currentLockState}
+        />
       </div>
     </div>
   );

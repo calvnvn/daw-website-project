@@ -58,6 +58,9 @@ export default function InvestmentsManager() {
     updateCompany,
     handleLogoChange,
     refreshData,
+    terjemahanHeadline, setTerjemahanHeadline,
+    terjemahanBody, setTerjemahanBody,
+    terjemahanIntro, setTerjemahanIntro,
   } = mgr;
 
   return (
@@ -292,6 +295,14 @@ export default function InvestmentsManager() {
             settingsIsLocked={
               mgr.isSettingsLockedForEditor || mgr.isSettingsOverrideMode
             }
+            terjemahanHeadline={terjemahanHeadline}
+            terjemahanBody={terjemahanBody}
+            terjemahanIntro={terjemahanIntro}
+            onTerjemahanChange={(field, value) => {
+              if (field === "teaserHeadline") setTerjemahanHeadline(value);
+              if (field === "teaserBody") setTerjemahanBody(value);
+              if (field === "sectionIntro") setTerjemahanIntro(value);
+            }}
           />
         )}
 

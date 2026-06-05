@@ -11,6 +11,7 @@ const ErpApprovalService = require("./erpApprovalService");
 const { autoTranslate } = require("./openaiService");
 const { generateNotrans } = require("../utils/notransGenerator");
 const { extractImagesFromHtml, handleEditorStaging } = require("../utils/editorHelper");
+const { saveManualTranslations } = require("../utils/translationHelper");
 const sanitizeHtml = require("sanitize-html");
 
 const MODULE_NAME = "BusinessSection";
@@ -282,7 +283,7 @@ class BusinessService {
           notransPrefix: MODULE_NAME,
           action: "UPDATE",
           targetId: id,
-          payload: { ...payload, status: "Published" },
+          payload: { ...payload, _translations: body._translations, status: "Published" },
           recordToLock: section,
           previousNotrans: previous_notrans,
           successMessage: "Revisi konten diajukan. Menunggu persetujuan.",
@@ -301,7 +302,11 @@ class BusinessService {
         await BusinessMapMarker.bulkCreate(newMarkers, { transaction: t });
       }
       
+      // Flush old AI cache, then write manual overrides if provided
       await Translation.destroy({ where: { modelName: MODULE_NAME, recordId: String(id) }, transaction: t });
+      if (body._translations) {
+        await saveManualTranslations(MODULE_NAME, id, body._translations, t);
+      }
       await t.commit();
       
       if (filesToDelete && filesToDelete.length > 0) {
