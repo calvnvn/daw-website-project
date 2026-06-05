@@ -53,6 +53,23 @@ const isHtmlString = (str: any): boolean => {
   return /<[a-z][\s\S]*>/i.test(str);
 };
 
+const cleanHtmlText = (val: any): string => {
+  if (val === null || val === undefined) return "";
+  if (typeof val === "object") return "";
+  let str = String(val);
+  if (isHtmlString(str)) {
+    str = str.replace(/<[^>]*>?/gm, "");
+  }
+  return str
+    .replace(/&nbsp;/g, " ")
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .trim();
+};
+
 const isMeaningfulTextField = (key: string, val: any): boolean => {
   const skippedFields = [
     "order",
@@ -69,6 +86,14 @@ const isMeaningfulTextField = (key: string, val: any): boolean => {
     "pageId",
     "is_locked",
     "lock_ticket",
+    "views",
+    "view_count",
+    "viewCount",
+    "likes",
+    "shares",
+    "clicks",
+    "readTime",
+    "read_time",
   ];
   if (skippedFields.includes(key)) return false;
 
@@ -491,7 +516,13 @@ const DiffModal = ({
 
     const allKeys = new Set([...Object.keys(safeOld), ...Object.keys(safeNew)]);
     allKeys.forEach((key) => {
-      if (JSON.stringify(safeOld[key]) !== JSON.stringify(safeNew[key])) {
+      const val1 = safeOld[key];
+      const val2 = safeNew[key];
+      
+      const norm1 = cleanHtmlText(val1);
+      const norm2 = cleanHtmlText(val2);
+      
+      if (norm1 !== norm2) {
         if (isMeaningfulTextField(key, safeNew[key] ?? safeOld[key])) {
           changes.push(key);
         }
@@ -753,27 +784,12 @@ const DiffModal = ({
                       {changedFields.map((field) => {
                         const getVal = (source: any) => {
                           const val = source?.[field];
-                          if (val === null || val === undefined || val === "")
-                            return "(Kosong)";
                           if (Array.isArray(val)) return val.join(", ");
-                          if (typeof val === "object")
+                          if (val && typeof val === "object")
                             return "[Struktur Objek Berubah]";
-                          if (typeof val === "string") {
-                            let text = val;
-                            if (isHtmlString(val)) {
-                              text = text.replace(/<[^>]*>?/gm, ""); // Hapus tag HTML
-                            }
-                            // Ganti HTML Entity umum (terutama &nbsp;) menjadi spasi biasa
-                            text = text
-                              .replace(/&nbsp;/g, " ")
-                              .replace(/&amp;/g, "&")
-                              .replace(/&lt;/g, "<")
-                              .replace(/&gt;/g, ">")
-                              .replace(/&quot;/g, '"')
-                              .replace(/&#39;/g, "'");
-                            return text;
-                          }
-                          return String(val);
+                          const cleaned = cleanHtmlText(val);
+                          if (cleaned === "") return "(Kosong)";
+                          return cleaned;
                         };
 
                         const oldString = getVal(oldData);
@@ -1325,7 +1341,7 @@ export default function ApprovalCenter() {
           </div>
           <p className="text-xs text-slate-500 mt-4 font-medium flex items-center gap-1">
             <span className="text-blue-500 font-bold">{stats.myTurn}</span>{" "}
-            tiket menunggu Anda
+            tugas menunggu keputusan Anda
           </p>
         </div>
 
@@ -1335,7 +1351,7 @@ export default function ApprovalCenter() {
           <div className="relative z-10 flex justify-between items-start">
             <div>
               <p className="text-[10px] font-black text-rose-400 uppercase tracking-widest mb-1">
-                Urgent (Hapus)
+                Persetujuan Hapus
               </p>
               <h3 className="text-4xl font-serif font-black text-rose-600">
                 {stats.urgent}
@@ -1346,7 +1362,7 @@ export default function ApprovalCenter() {
             </div>
           </div>
           <p className="text-xs text-slate-500 mt-4 font-medium">
-            Aksi permanen. Butuh review.
+            Penghapusan data secara permanen.
           </p>
         </div>
 
@@ -1356,7 +1372,7 @@ export default function ApprovalCenter() {
           <div className="relative z-10 flex justify-between items-start">
             <div>
               <p className="text-[10px] font-black text-amber-500 uppercase tracking-widest mb-1">
-                Tiket Tertunda
+                Tertunda Lama
               </p>
               <h3 className="text-4xl font-serif font-black text-amber-600">
                 {stats.aging}
@@ -1367,7 +1383,7 @@ export default function ApprovalCenter() {
             </div>
           </div>
           <p className="text-xs text-slate-500 mt-4 font-medium">
-            Mengendap lebih dari 3 hari.
+            Belum diputuskan lebih dari 3 hari.
           </p>
         </div>
 
@@ -1378,7 +1394,7 @@ export default function ApprovalCenter() {
             <div className="relative z-10 flex justify-between items-start">
               <div>
                 <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1">
-                  Ghost Tickets
+                  Tiket Bermasalah
                 </p>
                 <h3 className="text-4xl font-serif font-black text-slate-700">
                   {stats.ghosts}
@@ -1389,7 +1405,7 @@ export default function ApprovalCenter() {
               </div>
             </div>
             <p className="text-xs text-red-500 mt-4 font-bold flex items-center gap-1">
-              Data Desync. Butuh Dibersihkan IT.
+              Gangguan sinkronisasi. Butuh bantuan IT.
             </p>
           </div>
         )}
