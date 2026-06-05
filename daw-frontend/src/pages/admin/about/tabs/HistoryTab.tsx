@@ -15,6 +15,7 @@ import api from "@/lib/api";
 import { useAbout } from "@/contexts/AboutContext";
 import AboutLivePreview from "@/components/admin/about/AboutLivePreview";
 import { getErrorMessage } from "@/lib/utils";
+import MagicTranslationField from "@/components/admin/MagicTranslationField";
 
 interface HistoryTabProps {
   isEditing: boolean;
@@ -46,6 +47,8 @@ export default function HistoryTab({
 
   const [historyItems, setHistoryItems] = useState<LocalHistoryItem[]>([]);
   const [originalItems, setOriginalItems] = useState<LocalHistoryItem[]>([]);
+  const [historyTranslations, setHistoryTranslations] = useState<Record<string, any>>({});
+  const [originalTranslations, setOriginalTranslations] = useState<Record<string, any>>({});
   const [isSaving, setIsSaving] = useState(false);
   const [isDiscarding, setIsDiscarding] = useState(false);
   const [optimisticLock, setOptimisticLock] = useState(false);
@@ -67,6 +70,13 @@ export default function HistoryTab({
     if (!companyHistory.some((h) => h.is_locked)) {
       setOptimisticLock(false);
     }
+
+    api.get("/translation/manual?modelName=History&recordId=ALL").then(res => {
+      if (res.data?.data?.id) {
+        setHistoryTranslations(res.data.data.id);
+        setOriginalTranslations(res.data.data.id);
+      }
+    }).catch(console.error);
   }, [companyHistory]);
 
   // 2. REJECTION RADAR (Gated by saving/optimistic states)
@@ -96,14 +106,15 @@ export default function HistoryTab({
 
   // 3. DIFF ENGINE
   const hasDataChanged = useMemo(() => {
-    if (historyItems.length !== originalItems.length) return true;
+    let isTransChanged = JSON.stringify(historyTranslations) !== JSON.stringify(originalTranslations);
+    if (historyItems.length !== originalItems.length) return true || isTransChanged;
     const stripMeta = (items: LocalHistoryItem[]) =>
       items.map(({ year, text }) => ({ year, text }));
     return (
       JSON.stringify(stripMeta(historyItems)) !==
-      JSON.stringify(stripMeta(originalItems))
+      JSON.stringify(stripMeta(originalItems)) || isTransChanged
     );
-  }, [historyItems, originalItems]);
+  }, [historyItems, originalItems, historyTranslations, originalTranslations]);
 
   // 4. MODULE-LEVEL LOCK ISOLATION
   // 🚀 FIX B: Logic gembok yang lebih agresif.
@@ -122,6 +133,16 @@ export default function HistoryTab({
 
   const removeHistory = (id: string | number) => {
     setHistoryItems((prev) => prev.filter((h) => h.id !== id));
+  };
+
+  const updateHistoryTranslation = (year: string, field: string, value: string) => {
+    setHistoryTranslations(prev => ({
+       ...prev,
+       [year]: {
+         ...(prev[year] || {}),
+         [field]: value
+       }
+    }));
   };
 
   const updateHistory = (
@@ -158,6 +179,7 @@ export default function HistoryTab({
       }));
 
       setHistoryItems(restoredData);
+      if (payload._translations) setHistoryTranslations(payload._translations);
       toast.success("Timeline dipulihkan!");
     } catch {
       toast.error("Gagal memproses draf.");
@@ -194,6 +216,7 @@ export default function HistoryTab({
           text: h.text.trim(),
         })),
         status: isSuperadmin ? "Active" : "Published",
+        _translations: historyTranslations,
       };
 
       if (isEditor && rejectedDraft?.notrans)
@@ -333,6 +356,15 @@ export default function HistoryTab({
                   disabled={isItemDisabled}
                   className={`w-full px-3 py-2.5 rounded-lg resize-none transition-all text-sm ${!isItemDisabled ? "bg-white border-slate-300 focus:ring-2 focus:ring-daw-green/20" : "bg-slate-100/50 cursor-not-allowed"}`}
                 />
+                <div className="mt-2">
+                  <MagicTranslationField
+                    label="Description (Indonesian)"
+                    originalText={item.text}
+                    value={historyTranslations[item.year]?.description || ""}
+                    onChange={(val) => updateHistoryTranslation(item.year, "description", val)}
+                    disabled={isItemDisabled}
+                  />
+                </div>
               </div>
               {!isItemDisabled && (
                 <button

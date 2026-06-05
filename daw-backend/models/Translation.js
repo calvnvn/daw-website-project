@@ -14,7 +14,7 @@ const Translation = sequelize.define(
       allowNull: false,
     },
     recordId: {
-      type: DataTypes.UUID,
+      type: DataTypes.STRING(50),
       allowNull: false,
     },
     field: {

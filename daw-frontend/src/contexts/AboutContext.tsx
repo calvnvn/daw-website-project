@@ -112,7 +112,8 @@ export function AboutProvider({ children }: { children: ReactNode }) {
   const fetchData = useCallback(async (signal?: AbortSignal) => {
     setIsLoading(true);
     try {
-      const langParam = i18n.language === "id" ? "id" : "en";
+      const isAdminArea = window.location.pathname.startsWith("/admin");
+      const langParam = isAdminArea ? "en" : (i18n.language === "id" ? "id" : "en");
       const params = { lang: langParam };
 
       const [

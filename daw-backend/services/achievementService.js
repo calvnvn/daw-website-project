@@ -8,6 +8,7 @@ const { deleteSingleFile } = require("../utils/fileRemover");
 const ErpApprovalService = require("./erpApprovalService");
 const { invalidateOldDrafts } = require("../utils/draftCleanup");
 const { generateNotrans } = require("../utils/notransGenerator");
+const { saveManualTranslations } = require("../utils/translationHelper");
 
 const MODULE_NAME = "Achievement";
 const NOTRANS_PREFIX = "ACM";
@@ -146,6 +147,7 @@ class AchievementService {
               description,
               imageUrl,
               status: "Published",
+              _translations: body._translations,
             },
             created_by: actorId,
             status: "Pending",
@@ -170,6 +172,7 @@ class AchievementService {
         return { success: true, isDraft: true, ticket: notrans };
       }
 
+      await saveManualTranslations(MODULE_NAME, newAchievement.id, body._translations, t);
       await t.commit();
       return { success: true, isDraft: false, data: newAchievement };
     } catch (error) {
@@ -246,7 +249,7 @@ class AchievementService {
             module_name: MODULE_NAME,
             target_id: String(id),
             action: "UPDATE",
-            payload: { ...payload, status: "Published" },
+            payload: { ...payload, status: "Published", _translations: body._translations },
             created_by: actorId,
             status: "Pending",
           },
@@ -292,7 +295,7 @@ class AchievementService {
         { transaction: t },
       );
       
-      await Translation.destroy({ where: { modelName: MODULE_NAME, recordId: String(id) }, transaction: t });
+      await saveManualTranslations(MODULE_NAME, id, body._translations, t);
 
       await t.commit();
 

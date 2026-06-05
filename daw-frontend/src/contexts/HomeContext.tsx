@@ -114,7 +114,7 @@ export function HomeProvider({ children }: { children: ReactNode }) {
         if (canAccessAdmin) {
           try {
             // Tembak jalur Admin
-            const response = await api.get(`/homepage/admin?lang=${lang}`, { signal });
+            const response = await api.get(`/homepage/admin?lang=en`, { signal });
             payload = response.data?.data || response.data;
           } catch (adminError: unknown) {
             if ((typeof adminError === "object" && adminError !== null && "name" in adminError && (adminError as { name?: string }).name === "CanceledError")) return;

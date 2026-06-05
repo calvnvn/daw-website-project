@@ -19,6 +19,7 @@ import { useAbout } from "@/contexts/AboutContext";
 import type { PhilosophyPillar } from "@/contexts/AboutContext";
 import { AVAILABLE_ICONS } from "../AboutConstants";
 import AboutLivePreview from "@/components/admin/about/AboutLivePreview";
+import MagicTranslationField from "@/components/admin/MagicTranslationField";
 import { getErrorMessage } from "@/lib/utils";
 
 interface PhilosophyTabProps {
@@ -39,6 +40,8 @@ export default function PhilosophyTab({
   // SINGLETON LOGIC (Main Title)
   const [titleForm, setTitleForm] = useState("Our Philosophy");
   const [originalTitle, setOriginalTitle] = useState("Our Philosophy");
+  const [terjemahanTitle, setTerjemahanTitle] = useState("");
+  const [originalTerjemahanTitle, setOriginalTerjemahanTitle] = useState("");
   const [isSavingTitle, setIsSavingTitle] = useState(false);
   const [rejectedTitleDraft, setRejectedTitleDraft] = useState<any | null>(
     null,
@@ -49,6 +52,13 @@ export default function PhilosophyTab({
       setTitleForm(philosophyData.philosophyTitle || "Our Philosophy");
       setOriginalTitle(philosophyData.philosophyTitle || "Our Philosophy");
     }
+    
+    api.get("/translation/manual?modelName=Philosophy&recordId=1").then(res => {
+       if (res.data?.data?.id) {
+         setTerjemahanTitle(res.data.data.id.philosophyTitle || "");
+         setOriginalTerjemahanTitle(res.data.data.id.philosophyTitle || "");
+       }
+    }).catch(console.error);
   }, [philosophyData]);
 
   useEffect(() => {
@@ -67,8 +77,8 @@ export default function PhilosophyTab({
   }, [philosophyData?.hasRejected, isEditor, rejectedTitleDraft]);
 
   const hasTitleChanged = useMemo(
-    () => titleForm !== originalTitle,
-    [titleForm, originalTitle],
+    () => titleForm !== originalTitle || terjemahanTitle !== originalTerjemahanTitle,
+    [titleForm, originalTitle, terjemahanTitle, originalTerjemahanTitle],
   );
   const isTitleLocked = philosophyData?.is_locked && !isSuperadmin;
 
@@ -100,6 +110,11 @@ export default function PhilosophyTab({
       const payload: any = {
         philosophyTitle: titleForm,
         status: isSuperadmin ? "Active" : "Published",
+        _translations: {
+          id: {
+            philosophyTitle: terjemahanTitle
+          }
+        }
       };
       if (isEditor && rejectedTitleDraft?.notrans)
         payload.previous_notrans = rejectedTitleDraft.notrans;
@@ -135,6 +150,10 @@ export default function PhilosophyTab({
     orderIndex: 1,
     previous_notrans: null as string | null,
     originalSnapshot: null as string | null,
+    terjemahanTitle: "",
+    terjemahanText: "",
+    originalTerjemahanTitle: "",
+    originalTerjemahanText: "",
   });
 
   const openPillarModal = async (pillar: PhilosophyPillar | null = null) => {
@@ -176,7 +195,18 @@ export default function PhilosophyTab({
           text: pillar.text,
           orderIndex: pillar.orderIndex,
         }),
+        terjemahanTitle: "",
+        terjemahanText: "",
+        originalTerjemahanTitle: "",
+        originalTerjemahanText: "",
       });
+
+      api.get(`/translation/manual?modelName=PhilosophyPillar&recordId=${pillar.id}`).then(res => {
+         if (res.data?.data?.id) {
+           const trans = res.data.data.id;
+           setPillarForm(prev => ({ ...prev, terjemahanTitle: trans.title || "", originalTerjemahanTitle: trans.title || "", terjemahanText: trans.text || "", originalTerjemahanText: trans.text || "" }));
+         }
+      }).catch(console.error);
     } else {
       setEditingPillarId(null);
       setPillarForm({
@@ -186,6 +216,10 @@ export default function PhilosophyTab({
         orderIndex: philosophyPillars.length + 1,
         previous_notrans: null,
         originalSnapshot: null,
+        terjemahanTitle: "",
+        terjemahanText: "",
+        originalTerjemahanTitle: "",
+        originalTerjemahanText: "",
       });
     }
     setIsModalOpen(true);
@@ -199,7 +233,8 @@ export default function PhilosophyTab({
       text: pillarForm.text,
       orderIndex: pillarForm.orderIndex,
     };
-    return JSON.stringify(current) !== pillarForm.originalSnapshot;
+    const isTransChanged = pillarForm.terjemahanTitle !== pillarForm.originalTerjemahanTitle || pillarForm.terjemahanText !== pillarForm.originalTerjemahanText;
+    return JSON.stringify(current) !== pillarForm.originalSnapshot || isTransChanged;
   }, [pillarForm, editingPillarId]);
   const handleRestoreTitleData = () => {
     if (!rejectedTitleDraft?.payload) return;
@@ -210,6 +245,9 @@ export default function PhilosophyTab({
           : rejectedTitleDraft.payload;
 
       setTitleForm(payload?.philosophyTitle || titleForm);
+      if (payload?._translations?.id?.philosophyTitle) {
+         setTerjemahanTitle(payload._translations.id.philosophyTitle);
+      }
       toast.success("Draf headline dipulihkan!");
     } catch (err) {
       toast.error("Gagal memulihkan data draf.");
@@ -229,6 +267,8 @@ export default function PhilosophyTab({
         title: payload.title ?? prev.title,
         text: payload.text ?? prev.text,
         orderIndex: payload.orderIndex ?? prev.orderIndex,
+        terjemahanTitle: payload._translations?.id?.title ?? prev.terjemahanTitle,
+        terjemahanText: payload._translations?.id?.text ?? prev.terjemahanText,
       }));
       toast.success("Data draf berhasil dipulihkan!");
     } catch {
@@ -277,6 +317,12 @@ export default function PhilosophyTab({
         text: pillarForm.text,
         orderIndex: pillarForm.orderIndex,
         status: isSuperadmin ? "Active" : "Published",
+        _translations: {
+          id: {
+            title: pillarForm.terjemahanTitle,
+            text: pillarForm.terjemahanText
+          }
+        }
       };
       if (isEditor && pillarForm.previous_notrans)
         payload.previous_notrans = pillarForm.previous_notrans;
@@ -342,12 +388,12 @@ export default function PhilosophyTab({
 
   return (
     <div className="space-y-12 animate-in fade-in duration-300">
-      {/* ==========================================
+      {/*
           SECTION 1: MAIN TITLE (SINGLETON)
-          ========================================== */}
+         */}
       <div
         className={`space-y-6 pb-8 border-b border-slate-200 ${isTitleLocked ? "opacity-60 grayscale-[30%] pointer-events-none select-none" : ""}`}>
-        {/* 🚀 REFACTOR: BUREAUCRATIC MIRROR - Red Recovery Banner untuk Title */}
+        {/* REFACTOR: BUREAUCRATIC MIRROR - Red Recovery Banner untuk Title */}
         {rejectedTitleDraft && !isTitleLocked && (
           <div className="p-5 rounded-xl bg-red-50 border border-red-200 flex items-start gap-4 text-red-700 shadow-sm mb-6 animate-in slide-in-from-top-4 duration-300">
             <div className="p-2 bg-red-100 rounded-lg h-fit shrink-0">
@@ -405,6 +451,15 @@ export default function PhilosophyTab({
                 disabled={!isEditing || isTitleLocked}
                 className="w-full px-4 py-3 rounded-lg font-serif text-xl border border-slate-200 focus:ring-2 focus:ring-daw-green/20 disabled:bg-slate-100"
               />
+            </div>
+            <div className="mt-2">
+               <MagicTranslationField
+                 label="Main Title (Indonesian)"
+                 originalText={titleForm}
+                 value={terjemahanTitle}
+                 onChange={setTerjemahanTitle}
+                 disabled={!isEditing || isTitleLocked}
+               />
               <button
                 onClick={saveTitle}
                 disabled={
@@ -430,9 +485,9 @@ export default function PhilosophyTab({
         </div>
       </div>
 
-      {/* ==========================================
+      {/*
           SECTION 2: PILLARS COLLECTION (GRANULAR)
-           */}
+        */}
       <div>
         {/* REJECTION RIBBON (Pillars) */}
         {isEditor && philosophyPillars.some((p) => p.hasRejected) && (
@@ -473,7 +528,7 @@ export default function PhilosophyTab({
             const SelectedIcon =
               AVAILABLE_ICONS.find((i) => i.id === pillar.iconId)?.icon ||
               Target;
-            // 🚀 FIX: Baris tidak terkunci abu-abu jika ada rejection
+            // FIX: Baris tidak terkunci abu-abu jika ada rejection
             const isRowLocked =
               pillar.is_locked && !pillar.hasRejected && !isSuperadmin;
 
@@ -690,6 +745,15 @@ export default function PhilosophyTab({
                         }
                         className="w-full px-3 py-2.5 border border-slate-200 rounded-lg focus:ring-2 focus:ring-daw-green/20"
                       />
+                      <div className="mt-2">
+                        <MagicTranslationField
+                          label="Title (Indonesian)"
+                          originalText={pillarForm.title}
+                          value={pillarForm.terjemahanTitle}
+                          onChange={(v) => setPillarForm({...pillarForm, terjemahanTitle: v})}
+                          disabled={isSavingPillar}
+                        />
+                      </div>
                     </div>
 
                     <div>
@@ -705,6 +769,15 @@ export default function PhilosophyTab({
                         }
                         className="w-full px-3 py-2.5 border border-slate-200 rounded-lg focus:ring-2 focus:ring-daw-green/20 resize-none"
                       />
+                      <div className="mt-2">
+                        <MagicTranslationField
+                          label="Description (Indonesian)"
+                          originalText={pillarForm.text}
+                          value={pillarForm.terjemahanText}
+                          onChange={(v) => setPillarForm({...pillarForm, terjemahanText: v})}
+                          disabled={isSavingPillar}
+                        />
+                      </div>
                     </div>
                   </>
                 )}

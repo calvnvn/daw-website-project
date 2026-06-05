@@ -67,7 +67,8 @@ export function ContentProvider({ children }: { children: ReactNode }) {
   const refreshData = useCallback(async () => {
     setIsLoading(true);
     try {
-      const lang = i18n.language || "en";
+      const isAdminArea = window.location.pathname.startsWith("/admin");
+      const lang = isAdminArea ? "en" : (i18n.language || "en");
       const [pagesRes, treeRes, flatRes] = await Promise.allSettled([
         api.get(`/pages?lang=${lang}`),
         api.get(`/menus/tree?lang=${lang}`),

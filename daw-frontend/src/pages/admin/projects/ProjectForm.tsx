@@ -392,9 +392,13 @@ export default function ProjectForm() {
   const [coverPreview, setCoverPreview] = useState<string | null>(null);
 
   // --- Image Adjustment Modal State ---
-  const [cropQueue, setCropQueue] = useState<{file: File, type: "cover"|"gallery"}[]>([]);
+  const [cropQueue, setCropQueue] = useState<
+    { file: File; type: "cover" | "gallery" }[]
+  >([]);
   const [currentCropFile, setCurrentCropFile] = useState<File | null>(null);
-  const [currentCropType, setCurrentCropType] = useState<"cover" | "gallery" | null>(null);
+  const [currentCropType, setCurrentCropType] = useState<
+    "cover" | "gallery" | null
+  >(null);
 
   const processCroppedFile = (croppedFile: File) => {
     if (currentCropType === "cover") {
@@ -407,7 +411,7 @@ export default function ProjectForm() {
         return [...prev, ...newFiles];
       });
     }
-    
+
     // Check queue
     const nextQueue = [...cropQueue];
     if (nextQueue.length > 0) {
@@ -532,7 +536,14 @@ export default function ProjectForm() {
           console.error("Recovery Data Fetch Error:", draftRes.reason);
         }
       } catch (error: unknown) {
-        if (!(typeof error === "object" && error !== null && "name" in error && (error as { name?: string }).name === "CanceledError")) {
+        if (
+          !(
+            typeof error === "object" &&
+            error !== null &&
+            "name" in error &&
+            (error as { name?: string }).name === "CanceledError"
+          )
+        ) {
           console.error("Fetch Error:", error);
           toast.error("Gagal memuat data proyek", {
             description: "Mohon periksa koneksi atau hubungi IT.",
@@ -568,8 +579,7 @@ export default function ProjectForm() {
       toast.error("Gagal mengabaikan draf", {
         id: toastId,
         description:
-          getErrorMessage(error) ||
-          "Kesalahan komunikasi dengan server.",
+          getErrorMessage(error) || "Kesalahan komunikasi dengan server.",
       });
     }
   };
@@ -678,8 +688,7 @@ export default function ProjectForm() {
         } catch (err: unknown) {
           toast.error("Upload gagal", {
             id: toastId,
-            description:
-              getErrorMessage(err) || "Kesalahan pada server.",
+            description: getErrorMessage(err) || "Kesalahan pada server.",
           });
         }
       }
@@ -896,7 +905,7 @@ export default function ProjectForm() {
         setCurrentCropFile(files[0]);
         setCurrentCropType("cover");
       } else {
-        setCropQueue(prev => [...prev, { file: files[0], type: "cover" }]);
+        setCropQueue((prev) => [...prev, { file: files[0], type: "cover" }]);
       }
     },
     accept: { "image/jpeg": [], "image/png": [], "image/webp": [] },
@@ -917,14 +926,17 @@ export default function ProjectForm() {
         toast.error("Beberapa gambar diabaikan karena lebih dari 10MB.");
       }
 
-      const queueItems = validFiles.map(f => ({ file: f, type: "gallery" as const }));
-      
+      const queueItems = validFiles.map((f) => ({
+        file: f,
+        type: "gallery" as const,
+      }));
+
       if (!currentCropFile) {
         setCurrentCropFile(queueItems[0].file);
         setCurrentCropType(queueItems[0].type);
-        setCropQueue(prev => [...prev, ...queueItems.slice(1)]);
+        setCropQueue((prev) => [...prev, ...queueItems.slice(1)]);
       } else {
-        setCropQueue(prev => [...prev, ...queueItems]);
+        setCropQueue((prev) => [...prev, ...queueItems]);
       }
     },
     accept: { "image/jpeg": [], "image/png": [], "image/webp": [] },
@@ -1477,7 +1489,11 @@ export default function ProjectForm() {
         imageFile={currentCropFile}
         onSave={processCroppedFile}
         aspectRatio={currentCropType === "cover" ? 16 / 9 : 3 / 2}
-        title={currentCropType === "cover" ? "Sesuaikan Sampul Proyek" : "Sesuaikan Foto Galeri"}
+        title={
+          currentCropType === "cover"
+            ? "Sesuaikan Sampul Proyek"
+            : "Sesuaikan Foto Galeri"
+        }
       />
     </div>
   );

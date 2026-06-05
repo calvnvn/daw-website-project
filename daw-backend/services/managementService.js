@@ -7,6 +7,7 @@ const ErpApprovalService = require("./erpApprovalService");
 const { invalidateOldDrafts } = require("../utils/draftCleanup");
 const { generateNotrans } = require("../utils/notransGenerator");
 const { autoTranslate } = require("./openaiService");
+const { saveManualTranslations } = require("../utils/translationHelper");
 
 const MODULE_NAME = "Management";
 const NOTRANS_PREFIX = "MGT";
@@ -112,7 +113,7 @@ class ManagementService {
         const notrans = await generateNotrans(NOTRANS_PREFIX);
         await ApprovalDraft.create({
           notrans, module_name: MODULE_NAME, target_id: String(newRecord.id), action: "CREATE",
-          payload: { ...payload, status: "Published" }, created_by: actorId, status: "Pending",
+          payload: { ...payload, status: "Published", _translations: body._translations }, created_by: actorId, status: "Pending",
         }, { transaction: t });
 
         await newRecord.update({ lock_ticket: notrans }, { transaction: t });
@@ -125,6 +126,7 @@ class ManagementService {
         return { success: true, isDraft: true, ticket: notrans };
       }
 
+      await saveManualTranslations(MODULE_NAME, newRecord.id, body._translations, t);
       await t.commit();
       return { success: true, isDraft: false, data: newRecord };
     } catch (error) {
@@ -161,7 +163,7 @@ class ManagementService {
 
         await ApprovalDraft.create({
           notrans, module_name: MODULE_NAME, target_id: String(id), action: "UPDATE",
-          payload: { ...payload, status: "Published" }, created_by: actorId, status: "Pending",
+          payload: { ...payload, status: "Published", _translations: body._translations }, created_by: actorId, status: "Pending",
         }, { transaction: t });
 
         await person.update({ is_locked: true, lock_ticket: notrans }, { transaction: t });
@@ -176,7 +178,7 @@ class ManagementService {
 
       await ApprovalDraft.update({ status: "Obsolete" }, { where: { module_name: MODULE_NAME, target_id: String(id), status: ["Pending", "Rejected"] }, transaction: t });
       await person.update({ ...payload, is_locked: false, lock_ticket: null }, { transaction: t });
-      await Translation.destroy({ where: { modelName: MODULE_NAME, recordId: String(id) }, transaction: t });
+      await saveManualTranslations(MODULE_NAME, id, body._translations, t);
       await t.commit();
 
       if (filesToDelete.length > 0) filesToDelete.forEach((f) => deleteSingleFile(f));

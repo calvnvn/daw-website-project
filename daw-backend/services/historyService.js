@@ -6,6 +6,7 @@ const Translation = require("../models/Translation");
 const { autoTranslate } = require("./openaiService");
 const { invalidateOldDrafts } = require("../utils/draftCleanup");
 const { generateNotrans } = require("../utils/notransGenerator");
+const { saveManualTranslations } = require("../utils/translationHelper");
 
 const MODULE_NAME = "History";
 const NOTRANS_PREFIX = "HIS";
@@ -116,7 +117,7 @@ class HistoryService {
             module_name: MODULE_NAME,
             target_id: TARGET_ID,
             action: "UPDATE",
-            payload,
+            payload: { ...payload, _translations: body._translations },
             created_by: actorId,
             status: "Pending",
           },
@@ -169,6 +170,17 @@ class HistoryService {
       }
 
       await Translation.destroy({ where: { modelName: MODULE_NAME }, transaction: t });
+      if (body._translations) {
+        let transObj = body._translations;
+        if (typeof transObj === "string") {
+          try { transObj = JSON.parse(transObj); } catch(e) {}
+        }
+        for (const [year, fields] of Object.entries(transObj)) {
+          if (typeof fields === "object" && fields !== null) {
+            await saveManualTranslations(MODULE_NAME, year, { id: fields }, t);
+          }
+        }
+      }
       await t.commit();
       return { success: true, isDraft: false };
     } catch (error) {

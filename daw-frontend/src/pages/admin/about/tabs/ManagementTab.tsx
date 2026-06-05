@@ -19,6 +19,7 @@ import { PhotoPreviewer, ManagementImage } from "../AboutSharedComponents";
 import AboutLivePreview from "@/components/admin/about/AboutLivePreview";
 import { getErrorMessage } from "@/lib/utils";
 import ImageAdjustmentModal from "@/components/admin/ImageAdjustmentModal";
+import MagicTranslationField from "@/components/admin/MagicTranslationField";
 
 interface ManagementTabProps {
   isEditing: boolean;
@@ -57,6 +58,10 @@ export default function ManagementTab({
     savedPhotoUrl: null as string | null,
     previous_notrans: null as string | null,
     originalSnapshot: null as string | null,
+    terjemahanRole: "",
+    terjemahanDescription: "",
+    originalTerjemahanRole: "",
+    originalTerjemahanDescription: "",
   });
 
   const [currentCropFile, setCurrentCropFile] = useState<File | null>(null);
@@ -120,9 +125,20 @@ export default function ManagementTab({
           description: person.description,
           level: person.level,
           order: person.order,
-          photoUrl: person.photoUrl, // Kita lacak photoUrl lama untuk Diff
+          photoUrl: person.photoUrl,
         }),
+        terjemahanRole: "",
+        terjemahanDescription: "",
+        originalTerjemahanRole: "",
+        originalTerjemahanDescription: "",
       });
+
+      api.get(`/translation/manual?modelName=Management&recordId=${person.id}`).then(res => {
+         if (res.data?.data?.id) {
+           const trans = res.data.data.id;
+           setPersonForm(prev => ({ ...prev, terjemahanRole: trans.role || "", originalTerjemahanRole: trans.role || "", terjemahanDescription: trans.description || "", originalTerjemahanDescription: trans.description || "" }));
+         }
+      }).catch(console.error);
     } else {
       setEditingPersonId(null);
       setPersonForm({
@@ -136,6 +152,10 @@ export default function ManagementTab({
         savedPhotoUrl: null,
         previous_notrans: null,
         originalSnapshot: null,
+        terjemahanRole: "",
+        terjemahanDescription: "",
+        originalTerjemahanRole: "",
+        originalTerjemahanDescription: "",
       });
     }
 
@@ -176,7 +196,8 @@ export default function ManagementTab({
       photoUrl: personForm.savedPhotoUrl,
     };
 
-    return JSON.stringify(currentData) !== personForm.originalSnapshot;
+    const isTransChanged = personForm.terjemahanRole !== personForm.originalTerjemahanRole || personForm.terjemahanDescription !== personForm.originalTerjemahanDescription;
+    return JSON.stringify(currentData) !== personForm.originalSnapshot || isTransChanged;
   }, [personForm, editingPersonId]);
 
   const handleRestoreDraft = () => {
@@ -205,6 +226,8 @@ export default function ManagementTab({
         level: payload.level ?? prev.level,
         order: payload.order ?? prev.order,
         removePhoto: false,
+        terjemahanRole: (payload as any)?._translations?.id?.role ?? prev.terjemahanRole,
+        terjemahanDescription: (payload as any)?._translations?.id?.description ?? prev.terjemahanDescription,
       }));
 
       toast.success("Data teks dipulihkan dari draf!");
@@ -265,6 +288,14 @@ export default function ManagementTab({
     formData.append("status", isSuperadmin ? "Active" : "Published");
 
     if (personForm.removePhoto) formData.append("removePhoto", "true");
+    
+    const transObj = {
+      id: {
+        role: personForm.terjemahanRole,
+        description: personForm.terjemahanDescription
+      }
+    };
+    formData.append("_translations", JSON.stringify(transObj));
     if (personForm.photo) formData.append("photo", personForm.photo);
     if (isEditor && personForm.previous_notrans) {
       formData.append("previous_notrans", personForm.previous_notrans);
@@ -564,60 +595,69 @@ export default function ManagementTab({
                           className="w-full px-3 py-2.5 border border-slate-200 rounded-lg focus:ring-2 focus:ring-daw-green/20 focus:border-daw-green transition-all text-sm"
                         />
                       </div>
-                      <div>
-                        <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">
-                          Job Title / Role
-                        </label>
-                        <input
-                          required
-                          type="text"
-                          value={personForm.role}
-                          onChange={(e) =>
-                            setPersonForm({
-                              ...personForm,
-                              role: e.target.value,
-                            })
-                          }
-                          className="w-full px-3 py-2.5 border border-slate-200 rounded-lg focus:ring-2 focus:ring-daw-green/20 focus:border-daw-green transition-all text-sm"
-                        />
+                      <div className="grid grid-cols-2 gap-5">
+                        <div>
+                          <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">
+                            Tingkat Jabatan
+                          </label>
+                          <select
+                            value={personForm.level}
+                            onChange={(e) =>
+                              setPersonForm({
+                                ...personForm,
+                                level: e.target.value as any,
+                              })
+                            }
+                            className="w-full px-3 py-2.5 border border-slate-200 rounded-lg focus:ring-2 focus:ring-daw-green/20 focus:border-daw-green transition-all bg-white text-sm">
+                            <option value="chairman">Chairman</option>
+                            <option value="director">Director</option>
+                            <option value="division">Division Head</option>
+                          </select>
+                        </div>
+                        <div>
+                          <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">
+                            Urutan
+                          </label>
+                          <input
+                            required
+                            type="number"
+                            min="1"
+                            value={personForm.order}
+                            onChange={(e) =>
+                              setPersonForm({
+                                ...personForm,
+                                order: parseInt(e.target.value) || 1,
+                              })
+                            }
+                            className="w-full px-3 py-2.5 border border-slate-200 rounded-lg focus:ring-2 focus:ring-daw-green/20 focus:border-daw-green transition-all text-sm"
+                          />
+                        </div>
                       </div>
                     </div>
 
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
-                      <div>
-                        <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">
-                          Tingkat Jabatan
-                        </label>
-                        <select
-                          value={personForm.level}
-                          onChange={(e) =>
-                            setPersonForm({
-                              ...personForm,
-                              level: e.target.value as any,
-                            })
-                          }
-                          className="w-full px-3 py-2.5 border border-slate-200 rounded-lg focus:ring-2 focus:ring-daw-green/20 focus:border-daw-green transition-all bg-white text-sm">
-                          <option value="chairman">Chairman</option>
-                          <option value="director">Director</option>
-                          <option value="division">Division Head</option>
-                        </select>
-                      </div>
-                      <div>
-                        <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">
-                          Urutan Tampilan
-                        </label>
-                        <input
-                          required
-                          type="number"
-                          min="1"
-                          value={personForm.order}
-                          onChange={(e) =>
-                            setPersonForm({
-                              ...personForm,
-                              order: parseInt(e.target.value) || 1,
-                            })
-                          }
-                          className="w-full px-3 py-2.5 border border-slate-200 rounded-lg focus:ring-2 focus:ring-daw-green/20 focus:border-daw-green transition-all text-sm"
+                    <div>
+                      <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">
+                        Job Title / Role
+                      </label>
+                      <input
+                        required
+                        type="text"
+                        value={personForm.role}
+                        onChange={(e) =>
+                          setPersonForm({
+                            ...personForm,
+                            role: e.target.value,
+                          })
+                        }
+                        className="w-full px-3 py-2.5 border border-slate-200 rounded-lg focus:ring-2 focus:ring-daw-green/20 focus:border-daw-green transition-all text-sm"
+                      />
+                      <div className="mt-2">
+                        <MagicTranslationField
+                          label="Role (Indonesian)"
+                          originalText={personForm.role}
+                          value={personForm.terjemahanRole}
+                          onChange={(v: string) => setPersonForm({...personForm, terjemahanRole: v})}
+                          disabled={isSaving}
                         />
                       </div>
                     </div>
@@ -638,6 +678,15 @@ export default function ManagementTab({
                         }
                         className="w-full px-3 py-2.5 border border-slate-200 rounded-lg focus:ring-2 focus:ring-daw-green/20 focus:border-daw-green resize-none transition-all text-sm"
                       />
+                      <div className="mt-2">
+                        <MagicTranslationField
+                          label="Description (Indonesian)"
+                          originalText={personForm.description}
+                          value={personForm.terjemahanDescription}
+                          onChange={(v: string) => setPersonForm({...personForm, terjemahanDescription: v})}
+                          disabled={isSaving}
+                        />
+                      </div>
                     </div>
 
                     {/* PHOTO UPLOAD AREA */}

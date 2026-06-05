@@ -147,15 +147,18 @@ export const BusinessProvider = ({ children }: { children: ReactNode }) => {
     if (sections.length === 0) setIsLoading(true);
 
     try {
+      const isAdminArea = window.location.pathname.startsWith("/admin");
+      const langParam = isAdminArea ? "en" : (i18n.language === "id" ? "id" : "en");
+      
       const promises: Promise<any>[] = [
         api.get("/map-categories", {
-          params: { lang: i18n.language === "id" ? "id" : "en" },
+          params: { lang: langParam },
         }), // index 0
         api.get("/projects/public", {
-          params: { lang: i18n.language === "id" ? "id" : "en" },
+          params: { lang: langParam },
         }), // index 1
         api.get("/businesses/public", {
-          params: { lang: i18n.language === "id" ? "id" : "en" },
+          params: { lang: langParam },
         }), // index 2
       ];
 

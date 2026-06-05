@@ -5,6 +5,7 @@ const Translation = require("../models/Translation");
 const { autoTranslate } = require("./openaiService");
 const ErpApprovalService = require("./erpApprovalService");
 const { generateNotrans } = require("../utils/notransGenerator");
+const { saveManualTranslations } = require("../utils/translationHelper");
 
 const MODULE_NAME = "AboutInfo";
 const NOTRANS_PREFIX = "ABT";
@@ -122,7 +123,7 @@ class AboutService {
             module_name: MODULE_NAME,
             target_id: "1",
             action: "UPDATE",
-            payload: { ...payload, status: "Published" },
+            payload: { ...payload, status: "Published", _translations: body._translations },
             created_by: actorId,
             status: "Pending",
           },
@@ -165,7 +166,7 @@ class AboutService {
         { ...payload, is_locked: false, lock_ticket: null },
         { transaction: t },
       );
-      await Translation.destroy({ where: { modelName: MODULE_NAME, recordId: "1" }, transaction: t });
+      await saveManualTranslations(MODULE_NAME, "1", body._translations, t);
       await t.commit();
 
       return { success: true, isDraft: false, message: "About Info updated live." };

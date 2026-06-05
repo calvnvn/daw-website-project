@@ -11,6 +11,7 @@ const {
   generateUniqueSlug,
   handleEditorStaging,
 } = require("../utils/editorHelper");
+const { saveManualTranslations } = require("../utils/translationHelper");
 
 const MODULE_NAME = "Project";
 
@@ -20,9 +21,24 @@ class ProjectService {
    */
   async triggerBackgroundTranslation(projectId, payload) {
     try {
-      const { title, excerpt, content } = payload;
+      const { title, excerpt, content, _translations } = payload;
+
+      let manualTransObj = _translations;
+      if (typeof manualTransObj === "string") {
+        try {
+          manualTransObj = JSON.parse(manualTransObj);
+        } catch (e) {
+          manualTransObj = {};
+        }
+      }
+      const manualTrans = manualTransObj?.id || {};
 
       const safeTranslateBG = async (field, sourceValue) => {
+        // Skip background auto-translate if the user manually input a translation for this field
+        if (manualTrans[field] && String(manualTrans[field]).trim() !== "") {
+          return;
+        }
+
         let transRecord = await Translation.findOne({ where: { modelName: MODULE_NAME, recordId: String(projectId), field, locale: "id" } });
         if (!sourceValue || !String(sourceValue).trim()) {
            if (transRecord) await transRecord.destroy();
@@ -190,7 +206,7 @@ class ProjectService {
           notransPrefix: "Projects",
           action: "CREATE",
           targetId: newProject.id,
-          payload: { ...payload, status: "Published" },
+          payload: { ...payload, status: "Published", _translations: body._translations },
           recordToLock: newProject,
           previousNotrans: previous_notrans,
           successMessage: "Proyek baru diajukan. Data dikunci menunggu persetujuan.",
@@ -204,8 +220,9 @@ class ProjectService {
         { transaction: t }
       );
 
+      await saveManualTranslations("Project", newProject.id, body._translations, t);
       await t.commit();
-      this.triggerBackgroundTranslation(newProject.id, payload);
+      this.triggerBackgroundTranslation(newProject.id, { ...payload, _translations: body._translations });
 
       return res.status(201).json({
         success: true,
@@ -251,7 +268,7 @@ class ProjectService {
           notransPrefix: "Projects",
           action: "UPDATE",
           targetId: id,
-          payload: { ...payload, status: "Published" },
+          payload: { ...payload, status: "Published", _translations: body._translations },
           recordToLock: project,
           previousNotrans: previous_notrans,
           successMessage: "Revisi diajukan. Data asli dikunci.",
@@ -264,9 +281,10 @@ class ProjectService {
       }
 
       await project.update({ ...payload, is_locked: false, lock_ticket: null }, { transaction: t });
+      await saveManualTranslations("Project", id, body._translations, t);
       await t.commit();
 
-      this.triggerBackgroundTranslation(id, payload);
+      this.triggerBackgroundTranslation(id, { ...payload, _translations: body._translations });
 
       if (normalizedRole === "superadmin" || (normalizedRole === "editor" && status === "Draft")) {
         filesToDelete.forEach((file) => deleteSingleFile(file));

@@ -2,6 +2,7 @@ const sequelize = require("../config/database");
 const Philosophy = require("../models/Philosophy");
 const ApprovalDraft = require("../models/ApprovalDraft");
 const Translation = require("../models/Translation");
+const { saveManualTranslations } = require("../utils/translationHelper");
 const { autoTranslate } = require("./openaiService");
 const ErpApprovalService = require("./erpApprovalService");
 const { generateNotrans } = require("../utils/notransGenerator");
@@ -121,7 +122,7 @@ class PhilosophyService {
             module_name: MODULE_NAME,
             target_id: "1",
             action: "UPDATE",
-            payload: { ...payload, status: "Published" },
+            payload: { ...payload, status: "Published", _translations: body._translations },
             created_by: actorId,
             status: "Pending",
           },
@@ -169,7 +170,7 @@ class PhilosophyService {
         { ...payload, is_locked: false, lock_ticket: null },
         { transaction: t }
       );
-      await Translation.destroy({ where: { modelName: MODULE_NAME, recordId: "1" }, transaction: t });
+      await saveManualTranslations(MODULE_NAME, "1", body._translations, t);
       
       await t.commit();
 

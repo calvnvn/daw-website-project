@@ -2,6 +2,7 @@ const sequelize = require("../config/database");
 const PhilosophyPillar = require("../models/PhilosophyPillar");
 const ApprovalDraft = require("../models/ApprovalDraft");
 const Translation = require("../models/Translation");
+const { saveManualTranslations } = require("../utils/translationHelper");
 const { autoTranslate } = require("./openaiService");
 const ErpApprovalService = require("./erpApprovalService");
 const { generateNotrans } = require("../utils/notransGenerator");
@@ -104,7 +105,7 @@ class PhilosophyPillarService {
             module_name: MODULE_NAME,
             target_id: String(newPillar.id),
             action: "CREATE",
-            payload: { ...payload, status: "Published" },
+            payload: { ...payload, status: "Published", _translations: body._translations },
             created_by: actorId,
             status: "Pending",
           },
@@ -128,10 +129,11 @@ class PhilosophyPillarService {
       }
 
       // Admin Flow: Direct live commit
-      await PhilosophyPillar.create(
+      const newPlr = await PhilosophyPillar.create(
         { ...payload, is_locked: false },
         { transaction: t }
       );
+      await saveManualTranslations(MODULE_NAME, String(newPlr.id), body._translations, t);
       await t.commit();
 
       return { success: true, isDraft: false };
@@ -182,7 +184,7 @@ class PhilosophyPillarService {
             module_name: MODULE_NAME,
             target_id: String(id),
             action: "UPDATE",
-            payload: { ...payload, status: "Published" },
+            payload: { ...payload, status: "Published", _translations: body._translations },
             created_by: actorId,
             status: "Pending",
           },
@@ -224,7 +226,7 @@ class PhilosophyPillarService {
         { ...payload, is_locked: false, lock_ticket: null },
         { transaction: t }
       );
-      await Translation.destroy({ where: { modelName: MODULE_NAME, recordId: String(id) }, transaction: t });
+      await saveManualTranslations(MODULE_NAME, String(id), body._translations, t);
       await t.commit();
 
       return { success: true, isDraft: false };

@@ -24,6 +24,7 @@ import api, { BASE_UPLOAD_URL } from "@/lib/api";
 import { useAuth } from "@/contexts/AuthContext";
 import { getErrorMessage } from "@/lib/utils";
 import ImageAdjustmentModal from "@/components/admin/ImageAdjustmentModal";
+import MagicTranslationField from "@/components/admin/MagicTranslationField";
 
 interface EditableSlide extends Omit<HeroSlides, "id"> {
   id: string | number;
@@ -31,6 +32,8 @@ interface EditableSlide extends Omit<HeroSlides, "id"> {
   previewUrl?: string;
   previous_notrans?: string;
   isDeleting?: boolean;
+  terjemahan_title?: string;
+  terjemahan_subtitle?: string;
 }
 
 export default function HeroManager({
@@ -78,6 +81,34 @@ export default function HeroManager({
       }
     }
   }, [initialSlides, isEditing]);
+
+  // Load manual translations when entering edit mode
+  useEffect(() => {
+    if (isEditing) {
+      slides.forEach(async (slide) => {
+        if (typeof slide.id === "string" && slide.id.startsWith("new-")) return;
+        try {
+          const res = await api.get(`/translation/manual?modelName=HeroSlides&recordId=${slide.id}`);
+          const trans = res.data?.data?.id;
+          if (trans) {
+            setSlides((prev) => prev.map(s => 
+              s.id === slide.id 
+                ? { ...s, terjemahan_title: trans.title || "", terjemahan_subtitle: trans.subtitle || "" } 
+                : s
+            ));
+            setOriginalSlides((prev) => prev.map(s => 
+              s.id === slide.id 
+                ? { ...s, terjemahan_title: trans.title || "", terjemahan_subtitle: trans.subtitle || "" } 
+                : s
+            ));
+          }
+        } catch (e) {
+          console.error("Gagal menarik terjemahan untuk slide", slide.id);
+        }
+      });
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isEditing]);
 
   // Garbage Collection & Memory Safety
   useEffect(() => {
@@ -314,7 +345,8 @@ export default function HeroManager({
       if (!original) return false;
 
       const isTextChanged =
-        slide.title !== original.title || slide.subtitle !== original.subtitle;
+        slide.title !== original.title || slide.subtitle !== original.subtitle ||
+        slide.terjemahan_title !== original.terjemahan_title || slide.terjemahan_subtitle !== original.terjemahan_subtitle;
       const isOrderChanged = slide.order !== original.order;
       const isImageChanged = !!slide.file;
 
@@ -353,6 +385,14 @@ export default function HeroManager({
         formData.append("subtitle", slide.subtitle);
         formData.append("order", slide.order.toString());
         formData.append("status", isSuperadmin ? "Active" : "Published");
+
+        const transObj = {
+          id: {
+            title: slide.terjemahan_title || "",
+            subtitle: slide.terjemahan_subtitle || "",
+          }
+        };
+        formData.append("_translations", JSON.stringify(transObj));
 
         const radarDraft = rejectedSlidesMap[String(slide.id)];
         const ticketToClear = slide.previous_notrans || radarDraft?.notrans;
@@ -783,6 +823,19 @@ export default function HeroManager({
                           : "bg-transparent border-transparent"
                       } ${slide.isDeleting ? "line-through text-slate-400" : ""}`} // 🎨 The Line-Through Rule
                     />
+                    {isEditing && !shouldLockRowUI && (
+                      <div className="mt-2 pl-3 border-l-2 border-slate-100">
+                        <MagicTranslationField
+                          label="Judul (Indonesia)"
+                          originalText={slide.title}
+                          value={slide.terjemahan_title || ""}
+                          onChange={(val) =>
+                            setSlides(slides.map(s => s.id === slide.id ? { ...s, terjemahan_title: val } : s))
+                          }
+                          disabled={!isEditing || shouldLockRowUI}
+                        />
+                      </div>
+                    )}
                   </div>
                   <div>
                     <label className="block text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-1">
@@ -807,6 +860,19 @@ export default function HeroManager({
                           : "bg-transparent border-transparent"
                       } ${slide.isDeleting ? "line-through text-slate-400" : ""}`}
                     />
+                    {isEditing && !shouldLockRowUI && (
+                      <div className="mt-2 pl-3 border-l-2 border-slate-100">
+                        <MagicTranslationField
+                          label="Sub-judul (Indonesia)"
+                          originalText={slide.subtitle}
+                          value={slide.terjemahan_subtitle || ""}
+                          onChange={(val) =>
+                            setSlides(slides.map(s => s.id === slide.id ? { ...s, terjemahan_subtitle: val } : s))
+                          }
+                          disabled={!isEditing || shouldLockRowUI}
+                        />
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>

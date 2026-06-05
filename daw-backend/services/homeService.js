@@ -15,8 +15,11 @@ const { generateNotrans } = require("../utils/notransGenerator");
 const ErpApprovalService = require("./erpApprovalService");
 const { autoTranslate } = require("./openaiService");
 
+const { saveManualTranslations } = require("../utils/translationHelper");
+
 const MODULE_NAME = "HomeSettings";
 const NOTRANS_PREFIX = "HOME";
+
 
 class HomeService {
   applyTempPrefix(fileObj) {
@@ -175,90 +178,7 @@ class HomeService {
       });
     }
 
-    let finalSlides = slides;
-    let finalStats = stats;
-    let finalSettings = settings;
-
-    if (lang !== "en") {
-      finalSlides = [];
-      for (let i = 0; i < slides.length; i++) {
-        const item = slides[i].get ? slides[i].get({ plain: true }) : { ...slides[i] };
-        let titleTrans = await Translation.findOne({ where: { modelName: "HeroSlides", recordId: String(item.id), field: "title", locale: "id" } });
-        let subtitleTrans = await Translation.findOne({ where: { modelName: "HeroSlides", recordId: String(item.id), field: "subtitle", locale: "id" } });
-        
-        if ((item.title && !titleTrans) || (item.subtitle && !subtitleTrans)) {
-          const freshTitle = item.title && !titleTrans ? await autoTranslate(item.title, "Indonesian") : "";
-          const freshSubtitle = item.subtitle && !subtitleTrans ? await autoTranslate(item.subtitle, "Indonesian") : "";
-          
-          const upsertTrans = async (field, translatedText) => {
-            if (!translatedText) return;
-            const existing = await Translation.findOne({ where: { modelName: "HeroSlides", recordId: String(item.id), field, locale: "id" } });
-            if (existing) await existing.update({ translatedText });
-            else await Translation.create({ modelName: "HeroSlides", recordId: String(item.id), field, locale: "id", translatedText });
-          };
-          
-          if (freshTitle) { await upsertTrans("title", freshTitle); item.title = freshTitle; }
-          if (freshSubtitle) { await upsertTrans("subtitle", freshSubtitle); item.subtitle = freshSubtitle; }
-        } else {
-          if (titleTrans) item.title = titleTrans.translatedText;
-          if (subtitleTrans) item.subtitle = subtitleTrans.translatedText;
-        }
-        finalSlides.push(item);
-      }
-
-      finalStats = [];
-      for (let i = 0; i < stats.length; i++) {
-        const item = stats[i].get ? stats[i].get({ plain: true }) : { ...stats[i] };
-        let labelTrans = await Translation.findOne({ where: { modelName: "ImpactStats", recordId: String(item.id), field: "label", locale: "id" } });
-        let descTrans = await Translation.findOne({ where: { modelName: "ImpactStats", recordId: String(item.id), field: "desc", locale: "id" } });
-        
-        if ((item.label && !labelTrans) || (item.desc && !descTrans)) {
-          const freshLabel = item.label && !labelTrans ? await autoTranslate(item.label, "Indonesian") : "";
-          const freshDesc = item.desc && !descTrans ? await autoTranslate(item.desc, "Indonesian") : "";
-          
-          const upsertTrans = async (field, translatedText) => {
-            if (!translatedText) return;
-            const existing = await Translation.findOne({ where: { modelName: "ImpactStats", recordId: String(item.id), field, locale: "id" } });
-            if (existing) await existing.update({ translatedText });
-            else await Translation.create({ modelName: "ImpactStats", recordId: String(item.id), field, locale: "id", translatedText });
-          };
-          
-          if (freshLabel) { await upsertTrans("label", freshLabel); item.label = freshLabel; }
-          if (freshDesc) { await upsertTrans("desc", freshDesc); item.desc = freshDesc; }
-        } else {
-          if (labelTrans) item.label = labelTrans.translatedText;
-          if (descTrans) item.desc = descTrans.translatedText;
-        }
-        finalStats.push(item);
-      }
-
-      if (settings) {
-        const item = settings.get ? settings.get({ plain: true }) : { ...settings };
-        let headlineTrans = await Translation.findOne({ where: { modelName: "HomeSettings", recordId: "1", field: "introHeadline", locale: "id" } });
-        let bodyTrans = await Translation.findOne({ where: { modelName: "HomeSettings", recordId: "1", field: "introBody", locale: "id" } });
-        
-        if ((item.introHeadline && !headlineTrans) || (item.introBody && !bodyTrans)) {
-          const freshHeadline = item.introHeadline && !headlineTrans ? await autoTranslate(item.introHeadline, "Indonesian") : "";
-          const freshBody = item.introBody && !bodyTrans ? await autoTranslate(item.introBody, "Indonesian") : "";
-          
-          const upsertTrans = async (field, translatedText) => {
-            if (!translatedText) return;
-            const existing = await Translation.findOne({ where: { modelName: "HomeSettings", recordId: "1", field, locale: "id" } });
-            if (existing) await existing.update({ translatedText });
-            else await Translation.create({ modelName: "HomeSettings", recordId: "1", field, locale: "id", translatedText });
-          };
-          
-          if (freshHeadline) { await upsertTrans("introHeadline", freshHeadline); item.introHeadline = freshHeadline; }
-          if (freshBody) { await upsertTrans("introBody", freshBody); item.introBody = freshBody; }
-        } else {
-          if (headlineTrans) item.introHeadline = headlineTrans.translatedText;
-          if (bodyTrans) item.introBody = bodyTrans.translatedText;
-        }
-        finalSettings = item;
-      }
-    }
-
-    return { slides: finalSlides, stats: finalStats, settings: finalSettings, rejectionRadar: rejections };
+    return { slides, stats, settings, rejectionRadar: rejections };
   }
 
   async updateSettings({ userRole, body, actorId, owlToken }) {
@@ -285,7 +205,7 @@ class HomeService {
 
         await ApprovalDraft.create({
           notrans, module_name: MODULE_NAME, action: "UPDATE", target_id: "1",
-          payload: { introHeadline: safeHeadline, introBody: safeBody, status: "Published" },
+          payload: { introHeadline: safeHeadline, introBody: safeBody, status: "Published", _translations: body._translations },
           created_by: actorId, status: "Pending",
         }, { transaction: t });
 
@@ -302,6 +222,7 @@ class HomeService {
 
       await ApprovalDraft.update({ status: "Obsolete" }, { where: { module_name: MODULE_NAME, status: ["Pending", "Rejected"] }, transaction: t });
       await settings.update({ introHeadline: safeHeadline, introBody: safeBody, is_locked: false, lock_ticket: null }, { transaction: t });
+      await saveManualTranslations(MODULE_NAME, "1", body._translations, t);
       await t.commit();
       
       return { success: true, isDraft: false };
@@ -325,7 +246,7 @@ class HomeService {
         const notrans = await generateNotrans("HERO");
         await ApprovalDraft.create({
           notrans, module_name: "HeroSlides", action: "CREATE", target_id: "0",
-          payload: { ...slideData, status: "Published" }, created_by: actorId, status: "Pending",
+          payload: { ...slideData, status: "Published", _translations: body._translations }, created_by: actorId, status: "Pending",
         }, { transaction: t });
         slideData.is_locked = true;
         slideData.lock_ticket = notrans;
@@ -341,6 +262,7 @@ class HomeService {
         return { success: true, isDraft: true, ticket: slideData.lock_ticket };
       }
 
+      await saveManualTranslations("HeroSlides", newSlide.id, body._translations, t);
       await t.commit();
       return { success: true, isDraft: false, data: newSlide };
     } catch (error) {
@@ -380,7 +302,7 @@ class HomeService {
         if (previous_notrans) await ApprovalDraft.update({ status: "Replaced" }, { where: { notrans: previous_notrans }, transaction: t });
         await ApprovalDraft.create({
           notrans, module_name: "HeroSlides", action: "UPDATE", target_id: String(id),
-          payload: { ...updatedData, status: "Published" }, created_by: actorId, status: "Pending",
+          payload: { ...updatedData, status: "Published", _translations: body._translations }, created_by: actorId, status: "Pending",
         }, { transaction: t });
         await slide.update({ is_locked: true, lock_ticket: notrans }, { transaction: t });
         await t.commit();
@@ -394,6 +316,7 @@ class HomeService {
 
       await invalidateOldDrafts("HeroSlides", id, t);
       await slide.update({ ...updatedData, is_locked: false, lock_ticket: null }, { transaction: t });
+      await saveManualTranslations("HeroSlides", id, body._translations, t);
       await t.commit();
       if (oldImageToDelete) deleteSingleFile(oldImageToDelete);
 
@@ -467,7 +390,7 @@ class HomeService {
         const notrans = await generateNotrans("STAT");
         await ApprovalDraft.create({
           notrans, module_name: "ImpactStats", action: "CREATE", target_id: "0",
-          payload: { ...statData, status: "Published" }, created_by: actorId, status: "Pending",
+          payload: { ...statData, status: "Published", _translations: body._translations }, created_by: actorId, status: "Pending",
         }, { transaction: t });
         statData.is_locked = true;
         statData.lock_ticket = notrans;
@@ -484,6 +407,7 @@ class HomeService {
         return { success: true, isDraft: true, ticket: statData.lock_ticket };
       }
 
+      await saveManualTranslations("ImpactStats", newStat.id, body._translations, t);
       await t.commit();
       return { success: true, isDraft: false, data: newStat };
     } catch (error) {
@@ -515,7 +439,7 @@ class HomeService {
         if (previous_notrans) await ApprovalDraft.update({ status: "Replaced" }, { where: { notrans: previous_notrans }, transaction: t });
         await ApprovalDraft.create({
           notrans, module_name: "ImpactStats", action: "UPDATE", target_id: String(id),
-          payload: { ...updatedData, status: "Published" }, created_by: actorId, status: "Pending",
+          payload: { ...updatedData, status: "Published", _translations: body._translations }, created_by: actorId, status: "Pending",
         }, { transaction: t });
         await stat.update({ is_locked: true, lock_ticket: notrans }, { transaction: t });
         await t.commit();
@@ -529,6 +453,7 @@ class HomeService {
 
       await invalidateOldDrafts("ImpactStats", String(id), t);
       await stat.update({ ...updatedData, is_locked: false, lock_ticket: null }, { transaction: t });
+      await saveManualTranslations("ImpactStats", id, body._translations, t);
       await t.commit();
 
       return { success: true, isDraft: false, data: stat };

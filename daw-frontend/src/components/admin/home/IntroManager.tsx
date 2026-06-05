@@ -16,6 +16,7 @@ import {
 import { toast } from "sonner";
 import api from "@/lib/api";
 import { getErrorMessage } from "@/lib/utils";
+import MagicTranslationField from "@/components/admin/MagicTranslationField";
 
 export default function IntroManager({
   mode = "edit",
@@ -40,12 +41,16 @@ export default function IntroManager({
   const [settings, setSettings] = useState({
     introHeadline: "",
     introBody: "",
+    terjemahan_introHeadline: "",
+    terjemahan_introBody: "",
   });
 
   // 🚀 Sub-Langkah 2.1: Snapshotting (Jangkar Diff Engine)
   const [originalData, setOriginalData] = useState({
     introHeadline: "",
     introBody: "",
+    terjemahan_introHeadline: "",
+    terjemahan_introBody: "",
   });
 
   // State UI & Lifecycle
@@ -82,6 +87,8 @@ export default function IntroManager({
       const cleanData = {
         introHeadline: initialSettings.introHeadline ?? "",
         introBody: initialSettings.introBody ?? "",
+        terjemahan_introHeadline: "",
+        terjemahan_introBody: "",
       };
 
       setSettings(cleanData);
@@ -93,11 +100,39 @@ export default function IntroManager({
     }
   }, [initialSettings, isEditing]);
 
+  useEffect(() => {
+    if (isEditing) {
+      const fetchTranslations = async () => {
+        try {
+          const res = await api.get(`/translation/manual?modelName=HomeSettings&recordId=1`);
+          const trans = res.data?.data?.id;
+          if (trans) {
+            setSettings((prev) => ({
+              ...prev,
+              terjemahan_introHeadline: trans.introHeadline || "",
+              terjemahan_introBody: trans.introBody || "",
+            }));
+            setOriginalData((prev) => ({
+              ...prev,
+              terjemahan_introHeadline: trans.introHeadline || "",
+              terjemahan_introBody: trans.introBody || "",
+            }));
+          }
+        } catch (e) {
+          console.error("Gagal menarik terjemahan manual:", e);
+        }
+      };
+      fetchTranslations();
+    }
+  }, [isEditing]);
+
   // --- 2. ROBUST DIFF ENGINE ---
   const hasDataChanged = useCallback(() => {
     return (
       settings.introHeadline.trim() !== originalData.introHeadline.trim() ||
-      settings.introBody.trim() !== originalData.introBody.trim()
+      settings.introBody.trim() !== originalData.introBody.trim() ||
+      settings.terjemahan_introHeadline.trim() !== originalData.terjemahan_introHeadline.trim() ||
+      settings.terjemahan_introBody.trim() !== originalData.terjemahan_introBody.trim()
     );
   }, [settings, originalData]);
 
@@ -122,6 +157,8 @@ export default function IntroManager({
     setSettings((prev) => ({
       introHeadline: payloadObj.introHeadline ?? prev.introHeadline,
       introBody: payloadObj.introBody ?? prev.introBody,
+      terjemahan_introHeadline: payloadObj._translations?.id?.introHeadline ?? prev.terjemahan_introHeadline,
+      terjemahan_introBody: payloadObj._translations?.id?.introBody ?? prev.terjemahan_introBody,
     }));
 
     setIsEditing(true);
@@ -192,6 +229,12 @@ export default function IntroManager({
         introHeadline: settings.introHeadline.trim(),
         introBody: settings.introBody.trim(),
         status: isSuperadmin ? "Active" : "Published",
+        _translations: {
+          id: {
+            introHeadline: settings.terjemahan_introHeadline.trim(),
+            introBody: settings.terjemahan_introBody.trim(),
+          }
+        }
       };
 
       if (rejectedIntro?.notrans && isEditor) {
@@ -458,6 +501,17 @@ export default function IntroManager({
                   : "bg-slate-100/50 border-transparent text-slate-500 cursor-not-allowed"
               }`}
             />
+            {isEditing && !isFormLocked && (
+              <div className="mt-3 pl-4 border-l-2 border-slate-200">
+                <MagicTranslationField
+                  label="Headline (Indonesia)"
+                  originalText={settings.introHeadline}
+                  value={settings.terjemahan_introHeadline}
+                  onChange={(val) => setSettings({ ...settings, terjemahan_introHeadline: val })}
+                  disabled={isFormLocked}
+                />
+              </div>
+            )}
           </div>
           <div>
             <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-2">
@@ -476,6 +530,17 @@ export default function IntroManager({
                   : "bg-slate-100/50 border-transparent text-slate-500 cursor-not-allowed"
               }`}
             />
+            {isEditing && !isFormLocked && (
+              <div className="mt-3 pl-4 border-l-2 border-slate-200">
+                <MagicTranslationField
+                  label="Body (Indonesia)"
+                  originalText={settings.introBody}
+                  value={settings.terjemahan_introBody}
+                  onChange={(val) => setSettings({ ...settings, terjemahan_introBody: val })}
+                  disabled={isFormLocked}
+                />
+              </div>
+            )}
           </div>
         </div>
       </div>

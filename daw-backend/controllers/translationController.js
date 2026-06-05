@@ -1,5 +1,5 @@
 const Translation = require("../models/Translation");
-const { translateText } = require("../services/openaiService");
+const { autoTranslate: translateText } = require("../services/openaiService");
 
 /**
  * Controller to handle Manual Translation Operations
@@ -18,18 +18,25 @@ class TranslationController {
       // We default to "1" if missing, to be safe.
       const queryRecordId = recordId || "1";
 
+      const whereClause = { modelName: modelName };
+      if (queryRecordId !== "ALL") {
+        whereClause.recordId = String(queryRecordId);
+      }
+
       const translations = await Translation.findAll({
-        where: {
-          modelName: modelName,
-          recordId: String(queryRecordId),
-        },
+        where: whereClause,
       });
 
-      // Format response to { id: { title: "...", description: "..." } }
+      // Format response
       const formatted = { id: {} };
       translations.forEach((t) => {
-        if (t.language === "id") {
-          formatted.id[t.field] = t.translatedText;
+        if (t.locale === "id") {
+          if (queryRecordId === "ALL") {
+            if (!formatted.id[t.recordId]) formatted.id[t.recordId] = {};
+            formatted.id[t.recordId][t.field] = t.translatedText;
+          } else {
+            formatted.id[t.field] = t.translatedText;
+          }
         }
       });
 

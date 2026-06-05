@@ -18,6 +18,12 @@ import * as Icons from "lucide-react";
 import { toast } from "sonner";
 import api from "@/lib/api";
 import { getErrorMessage } from "@/lib/utils";
+import MagicTranslationField from "@/components/admin/MagicTranslationField";
+
+interface EditableStat extends ImpactStats {
+  terjemahan_label?: string;
+  terjemahan_desc?: string;
+}
 
 const CURATED_ICONS = [
   "Map",
@@ -88,8 +94,8 @@ export default function StatsManager({
   const isEditor = user?.role?.toLowerCase() === "editor";
 
   // States
-  const [stats, setStats] = useState<ImpactStats[]>([]);
-  const [originalStats, setOriginalStats] = useState<ImpactStats[]>([]);
+  const [stats, setStats] = useState<EditableStat[]>([]);
+  const [originalStats, setOriginalStats] = useState<EditableStat[]>([]);
 
   const [restoredTickets, setRestoredTickets] = useState<
     Record<string, string>
@@ -119,12 +125,40 @@ export default function StatsManager({
   // 1. SINKRONISASI DATA & SNAPSHOTTING
   useEffect(() => {
     if (initialStats && !isEditing) {
-      const cleanStats = initialStats.map((s) => ({ ...s }));
+      const cleanStats = initialStats.map((s) => ({ ...s, terjemahan_label: "", terjemahan_desc: "" }));
       setStats(cleanStats);
-      setOriginalStats(cleanStats);
+      setOriginalStats(cleanStats.map((s) => ({ ...s })));
       setRestoredTickets({}); // Reset tracker saat data sinkron
     }
   }, [initialStats, isEditing]);
+
+  // Fetch translations when entering edit mode
+  useEffect(() => {
+    if (isEditing) {
+      stats.forEach(async (stat) => {
+        if (typeof stat.id === "string" && stat.id.startsWith("new-")) return;
+        try {
+          const res = await api.get(`/translation/manual?modelName=ImpactStats&recordId=${stat.id}`);
+          const trans = res.data?.data?.id;
+          if (trans) {
+            setStats((prev) => prev.map(s => 
+              s.id === stat.id 
+                ? { ...s, terjemahan_label: trans.label || "", terjemahan_desc: trans.desc || "" } 
+                : s
+            ));
+            setOriginalStats((prev) => prev.map(s => 
+              s.id === stat.id 
+                ? { ...s, terjemahan_label: trans.label || "", terjemahan_desc: trans.desc || "" } 
+                : s
+            ));
+          }
+        } catch (e) {
+          console.error("Gagal menarik terjemahan manual untuk stat", stat.id);
+        }
+      });
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isEditing]);
 
   // 2. RESTORATION ENGINE (Anti-Corruption Guard)
   const handleRestoreDraft = useCallback(
@@ -152,7 +186,9 @@ export default function StatsManager({
               label: payloadObj.label ?? s.label,
               desc: payloadObj.desc ?? s.desc,
               order: payloadObj.order ?? s.order,
-            } as ImpactStats;
+              terjemahan_label: payloadObj._translations?.id?.label ?? s.terjemahan_label,
+              terjemahan_desc: payloadObj._translations?.id?.desc ?? s.terjemahan_desc,
+            } as EditableStat;
           }
           return s;
         }),
@@ -325,7 +361,9 @@ export default function StatsManager({
         stat.value !== original.value ||
         stat.label !== original.label ||
         stat.desc !== original.desc ||
-        stat.order !== original.order
+        stat.order !== original.order ||
+        stat.terjemahan_label !== original.terjemahan_label ||
+        stat.terjemahan_desc !== original.terjemahan_desc
       );
     });
   }, [stats, originalStats, isSuperadmin]);
@@ -361,6 +399,12 @@ export default function StatsManager({
           desc: stat.desc,
           order: stat.order,
           status: isSuperadmin ? "Active" : "Published",
+          _translations: {
+            id: {
+              label: stat.terjemahan_label || "",
+              desc: stat.terjemahan_desc || "",
+            }
+          }
         };
 
         if (restoredTickets[stat.id] && isEditor) {
@@ -720,6 +764,17 @@ export default function StatsManager({
                       className={`w-full px-3 py-1.5 text-xs font-bold uppercase tracking-wide rounded-md transition-all ${isEditing && !shouldLockThisRowUI ? "bg-white border border-slate-200 focus:ring-2 focus:ring-daw-green/10" : "bg-transparent border-transparent"}`}
                       placeholder="E.g., Global Projects"
                     />
+                    {isEditing && !shouldLockThisRowUI && (
+                      <div className="mt-2 pl-3 border-l-2 border-slate-100">
+                        <MagicTranslationField
+                          label="Label (Indonesia)"
+                          originalText={stat.label}
+                          value={stat.terjemahan_label || ""}
+                          onChange={(val) => updateStatField(stat.id, "terjemahan_label" as any, val)}
+                          disabled={!isEditing || shouldLockThisRowUI}
+                        />
+                      </div>
+                    )}
                   </div>
                   <div>
                     <label className="block text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-1">
@@ -735,6 +790,17 @@ export default function StatsManager({
                       className={`w-full px-3 py-1.5 text-[11px] rounded-md transition-all ${isEditing && !shouldLockThisRowUI ? "bg-white border border-slate-200 focus:ring-2 focus:ring-daw-green/10" : "bg-transparent border-transparent"}`}
                       placeholder="Short description here..."
                     />
+                    {isEditing && !shouldLockThisRowUI && (
+                      <div className="mt-2 pl-3 border-l-2 border-slate-100">
+                        <MagicTranslationField
+                          label="Description (Indonesia)"
+                          originalText={stat.desc}
+                          value={stat.terjemahan_desc || ""}
+                          onChange={(val) => updateStatField(stat.id, "terjemahan_desc" as any, val)}
+                          disabled={!isEditing || shouldLockThisRowUI}
+                        />
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>

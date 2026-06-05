@@ -21,6 +21,7 @@ import { getCleanImageUrl } from "@/lib/utils";
 import AboutLivePreview from "@/components/admin/about/AboutLivePreview";
 import { getErrorMessage } from "@/lib/utils";
 import ImageAdjustmentModal from "@/components/admin/ImageAdjustmentModal";
+import MagicTranslationField from "@/components/admin/MagicTranslationField";
 
 interface AchievementTabProps {
   isEditing: boolean;
@@ -82,6 +83,10 @@ export default function AchievementTab({
     originalSnapshot: null as string | null,
     previous_notrans: undefined as string | undefined,
     rejection_reason: undefined as string | undefined,
+    terjemahanTitle: "",
+    terjemahanDescription: "",
+    originalTerjemahanTitle: "",
+    originalTerjemahanDescription: "",
   });
 
   const openModal = async (achievement: AchievementItem | null = null) => {
@@ -142,6 +147,10 @@ export default function AchievementTab({
         news_article_id: payload.news_article_id || "",
         previous_notrans: draftNotrans,
         rejection_reason: draftReason,
+        terjemahanTitle: "",
+        terjemahanDescription: "",
+        originalTerjemahanTitle: "",
+        originalTerjemahanDescription: "",
         originalSnapshot: JSON.stringify({
           year: payload.year || "",
           title: payload.title || "",
@@ -153,6 +162,19 @@ export default function AchievementTab({
           news_article_id: payload.news_article_id || "",
         }),
       }));
+
+      api.get(`/translation/manual?modelName=Achievement&recordId=${achievement.id}`).then(res => {
+        if (res.data?.data?.id) {
+          const trans = res.data.data.id;
+          setForm(prev => ({
+            ...prev,
+            terjemahanTitle: trans.title || "",
+            originalTerjemahanTitle: trans.title || "",
+            terjemahanDescription: trans.description || "",
+            originalTerjemahanDescription: trans.description || "",
+          }));
+        }
+      }).catch(console.error);
     } else {
       setEditingId(null);
       setForm({
@@ -169,6 +191,10 @@ export default function AchievementTab({
         originalSnapshot: null,
         previous_notrans: undefined,
         rejection_reason: undefined,
+        terjemahanTitle: "",
+        terjemahanDescription: "",
+        originalTerjemahanTitle: "",
+        originalTerjemahanDescription: "",
       });
     }
 
@@ -205,7 +231,11 @@ export default function AchievementTab({
       news_article_id: form.news_article_id || "",
     };
 
-    return JSON.stringify(currentData) !== form.originalSnapshot;
+    const isTransChanged =
+      form.terjemahanTitle !== form.originalTerjemahanTitle ||
+      form.terjemahanDescription !== form.originalTerjemahanDescription;
+
+    return JSON.stringify(currentData) !== form.originalSnapshot || isTransChanged;
   }, [form, editingId]);
 
   const saveAchievement = async (e: React.FormEvent) => {
@@ -239,6 +269,14 @@ export default function AchievementTab({
     if (form.removePhoto) formData.append("removePhoto", "true");
     if (form.photo) formData.append("image", form.photo);
     formData.append("news_article_id", form.news_article_id || "");
+
+    const transObj = {
+      id: {
+        title: form.terjemahanTitle,
+        description: form.terjemahanDescription,
+      },
+    };
+    formData.append("_translations", JSON.stringify(transObj));
 
     // Inject Editor status for approval workflow
     if (isEditor) {
@@ -531,8 +569,7 @@ export default function AchievementTab({
                 id="achievement-form"
                 onSubmit={saveAchievement}
                 className="space-y-6">
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
-                  <div>
+                <div>
                     <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">
                       Title / Headline
                     </label>
@@ -546,59 +583,72 @@ export default function AchievementTab({
                       className="w-full px-3 py-2.5 border border-slate-200 rounded-lg focus:ring-2 focus:ring-daw-green/20 transition-all text-sm"
                       placeholder="Contoh: CSR Excellence Award"
                     />
+                    <div className="mt-2">
+                      <MagicTranslationField
+                        label="Title (Indonesian)"
+                        originalText={form.title}
+                        value={form.terjemahanTitle}
+                        onChange={(v) => setForm({...form, terjemahanTitle: v})}
+                        disabled={isSaving}
+                      />
+                    </div>
                   </div>
-                  <div>
-                    <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">
-                      Kategori
-                    </label>
-                    <input
-                      required
-                      type="text"
-                      value={form.category}
-                      onChange={(e) =>
-                        setForm({ ...form, category: e.target.value })
-                      }
-                      className="w-full px-3 py-2.5 border border-slate-200 rounded-lg focus:ring-2 focus:ring-daw-green/20 transition-all text-sm"
-                      placeholder="Contoh: Sustainability"
-                    />
-                  </div>
-                </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+                    <div>
+                      <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">
+                        Kategori
+                      </label>
+                      <input
+                        required
+                        type="text"
+                        value={form.category}
+                        onChange={(e) =>
+                          setForm({ ...form, category: e.target.value })
+                        }
+                        className="w-full px-3 py-2.5 border border-slate-200 rounded-lg focus:ring-2 focus:ring-daw-green/20 transition-all text-sm"
+                        placeholder="Contoh: Sustainability"
+                      />
+                    </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
-                  <div>
-                    <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">
-                      Tahun
-                    </label>
-                    <input
-                      required
-                      type="text"
-                      value={form.year}
-                      onChange={(e) =>
-                        setForm({ ...form, year: e.target.value })
-                      }
-                      className="w-full px-3 py-2.5 border border-slate-200 rounded-lg focus:ring-2 focus:ring-daw-green/20 transition-all text-sm"
-                      placeholder="2026"
-                    />
+                <div className="grid grid-cols-2 gap-5">
+                      <div>
+                        <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">
+                          Tahun
+                        </label>
+                        <input
+                          required
+                          type="text"
+                          value={form.year}
+                          onChange={(e) =>
+                            setForm({ ...form, year: e.target.value })
+                          }
+                          className="w-full px-3 py-2.5 border border-slate-200 rounded-lg focus:ring-2 focus:ring-daw-green/20 transition-all text-sm"
+                          placeholder="2026"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">
+                          Tanggal Spesifik
+                        </label>
+                        <input
+                          required
+                          type="date"
+                          value={form.date}
+                          onChange={(e) => {
+                            const newDate = e.target.value;
+                            const yearFromDate = newDate
+                              ? newDate.split("-")[0]
+                              : form.year;
+                            setForm({ ...form, date: newDate, year: yearFromDate });
+                          }}
+                          className="w-full px-3 py-2.5 border border-slate-200 rounded-lg focus:ring-2 focus:ring-daw-green/20 transition-all text-sm"
+                        />
+                      </div>
+                    </div>
                   </div>
-                  <div>
-                    <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">
-                      Tanggal Spesifik
-                    </label>
-                    <input
-                      required
-                      type="date"
-                      value={form.date}
-                      onChange={(e) => {
-                        const newDate = e.target.value;
-                        const yearFromDate = newDate
-                          ? newDate.split("-")[0]
-                          : form.year;
-                        setForm({ ...form, date: newDate, year: yearFromDate });
-                      }}
-                      className="w-full px-3 py-2.5 border border-slate-200 rounded-lg focus:ring-2 focus:ring-daw-green/20 transition-all text-sm"
-                    />
-                  </div>
-                  <div className="relative">
+                  
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+                    <div className="relative">
                     <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">
                       Ikon (Fallback)
                     </label>
@@ -639,6 +689,29 @@ export default function AchievementTab({
                       </div>
                     )}
                   </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                      <Link2 className="w-3.5 h-3.5" />
+                      Hubungkan ke Artikel Berita (Opsional)
+                    </label>
+                    <select
+                      value={form.news_article_id}
+                      onChange={(e) =>
+                        setForm({ ...form, news_article_id: e.target.value })
+                      }
+                      className="w-full px-3 py-2.5 border border-slate-200 rounded-lg focus:ring-2 focus:ring-daw-green/20 transition-all text-sm bg-white">
+                      <option value="">— Tidak Ada Hubungan Artikel —</option>
+                      {publishedArticles.map((art) => (
+                        <option key={art.id} value={art.id}>
+                          {art.title}
+                        </option>
+                      ))}
+                    </select>
+                    <p className="text-[10px] text-slate-400 mt-1.5">
+                      Jika dihubungkan, pengunjung dapat menekan tombol "Read Full Story" pada kartu penghargaan untuk membaca cerita lengkapnya di News & Events.
+                    </p>
+                  </div>
                 </div>
 
                 <div>
@@ -654,33 +727,18 @@ export default function AchievementTab({
                     }
                     className="w-full px-3 py-2.5 border border-slate-200 rounded-lg focus:ring-2 focus:ring-daw-green/20 resize-none transition-all text-sm"
                   />
+                  <div className="mt-2">
+                    <MagicTranslationField
+                      label="Description (Indonesian)"
+                      originalText={form.description}
+                      value={form.terjemahanDescription}
+                      onChange={(v) => setForm({...form, terjemahanDescription: v})}
+                      disabled={isSaving}
+                    />
+                  </div>
                 </div>
 
-                {/* ARTICLE LINK DROPDOWN (Optional) */}
-                <div>
-                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2 flex items-center gap-1.5">
-                    <Link2 className="w-3.5 h-3.5" />
-                    Hubungkan ke Artikel Berita (Opsional)
-                  </label>
-                  <select
-                    value={form.news_article_id}
-                    onChange={(e) =>
-                      setForm({ ...form, news_article_id: e.target.value })
-                    }
-                    className="w-full px-3 py-2.5 border border-slate-200 rounded-lg focus:ring-2 focus:ring-daw-green/20 transition-all text-sm bg-white">
-                    <option value="">— Tidak Ada Hubungan Artikel —</option>
-                    {publishedArticles.map((art) => (
-                      <option key={art.id} value={art.id}>
-                        {art.title}
-                      </option>
-                    ))}
-                  </select>
-                  <p className="text-[10px] text-slate-400 mt-1.5">
-                    Jika dihubungkan, pengunjung dapat menekan tombol "Read Full
-                    Story" pada kartu penghargaan untuk membaca cerita
-                    lengkapnya di News & Events.
-                  </p>
-                </div>
+                
 
                 <div>
                   <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">

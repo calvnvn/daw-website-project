@@ -13,6 +13,7 @@ import api from "@/lib/api";
 import { useAbout } from "@/contexts/AboutContext";
 import AboutLivePreview from "@/components/admin/about/AboutLivePreview";
 import { getErrorMessage } from "@/lib/utils";
+import MagicTranslationField from "@/components/admin/MagicTranslationField";
 
 interface AboutInfoTabProps {
   isEditing: boolean;
@@ -42,6 +43,11 @@ export default function AboutInfoTab({
   });
   const [originalData, setOriginalData] = useState<InfoFormData | null>(null);
 
+  const [originalTranslations, setOriginalTranslations] = useState<Record<string, string>>({});
+  const [terjemahanSpirit, setTerjemahanSpirit] = useState("");
+  const [terjemahanMission, setTerjemahanMission] = useState("");
+  const [terjemahanVision, setTerjemahanVision] = useState("");
+
   // SYSTEM STATES
   const [isSaving, setIsSaving] = useState(false);
   const [isDiscarding, setIsDiscarding] = useState(false);
@@ -62,6 +68,18 @@ export default function AboutInfoTab({
       if (!aboutData.is_locked) {
         setOptimisticLock(false);
       }
+
+      api.get("/translation/manual?modelName=AboutInfo&recordId=1")
+        .then((res) => {
+          if (res.data?.data?.id) {
+            const trans = res.data.data.id;
+            setTerjemahanSpirit(trans.spiritText || "");
+            setTerjemahanMission(trans.missionText || "");
+            setTerjemahanVision(trans.visionText || "");
+            setOriginalTranslations(trans);
+          }
+        })
+        .catch(console.error);
     }
   }, [aboutData]);
 
@@ -102,12 +120,19 @@ export default function AboutInfoTab({
   // 3. THE DIFF ENGINE
   const hasDataChanged = useMemo(() => {
     if (!originalData) return false;
+    
+    const isTransChanged = 
+      terjemahanSpirit.trim() !== (originalTranslations.spiritText || "") ||
+      terjemahanMission.trim() !== (originalTranslations.missionText || "") ||
+      terjemahanVision.trim() !== (originalTranslations.visionText || "");
+
     return (
       formData.spiritText.trim() !== originalData.spiritText ||
       formData.missionText.trim() !== originalData.missionText ||
-      formData.visionText.trim() !== originalData.visionText
+      formData.visionText.trim() !== originalData.visionText ||
+      isTransChanged
     );
-  }, [formData, originalData]);
+  }, [formData, originalData, terjemahanSpirit, terjemahanMission, terjemahanVision, originalTranslations]);
 
   // 4. ITEM-LEVEL LOCK ISOLATION
   const isPendingLock = aboutData?.is_locked && !aboutData?.hasRejected;
@@ -138,6 +163,12 @@ export default function AboutInfoTab({
         missionText: String(payload.missionText || "").trim(),
         visionText: String(payload.visionText || "").trim(),
       });
+
+      if (payload._translations?.id) {
+         setTerjemahanSpirit(payload._translations.id.spiritText || "");
+         setTerjemahanMission(payload._translations.id.missionText || "");
+         setTerjemahanVision(payload._translations.id.visionText || "");
+      }
 
       toast.success("Teks Visi, Misi, & Spirit dipulihkan!");
     } catch (err) {
@@ -178,6 +209,13 @@ export default function AboutInfoTab({
         missionText: formData.missionText.trim(),
         visionText: formData.visionText.trim(),
         status: isSuperadmin ? "Active" : "Published",
+        _translations: {
+          id: {
+            spiritText: terjemahanSpirit,
+            missionText: terjemahanMission,
+            visionText: terjemahanVision
+          }
+        }
       };
 
       if (isEditor && rejectedDraft?.notrans) {
@@ -308,9 +346,7 @@ export default function AboutInfoTab({
           <textarea
             rows={2}
             value={formData.spiritText}
-            onChange={(e) =>
-              setFormData({ ...formData, spiritText: e.target.value })
-            }
+            onChange={(e) => setFormData({ ...formData, spiritText: e.target.value })}
             disabled={!isEditing || isItemLocked}
             className={`w-full px-3 py-2.5 rounded-lg resize-none font-serif text-sm transition-all duration-300 ${
               isEditing && !isItemLocked
@@ -318,6 +354,15 @@ export default function AboutInfoTab({
                 : "bg-slate-100/50 border-transparent text-slate-500 cursor-not-allowed"
             }`}
           />
+          <div className="mt-4">
+            <MagicTranslationField
+              label="Spirit Text (Indonesian)"
+              originalText={formData.spiritText}
+              value={terjemahanSpirit}
+              onChange={setTerjemahanSpirit}
+              disabled={!isEditing || isItemLocked}
+            />
+          </div>
         </div>
 
         {/* MISSION */}
@@ -337,9 +382,7 @@ export default function AboutInfoTab({
           <textarea
             rows={4}
             value={formData.missionText}
-            onChange={(e) =>
-              setFormData({ ...formData, missionText: e.target.value })
-            }
+            onChange={(e) => setFormData({ ...formData, missionText: e.target.value })}
             disabled={!isEditing || isItemLocked}
             className={`w-full px-3 py-2.5 rounded-lg resize-none font-serif text-sm transition-all duration-300 ${
               isEditing && !isItemLocked
@@ -347,6 +390,15 @@ export default function AboutInfoTab({
                 : "bg-slate-100/50 border-transparent text-slate-500 cursor-not-allowed"
             }`}
           />
+          <div className="mt-4">
+            <MagicTranslationField
+              label="Mission Text (Indonesian)"
+              originalText={formData.missionText}
+              value={terjemahanMission}
+              onChange={setTerjemahanMission}
+              disabled={!isEditing || isItemLocked}
+            />
+          </div>
         </div>
 
         {/* VISION */}
@@ -366,9 +418,7 @@ export default function AboutInfoTab({
           <textarea
             rows={4}
             value={formData.visionText}
-            onChange={(e) =>
-              setFormData({ ...formData, visionText: e.target.value })
-            }
+            onChange={(e) => setFormData({ ...formData, visionText: e.target.value })}
             disabled={!isEditing || isItemLocked}
             className={`w-full px-3 py-2.5 rounded-lg resize-none font-serif text-sm transition-all duration-300 ${
               isEditing && !isItemLocked
@@ -376,6 +426,15 @@ export default function AboutInfoTab({
                 : "bg-slate-100/50 border-transparent text-slate-500 cursor-not-allowed"
             }`}
           />
+          <div className="mt-4">
+            <MagicTranslationField
+              label="Vision Text (Indonesian)"
+              originalText={formData.visionText}
+              value={terjemahanVision}
+              onChange={setTerjemahanVision}
+              disabled={!isEditing || isItemLocked}
+            />
+          </div>
         </div>
       </div>
 

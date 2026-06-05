@@ -401,7 +401,14 @@ class ApprovalService {
     const filesToTrash = payload._filesToDelete || [];
     delete payload._filesToDelete;
 
-    const manualTranslations = payload._translations || null;
+    let manualTranslations = payload._translations || null;
+    if (typeof manualTranslations === "string") {
+      try {
+        manualTranslations = JSON.parse(manualTranslations);
+      } catch (e) {
+        console.warn("Failed to parse _translations from string payload");
+      }
+    }
     delete payload._translations;
 
     const validAttributes = Object.keys(Model.rawAttributes);
@@ -470,10 +477,10 @@ class ApprovalService {
     // 🧹 [CACHE INVALIDATION & MANUAL OVERRIDE]
     try {
       if (effectiveModule === "History") {
-        await Translation.destroy({ where: { modelName: effectiveModule }, transaction });
+        await Translation.destroy({ where: { modelName: effectiveModule, locale: "id" }, transaction });
       } else if (finalTargetId && finalTargetId !== "ALL_TREE") {
         await Translation.destroy({
-          where: { modelName: effectiveModule, recordId: String(finalTargetId) },
+          where: { modelName: effectiveModule, recordId: String(finalTargetId), locale: "id" },
           transaction
         });
       }
@@ -485,7 +492,7 @@ class ApprovalService {
                  modelName: effectiveModule,
                  recordId: String(finalTargetId),
                  field: field,
-                 language: 'id',
+                 locale: 'id',
                  translatedText: text
              }, { transaction });
            }
