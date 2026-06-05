@@ -401,6 +401,9 @@ class ApprovalService {
     const filesToTrash = payload._filesToDelete || [];
     delete payload._filesToDelete;
 
+    const manualTranslations = payload._translations || null;
+    delete payload._translations;
+
     const validAttributes = Object.keys(Model.rawAttributes);
     const scrubbedPayload = {};
 
@@ -414,67 +417,82 @@ class ApprovalService {
     if (action === "DELETE") {
       if (effectiveModule === "BusinessSection") await BusinessMapMarker.destroy({ where: { sectionId: targetId }, transaction });
       await Model.destroy({ where: { id: targetId }, transaction });
-      return filesToTrash;
-    }
-
-    if (action === "CREATE") {
-      const placeholder = await Model.findByPk(targetId, { transaction });
-      if (placeholder) await placeholder.update(scrubbedPayload, { transaction });
-      else await Model.create({ ...scrubbedPayload, id: targetId }, { transaction });
+      await Translation.destroy({ where: { modelName: effectiveModule, recordId: String(targetId) }, transaction });
       return filesToTrash;
     }
 
     const singletonModules = ["AboutInfo", "HomeSettings", "InvestmentSettings", "Settings"];
-    if (singletonModules.includes(effectiveModule)) {
-      await Model.update(scrubbedPayload, { where: { id: 1 }, transaction });
-      return filesToTrash;
+    const finalTargetId = singletonModules.includes(effectiveModule) ? "1" : targetId;
+
+    if (action === "CREATE") {
+      const placeholder = await Model.findByPk(finalTargetId, { transaction });
+      if (placeholder) await placeholder.update(scrubbedPayload, { transaction });
+      else await Model.create({ ...scrubbedPayload, id: finalTargetId }, { transaction });
+    } else {
+      if (singletonModules.includes(effectiveModule)) {
+        await Model.update(scrubbedPayload, { where: { id: 1 }, transaction });
+      } else {
+        switch (effectiveModule) {
+          case "History":
+            await History.destroy({ where: {}, transaction });
+            if (payload.histories && Array.isArray(payload.histories)) {
+              const historyData = payload.histories.map((h) => ({ year: h.year, description: h.description, is_locked: false, lock_ticket: null }));
+              await History.bulkCreate(historyData, { transaction });
+            }
+            break;
+          case "BusinessSection":
+            const parentPayload = { ...scrubbedPayload };
+            delete parentPayload.mapMarkers;
+            await BusinessSection.update(parentPayload, { where: { id: finalTargetId }, transaction });
+            if (payload.mapMarkers && Array.isArray(payload.mapMarkers)) {
+              await BusinessMapMarker.destroy({ where: { sectionId: finalTargetId }, transaction });
+              const newMarkers = payload.mapMarkers.map((m) => ({ ...m, id: undefined, sectionId: finalTargetId, is_locked: false, lock_ticket: null }));
+              await BusinessMapMarker.bulkCreate(newMarkers, { transaction });
+            }
+            break;
+          case "Menu":
+            if (finalTargetId === "ALL_TREE") {
+              for (const item of payload.updatedMenus) {
+                await Menu.update({ orderIndex: item.orderIndex, parentId: item.parentId }, { where: { id: item.id }, transaction });
+              }
+              await Menu.update({ is_locked: false, lock_ticket: null }, { where: {}, transaction });
+            } else {
+              await Model.update(scrubbedPayload, { where: { id: finalTargetId }, transaction });
+            }
+            break;
+          default:
+            await Model.update(scrubbedPayload, { where: { id: finalTargetId }, transaction });
+            break;
+        }
+      }
     }
 
-    // 🧹 [CACHE INVALIDATION] - Bersihkan cache terjemahan untuk record yang terupdate/dihapus
+    // 🧹 [CACHE INVALIDATION & MANUAL OVERRIDE]
     try {
       if (effectiveModule === "History") {
         await Translation.destroy({ where: { modelName: effectiveModule }, transaction });
-      } else if (targetId && targetId !== "ALL_TREE") {
+      } else if (finalTargetId && finalTargetId !== "ALL_TREE") {
         await Translation.destroy({
-          where: { modelName: effectiveModule, recordId: String(targetId) },
+          where: { modelName: effectiveModule, recordId: String(finalTargetId) },
           transaction
         });
       }
-    } catch (err) {
-      console.error("Gagal membersihkan cache terjemahan:", err);
-    }
 
-    switch (effectiveModule) {
-      case "History":
-        await History.destroy({ where: {}, transaction });
-        if (payload.histories && Array.isArray(payload.histories)) {
-          const historyData = payload.histories.map((h) => ({ year: h.year, description: h.description, is_locked: false, lock_ticket: null }));
-          await History.bulkCreate(historyData, { transaction });
+      if (manualTranslations && manualTranslations.id && finalTargetId !== "ALL_TREE") {
+        for (const [field, text] of Object.entries(manualTranslations.id)) {
+           if (text) {
+             await Translation.create({
+                 modelName: effectiveModule,
+                 recordId: String(finalTargetId),
+                 field: field,
+                 language: 'id',
+                 translatedText: text
+             }, { transaction });
+           }
         }
-        break;
-      case "BusinessSection":
-        const parentPayload = { ...scrubbedPayload };
-        delete parentPayload.mapMarkers;
-        await BusinessSection.update(parentPayload, { where: { id: targetId }, transaction });
-        if (payload.mapMarkers && Array.isArray(payload.mapMarkers)) {
-          await BusinessMapMarker.destroy({ where: { sectionId: targetId }, transaction });
-          const newMarkers = payload.mapMarkers.map((m) => ({ ...m, id: undefined, sectionId: targetId, is_locked: false, lock_ticket: null }));
-          await BusinessMapMarker.bulkCreate(newMarkers, { transaction });
-        }
-        break;
-      case "Menu":
-        if (targetId === "ALL_TREE") {
-          for (const item of payload.updatedMenus) {
-            await Menu.update({ orderIndex: item.orderIndex, parentId: item.parentId }, { where: { id: item.id }, transaction });
-          }
-          await Menu.update({ is_locked: false, lock_ticket: null }, { where: {}, transaction });
-        } else {
-          await Model.update(scrubbedPayload, { where: { id: targetId }, transaction });
-        }
-        break;
-      default:
-        await Model.update(scrubbedPayload, { where: { id: targetId }, transaction });
-        break;
+      }
+    } catch (err) {
+      console.error("Gagal mengurus terjemahan:", err);
     }
 
     return filesToTrash;

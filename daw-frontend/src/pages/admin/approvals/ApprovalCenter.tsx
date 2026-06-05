@@ -68,6 +68,15 @@ const sanitizeForDiff = (data: any) => {
   ];
 
   systemFields.forEach((key) => delete cleanData[key]);
+
+  // Flatten manual translations for word-level diffing
+  if (cleanData._translations && cleanData._translations.id) {
+    for (const [key, val] of Object.entries(cleanData._translations.id)) {
+      cleanData[`terjemahan_id_${key}`] = val;
+    }
+  }
+  delete cleanData._translations;
+
   return cleanData;
 };
 

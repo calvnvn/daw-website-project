@@ -86,6 +86,7 @@ const philosophyPillarRoutes = require("./routes/philosophyPillarRoutes");
 const achievementRoutes = require("./routes/achievementRoutes");
 const newsRoutes = require("./routes/newsRoutes");
 const newsCategoryRoutes = require("./routes/newsCategoryRoutes");
+const translationRoutes = require("./routes/translationRoutes");
 
 // INITIALIZATION: Model Registry
 const User = require("./models/User");
@@ -223,6 +224,7 @@ app.use("/", sitemapRoutes);
 app.use("/api/achievements", achievementRoutes);
 app.use("/api/news", newsRoutes);
 app.use("/api/news-categories", newsCategoryRoutes);
+app.use("/api/translation", translationRoutes);
 
 // Mount core health check endpoint
 app.get("/", (req, res) => {
