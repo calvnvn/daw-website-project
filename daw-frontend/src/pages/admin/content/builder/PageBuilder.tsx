@@ -31,6 +31,7 @@ import { useContent } from "@/contexts/ContentContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { getErrorMessage } from "@/lib/utils";
 import ImageAdjustmentModal from "@/components/admin/ImageAdjustmentModal";
+import MagicTranslationField from "@/components/admin/MagicTranslationField";
 
 interface Page {
   id: string;
@@ -96,6 +97,14 @@ export default function PageBuilder() {
   const [currentCropFile, setCurrentCropFile] = useState<File | null>(null);
   const quillRef = useRef<ReactQuill>(null);
 
+  // Translations
+  const [terjemahanTitle, setTerjemahanTitle] = useState("");
+  const [terjemahanSubtitle, setTerjemahanSubtitle] = useState("");
+  const [terjemahanContent, setTerjemahanContent] = useState("");
+  const [originalTerjemahanTitle, setOriginalTerjemahanTitle] = useState("");
+  const [originalTerjemahanSubtitle, setOriginalTerjemahanSubtitle] = useState("");
+  const [originalTerjemahanContent, setOriginalTerjemahanContent] = useState("");
+
   useEffect(() => {
     return () => {
       if (heroImage && heroImage.startsWith("blob:")) {
@@ -118,9 +127,12 @@ export default function PageBuilder() {
     };
 
     return (
-      JSON.stringify(currentData) !== originalSnapshot || heroFile !== null
+      JSON.stringify(currentData) !== originalSnapshot || heroFile !== null ||
+      terjemahanTitle !== originalTerjemahanTitle ||
+      terjemahanSubtitle !== originalTerjemahanSubtitle ||
+      terjemahanContent !== originalTerjemahanContent
     );
-  }, [formData, originalSnapshot, heroFile]);
+  }, [formData, originalSnapshot, heroFile, terjemahanTitle, originalTerjemahanTitle, terjemahanSubtitle, originalTerjemahanSubtitle, terjemahanContent, originalTerjemahanContent]);
 
   const imageHandler = useCallback(() => {
     const input = document.createElement("input");
@@ -234,6 +246,12 @@ export default function PageBuilder() {
       metaDescription: "",
       status: "Published",
     });
+    setTerjemahanTitle("");
+    setTerjemahanSubtitle("");
+    setTerjemahanContent("");
+    setOriginalTerjemahanTitle("");
+    setOriginalTerjemahanSubtitle("");
+    setOriginalTerjemahanContent("");
   };
 
   const handleCreateNew = () => {
@@ -306,6 +324,20 @@ export default function PageBuilder() {
 
       toast.dismiss(toastId);
       setIsEditingMode(true);
+
+      // Fetch translations
+      api.get("/translation/manual", {
+        params: { modelName: "Page", recordId: exactData.id },
+      }).then((transRes) => {
+        const transData = transRes.data?.data?.id || {};
+        setTerjemahanTitle(transData.title || "");
+        setTerjemahanSubtitle(transData.subtitle || "");
+        setTerjemahanContent(transData.content || "");
+        setOriginalTerjemahanTitle(transData.title || "");
+        setOriginalTerjemahanSubtitle(transData.subtitle || "");
+        setOriginalTerjemahanContent(transData.content || "");
+      }).catch(() => {});
+
     } catch {
       toast.error("Gagal memuat detail halaman", { id: toastId });
     }
@@ -449,6 +481,16 @@ export default function PageBuilder() {
 
       if (rejectedDraft) {
         payload.append("previous_notrans", rejectedDraft.notrans);
+      }
+
+      // Translation payload
+      const translationPayload: Record<string, string> = {};
+      if (terjemahanTitle.trim()) translationPayload.title = terjemahanTitle.trim();
+      if (terjemahanSubtitle.trim()) translationPayload.subtitle = terjemahanSubtitle.trim();
+      if (terjemahanContent.trim()) translationPayload.content = terjemahanContent.trim();
+
+      if (Object.keys(translationPayload).length > 0) {
+        payload.append("_translations", JSON.stringify({ id: translationPayload }));
       }
 
       if (heroFile) payload.append("heroImage", heroFile);
@@ -1001,6 +1043,13 @@ export default function PageBuilder() {
                       ${activeItemLocked && !isSuperadmin ? "bg-slate-50 border-slate-200 opacity-60 cursor-not-allowed" : "bg-slate-50 border-slate-200 focus:bg-white focus:border-daw-green focus:ring-4 focus:ring-daw-green/10"}`}
                             placeholder="e.g. Corporate Sustainability Report"
                           />
+                          <MagicTranslationField
+                            label="Judul Utama (Indonesian)"
+                            value={terjemahanTitle}
+                            onChange={setTerjemahanTitle}
+                            originalText={formData.title}
+                            disabled={activeItemLocked && !isSuperadmin}
+                          />
                         </div>
 
                         <div className="space-y-2">
@@ -1060,6 +1109,13 @@ export default function PageBuilder() {
                             className={`w-full px-5 py-4 rounded-2xl border transition-all outline-none text-slate-600
                       ${activeItemLocked && !isSuperadmin ? "bg-slate-50 border-slate-200 opacity-60 cursor-not-allowed" : "bg-slate-50 border-slate-200 focus:bg-white focus:border-daw-green focus:ring-4 focus:ring-daw-green/10"}`}
                             placeholder="Brief overview or engaging hook for the article..."
+                          />
+                          <MagicTranslationField
+                            label="Subjudul Pendukung (Indonesian)"
+                            value={terjemahanSubtitle}
+                            onChange={setTerjemahanSubtitle}
+                            originalText={formData.subtitle}
+                            disabled={activeItemLocked && !isSuperadmin}
                           />
                         </div>
                       </div>
@@ -1439,6 +1495,14 @@ export default function PageBuilder() {
                           className="min-h-[500px] flex flex-col [&_.ql-editor]:p-10 [&_.ql-editor]:text-slate-700 [&_.ql-editor]:text-lg [&_.ql-toolbar]:border-0 [&_.ql-toolbar]:border-b [&_.ql-toolbar]:bg-slate-50/80 [&_.ql-container]:border-0"
                         />
                       </div>
+                      <MagicTranslationField
+                        label="Konten Artikel (Indonesian)"
+                        value={terjemahanContent}
+                        onChange={setTerjemahanContent}
+                        originalText={formData.content}
+                        isRichText
+                        disabled={activeItemLocked && !isSuperadmin}
+                      />
                     </div>
                   </div>
                 </form>

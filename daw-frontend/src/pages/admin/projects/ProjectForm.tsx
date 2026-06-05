@@ -30,6 +30,7 @@ import { useBusiness } from "@/contexts/BusinessContext";
 import DOMPurify from "dompurify";
 import { getErrorMessage } from "@/lib/utils";
 import ImageAdjustmentModal from "@/components/admin/ImageAdjustmentModal";
+import MagicTranslationField from "@/components/admin/MagicTranslationField";
 
 interface RejectedDraft {
   notrans: string;
@@ -356,6 +357,14 @@ export default function ProjectForm() {
   const [formData, setFormData] = useState(initialFormState);
   const [originalData, setOriginalData] = useState(initialFormState);
 
+  // Translation States
+  const [terjemahanTitle, setTerjemahanTitle] = useState("");
+  const [originalTerjemahanTitle, setOriginalTerjemahanTitle] = useState("");
+  const [terjemahanExcerpt, setTerjemahanExcerpt] = useState("");
+  const [originalTerjemahanExcerpt, setOriginalTerjemahanExcerpt] = useState("");
+  const [terjemahanContent, setTerjemahanContent] = useState("");
+  const [originalTerjemahanContent, setOriginalTerjemahanContent] = useState("");
+
   const [rejectedDraft, setRejectedDraft] = useState<RejectedDraft | null>(
     null,
   );
@@ -477,6 +486,12 @@ export default function ProjectForm() {
       setCoverFile(null);
       setGalleryFiles([]);
       setCoverPreview(null);
+      setTerjemahanTitle("");
+      setOriginalTerjemahanTitle("");
+      setTerjemahanExcerpt("");
+      setOriginalTerjemahanExcerpt("");
+      setTerjemahanContent("");
+      setOriginalTerjemahanContent("");
       setIsFetching(false);
       return;
     }
@@ -486,9 +501,13 @@ export default function ProjectForm() {
 
       try {
         // console.log("Hitting API with ID:", id);
-        const [projectRes, draftRes] = await Promise.allSettled([
+        const [projectRes, draftRes, transRes] = await Promise.allSettled([
           api.get(`/projects/${id}`, { signal: controller.signal }),
           api.get(`/approval/rejected/${id}?module=Project`, {
+            signal: controller.signal,
+          }),
+          api.get("/translation/manual", {
+            params: { modelName: "Project", recordId: id },
             signal: controller.signal,
           }),
         ]);
@@ -534,6 +553,16 @@ export default function ProjectForm() {
           draftRes.reason.name !== "CanceledError"
         ) {
           console.error("Recovery Data Fetch Error:", draftRes.reason);
+        }
+
+        if (transRes.status === "fulfilled") {
+          const transData = transRes.value.data?.data?.id || {};
+          setTerjemahanTitle(transData.title || "");
+          setOriginalTerjemahanTitle(transData.title || "");
+          setTerjemahanExcerpt(transData.excerpt || "");
+          setOriginalTerjemahanExcerpt(transData.excerpt || "");
+          setTerjemahanContent(transData.content || "");
+          setOriginalTerjemahanContent(transData.content || "");
         }
       } catch (error: unknown) {
         if (
@@ -621,6 +650,19 @@ export default function ProjectForm() {
         seo_title: payload.seo_title ?? prev.seo_title,
         meta_description: payload.meta_description ?? prev.meta_description,
       }));
+
+      // Restore translations if present in payload
+      if (payload._translations?.id) {
+        const transData = payload._translations.id;
+        setTerjemahanTitle(transData.title || "");
+        setTerjemahanExcerpt(transData.excerpt || "");
+        setTerjemahanContent(transData.content || "");
+      } else if (payload._translations) {
+        const transData = payload._translations;
+        setTerjemahanTitle(transData.title || "");
+        setTerjemahanExcerpt(transData.excerpt || "");
+        setTerjemahanContent(transData.content || "");
+      }
 
       // Bersihkan file picker (karena kita memulihkan path file draf lama)
       setCoverFile(null);
@@ -716,6 +758,15 @@ export default function ProjectForm() {
     if (!isEditMode) return true;
     if (coverFile !== null || galleryFiles.length > 0) return true;
     if (rejectedDraft !== null && !showDraftBanner) return true;
+
+    // Check manual translations
+    if (
+      terjemahanTitle !== originalTerjemahanTitle ||
+      terjemahanExcerpt !== originalTerjemahanExcerpt ||
+      terjemahanContent !== originalTerjemahanContent
+    ) {
+      return true;
+    }
 
     const keysToCheck = [
       "title",
@@ -829,6 +880,16 @@ export default function ProjectForm() {
       // Menautkan ID tiket lama jika ini adalah pengajuan ulang (re-submission)
       if (rejectedDraft?.notrans) {
         payload.append("previous_notrans", rejectedDraft.notrans);
+      }
+
+      // Translation payload wrapped in 'id' key
+      const translationPayload: Record<string, string> = {};
+      if (terjemahanTitle.trim()) translationPayload.title = terjemahanTitle.trim();
+      if (terjemahanExcerpt.trim()) translationPayload.excerpt = terjemahanExcerpt.trim();
+      if (terjemahanContent.trim()) translationPayload.content = terjemahanContent.trim();
+
+      if (Object.keys(translationPayload).length > 0) {
+        payload.append("_translations", JSON.stringify({ id: translationPayload }));
       }
 
       // 5. API EXECUTION
@@ -1159,8 +1220,8 @@ export default function ProjectForm() {
             {/* THE CANVAS */}
             <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 md:p-8 flex flex-col gap-8">
               {/* 1. Title Input (Clean & Functional) */}
-              <div>
-                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">
+              <div className="space-y-2">
+                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider">
                   Judul Proyek
                 </label>
                 <textarea
@@ -1175,11 +1236,18 @@ export default function ProjectForm() {
                     e.target.style.height = e.target.scrollHeight + "px";
                   }}
                 />
+                <MagicTranslationField
+                  label="Judul Proyek (Indonesian)"
+                  value={terjemahanTitle}
+                  onChange={setTerjemahanTitle}
+                  originalText={formData.title}
+                  disabled={shouldLockUI}
+                />
               </div>
 
               {/* 2. Editorial Excerpt (Standardized Form Input) */}
-              <div>
-                <div className="flex justify-between items-end mb-2">
+              <div className="space-y-2">
+                <div className="flex justify-between items-end">
                   <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider">
                     Lead Paragraph (Excerpt)
                   </label>
@@ -1202,11 +1270,18 @@ export default function ProjectForm() {
                     setFormData({ ...formData, excerpt: e.target.value })
                   }
                 />
+                <MagicTranslationField
+                  label="Lead Paragraph (Indonesian)"
+                  value={terjemahanExcerpt}
+                  onChange={setTerjemahanExcerpt}
+                  originalText={formData.excerpt}
+                  disabled={shouldLockUI}
+                />
               </div>
 
               {/* 3. Quill Editor (Containerized & Bounded) */}
-              <div>
-                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">
+              <div className="space-y-2">
+                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider">
                   Konten Proyek
                 </label>
                 <div
@@ -1232,6 +1307,14 @@ export default function ProjectForm() {
                     placeholder="Mulai menulis detail proyek di sini..."
                   />
                 </div>
+                <MagicTranslationField
+                  label="Konten Proyek (Indonesian)"
+                  value={terjemahanContent}
+                  onChange={setTerjemahanContent}
+                  originalText={formData.content}
+                  isRichText={true}
+                  disabled={shouldLockUI}
+                />
               </div>
             </div>
 

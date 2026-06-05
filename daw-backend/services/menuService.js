@@ -4,6 +4,7 @@ const Page = require("../models/Page");
 const ApprovalDraft = require("../models/ApprovalDraft");
 const Translation = require("../models/Translation");
 const { autoTranslate } = require("./openaiService");
+const { saveManualTranslations } = require("../utils/translationHelper");
 
 const MODULE_NAME = "MENU";
 
@@ -123,6 +124,11 @@ class MenuService {
       safePayload.orderIndex = lastMenu ? lastMenu.orderIndex + 1 : 0;
       
       const newMenu = await Menu.create(safePayload, { transaction: t });
+      
+      if (body._translations) {
+        await saveManualTranslations(MODULE_NAME, newMenu.id, body._translations, t);
+      }
+      
       await t.commit();
       
       return newMenu;
@@ -152,6 +158,11 @@ class MenuService {
 
       await ApprovalDraft.update({ status: "Obsolete" }, { where: { module_name: MODULE_NAME, target_id: String(id) }, transaction: t });
       await menu.update(safePayload, { transaction: t });
+      
+      if (body._translations) {
+        await saveManualTranslations(MODULE_NAME, id, body._translations, t);
+      }
+      
       await t.commit();
       
       return { success: true };

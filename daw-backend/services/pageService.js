@@ -13,6 +13,7 @@ const Translation = require("../models/Translation");
 const { autoTranslate } = require("./openaiService");
 const { deleteSingleFile } = require("../utils/fileRemover");
 const { generateUniqueSlug, handleEditorStaging } = require("../utils/editorHelper");
+const { saveManualTranslations } = require("../utils/translationHelper");
 
 const MODULE_NAME = "PAGE";
 const NOTRANS_PREFIX = "PAGE";
@@ -152,14 +153,17 @@ class PageService {
       if (isPublishing) {
         return handleEditorStaging({
           req, res, t, moduleName: MODULE_NAME, notransPrefix: NOTRANS_PREFIX, action: "CREATE",
-          targetId: newPage.id, payload: { ...pageData, status: "Published" }, recordToLock: newPage,
+          targetId: newPage.id, payload: { ...pageData, status: "Published", _translations: body._translations }, recordToLock: newPage,
           previousNotrans: previous_notrans, successMessage: "Permintaan pembuatan halaman dikirim. Data dikunci.",
           onSuccessCallback: (id, payload) => this.triggerBackgroundTranslation(id, payload),
         });
       }
 
+      if (body._translations) {
+        await saveManualTranslations(MODULE_NAME, newPage.id, body._translations, t);
+      }
       await t.commit();
-      this.triggerBackgroundTranslation(newPage.id, pageData);
+      this.triggerBackgroundTranslation(newPage.id, { ...pageData, _translations: body._translations });
       return res.status(201).json({ success: true, message: "Page created successfully", page: newPage });
     } catch (error) {
       if (t && !t.finished) await t.rollback();
@@ -213,7 +217,7 @@ class PageService {
         const ticketToClear = previous_notrans || page.lock_ticket;
         return handleEditorStaging({
           req, res, t, moduleName: MODULE_NAME, notransPrefix: NOTRANS_PREFIX, action: "UPDATE",
-          targetId: id, payload: { ...updatedData, status: "Published" }, recordToLock: page,
+          targetId: id, payload: { ...updatedData, status: "Published", _translations: body._translations }, recordToLock: page,
           previousNotrans: ticketToClear, successMessage: "Revisi dikirim.",
           onSuccessCallback: (id, payload) => this.triggerBackgroundTranslation(id, payload),
         });
@@ -221,8 +225,12 @@ class PageService {
 
       await ApprovalDraft.update({ status: "Obsolete" }, { where: { module_name: MODULE_NAME, target_id: String(id), status: ["Pending", "Rejected"] }, transaction: t });
       await page.update({ ...updatedData, status: status || page.status, is_locked: false, lock_ticket: null }, { transaction: t });
+      
+      if (body._translations) {
+        await saveManualTranslations(MODULE_NAME, id, body._translations, t);
+      }
       await t.commit();
-      this.triggerBackgroundTranslation(id, updatedData);
+      this.triggerBackgroundTranslation(id, { ...updatedData, _translations: body._translations });
 
       if (oldHeroToDelete && (userRole === "superadmin" || status === "Draft")) {
         deleteSingleFile(oldHeroToDelete);

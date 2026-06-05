@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import api from "@/lib/api";
 import { useContent } from "@/contexts/ContentContext";
+import MagicTranslationField from "@/components/admin/MagicTranslationField";
 
 interface Menu {
   id: string;
@@ -53,6 +54,9 @@ export default function NavigationBuilder() {
     isActive: true,
   });
 
+  // Translation States
+  const [terjemahanLabel, setTerjemahanLabel] = useState("");
+
   const getMaxDepth = (menu: Menu): number => {
     if (!menu.children || menu.children.length === 0) return 0;
     return 1 + Math.max(0, ...menu.children.map(getMaxDepth));
@@ -82,6 +86,7 @@ export default function NavigationBuilder() {
       parentId: "",
       isActive: true,
     });
+    setTerjemahanLabel("");
   };
 
   const isCircularMove = (
@@ -108,6 +113,13 @@ export default function NavigationBuilder() {
       parentId: menu.parentId || "",
       isActive: menu.isActive,
     });
+
+    api.get("/translation/manual", {
+      params: { modelName: "MENU", recordId: menu.id },
+    }).then((transRes) => {
+      const transData = transRes.data?.data?.id || {};
+      setTerjemahanLabel(transData.label || "");
+    }).catch(() => {});
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -139,6 +151,10 @@ export default function NavigationBuilder() {
         externalLink:
           formData.type === "external" ? formData.externalLink || null : null,
       };
+
+      if (terjemahanLabel.trim()) {
+        payload._translations = { id: { label: terjemahanLabel.trim() } };
+      }
 
       if (editingId) await api.put(`/menus/${editingId}`, payload);
       else await api.post("/menus", payload);
@@ -418,6 +434,12 @@ export default function NavigationBuilder() {
                 }
                 className="w-full px-5 py-4 rounded-2xl bg-slate-50 border border-slate-100 focus:bg-white focus:border-emerald-500 outline-none transition-all font-bold text-slate-700"
                 placeholder="e.g. Services / Layanan"
+              />
+              <MagicTranslationField
+                label="Nama Label (Indonesian)"
+                value={terjemahanLabel}
+                onChange={setTerjemahanLabel}
+                originalText={formData.label}
               />
             </div>
 

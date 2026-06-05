@@ -28,6 +28,7 @@ import { compressImage } from "@/utils/imageHelper";
 import { useAuth } from "@/contexts/AuthContext";
 import { getErrorMessage } from "@/lib/utils";
 import ImageAdjustmentModal from "@/components/admin/ImageAdjustmentModal";
+import MagicTranslationField from "@/components/admin/MagicTranslationField";
 
 interface NewsCategory {
   id: string;
@@ -160,6 +161,14 @@ export default function NewsForm() {
   const [coverFile, setCoverFile] = useState<File | null>(null);
   const [coverPreview, setCoverPreview] = useState<string | null>(null);
 
+  // Translations
+  const [terjemahanTitle, setTerjemahanTitle] = useState("");
+  const [terjemahanExcerpt, setTerjemahanExcerpt] = useState("");
+  const [terjemahanContent, setTerjemahanContent] = useState("");
+  const [originalTerjemahanTitle, setOriginalTerjemahanTitle] = useState("");
+  const [originalTerjemahanExcerpt, setOriginalTerjemahanExcerpt] = useState("");
+  const [originalTerjemahanContent, setOriginalTerjemahanContent] = useState("");
+
   // Sync title to seo_title auto
   useEffect(() => {
     if (!isEditMode && !formData.seo_title) {
@@ -250,6 +259,19 @@ export default function NewsForm() {
           setRejectedDraft(draftRes.value.data.data);
           setShowDraftBanner(true);
         }
+
+        // Fetch translations
+        api.get("/translation/manual", {
+          params: { modelName: "NewsArticle", recordId: id },
+        }).then((transRes) => {
+          const transData = transRes.data?.data?.id || {};
+          setTerjemahanTitle(transData.title || "");
+          setTerjemahanExcerpt(transData.excerpt || "");
+          setTerjemahanContent(transData.content || "");
+          setOriginalTerjemahanTitle(transData.title || "");
+          setOriginalTerjemahanExcerpt(transData.excerpt || "");
+          setOriginalTerjemahanContent(transData.content || "");
+        }).catch(() => {});
       } catch (error: unknown) {
         if (!(typeof error === "object" && error !== null && "name" in error && (error as { name?: string }).name === "CanceledError")) {
           toast.error("Gagal memuat data artikel");
@@ -398,6 +420,10 @@ export default function NewsForm() {
       JSON.stringify(originalData.gallery_images)
     )
       return true;
+      
+    if (terjemahanTitle !== originalTerjemahanTitle) return true;
+    if (terjemahanExcerpt !== originalTerjemahanExcerpt) return true;
+    if (terjemahanContent !== originalTerjemahanContent) return true;
     return false;
   };
 
@@ -441,6 +467,16 @@ export default function NewsForm() {
 
       if (rejectedDraft?.notrans)
         payload.append("previous_notrans", rejectedDraft.notrans);
+
+      // Translation payload
+      const translationPayload: Record<string, string> = {};
+      if (terjemahanTitle.trim()) translationPayload.title = terjemahanTitle.trim();
+      if (terjemahanExcerpt.trim()) translationPayload.excerpt = terjemahanExcerpt.trim();
+      if (terjemahanContent.trim()) translationPayload.content = terjemahanContent.trim();
+
+      if (Object.keys(translationPayload).length > 0) {
+        payload.append("_translations", JSON.stringify({ id: translationPayload }));
+      }
 
       const endpoint = isEditMode ? `/news/${id}` : "/news";
       const method = isEditMode ? api.put : api.post;
@@ -857,6 +893,13 @@ export default function NewsForm() {
                           }`}
                         placeholder="Tulis judul yang memikat pembaca..."
                       />
+                      <MagicTranslationField
+                        label="Judul Artikel (Indonesian)"
+                        value={terjemahanTitle}
+                        onChange={setTerjemahanTitle}
+                        originalText={formData.title}
+                        disabled={shouldLockUI}
+                      />
                     </div>
 
                     <div className="space-y-2">
@@ -879,6 +922,13 @@ export default function NewsForm() {
                               : "bg-slate-50 border-slate-200 focus:bg-white focus:border-daw-green focus:ring-4 focus:ring-daw-green/10"
                           }`}
                         placeholder="Rangkuman singkat untuk ditampilkan di kartu halaman depan..."
+                      />
+                      <MagicTranslationField
+                        label="Ringkasan (Indonesian)"
+                        value={terjemahanExcerpt}
+                        onChange={setTerjemahanExcerpt}
+                        originalText={formData.excerpt}
+                        disabled={shouldLockUI}
                       />
                     </div>
                   </div>
@@ -1143,6 +1193,14 @@ export default function NewsForm() {
                       className="min-h-[500px] flex flex-col [&_.ql-editor]:p-10 [&_.ql-editor]:text-slate-700 [&_.ql-editor]:text-lg [&_.ql-toolbar]:border-0 [&_.ql-toolbar]:border-b [&_.ql-toolbar]:bg-slate-50/80 [&_.ql-container]:border-0"
                     />
                   </div>
+                  <MagicTranslationField
+                    label="Konten Artikel (Indonesian)"
+                    value={terjemahanContent}
+                    onChange={setTerjemahanContent}
+                    originalText={formData.content}
+                    isRichText
+                    disabled={shouldLockUI}
+                  />
                 </div>
 
                 {/* SECTION 5: EVENT GALLERY EDITOR */}

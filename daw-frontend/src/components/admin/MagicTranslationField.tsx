@@ -98,14 +98,14 @@ const MagicTranslationField: React.FC<MagicTranslationFieldProps> = ({
   // 2. EXPANDED AI ASSISTANT PANEL
   return (
     <div className={`mt-2 bg-gradient-to-br from-amber-50/10 to-slate-50/50 p-4 border border-dashed border-slate-300 rounded-xl space-y-3 shadow-inner transition-all ${className}`}>
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <Languages className="w-4 h-4 text-amber-600" />
-          <label className="text-xs font-bold text-slate-800 uppercase tracking-wider">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="flex items-center gap-2 min-w-0">
+          <Languages className="w-4 h-4 text-amber-600 shrink-0" />
+          <label className="text-xs font-bold text-slate-800 uppercase tracking-wider truncate">
             🇮🇩 {label}
           </label>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap shrink-0">
           <button
             type="button"
             onClick={handleMagicTranslate}

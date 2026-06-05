@@ -10,6 +10,7 @@ const ErpApprovalService = require("./erpApprovalService");
 const { invalidateOldDrafts } = require("../utils/draftCleanup");
 const { generateNotrans } = require("../utils/notransGenerator");
 const { extractImagesFromHtml, generateUniqueSlug, handleEditorStaging } = require("../utils/editorHelper");
+const { saveManualTranslations } = require("../utils/translationHelper");
 
 const MODULE_NAME = "NewsArticle";
 
@@ -219,7 +220,7 @@ class NewsService {
           notransPrefix: "News",
           action: "CREATE",
           targetId: newArticle.id,
-          payload: { ...payload, status: "Published" },
+          payload: { ...payload, status: "Published", _translations: body._translations },
           recordToLock: newArticle,
           previousNotrans: previous_notrans,
           successMessage: "Artikel baru diajukan. Data dikunci menunggu persetujuan.",
@@ -234,9 +235,12 @@ class NewsService {
         { transaction: t }
       );
 
+      if (body._translations) {
+        await saveManualTranslations(MODULE_NAME, newArticle.id, body._translations, t);
+      }
       await t.commit();
       
-      this.triggerBackgroundTranslation(newArticle.id, payload);
+      this.triggerBackgroundTranslation(newArticle.id, { ...payload, _translations: body._translations });
 
       return res.status(201).json({
         success: true,
@@ -286,7 +290,7 @@ class NewsService {
           notransPrefix: "News",
           action: "UPDATE",
           targetId: id,
-          payload: { ...payload, status: "Published" },
+          payload: { ...payload, status: "Published", _translations: body._translations },
           recordToLock: article,
           previousNotrans: previous_notrans,
           successMessage: "Revisi diajukan. Data asli dikunci.",
@@ -303,9 +307,13 @@ class NewsService {
         { ...payload, is_locked: false, lock_ticket: null },
         { transaction: t }
       );
+
+      if (body._translations) {
+        await saveManualTranslations(MODULE_NAME, id, body._translations, t);
+      }
       await t.commit();
 
-      this.triggerBackgroundTranslation(id, payload);
+      this.triggerBackgroundTranslation(id, { ...payload, _translations: body._translations });
 
       if (normalizedRole === "superadmin" || (normalizedRole === "editor" && status === "Draft")) {
         filesToDelete.forEach((f) => deleteSingleFile(f));
