@@ -417,7 +417,7 @@ export default function NewsEvents() {
 
               {/* Article Grid */}
               <div id="article-grid" className="scroll-mt-56">
-                {gridArticles.length === 0 ? (
+                {articles.length === 0 ? (
                   <div className="text-center text-slate-400 py-32 border-2 border-dashed border-slate-100 rounded-3xl">
                     <Filter className="w-12 h-12 mx-auto mb-4 opacity-20" />
                     <p className="font-bold">
