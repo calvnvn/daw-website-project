@@ -25,7 +25,74 @@ exports.getPendingApprovals = async (req, res) => {
     const karyawanIdForOwl = String(req.karyawanId);
     const tokenOWL = req.owl_token;
 
-    const data = await approvalService.getPendingApprovals(userRole, karyawanIdForOwl, tokenOWL);
+    const { page, limit, tab = "all", search = "" } = req.query;
+    
+    let data = await approvalService.getPendingApprovals(userRole, karyawanIdForOwl, tokenOWL);
+    
+    // SERVER-SIDE DERIVED PIPELINE
+    const isSuperadmin = userRole === "superadmin" || userRole === "admin";
+
+    // 1. FILTER
+    let filteredData = data.filter((d) => {
+      if (tab === "my_queue") return d.isMyQueue;
+      if (tab === "history") return d.owlStatus === "1" || d.owlStatus === "2";
+      if (tab === "all" && isSuperadmin) return true;
+      return d.isMyQueue;
+    });
+
+    if (search.trim()) {
+      const lowerQuery = search.toLowerCase();
+      filteredData = filteredData.filter((d) => 
+        (d.notrans && d.notrans.toLowerCase().includes(lowerQuery)) ||
+        (d.module_name && d.module_name.toLowerCase().includes(lowerQuery)) ||
+        (d.created_by && d.created_by.toLowerCase().includes(lowerQuery))
+      );
+    }
+
+    // 2. SORT
+    const now = new Date().getTime();
+    filteredData.sort((a, b) => {
+      if (a._isGhost !== b._isGhost) return a._isGhost ? 1 : -1;
+      if (a.action === "DELETE" && b.action !== "DELETE") return -1;
+      if (b.action === "DELETE" && a.action !== "DELETE") return 1;
+
+      const aAge = now - new Date(a.createdAt || now).getTime();
+      const bAge = now - new Date(b.createdAt || now).getTime();
+      const aIsAging = aAge > 3 * 24 * 60 * 60 * 1000;
+      const bIsAging = bAge > 3 * 24 * 60 * 60 * 1000;
+      if (aIsAging !== bIsAging) return aIsAging ? -1 : 1;
+
+      return new Date(b.createdAt || now).getTime() - new Date(a.createdAt || now).getTime();
+    });
+
+    // 3. STATS
+    let urgent = 0, aging = 0, ghosts = 0, myTurn = 0;
+    data.forEach((d) => {
+      if (d.action === "DELETE") urgent++;
+      if (d._isGhost) ghosts++;
+      if (d.isMyQueue) myTurn++;
+      const draftDate = new Date(d.createdAt || now).getTime();
+      if (now - draftDate > 3 * 24 * 60 * 60 * 1000) aging++;
+    });
+
+    const stats = { total: data.length, urgent, aging, ghosts, myTurn };
+
+    // 4. PAGINATION
+    if (page && limit) {
+      const totalItems = filteredData.length;
+      const totalPages = Math.ceil(totalItems / limit) || 1;
+      const startIndex = (parseInt(page) - 1) * parseInt(limit);
+      const paginatedData = filteredData.slice(startIndex, startIndex + parseInt(limit));
+      
+      return res.status(200).json({
+        data: paginatedData,
+        totalItems,
+        totalPages,
+        stats
+      });
+    }
+
+    // LEGACY FALLBACK (Jika frontend belum update)
     res.status(200).json(data);
   } catch (error) {
     handleServiceError(res, error, "Gagal memuat antrean persetujuan.");

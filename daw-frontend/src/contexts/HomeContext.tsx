@@ -9,6 +9,7 @@ import {
   type ReactNode,
 } from "react";
 import api from "@/lib/api";
+import { useLocation } from "react-router-dom";
 import { useAuth } from "./AuthContext"; // 1. Import useAuth
 import { useTranslation } from "react-i18next";
 import { getErrorMessage } from "@/lib/utils";
@@ -82,6 +83,7 @@ export const HomeContext = createContext<HomeContextType>({
 export function HomeProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth(); // 2. Ambil state user
   const { i18n } = useTranslation();
+  const location = useLocation();
   const lang = i18n.language || "en";
 
   const [slides, setSlides] = useState<HeroSlides[]>([]);
@@ -99,8 +101,9 @@ export function HomeProvider({ children }: { children: ReactNode }) {
       const token = localStorage.getItem("daw_token");
       if (token && user === null) return;
 
-      // Cek Otoritas
-      const canAccessAdmin = [
+      // Cek Otoritas (Hanya berlaku di area dashboard admin)
+      const isAdminArea = location.pathname.startsWith("/admin");
+      const canAccessAdmin = isAdminArea && [
         "superadmin",
         "admin",
         "editor",
@@ -149,7 +152,7 @@ export function HomeProvider({ children }: { children: ReactNode }) {
         setIsLoading(false);
       }
     },
-    [user, lang],
+    [user, lang, location.pathname],
   ); // Dependensi ditambahkan ke user dan lang
 
   useEffect(() => {

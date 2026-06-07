@@ -186,7 +186,7 @@ export default function CategoryManager() {
               <th className="px-6 py-4">Visual Color</th>
               {canManageCategories && (
                 <th className="px-6 py-4 text-right">Actions</th>
-              )}{" "}
+              )}
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">

@@ -179,8 +179,9 @@ export default function AdminLayout() {
       if (can("manage_inbox")) {
         try {
           const response = await api.get("/inquiries");
-          if (response.data) {
-            const unread = response.data.filter(
+          const payload = response.data?.data || response.data;
+          if (Array.isArray(payload)) {
+            const unread = payload.filter(
               (item: InquiryData) => !item.isRead,
             );
             setUnreadInquiries(unread);
