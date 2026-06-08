@@ -48,7 +48,7 @@ router.put(
   checkPermission("manage_content"),
   upload.single("heroImage"),
   optimizeImage,
-  validate(pageSchema),
+  validate(pageSchema.partial()),
   pageController.updatePage,
 );
 

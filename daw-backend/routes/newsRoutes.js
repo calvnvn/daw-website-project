@@ -72,7 +72,7 @@ router.put(
   checkLock(NewsArticle),
   upload.fields([{ name: "cover_image", maxCount: 1 }]),
   optimizeImage,
-  validate(newsSchema),
+  validate(newsSchema.partial()),
   newsController.updateNews,
 );
 

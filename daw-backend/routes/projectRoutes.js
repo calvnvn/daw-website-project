@@ -80,7 +80,7 @@ router.put(
     { name: "gallery", maxCount: 10 },
   ]),
   optimizeImage,
-  validate(projectSchema),
+  validate(projectSchema.partial()),
   projectController.updateProject,
 );
 

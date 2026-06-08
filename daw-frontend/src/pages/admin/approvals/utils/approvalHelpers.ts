@@ -111,14 +111,29 @@ export const sanitizeForDiff = (data: any) => {
 
   systemFields.forEach((key) => delete cleanData[key]);
 
+  // Deep parsing for fields that might be stringified due to FormData
+  const maybeParseJSON = (val: any) => {
+    if (typeof val === "string" && val.trim().startsWith("{") && val.trim().endsWith("}")) {
+      try {
+        return JSON.parse(val);
+      } catch {
+        return val;
+      }
+    }
+    return val;
+  };
+
+  let translations = cleanData._translations;
+  translations = maybeParseJSON(translations);
+
   // Flatten manual translations for word-level diffing
-  if (cleanData._translations && typeof cleanData._translations === "object") {
-    if (cleanData._translations.id) {
-      for (const [key, val] of Object.entries(cleanData._translations.id)) {
+  if (translations && typeof translations === "object") {
+    if (translations.id) {
+      for (const [key, val] of Object.entries(translations.id)) {
         cleanData[`terjemahan_id_${key}`] = val;
       }
     } else {
-      for (const [recKey, fields] of Object.entries(cleanData._translations)) {
+      for (const [recKey, fields] of Object.entries(translations)) {
         if (fields && typeof fields === "object") {
           for (const [fKey, val] of Object.entries(fields)) {
             cleanData[`terjemahan_${recKey}_${fKey}`] = val;
@@ -310,11 +325,11 @@ export const timeAgo = (dateString: string) => {
 
   if (diffInSeconds < 60) return "Baru saja";
   const diffInMinutes = Math.floor(diffInSeconds / 60);
-  if (diffInMinutes < 60) return ` menit yang lalu`;
+  if (diffInMinutes < 60) return `${diffInMinutes} menit yang lalu`;
   const diffInHours = Math.floor(diffInMinutes / 60);
-  if (diffInHours < 24) return ` jam yang lalu`;
+  if (diffInHours < 24) return `${diffInHours} jam yang lalu`;
   const diffInDays = Math.floor(diffInHours / 24);
-  if (diffInDays < 7) return ` hari yang lalu`;
+  if (diffInDays < 7) return `${diffInDays} hari yang lalu`;
 
   return date.toLocaleDateString("id-ID", {
     day: "numeric",

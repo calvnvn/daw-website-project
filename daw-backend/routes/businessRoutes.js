@@ -34,7 +34,7 @@ router.put(
   verifyToken,
   checkPermission("manage_businesses"),
   checkLock(require("../models/BusinessSection")),
-  validate(businessSchema),
+  validate(businessSchema.partial()),
   businessController.updateBusinessSection,
 );
 
