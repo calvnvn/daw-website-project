@@ -262,7 +262,7 @@ const sendApprovalNotification = async ({
       ],
     });
 
-    // console.log(`✉️ [SUCCESS] Notifikasi terkirim ke: ${toEmail}`);
+    console.log(`✉️ [SUCCESS] Notifikasi terkirim ke: ${toEmail} | Tipe: ${type} | Tiket: ${draftInfo.notrans}`);
     return true;
   } catch (error) {
     console.error(`🚨 [MAILER ERROR]:`, error.message);
@@ -369,13 +369,13 @@ const sendInquiryNotification = async ({
             <div class="brand-header">
               <img src="${logoSrc}" alt="${companyName} Logo" />
             </div>
-
+ 
             <!-- Header -->
             <div class="hero-section">
               <h1>New Contact Inquiry</h1>
               <p>Subjek: <strong>${subject}</strong></p>
             </div>
-
+ 
             <!-- Email Body -->
             <div class="content-body">
               <p class="greeting">Halo Tim ${activeSubjectName},</p>
@@ -401,19 +401,19 @@ const sendInquiryNotification = async ({
                   <span class="info-label">Nomor Telepon</span>
                   <span class="info-value">${phone || "-"}</span>
                 </div>
-
+ 
                 <div class="info-row">
                   <span class="info-label">Perusahaan</span>
                   <span class="info-value">${company || "-"}</span>
                 </div>
               </div>
-
+ 
               <!-- Message Content Block -->
               <div class="message-block">
                 <div class="message-title">Isi Pesan:</div>
                 <p class="message-text">${message}</p>
               </div>
-
+ 
               <!-- Call to Action -->
               <div class="cta-wrapper">
                 <a href="mailto:${email}" class="cta-btn">Balas Email Pengirim</a>
@@ -425,7 +425,7 @@ const sendInquiryNotification = async ({
               <p><strong>${companyName} Website Management System</strong><br/>
               Ini adalah email otomatis yang dikirim langsung dari formulir kontak portal DAW.</p>
             </div>
-
+ 
           </div>
         </div>
       </body>
@@ -442,6 +442,17 @@ const sendInquiryNotification = async ({
       });
     }
 
+    console.log("\n==================================================");
+    console.log("✉️ [EMAIL TESTING - INCOMING CONTACT FORM INQUIRY]");
+    console.log(`   👉 Pengirim  : ${name} <${email}>`);
+    console.log(`   👉 Telepon   : ${phone || "-"}`);
+    console.log(`   👉 Perusahaan: ${company || "-"}`);
+    console.log(`   👉 Subjek    : ${subject}`);
+    console.log(`   👉 Ditujukan : ${targetEmail} (${activeSubjectName})`);
+    console.log("   👉 Isi Pesan :");
+    console.log(`      "${message}"`);
+    console.log("==================================================\n");
+
     await transporter.sendMail({
       from: sender,
       to: targetEmail,
@@ -450,8 +461,8 @@ const sendInquiryNotification = async ({
       html: htmlTemplate,
       attachments,
     });
-
-    // console.log(`✉️ [SUCCESS] Email Inquiry terkirim ke: ${targetEmail}`);
+ 
+    console.log(`✉️ [SUCCESS] Email Inquiry terkirim ke: ${targetEmail}`);
     return true;
   } catch (error) {
     console.error(`🚨 [MAILER ERROR] Gagal mengirim email inquiry:`, error.message);
