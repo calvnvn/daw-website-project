@@ -68,20 +68,36 @@ export const isMeaningfulTextField = (key: string, val: any): boolean => {
     "clicks",
     "readTime",
     "read_time",
+    "status",
+    "is_published",
+    "published_at",
+    "publish_date",
+    "created_at",
+    "updated_at",
   ];
-  if (skippedFields.includes(key)) return false;
 
-  if (
-    key.includes("image") ||
-    key.includes("photo") ||
-    key.includes("url") ||
-    key.includes("file") ||
-    key.includes("gallery") ||
-    key.includes("existing_gallery") ||
-    key.includes("sidebarLinks")
-  ) {
-    return false;
-  }
+  // Check if key ends with any skipped field (including nested keys)
+  const isSkipped = skippedFields.some((field) => {
+    return (
+      key === field ||
+      key.endsWith(`_${field}`) ||
+      key.endsWith(`.${field}`) ||
+      key.endsWith(`]_${field}`)
+    );
+  });
+  if (isSkipped) return false;
+
+  const hasMediaKeywords = [
+    "image",
+    "photo",
+    "url",
+    "file",
+    "gallery",
+    "existing_gallery",
+    "sidebarLinks",
+  ].some((kw) => key.toLowerCase().includes(kw));
+
+  if (hasMediaKeywords) return false;
 
   if (val && typeof val === "object") return false;
 
@@ -97,7 +113,6 @@ export const isMeaningfulTextField = (key: string, val: any): boolean => {
 
 export const sanitizeForDiff = (data: any) => {
   if (!data || typeof data !== "object") return {};
-  const cleanData = { ...data };
 
   const systemFields = [
     "id",
@@ -107,26 +122,43 @@ export const sanitizeForDiff = (data: any) => {
     "lock_ticket",
     "_system_note",
     "_filesToDelete",
+    "status",
+    "is_published",
+    "published_at",
+    "publish_date",
+    "created_at",
+    "updated_at",
+    "views",
+    "likes",
+    "share_count",
+    "view_count",
+    "viewCount",
   ];
 
-  systemFields.forEach((key) => delete cleanData[key]);
-
-  // Deep parsing for fields that might be stringified due to FormData
   const maybeParseJSON = (val: any) => {
-    if (typeof val === "string" && val.trim().startsWith("{") && val.trim().endsWith("}")) {
-      try {
-        return JSON.parse(val);
-      } catch {
-        return val;
+    if (typeof val === "string") {
+      const trimmed = val.trim();
+      if (
+        (trimmed.startsWith("{") && trimmed.endsWith("}")) ||
+        (trimmed.startsWith("[") && trimmed.endsWith("]"))
+      ) {
+        try {
+          return JSON.parse(val);
+        } catch {
+          return val;
+        }
       }
     }
     return val;
   };
 
+  // 1. Clean first level system fields
+  const cleanData = { ...data };
+  systemFields.forEach((key) => delete cleanData[key]);
+
+  // 2. Parse and flatten translations first
   let translations = cleanData._translations;
   translations = maybeParseJSON(translations);
-
-  // Flatten manual translations for word-level diffing
   if (translations && typeof translations === "object") {
     if (translations.id) {
       for (const [key, val] of Object.entries(translations.id)) {
@@ -144,7 +176,34 @@ export const sanitizeForDiff = (data: any) => {
   }
   delete cleanData._translations;
 
-  return cleanData;
+  // 3. Deep flatten helper for arrays and objects
+  const flatten = (obj: any, prefix = ""): any => {
+    if (obj === null || obj === undefined) return {};
+    const res: any = {};
+    for (const [key, rawVal] of Object.entries(obj)) {
+      if (systemFields.includes(key)) continue;
+
+      const val = maybeParseJSON(rawVal);
+      const newKey = prefix ? `${prefix}_${key}` : key;
+
+      if (val && typeof val === "object" && !Array.isArray(val)) {
+        Object.assign(res, flatten(val, newKey));
+      } else if (Array.isArray(val)) {
+        val.forEach((item, index) => {
+          if (item && typeof item === "object") {
+            Object.assign(res, flatten(item, `${newKey}[${index + 1}]`));
+          } else {
+            res[`${newKey}[${index + 1}]`] = item;
+          }
+        });
+      } else {
+        res[newKey] = val;
+      }
+    }
+    return res;
+  };
+
+  return flatten(cleanData);
 };
 
 // ─── HUMAN-READABLE LABEL DICTIONARIES ───
@@ -267,10 +326,31 @@ export const FIELD_LABELS: Record<string, string> = {
   terjemahan_id_locationName: "Terjemahan (ID): Nama Lokasi",
   terjemahan_id_address: "Terjemahan (ID): Alamat",
   terjemahan_id_desc: "Terjemahan (ID): Deskripsi",
+  // Nested parent field labels
+  histories: "Timeline Sejarah",
+  achievements: "Penghargaan",
+  pillars: "Pilar Filosofi",
+  stats: "Statistik Dampak",
+  members: "Anggota Direksi",
+  mapMarkers: "Penanda Peta",
 };
 
 export const getFieldLabel = (field: string): string => {
   if (FIELD_LABELS[field]) return FIELD_LABELS[field];
+
+  // Formatting for array properties, e.g. histories[1]_title
+  const arrayMatch = field.match(/^([a-zA-Z0-9]+)\[(\d+)\]_(.+)$/);
+  if (arrayMatch) {
+    const parentField = arrayMatch[1];
+    const index = arrayMatch[2];
+    const subfield = arrayMatch[3];
+    
+    const parentLabel = FIELD_LABELS[parentField] || parentField.replace(/^\w/, (c) => c.toUpperCase());
+    const subLabel = getFieldLabel(subfield);
+    
+    return `${parentLabel} (Item ${index}) - ${subLabel}`;
+  }
+
   // Fallback: prettify any terjemahan_id_ prefix
   if (field.startsWith("terjemahan_id_")) {
     const rawField = field.replace("terjemahan_id_", "");
