@@ -451,12 +451,19 @@ export default function NavigationBuilder() {
                 <HelpTooltip content="Tipe menu menentukan fungsi dari tombol menu di website. Apakah membuka halaman yang Anda buat (Internal), membuka website lain (External), atau hanya sebagai induk dropdown (Folder)." />
               </label>
               <div className="grid grid-cols-3 gap-3">
-                <button
-                  type="button"
+                <div
+                  role="button"
+                  tabIndex={0}
                   onClick={() =>
                     setFormData({ ...formData, type: "page", externalLink: "" })
                   }
-                  className={`relative p-3 rounded-xl border-2 flex flex-col items-center gap-1.5 transition-all text-center
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") {
+                      e.preventDefault();
+                      setFormData({ ...formData, type: "page", externalLink: "" });
+                    }
+                  }}
+                  className={`relative p-3 rounded-xl border-2 flex flex-col items-center gap-1.5 transition-all text-center cursor-pointer select-none
                         ${formData.type === "page" ? "border-blue-500 bg-blue-50/30" : "border-slate-100 hover:border-slate-200"}`}>
                   <FileText
                     className={`w-5 h-5 ${formData.type === "page" ? "text-blue-500" : "text-slate-400"}`}
@@ -468,14 +475,21 @@ export default function NavigationBuilder() {
                     </span>
                     <HelpTooltip content="Pilih ini untuk menautkan menu ke halaman (Page) yang sudah Anda buat di menu Page Builder." position="bottom" />
                   </div>
-                </button>
+                </div>
 
-                <button
-                  type="button"
+                <div
+                  role="button"
+                  tabIndex={0}
                   onClick={() =>
                     setFormData({ ...formData, type: "external", pageId: "" })
                   }
-                  className={`relative p-3 rounded-xl border-2 flex flex-col items-center gap-1.5 transition-all text-center
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") {
+                      e.preventDefault();
+                      setFormData({ ...formData, type: "external", pageId: "" });
+                    }
+                  }}
+                  className={`relative p-3 rounded-xl border-2 flex flex-col items-center gap-1.5 transition-all text-center cursor-pointer select-none
                         ${formData.type === "external" ? "border-amber-500 bg-amber-50/30" : "border-slate-100 hover:border-slate-200"}`}>
                   <Globe
                     className={`w-5 h-5 ${formData.type === "external" ? "text-amber-500" : "text-slate-400"}`}
@@ -487,10 +501,11 @@ export default function NavigationBuilder() {
                     </span>
                     <HelpTooltip content="Pilih ini jika menu akan mengarahkan pengunjung ke website di luar sistem (misal: Youtube, Google)." position="bottom" />
                   </div>
-                </button>
+                </div>
 
-                <button
-                  type="button"
+                <div
+                  role="button"
+                  tabIndex={0}
                   onClick={() =>
                     setFormData({
                       ...formData,
@@ -500,7 +515,19 @@ export default function NavigationBuilder() {
                       parentId: "",
                     })
                   }
-                  className={`relative p-3 rounded-xl border-2 flex flex-col items-center gap-1.5 transition-all text-center
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") {
+                      e.preventDefault();
+                      setFormData({
+                        ...formData,
+                        type: "folder",
+                        pageId: "",
+                        externalLink: "",
+                        parentId: "",
+                      });
+                    }
+                  }}
+                  className={`relative p-3 rounded-xl border-2 flex flex-col items-center gap-1.5 transition-all text-center cursor-pointer select-none
                         ${formData.type === "folder" ? "border-emerald-500 bg-emerald-50/30" : "border-slate-100 hover:border-slate-200"}`}>
                   <Folder
                     className={`w-5 h-5 ${formData.type === "folder" ? "text-emerald-500 fill-emerald-500/20" : "text-slate-400"}`}
@@ -512,7 +539,7 @@ export default function NavigationBuilder() {
                     </span>
                     <HelpTooltip content="Menu ini tidak bisa di-klik. Fungsinya murni sebagai induk (dropdown) untuk menampung sub-menu di bawahnya." position="bottom" />
                   </div>
-                </button>
+                </div>
               </div>
             </div>
 
