@@ -3,6 +3,10 @@ const router = express.Router();
 const investmentController = require("../controllers/investmentController");
 const { upload, optimizeImage } = require("../middleware/upload");
 const { verifyToken, checkPermission } = require("../middleware/authJwt");
+const checkLock = require("../middleware/checkLock");
+const AffiliateCategory = require("../models/AffiliateCategory");
+const InvestmentSettings = require("../models/InvestmentSettings");
+const Affiliate = require("../models/Affiliate");
 
 // PUBLIC
 // Fetch public investment portfolio and affiliate data (nested by category)
@@ -32,6 +36,7 @@ router.put(
   "/categories/:id",
   verifyToken,
   checkPermission("manage_investments"),
+  checkLock(AffiliateCategory),
   investmentController.updateCategory,
 );
 
@@ -40,6 +45,7 @@ router.delete(
   "/categories/:id",
   verifyToken,
   checkPermission("manage_investments"),
+  checkLock(AffiliateCategory),
   investmentController.deleteCategory,
 );
 
@@ -52,6 +58,7 @@ router.put(
   "/settings",
   verifyToken,
   checkPermission("manage_investments"),
+  checkLock(InvestmentSettings),
   investmentController.updateSettings,
 );
 
@@ -74,6 +81,7 @@ router.put(
   "/affiliates/:id",
   verifyToken,
   checkPermission("manage_investments"),
+  checkLock(Affiliate),
   upload.single("logo"),
   optimizeImage,
   investmentController.updateAffiliate,
@@ -84,6 +92,7 @@ router.delete(
   "/affiliates/:id",
   verifyToken,
   checkPermission("manage_investments"),
+  checkLock(Affiliate),
   investmentController.deleteAffiliate,
 );
 

@@ -4,6 +4,7 @@ const pageController = require("../controllers/pageController");
 const { upload, optimizeImage } = require("../middleware/upload");
 const { verifyToken, checkPermission } = require("../middleware/authJwt");
 const checkLock = require("../middleware/checkLock");
+const Page = require("../models/Page");
 const validate = require("../middleware/validate");
 const { pageSchema } = require("../schemas/pageSchema");
 
@@ -46,6 +47,7 @@ router.put(
   "/:id",
   verifyToken,
   checkPermission("manage_content"),
+  checkLock(Page),
   upload.single("heroImage"),
   optimizeImage,
   validate(pageSchema.partial()),
@@ -57,6 +59,7 @@ router.delete(
   "/:id",
   verifyToken,
   checkPermission("manage_content"),
+  checkLock(Page),
   pageController.deletePage,
 );
 

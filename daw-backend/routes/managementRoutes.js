@@ -3,6 +3,8 @@ const router = express.Router();
 const managementController = require("../controllers/managementController");
 const { upload, optimizeImage } = require("../middleware/upload");
 const { verifyToken, checkPermission } = require("../middleware/authJwt");
+const checkLock = require("../middleware/checkLock");
+const Management = require("../models/Management");
 
 // PUBLIC
 // Fetch organizational management and leadership hierarchy
@@ -24,6 +26,7 @@ router.put(
   "/:id",
   verifyToken,
   checkPermission("manage_about"),
+  checkLock(Management),
   upload.single("photo"),
   optimizeImage,
   managementController.updateManagement,
@@ -34,6 +37,7 @@ router.delete(
   "/:id",
   verifyToken,
   checkPermission("manage_about"),
+  checkLock(Management),
   managementController.deleteManagement,
 );
 

@@ -2,6 +2,8 @@ const express = require("express");
 const router = express.Router();
 const philosophyPillarController = require("../controllers/philosophyPillarController");
 const { verifyToken, checkPermission } = require("../middleware/authJwt");
+const checkLock = require("../middleware/checkLock");
+const PhilosophyPillar = require("../models/PhilosophyPillar");
 const validate = require("../middleware/validate");
 const { philosophyPillarSchema } = require("../schemas/philosophySchema");
 
@@ -24,6 +26,7 @@ router.put(
   "/:id",
   verifyToken,
   checkPermission("manage_about"),
+  checkLock(PhilosophyPillar),
   validate(philosophyPillarSchema),
   philosophyPillarController.updatePillar,
 );
@@ -33,6 +36,7 @@ router.delete(
   "/:id",
   verifyToken,
   checkPermission("manage_about"),
+  checkLock(PhilosophyPillar),
   philosophyPillarController.deletePillar,
 );
 

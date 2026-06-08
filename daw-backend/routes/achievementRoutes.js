@@ -2,6 +2,8 @@ const express = require("express");
 const router = express.Router();
 const achievementController = require("../controllers/achievementController");
 const { verifyToken, checkPermission } = require("../middleware/authJwt");
+const checkLock = require("../middleware/checkLock");
+const Achievement = require("../models/Achievement");
 const { upload, optimizeImage } = require("../middleware/upload");
 const validate = require("../middleware/validate");
 const { createAchievementSchema, updateAchievementSchema } = require("../schemas/achievementSchema");
@@ -35,6 +37,7 @@ router.put(
   "/:id",
   verifyToken,
   checkPermission("manage_achievements"),
+  checkLock(Achievement),
   upload.single("image"),
   validate(updateAchievementSchema),
   optimizeImage,
@@ -46,6 +49,7 @@ router.delete(
   "/:id",
   verifyToken,
   checkPermission("manage_achievements"),
+  checkLock(Achievement),
   achievementController.deleteAchievement,
 );
 

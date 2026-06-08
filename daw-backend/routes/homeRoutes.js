@@ -3,6 +3,10 @@ const router = express.Router();
 const homeController = require("../controllers/homeController");
 const { upload, optimizeImage } = require("../middleware/upload");
 const { verifyToken, checkPermission } = require("../middleware/authJwt");
+const checkLock = require("../middleware/checkLock");
+const HomeSettings = require("../models/HomeSettings");
+const HeroSlides = require("../models/HeroSlides");
+const ImpactStats = require("../models/ImpactStats");
 const validate = require("../middleware/validate");
 const { heroSchema, statSchema } = require("../schemas/homeSchema");
 
@@ -19,6 +23,7 @@ router.put(
   "/settings",
   verifyToken,
   checkPermission("manage_homepage"),
+  checkLock(HomeSettings),
   upload.none(),
   homeController.updateSettings,
 );
@@ -39,6 +44,7 @@ router.put(
   "/hero/:id",
   verifyToken,
   checkPermission("manage_homepage"),
+  checkLock(HeroSlides),
   upload.single("image"),
   optimizeImage,
   validate(heroSchema),
@@ -50,6 +56,7 @@ router.delete(
   "/hero/:id",
   verifyToken,
   checkPermission("manage_homepage"),
+  checkLock(HeroSlides),
   homeController.deleteHeroSlide,
 );
 
@@ -68,6 +75,7 @@ router.put(
   "/stats/:id",
   verifyToken,
   checkPermission("manage_homepage"),
+  checkLock(ImpactStats),
   upload.none(),
   validate(statSchema),
   homeController.updateStat,
@@ -78,6 +86,7 @@ router.delete(
   "/stats/:id",
   verifyToken,
   checkPermission("manage_homepage"),
+  checkLock(ImpactStats),
   homeController.deleteStat,
 );
 
