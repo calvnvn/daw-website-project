@@ -1,6 +1,7 @@
 const sequelize = require("../config/database");
 const ApprovalDraft = require("../models/ApprovalDraft");
 const NewsArticle = require("../models/NewsArticle");
+const approvalService = require("./approvalService");
 
 class DashboardService {
   /**
@@ -43,15 +44,14 @@ class DashboardService {
   }
 
   // Aggregates platform-wide metrics and recent activities customized by role.
-  async getDashboardData(role, actorId) {
+  async getDashboardData(role, actorId, tokenOWL) {
     const data = {};
 
     if (role === "approver") {
-      data.pendingApprovals = await ApprovalDraft.findAll({
-        where: { status: "Pending" },
-        limit: 10,
-        order: [["createdAt", "DESC"]],
-      });
+      const allApprovals = await approvalService.getPendingApprovals(role, actorId, tokenOWL);
+      data.pendingApprovals = allApprovals
+        .filter((d) => d.isMyQueue)
+        .slice(0, 10);
     } else if (role === "editor") {
       data.stats = await this.getGeneralStats();
       data.recentInquiries = await this.getRecentInquiries();

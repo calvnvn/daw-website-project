@@ -49,7 +49,7 @@ const MENU_GROUPS = [
     items: [
       { name: "Dashboard", path: "/admin", icon: LayoutDashboard },
       {
-        name: "Approval Queue",
+        name: "Approval Center",
         path: "/admin/approvals",
         icon: ClipboardCheck,
         perm: "manage_approvals",

@@ -6,7 +6,7 @@ exports.getDashboardStats = async (req, res) => {
   const actorId = String(req.karyawanId || req.owl_username);
 
   try {
-    const data = await dashboardService.getDashboardData(role, actorId);
+    const data = await dashboardService.getDashboardData(role, actorId, req.owl_token);
 
     res.status(200).json({
       success: true,

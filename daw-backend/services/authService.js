@@ -54,29 +54,30 @@ class AuthService {
 
     const owlData = owlResponse.data;
 
-    // 🔍 [DIAGNOSTIC] Temporary logging to debug first-time login OWL response shape
-    console.log("🦉 [OWL DEBUG] HTTP Status:", owlResponse.status);
-    console.log("🦉 [OWL DEBUG] Response keys:", Object.keys(owlData));
-    console.log(
-      "🦉 [OWL DEBUG] owlData.data:",
-      owlData.data ? "(token present)" : owlData.data,
-    );
-    console.log("🦉 [OWL DEBUG] owlData.error:", owlData.error);
-    console.log("🦉 [OWL DEBUG] owlData.message:", owlData.message);
-    console.log(
-      "🦉 [OWL DEBUG] owlData.token:",
-      owlData.token ? "(token present)" : owlData.token,
-    );
-    console.log(
-      "🦉 [OWL DEBUG] Full response:",
-      JSON.stringify(owlData, null, 2),
-    );
+    // [DIAGNOSTIC] Temporary logging to debug first-time login OWL response shape
+    // console.log("[OWL DEBUG] HTTP Status:", owlResponse.status);
+    // console.log("[OWL DEBUG] Response keys:", Object.keys(owlData));
+    // console.log(
+    //   "[OWL DEBUG] owlData.data:",
+    //   owlData.data ? "(token present)" : owlData.data,
+    // );
+    // console.log("[OWL DEBUG] owlData.error:", owlData.error);
+    // console.log("[OWL DEBUG] owlData.message:", owlData.message);
+    // console.log(
+    //   "[OWL DEBUG] owlData.token:",
+    //   owlData.token ? "(token present)" : owlData.token,
+    // );
+    // console.log(
+    //   "[OWL DEBUG] Full response:",
+    //   JSON.stringify(owlData, null, 2),
+    // );
 
     const tokenDiterima = owlData.data;
 
     // Jika OWL mengembalikan error (misal: "Account Not Found!" atau error lainnya)
     if (owlData.error) {
-      const owlMessage = owlData.response || owlData.message || "Unknown OWL error.";
+      const owlMessage =
+        owlData.response || owlData.message || "Unknown OWL error.";
       throw new Error(`AUTH_FAILED: Gagal Login via OWL: ${owlMessage}`);
     }
 
