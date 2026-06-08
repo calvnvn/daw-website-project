@@ -88,6 +88,45 @@ class ErpApprovalService {
         },
       );
 
+      // --- [NEW LOGIC] TRIGGER EMAIL TO APPROVER 1 ---
+      try {
+        const firstApprover = cleanApproverRows.find((row) => Number(row.level) === 1);
+        if (firstApprover) {
+          const ApprovalDraft = require("../models/ApprovalDraft");
+          const User = require("../models/User");
+          const { sendApprovalNotification } = require("../utils/mailer");
+
+          const draftData = await ApprovalDraft.findOne({ where: { notrans: String(notrans) } });
+          const targetUser = await User.findOne({ where: { owl_username: firstApprover.karyawanid } });
+
+          console.log(`\n================ [ERP COURIER - APPROVER 1 DETECTED] ================`);
+          console.log(`   👉 NIK Approver 1 : ${firstApprover.karyawanid}`);
+          console.log(`   👉 Nama Approver 1: ${firstApprover.namakaryawan || "-"}`);
+          console.log(`   👉 Target User DB : ${targetUser ? `Ditemukan (${targetUser.email})` : "TIDAK DITEMUKAN (Menggunakan Fallback)"}`);
+          console.log(`======================================================================\n`);
+
+          const toEmail = (targetUser && targetUser.email) ? targetUser.email : `${firstApprover.karyawanid}@daw.co.id`;
+          const recipientName = (targetUser && targetUser.name) ? targetUser.name : (firstApprover.namakaryawan || "Approver 1");
+
+          if (draftData) {
+            await sendApprovalNotification({
+              toEmail: toEmail,
+              recipientName: recipientName,
+              type: "NEW_REQUEST",
+              draftInfo: {
+                notrans: String(notrans),
+                module_name: draftData.module_name,
+                action: draftData.action,
+                created_by: draftData.created_by,
+              },
+            });
+          }
+        }
+      } catch (mailError) {
+        console.error("🚨 [ERP COURIER] Gagal mengirim email ke Approver 1:", mailError.message);
+      }
+      // ----------------------------------------------
+
       // console.log(
       //   `>>> [ERP COURIER] ✅ Success: Ticket ${notrans} registered to ERP.`,
       // );

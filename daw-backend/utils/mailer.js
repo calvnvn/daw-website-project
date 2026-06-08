@@ -2,6 +2,16 @@ const nodemailer = require("nodemailer");
 const Settings = require("../models/Settings");
 const path = require("path");
 
+// Helper to extract display name from SYSTEM_EMAIL_FROM configuration
+const getSenderName = (emailFrom) => {
+  if (!emailFrom) return "DAW Admin System";
+  const match = emailFrom.match(/^(?:"?([^"<]+)"?\s)?<([^>]+)>$/);
+  if (match && match[1]) {
+    return match[1].trim();
+  }
+  return emailFrom.split("<")[0].trim() || "DAW Admin System";
+};
+
 /**
  * UTILITY: Automated Approval Notifier
  * Facilitates multi-state email dispatch for the internal CMS bureaucracy workflow.
@@ -27,12 +37,15 @@ const sendApprovalNotification = async ({
 }) => {
   try {
     // INITIALIZATION
-    // Initialize notification context, branding assets, and UI theme constants
+    // Mengamankan email header agar terhindar dari warning "via" atau "on behalf of"
+    const backendUrl = process.env.BACKEND_URL || "http://localhost:5550";
     const frontendUrl = process.env.FRONTEND_URL;
-    const sender =
-      process.env.SYSTEM_EMAIL_FROM || '"DAW Group" <noreply@daw.co.id>';
-    const logoPath = path.join(__dirname, "..", "public", "logo-daw.png");
-    const logoUrl = "cid:logo-daw";
+    const senderName = getSenderName(process.env.SYSTEM_EMAIL_FROM);
+    const sender = `"${senderName}" <${process.env.SMTP_USER}>`;
+    
+    // Menggunakan static public URL, namun jika di localhost kita fallback ke CID agar tidak broken saat dev/testing
+    const isLocalhost = backendUrl.includes("localhost") || backendUrl.includes("127.0.0.1");
+    const logoUrl = isLocalhost ? "cid:logo-daw" : `${backendUrl}/logo-daw.png`;
 
     const DAW_GREEN = "#004b23";
     const DAW_YELLOW = "#e29504";
@@ -48,27 +61,27 @@ const sendApprovalNotification = async ({
     let statusPillHtml = "";
 
     // REFERENCE GATHERING
-    // Map notification metadata and visual themes based on workflow state and urgency
+    // Memetakan gaya UI berdasarkan tipe notifikasi (Semi Casual / Professional Tone)
     if (type === "NEW_REQUEST") {
       const isUrgent = draftInfo.action === "DELETE";
       subject = isUrgent
-        ? `[URGENT REVIEW] Permintaan Hapus Modul: ${draftInfo.module_name}`
-        : `[APPROVAL REQUIRED] Draf Baru Diajukan: ${draftInfo.module_name}`;
-      headline = "Dokumen Menunggu Persetujuan";
+        ? `[Urgent] Permintaan Hapus Modul: ${draftInfo.module_name}`
+        : `[Action Required] Draf Baru Diajukan: ${draftInfo.module_name}`;
+      headline = "Dokumen Butuh Approval Anda";
       bannerBgColor = isUrgent ? DAW_YELLOW : DAW_GREEN;
       bannerTextColor = isUrgent ? DAW_GREEN_HOVER : "#ffffff";
-      actionText = "Tinjau Dokumen Sekarang";
+      actionText = "Review Dokumen Sekarang";
       statusPillHtml = `<span style="background-color: ${isUrgent ? "#fef3c7" : "#dcfce7"}; color: ${isUrgent ? "#b45309" : "#166534"}; padding: 4px 10px; border-radius: 4px; font-size: 11px; font-weight: bold; letter-spacing: 1px;">ACTION REQUIRED</span>`;
     } else if (type === "REJECTED") {
-      subject = `[REVISION REQUIRED] Draf Ditolak: ${draftInfo.module_name} (${draftInfo.notrans})`;
-      headline = "Pemberitahuan Penolakan Draf";
+      subject = `[Revise Please] Draf Ditolak: ${draftInfo.module_name} (${draftInfo.notrans})`;
+      headline = "Draf Butuh Revisi";
       bannerBgColor = DANGER_RED;
       bannerTextColor = "#ffffff";
       actionText = "Buka & Perbaiki Draf";
       statusPillHtml = `<span style="background-color: #fee2e2; color: #991b1b; padding: 4px 10px; border-radius: 4px; font-size: 11px; font-weight: bold; letter-spacing: 1px;">REJECTED</span>`;
     } else if (type === "APPROVED") {
-      subject = `[APPROVED] Draf Telah Tayang: ${draftInfo.module_name}`;
-      headline = "Publikasi Berhasil";
+      subject = `[Live Now] Draf Telah Tayang: ${draftInfo.module_name}`;
+      headline = "Konten Berhasil Di-publish!";
       bannerBgColor = DAW_GREEN;
       bannerTextColor = "#ffffff";
       actionUrl = `${frontendUrl}/admin/approvals`;
@@ -76,9 +89,7 @@ const sendApprovalNotification = async ({
     }
 
     // EXECUTION
-    // Construct responsive executive email template
-    // EXECUTION
-    // Construct responsive executive email template
+    // Construct responsive executive email template following Golden Rules
     const htmlTemplate = `
       <!DOCTYPE html>
       <html lang="id">
@@ -173,19 +184,19 @@ const sendApprovalNotification = async ({
             <!-- Dynamic Executive Header -->
             <div class="hero-section">
               <h1>${headline}</h1>
-              <p>ID Transaksi: <span style="font-family: monospace; font-weight: bold;">${draftInfo.notrans}</span></p>
+              <p>ID Tiket: <span style="font-family: monospace; font-weight: bold;">${draftInfo.notrans}</span></p>
             </div>
 
             <!-- Email Body -->
             <div class="content-body">
-              <p class="greeting">Yth. ${recipientName},</p>
+              <p class="greeting">Halo ${recipientName},</p>
               <p class="intro-text">
-                Notifikasi ini dikirim secara otomatis oleh sistem <strong>DAW CMS Workflow</strong> untuk mengabarkan bahwa terdapat pembaruan data yang memerlukan perhatian, peninjauan, atau tindakan langsung dari pihak Anda.
+                Ada update terbaru nih di sistem <strong>DAW CMS</strong> yang butuh perhatian dan <i>review</i> langsung dari Anda. Yuk, kita pastikan semuanya sudah sesuai sebelum lanjut ke tahap berikutnya!
               </p>
               
               <!-- Info Card -->
               <div class="info-card">
-                <div class="info-card-title">Ringkasan Pengajuan</div>
+                <div class="info-card-title">Detail Pengajuan</div>
                 
                 <div class="info-row">
                   <span class="info-label">Status Tiket</span>
@@ -193,12 +204,12 @@ const sendApprovalNotification = async ({
                 </div>
                 
                 <div class="info-row">
-                  <span class="info-label">Konteks Modul</span>
+                  <span class="info-label">Bagian / Modul</span>
                   <span class="info-value" style="color: #0f172a;">${draftInfo.module_name}</span>
                 </div>
                 
                 <div class="info-row">
-                  <span class="info-label">Jenis Tindakan</span>
+                  <span class="info-label">Jenis Update</span>
                   <span class="info-value"><span class="action-badge">${draftInfo.action}</span></span>
                 </div>
                 
@@ -213,7 +224,7 @@ const sendApprovalNotification = async ({
                 type === "REJECTED"
                   ? `
               <div class="rejection-alert">
-                <h3>Alasan Penolakan / Catatan Revisi</h3>
+                <h3>Catatan Revisi dari Approver</h3>
                 <p>"${reason}"</p>
               </div>
               `
@@ -226,7 +237,7 @@ const sendApprovalNotification = async ({
               </div>
               
               <p style="text-align: center; font-size: 11px; color: #94a3b8; margin-top: 24px; line-height: 1.5;">
-                Jika tombol di atas tidak berfungsi secara langsung, Anda dapat menyalin tautan berikut ke browser:<br/>
+                Kalau tombol di atas tidak bisa di-klik, copy dan paste link ini ke browser Anda ya:<br/>
                 <a href="${actionUrl}" style="color: ${DAW_GREEN}; text-decoration: underline; word-break: break-all; font-weight: 500;">${actionUrl}</a>
               </p>
             </div>
@@ -234,10 +245,10 @@ const sendApprovalNotification = async ({
             <!-- Branded Footer -->
             <div class="footer-section">
               <p><strong>DAW Group Management System</strong><br/>
-              Ini adalah email otomatis dari sistem administrasi DAW Group. Mohon untuk tidak membalas email ini.</p>
+              Email ini dikirim otomatis oleh sistem DAW Group. Tolong jangan reply langsung ke email ini ya.</p>
               
               <div class="confidential-notice">
-                <strong>PEMBERITAHUAN KERAHASIAAN:</strong> Surat elektronik ini beserta lampirannya bersifat sangat rahasia dan dilindungi secara hukum. Jika Anda bukan penerima yang dituju, harap segera menghapus salinan ini dan memberitahu pengirim. Segala bentuk penyalinan, penyebarluasan, atau penggunaan tanpa izin tertulis dari DAW Group Management dilarang keras.
+                <strong>PEMBERITAHUAN KERAHASIAAN:</strong> Email ini beserta isinya bersifat rahasia dan dilindungi secara hukum. Jika Anda merasa salah menerima email ini, mohon segera dihapus dan beritahu kami. Dilarang menyalin atau menyebarkan isinya tanpa izin dari DAW Group Management.
               </div>
             </div>
 
@@ -247,19 +258,29 @@ const sendApprovalNotification = async ({
       </html>
     `;
 
-    // Execute asynchronous mail dispatch with embedded branding assets
+    // EMAIL TRAP/INTERCEPTOR FOR TESTING
+    let recipient = toEmail;
+    if (process.env.EMAIL_TRAP) {
+      recipient = process.env.EMAIL_TRAP;
+      subject = `[TRAP -> ${toEmail}] ${subject}`;
+    }
+
+    // Execute asynchronous mail dispatch
+    const mailAttachments = [];
+    if (isLocalhost) {
+      mailAttachments.push({
+        filename: "logo-daw.png",
+        path: path.join(__dirname, "..", "public", "logo-daw.png"),
+        cid: "logo-daw",
+      });
+    }
+
     await transporter.sendMail({
       from: sender,
-      to: toEmail,
+      to: recipient,
       subject: subject,
       html: htmlTemplate,
-      attachments: [
-        {
-          filename: "logo-daw.png",
-          path: logoPath,
-          cid: "logo-daw",
-        },
-      ],
+      attachments: mailAttachments.length ? mailAttachments : undefined,
     });
 
     console.log(`✉️ [SUCCESS] Notifikasi terkirim ke: ${toEmail} | Tipe: ${type} | Tiket: ${draftInfo.notrans}`);
@@ -283,11 +304,14 @@ const sendInquiryNotification = async ({
   companyName = "DAW Group",
 }) => {
   try {
-    const sender = process.env.SYSTEM_EMAIL_FROM || '"DAW Website Portal" <noreply@daw.co.id>';
-    const logoPath = path.join(__dirname, "..", "public", "logo-daw.png");
+    // Memperbaiki issue pengirim (Postman spoofing warning)
+    const backendUrl = process.env.BACKEND_URL || "http://localhost:5550";
+    const senderName = getSenderName(process.env.SYSTEM_EMAIL_FROM || "DAW Website Portal");
+    const sender = `"${senderName}" <${process.env.SMTP_USER}>`;
     
-    // Choose logo source (CID or absolute URL)
-    const logoSrc = logoUrl || "cid:logo-daw";
+    // Choose logo source (Dynamic from settings or Static URL)
+    const isLocalhost = backendUrl.includes("localhost") || backendUrl.includes("127.0.0.1");
+    const logoSrc = logoUrl || (isLocalhost ? "cid:logo-daw" : `${backendUrl}/logo-daw.png`);
 
     const DAW_GREEN = "#004b23";
     const DAW_YELLOW = "#e29504";
@@ -369,18 +393,18 @@ const sendInquiryNotification = async ({
             <div class="brand-header">
               <img src="${logoSrc}" alt="${companyName} Logo" />
             </div>
- 
+
             <!-- Header -->
             <div class="hero-section">
               <h1>New Contact Inquiry</h1>
-              <p>Subjek: <strong>${subject}</strong></p>
+              <p>Subjek Pesan: <strong>${subject}</strong></p>
             </div>
- 
+
             <!-- Email Body -->
             <div class="content-body">
               <p class="greeting">Halo Tim ${activeSubjectName},</p>
               <p class="intro-text">
-                Anda menerima pesan baru dari portal website resmi <strong>${companyName}</strong>. Berikut adalah rincian pengirim:
+                Ada pesan baru masuk nih dari pengunjung website <strong>${companyName}</strong>. Berikut detail pengirimnya yang bisa Anda cek:
               </p>
               
               <!-- Info Card -->
@@ -401,46 +425,36 @@ const sendInquiryNotification = async ({
                   <span class="info-label">Nomor Telepon</span>
                   <span class="info-value">${phone || "-"}</span>
                 </div>
- 
+
                 <div class="info-row">
                   <span class="info-label">Perusahaan</span>
                   <span class="info-value">${company || "-"}</span>
                 </div>
               </div>
- 
+
               <!-- Message Content Block -->
               <div class="message-block">
                 <div class="message-title">Isi Pesan:</div>
                 <p class="message-text">${message}</p>
               </div>
- 
+
               <!-- Call to Action -->
               <div class="cta-wrapper">
-                <a href="mailto:${email}" class="cta-btn">Balas Email Pengirim</a>
+                <a href="mailto:${email}" class="cta-btn">Balas Pesan Ini</a>
               </div>
             </div>
             
             <!-- Branded Footer -->
             <div class="footer-section">
-              <p><strong>${companyName} Website Management System</strong><br/>
-              Ini adalah email otomatis yang dikirim langsung dari formulir kontak portal DAW.</p>
+              <p><strong>${companyName} Website Portal</strong><br/>
+              Email ini diteruskan otomatis dari form kontak di website DAW. Silakan langsung balas (reply) email ini untuk merespon pengirim.</p>
             </div>
- 
+
           </div>
         </div>
       </body>
       </html>
     `;
-
-    // Only attach local logo if it is used (i.e. no custom logoUrl is provided)
-    const attachments = [];
-    if (!logoUrl) {
-      attachments.push({
-        filename: "logo-daw.png",
-        path: logoPath,
-        cid: "logo-daw",
-      });
-    }
 
     console.log("\n==================================================");
     console.log("✉️ [EMAIL TESTING - INCOMING CONTACT FORM INQUIRY]");
@@ -453,15 +467,33 @@ const sendInquiryNotification = async ({
     console.log(`      "${message}"`);
     console.log("==================================================\n");
 
+    // EMAIL TRAP/INTERCEPTOR FOR TESTING
+    let recipient = targetEmail;
+    let finalSubject = `[Inquiry] ${subject} - ${name}`;
+    if (process.env.EMAIL_TRAP) {
+      recipient = process.env.EMAIL_TRAP;
+      finalSubject = `[TRAP -> ${targetEmail}] ${finalSubject}`;
+    }
+
+    // Execute dispatch
+    const mailAttachments = [];
+    if (isLocalhost && !logoUrl) {
+      mailAttachments.push({
+        filename: "logo-daw.png",
+        path: path.join(__dirname, "..", "public", "logo-daw.png"),
+        cid: "logo-daw",
+      });
+    }
+
     await transporter.sendMail({
       from: sender,
-      to: targetEmail,
+      to: recipient,
       replyTo: email,
-      subject: `[Inquiry] ${subject} - ${name}`,
+      subject: finalSubject,
       html: htmlTemplate,
-      attachments,
+      attachments: mailAttachments.length ? mailAttachments : undefined,
     });
- 
+
     console.log(`✉️ [SUCCESS] Email Inquiry terkirim ke: ${targetEmail}`);
     return true;
   } catch (error) {
