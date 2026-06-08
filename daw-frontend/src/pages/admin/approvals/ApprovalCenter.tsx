@@ -21,7 +21,7 @@ import {
   getActionInfo,
   getHumanTargetName,
   timeAgo,
-  getInitials
+  getInitials,
 } from "./utils/approvalHelpers";
 
 import React, { Suspense } from "react";
@@ -378,11 +378,11 @@ export default function ApprovalCenter() {
                                 className="text-sm font-bold text-slate-700 max-w-[220px] truncate"
                                 title={
                                   isGhost
-                                    ? "Data Yatim (Tidak Tersinkron)"
+                                    ? "Draf Tidak Sinkron"
                                     : getHumanTargetName(draft)
                                 }>
                                 {isGhost
-                                  ? "Data Yatim (Tidak Tersinkron)"
+                                  ? "Draf Tidak Sinkron"
                                   : getHumanTargetName(draft)}
                               </span>
                               <span className="text-[11px] font-medium text-slate-500 mt-1 flex items-center gap-1">
@@ -546,11 +546,12 @@ export default function ApprovalCenter() {
 
       {/* DIFF MODAL RENDERER */}
       {selectedDraft && !selectedDraft._isGhost && (
-        <Suspense fallback={
-          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/80">
-            <Loader2 className="w-10 h-10 animate-spin text-white" />
-          </div>
-        }>
+        <Suspense
+          fallback={
+            <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/80">
+              <Loader2 className="w-10 h-10 animate-spin text-white" />
+            </div>
+          }>
           <DiffModal
             draft={selectedDraft}
             isReadOnly={!selectedDraft.isMyQueue}
