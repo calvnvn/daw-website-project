@@ -471,17 +471,24 @@ export default function ProjectForm() {
   // Default Category Initialization
   useEffect(() => {
     if (!isEditMode && sections.length > 0 && !formData.category) {
-      setFormData((prev) => ({ ...prev, category: sections[0].id }));
+      setFormData((prev) => {
+        if (!prev.category) {
+          return { ...prev, category: sections[0].id };
+        }
+        return prev;
+      });
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sections, isEditMode]);
+  }, [sections, isEditMode, formData.category]);
 
   // Fetch Existing Data & Lock State (Edit Mode Only)
   useEffect(() => {
     const controller = new AbortController();
 
     if (!isEditMode) {
-      setFormData(initialFormState);
+      setFormData((prev) => ({
+        ...initialFormState,
+        category: prev.category || (sections.length > 0 ? sections[0].id : ""),
+      }));
       setOriginalData(initialFormState);
       setCoverFile(null);
       setGalleryFiles([]);
