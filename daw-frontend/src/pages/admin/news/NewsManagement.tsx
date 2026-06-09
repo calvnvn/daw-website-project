@@ -12,6 +12,7 @@ import {
   Newspaper,
   Tags,
   Loader2,
+  RefreshCw,
 } from "lucide-react";
 import { Link } from "react-router-dom";
 import { toast } from "sonner";
@@ -436,14 +437,39 @@ export default function NewsManagement() {
                         )}
                       </td>
                       <td className="px-6 py-4">
-                        <button
-                          onClick={() =>
-                            toggleStatus(article.id, article.status)
-                          }
-                          disabled={isPending || isNeedsRevision}
-                          className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold tracking-wide transition-all ${isPending || isNeedsRevision ? "cursor-not-allowed opacity-80" : "cursor-pointer hover:shadow-md active:scale-95"} ${isPending ? "bg-slate-100 text-slate-400 border border-slate-200" : article.status === "Published" ? "bg-green-100 text-green-700 border border-green-200 hover:bg-green-200" : "bg-amber-100 text-amber-700 border border-amber-200 hover:bg-amber-200"}`}>
-                          {article.status}
-                        </button>
+                        <div className="flex flex-col items-start gap-1">
+                          <button
+                            onClick={() =>
+                              toggleStatus(article.id, article.status)
+                            }
+                            disabled={isPending || isNeedsRevision}
+                            title={
+                              isPending || isNeedsRevision
+                                ? "Tidak dapat diubah saat dalam proses persetujuan"
+                                : "Klik untuk mengubah status"
+                            }
+                            className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold tracking-wide transition-all ${
+                              isPending || isNeedsRevision
+                                ? "cursor-not-allowed opacity-80"
+                                : "cursor-pointer hover:shadow-md hover:scale-105 active:scale-95"
+                            } ${
+                              isPending
+                                ? "bg-slate-100 text-slate-400 border border-slate-200"
+                                : article.status === "Published"
+                                  ? "bg-green-100 text-green-700 border border-green-200 hover:bg-green-200"
+                                  : "bg-amber-100 text-amber-700 border border-amber-200 hover:bg-amber-200"
+                            }`}>
+                            {!isPending && !isNeedsRevision && (
+                              <RefreshCw className="w-3 h-3 text-slate-500 opacity-60 group-hover:rotate-180 transition-transform duration-500" />
+                            )}
+                            {article.status}
+                          </button>
+                          {!isPending && !isNeedsRevision && (
+                            <span className="text-[9px] text-slate-400 font-medium px-1">
+                              Klik untuk ubah status
+                            </span>
+                          )}
+                        </div>
                       </td>
                       <td className="px-6 py-4">
                         <p className="text-sm text-slate-600">
