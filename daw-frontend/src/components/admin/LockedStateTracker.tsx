@@ -77,10 +77,10 @@ export default function LockedStateTracker({
             </div>
             <div>
               <h4 className="text-xs font-black uppercase tracking-tight text-blue-900">
-                Akses Dibatasi (Sedang Ditinjau)
+                Halaman Terkunci (Sedang Menunggu Approval)
               </h4>
               <p className="text-xs text-blue-700 leading-relaxed mt-0.5">
-                Revisi sedang dalam proses persetujuan. Anda dapat melihat progres Baton Pass di bawah ini.
+                Data ini sedang dikunci karena dalam proses peninjauan (approval). Anda dapat memantau status persetujuan di bawah ini.
               </p>
             </div>
           </div>
@@ -88,7 +88,7 @@ export default function LockedStateTracker({
           {isLoading ? (
             <div className="p-6 bg-slate-50 border border-slate-200 rounded-xl flex items-center justify-center gap-2 text-xs text-slate-500 font-medium">
               <Loader2 className="w-4 h-4 animate-spin text-daw-green" />
-              Menghubungkan ke sistem persetujuan...
+              Memuat status approval...
             </div>
           ) : draft ? (
             <div className="border border-slate-200 rounded-2xl overflow-hidden bg-white shadow-sm">
@@ -96,8 +96,8 @@ export default function LockedStateTracker({
             </div>
           ) : (
             <div className="p-5 bg-slate-50 border border-slate-200 rounded-xl text-center text-xs text-slate-500">
-              <p className="font-semibold text-slate-600 mb-1">Data urutan approver tidak tersedia</p>
-              <p className="leading-relaxed">Tiket persetujuan mungkin belum tersinkron dengan ERP OWL, atau koneksi ke sistem OWL sedang bermasalah. Coba refresh halaman, atau hubungi administrator.</p>
+              <p className="font-semibold text-slate-600 mb-1">Status approval belum tersedia</p>
+              <p className="leading-relaxed">Data pengajuan persetujuan sedang disiapkan oleh server, atau terjadi kendala koneksi sementara. Silakan coba muat ulang (refresh) halaman ini beberapa saat lagi.</p>
             </div>
           )}
         </div>
