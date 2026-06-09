@@ -25,6 +25,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { getErrorMessage } from "@/lib/utils";
 import ImageAdjustmentModal from "@/components/admin/ImageAdjustmentModal";
 import MagicTranslationField from "@/components/admin/MagicTranslationField";
+import LockedStateTracker from "@/components/admin/LockedStateTracker";
 
 interface EditableSlide extends Omit<HeroSlides, "id"> {
   id: string | number;
@@ -605,8 +606,8 @@ export default function HeroManager({
           const rejectedDraft = rejectedSlidesMap[String(slide.id)];
 
           return (
+            <LockedStateTracker key={slide.id} isLocked={!!shouldLockRowUI} lockTicket={slide.lock_ticket || null}>
             <div
-              key={slide.id}
               draggable={isEditing && !shouldLockRowUI}
               onDragStart={(e) => handleDragStart(e, index)}
               onDragEnter={(e) => handleDragEnter(e, index)}
@@ -661,24 +662,11 @@ export default function HeroManager({
                 </div>
               )}
 
-              {/* 3. Locked & Pending Delete Status */}
-              {shouldLockRowUI && (
+              {/* 3. Pending Delete Status (Locked Status is handled by LockedStateTracker) */}
+              {shouldLockRowUI && slide.isDeleting && (
                 <div
-                  className={`absolute top-0 left-0 right-0 border-b text-[10px] font-bold px-3 py-1 flex items-center justify-center gap-1.5 z-10 uppercase tracking-widest ${
-                    slide.isDeleting
-                      ? "bg-rose-100 border-rose-200 text-rose-700"
-                      : "bg-blue-50 border-blue-100 text-blue-600"
-                  }`}>
-                  {slide.isDeleting ? (
-                    <>
-                      <Trash2 className="w-3 h-3" /> Menunggu Persetujuan Hapus
-                    </>
-                  ) : (
-                    <>
-                      <Lock className="w-3 h-3" /> Akses Dibatasi (Dalam
-                      Peninjauan)
-                    </>
-                  )}
+                  className={`absolute top-0 left-0 right-0 border-b text-[10px] font-bold px-3 py-1 flex items-center justify-center gap-1.5 z-10 uppercase tracking-widest bg-rose-100 border-rose-200 text-rose-700`}>
+                  <Trash2 className="w-3 h-3" /> Menunggu Persetujuan Hapus
                 </div>
               )}
 
@@ -877,6 +865,7 @@ export default function HeroManager({
                 </div>
               </div>
             </div>
+            </LockedStateTracker>
           );
         })}
 

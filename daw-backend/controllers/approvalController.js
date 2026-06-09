@@ -188,6 +188,43 @@ exports.discardDraft = async (req, res) => {
   }
 };
 
+exports.getDraftStatus = async (req, res) => {
+  try {
+    // notrans is URL-encoded on frontend (encodeURIComponent), Express decodes it automatically
+    const { notrans } = req.params;
+    const userRole = req.userRole ? req.userRole.toLowerCase() : "";
+
+    // Collect all possible identities for this user (normalized to lowercase)
+    const currentUserIdentities = [
+      req.owl_username ? String(req.owl_username).toLowerCase().trim() : null,
+      req.karyawanId ? String(req.karyawanId).toLowerCase().trim() : null,
+      req.userId ? String(req.userId).toLowerCase().trim() : null,
+    ].filter(Boolean);
+
+    const draft = await approvalService.getDraftStatus(notrans);
+    if (!draft) {
+      return res.status(404).json({ success: false, message: "Tiket approval tidak ditemukan." });
+    }
+
+    console.log(`[getDraftStatus] notrans=${notrans} | created_by=${draft.created_by} | identities=${JSON.stringify(currentUserIdentities)} | role=${userRole}`);
+
+    // Security Check: Editor hanya bisa melihat tiket miliknya sendiri.
+    // Admin/superadmin/approver bebas akses.
+    const isAdmin = ["superadmin", "admin", "approver"].includes(userRole);
+    const draftOwner = draft.created_by ? String(draft.created_by).toLowerCase().trim() : "";
+    const isOwner = currentUserIdentities.includes(draftOwner);
+
+    if (!isAdmin && !isOwner) {
+      console.warn(`[getDraftStatus] FORBIDDEN — user tidak memiliki akses ke tiket ${notrans}`);
+      return res.status(403).json({ success: false, message: "Akses ditolak." });
+    }
+
+    res.status(200).json({ success: true, data: draft });
+  } catch (error) {
+    handleServiceError(res, error, "Gagal memuat status persetujuan.");
+  }
+};
+
 // exports.forcePurgeGhostTicket = async (req, res) => {
 //   try {
 //     const { notrans, nourut, level, komentar } = req.body;

@@ -12,6 +12,7 @@ const Translation = require("../models/Translation");
 const { deleteSingleFile } = require("../utils/fileRemover");
 const { invalidateOldDrafts } = require("../utils/draftCleanup");
 const { generateNotrans } = require("../utils/notransGenerator");
+const { handleEditorStaging } = require("../utils/editorHelper");
 const ErpApprovalService = require("./erpApprovalService");
 const { autoTranslate } = require("./openaiService");
 
@@ -181,7 +182,7 @@ class HomeService {
     return { slides, stats, settings, rejectionRadar: rejections };
   }
 
-  async updateSettings({ userRole, body, actorId, owlToken }) {
+  async updateSettings({ req, res, userRole, body, actorId, owlToken }) {
     const t = await sequelize.transaction();
     try {
       const { introHeadline, introBody, status, previous_notrans } = body;
@@ -197,27 +198,17 @@ class HomeService {
           throw new Error(`LOCKED: tiket ${settings.lock_ticket}`);
         }
 
-        const notrans = await generateNotrans(NOTRANS_PREFIX);
-        const ticketToClear = previous_notrans || settings.lock_ticket;
-        if (ticketToClear) {
-          await ApprovalDraft.update({ status: "Replaced" }, { where: { notrans: ticketToClear, module_name: MODULE_NAME }, transaction: t });
-        }
-
-        await ApprovalDraft.create({
-          notrans, module_name: MODULE_NAME, action: "UPDATE", target_id: "1",
+        return handleEditorStaging({
+          req, res, t,
+          moduleName: MODULE_NAME,
+          notransPrefix: NOTRANS_PREFIX,
+          action: "UPDATE",
+          targetId: "1",
           payload: { introHeadline: safeHeadline, introBody: safeBody, status: "Published", _translations: body._translations },
-          created_by: actorId, status: "Pending",
-        }, { transaction: t });
-
-        await settings.update({ is_locked: true, lock_ticket: notrans }, { transaction: t });
-        await t.commit();
-
-        try {
-          await ErpApprovalService.initiateApproval({ notrans, moduleName: MODULE_NAME, karyawanId: actorId, token: owlToken });
-        } catch (owlError) {
-          console.error(`🚨 [ERP SYNC FAILED]: ${owlError.message}`);
-        }
-        return { success: true, isDraft: true, ticket: notrans };
+          recordToLock: settings,
+          previousNotrans: previous_notrans,
+          successMessage: "Revisi sambutan beranda diajukan ke ERP OWL.",
+        });
       }
 
       await ApprovalDraft.update({ status: "Obsolete" }, { where: { module_name: MODULE_NAME, status: ["Pending", "Rejected"] }, transaction: t });
@@ -234,7 +225,7 @@ class HomeService {
 
   // ─── HERO SLIDES ───
 
-  async createHeroSlide({ userRole, body, file, actorId, owlToken }) {
+  async createHeroSlide({ req, res, userRole, body, file, actorId, owlToken }) {
     const t = await sequelize.transaction();
     try {
       const { title, subtitle, order, status } = body;
@@ -243,25 +234,22 @@ class HomeService {
       if (file) slideData.imageUrl = userRole === "editor" ? this.applyTempPrefix(file) : file.filename;
 
       if (userRole === "editor" && status === "Published") {
-        const notrans = await generateNotrans("HERO");
-        await ApprovalDraft.create({
-          notrans, module_name: "HeroSlides", action: "CREATE", target_id: "0",
-          payload: { ...slideData, status: "Published", _translations: body._translations }, created_by: actorId, status: "Pending",
-        }, { transaction: t });
         slideData.is_locked = true;
-        slideData.lock_ticket = notrans;
+        const newSlide = await HeroSlides.create(slideData, { transaction: t });
+
+        return handleEditorStaging({
+          req, res, t,
+          moduleName: "HeroSlides",
+          notransPrefix: "HERO",
+          action: "CREATE",
+          targetId: String(newSlide.id),
+          payload: { ...slideData, status: "Published", _translations: body._translations },
+          recordToLock: newSlide,
+          successMessage: "Permintaan slide baru diajukan.",
+        });
       }
 
       const newSlide = await HeroSlides.create(slideData, { transaction: t });
-      if (userRole === "editor" && status === "Published") {
-        await ApprovalDraft.update({ target_id: String(newSlide.id) }, { where: { notrans: slideData.lock_ticket }, transaction: t });
-        await t.commit();
-        try {
-          await ErpApprovalService.initiateApproval({ notrans: slideData.lock_ticket, moduleName: "HeroSlides", karyawanId: actorId, token: owlToken });
-        } catch (erpErr) { console.error("⚠️ [ERP_SYNC_WARNING]:", erpErr.message); }
-        return { success: true, isDraft: true, ticket: slideData.lock_ticket };
-      }
-
       await saveManualTranslations("HeroSlides", newSlide.id, body._translations, t);
       await t.commit();
       return { success: true, isDraft: false, data: newSlide };
@@ -271,7 +259,7 @@ class HomeService {
     }
   }
 
-  async updateHeroSlide({ id, userRole, body, file, actorId, owlToken }) {
+  async updateHeroSlide({ req, res, id, userRole, body, file, actorId, owlToken }) {
     const t = await sequelize.transaction();
     try {
       const { title, subtitle, order, status, previous_notrans } = body;
@@ -298,20 +286,17 @@ class HomeService {
       const updatedData = { title, subtitle, order, imageUrl: newImageUrl };
 
       if (userRole === "editor" && status === "Published") {
-        const notrans = await generateNotrans("HERO");
-        if (previous_notrans) await ApprovalDraft.update({ status: "Replaced" }, { where: { notrans: previous_notrans }, transaction: t });
-        await ApprovalDraft.create({
-          notrans, module_name: "HeroSlides", action: "UPDATE", target_id: String(id),
-          payload: { ...updatedData, status: "Published", _translations: body._translations }, created_by: actorId, status: "Pending",
-        }, { transaction: t });
-        await slide.update({ is_locked: true, lock_ticket: notrans }, { transaction: t });
-        await t.commit();
-
-        try {
-          await ErpApprovalService.initiateApproval({ notrans, moduleName: "HeroSlides", karyawanId: actorId, token: owlToken });
-        } catch (owlError) {}
-        
-        return { success: true, isDraft: true, ticket: notrans };
+        return handleEditorStaging({
+          req, res, t,
+          moduleName: "HeroSlides",
+          notransPrefix: "HERO",
+          action: "UPDATE",
+          targetId: String(id),
+          payload: { ...updatedData, status: "Published", _translations: body._translations },
+          recordToLock: slide,
+          previousNotrans: previous_notrans,
+          successMessage: "Revisi slide berhasil diajukan ke ERP OWL.",
+        });
       }
 
       await invalidateOldDrafts("HeroSlides", id, t);
@@ -327,7 +312,7 @@ class HomeService {
     }
   }
 
-  async deleteHeroSlide({ id, userRole, actorId, owlToken }) {
+  async deleteHeroSlide({ req, res, id, userRole, actorId, owlToken }) {
     const t = await sequelize.transaction();
     try {
       const slide = await HeroSlides.findByPk(id, { transaction: t, lock: t.LOCK.UPDATE });
@@ -342,20 +327,16 @@ class HomeService {
       }
 
       if (userRole === "editor") {
-        const notrans = await generateNotrans("HERO_DEL");
-        await ApprovalDraft.create({
-          notrans, module_name: "HeroSlides", action: "DELETE", target_id: String(id),
+        return handleEditorStaging({
+          req, res, t,
+          moduleName: "HeroSlides",
+          notransPrefix: "HERO_DEL",
+          action: "DELETE",
+          targetId: String(id),
           payload: { ...slide.get({ plain: true }), reason: "Request Delete" },
-          created_by: actorId, status: "Pending",
-        }, { transaction: t });
-        await slide.update({ is_locked: true, lock_ticket: notrans }, { transaction: t });
-        await t.commit();
-
-        try {
-          await ErpApprovalService.initiateApproval({ notrans, moduleName: "HeroSlides", karyawanId: actorId, token: owlToken });
-        } catch (owlError) {}
-
-        return { success: true, isDraft: true, ticket: notrans };
+          recordToLock: slide,
+          successMessage: "Permintaan hapus slide diajukan. Data dikunci sementara.",
+        });
       }
 
       await invalidateOldDrafts("HeroSlides", id, t);
@@ -373,7 +354,7 @@ class HomeService {
 
   // ─── IMPACT STATS ───
 
-  async createStat({ userRole, body, actorId, owlToken }) {
+  async createStat({ req, res, userRole, body, actorId, owlToken }) {
     const t = await sequelize.transaction();
     try {
       const { icon, value, label, desc, order, status } = body;
@@ -387,26 +368,22 @@ class HomeService {
       const statData = { icon: icon || "Map", value, label, desc, order, is_locked: false };
 
       if (userRole === "editor" && status === "Published") {
-        const notrans = await generateNotrans("STAT");
-        await ApprovalDraft.create({
-          notrans, module_name: "ImpactStats", action: "CREATE", target_id: "0",
-          payload: { ...statData, status: "Published", _translations: body._translations }, created_by: actorId, status: "Pending",
-        }, { transaction: t });
         statData.is_locked = true;
-        statData.lock_ticket = notrans;
+        const newStat = await ImpactStats.create(statData, { transaction: t });
+
+        return handleEditorStaging({
+          req, res, t,
+          moduleName: "ImpactStats",
+          notransPrefix: "STAT",
+          action: "CREATE",
+          targetId: String(newStat.id),
+          payload: { ...statData, status: "Published", _translations: body._translations },
+          recordToLock: newStat,
+          successMessage: "Permintaan statistik diajukan.",
+        });
       }
 
       const newStat = await ImpactStats.create(statData, { transaction: t });
-
-      if (userRole === "editor" && status === "Published") {
-        await ApprovalDraft.update({ target_id: String(newStat.id) }, { where: { notrans: statData.lock_ticket }, transaction: t });
-        await t.commit();
-        try {
-          await ErpApprovalService.initiateApproval({ notrans: statData.lock_ticket, moduleName: "ImpactStats", karyawanId: actorId, token: owlToken });
-        } catch (erpErr) {}
-        return { success: true, isDraft: true, ticket: statData.lock_ticket };
-      }
-
       await saveManualTranslations("ImpactStats", newStat.id, body._translations, t);
       await t.commit();
       return { success: true, isDraft: false, data: newStat };
@@ -416,7 +393,7 @@ class HomeService {
     }
   }
 
-  async updateStat({ id, userRole, body, actorId, owlToken }) {
+  async updateStat({ req, res, id, userRole, body, actorId, owlToken }) {
     const t = await sequelize.transaction();
     try {
       const { icon, value, label, desc, order, status, previous_notrans } = body;
@@ -435,20 +412,17 @@ class HomeService {
       const updatedData = { icon, value, label, desc, order };
 
       if (userRole === "editor" && status === "Published") {
-        const notrans = await generateNotrans("STAT");
-        if (previous_notrans) await ApprovalDraft.update({ status: "Replaced" }, { where: { notrans: previous_notrans }, transaction: t });
-        await ApprovalDraft.create({
-          notrans, module_name: "ImpactStats", action: "UPDATE", target_id: String(id),
-          payload: { ...updatedData, status: "Published", _translations: body._translations }, created_by: actorId, status: "Pending",
-        }, { transaction: t });
-        await stat.update({ is_locked: true, lock_ticket: notrans }, { transaction: t });
-        await t.commit();
-
-        try {
-          await ErpApprovalService.initiateApproval({ notrans, moduleName: "ImpactStats", karyawanId: actorId, token: owlToken });
-        } catch (erpErr) {}
-
-        return { success: true, isDraft: true, ticket: notrans };
+        return handleEditorStaging({
+          req, res, t,
+          moduleName: "ImpactStats",
+          notransPrefix: "STAT",
+          action: "UPDATE",
+          targetId: String(id),
+          payload: { ...updatedData, status: "Published", _translations: body._translations },
+          recordToLock: stat,
+          previousNotrans: previous_notrans,
+          successMessage: "Revisi statistik diajukan.",
+        });
       }
 
       await invalidateOldDrafts("ImpactStats", String(id), t);
@@ -463,7 +437,7 @@ class HomeService {
     }
   }
 
-  async deleteStat({ id, userRole, actorId, owlToken }) {
+  async deleteStat({ req, res, id, userRole, actorId, owlToken }) {
     const t = await sequelize.transaction();
     try {
       const stat = await ImpactStats.findByPk(id, { transaction: t, lock: t.LOCK.UPDATE });
@@ -478,20 +452,16 @@ class HomeService {
       }
 
       if (userRole === "editor") {
-        const notrans = await generateNotrans("STAT_DEL");
-        await ApprovalDraft.create({
-          notrans, module_name: "ImpactStats", action: "DELETE", target_id: String(id),
+        return handleEditorStaging({
+          req, res, t,
+          moduleName: "ImpactStats",
+          notransPrefix: "STAT_DEL",
+          action: "DELETE",
+          targetId: String(id),
           payload: { ...stat.get({ plain: true }), reason: "Request Delete" },
-          created_by: actorId, status: "Pending",
-        }, { transaction: t });
-        await stat.update({ is_locked: true, lock_ticket: notrans }, { transaction: t });
-        await t.commit();
-
-        try {
-          await ErpApprovalService.initiateApproval({ notrans, moduleName: "ImpactStats", karyawanId: actorId, token: owlToken });
-        } catch (erpError) {}
-
-        return { success: true, isDraft: true, ticket: notrans };
+          recordToLock: stat,
+          successMessage: "Permintaan hapus statistik diajukan. Data dikunci sementara.",
+        });
       }
 
       await invalidateOldDrafts("ImpactStats", id, t);

@@ -37,6 +37,7 @@ exports.createPillar = async (req, res) => {
     const owlToken = req.headers["authorization"]?.split(" ")[1] || req.owl_token;
 
     const result = await philosophyPillarService.createPillar({
+      req, res,
       body: req.body,
       userRole: req.userRole,
       actorId,
@@ -44,13 +45,7 @@ exports.createPillar = async (req, res) => {
       owlToken,
     });
 
-    if (result.isDraft) {
-      return res.status(202).json({
-        success: true,
-        message: "Pengajuan Pilar baru dikirim.",
-        ticket: result.ticket,
-      });
-    }
+    if (res.headersSent) return;
 
     res.status(201).json({ success: true, message: "Pilar baru berhasil ditambahkan." });
   } catch (error) {
@@ -65,6 +60,7 @@ exports.updatePillar = async (req, res) => {
     const owlToken = req.headers["authorization"]?.split(" ")[1] || req.owl_token;
 
     const result = await philosophyPillarService.updatePillar({
+      req, res,
       id: req.params.id,
       body: req.body,
       userRole: req.userRole,
@@ -73,13 +69,7 @@ exports.updatePillar = async (req, res) => {
       owlToken,
     });
 
-    if (result.isDraft) {
-      return res.status(202).json({
-        success: true,
-        message: "Revisi pilar diajukan.",
-        ticket: result.ticket,
-      });
-    }
+    if (res.headersSent) return;
 
     res.status(200).json({ success: true, message: "Pilar berhasil diperbarui." });
   } catch (error) {
@@ -94,6 +84,7 @@ exports.deletePillar = async (req, res) => {
     const owlToken = req.headers["authorization"]?.split(" ")[1] || req.owl_token;
 
     const result = await philosophyPillarService.deletePillar({
+      req, res,
       id: req.params.id,
       userRole: req.userRole,
       actorId,
@@ -101,13 +92,7 @@ exports.deletePillar = async (req, res) => {
       owlToken,
     });
 
-    if (result.isDraft) {
-      return res.status(202).json({
-        success: true,
-        message: "Pengajuan hapus pilar dikirim.",
-        ticket: result.ticket,
-      });
-    }
+    if (res.headersSent) return;
 
     res.status(200).json({ success: true, message: "Pilar berhasil dihapus." });
   } catch (error) {

@@ -31,6 +31,7 @@ export default function InvestmentsManager() {
     setIsEditing,
     isSaving,
     isSettingsOverrideMode,
+    settingsLockTicket,
     currentLockState,
     lockStyles,
     pageContent,
@@ -295,6 +296,7 @@ export default function InvestmentsManager() {
             settingsIsLocked={
               mgr.isSettingsLockedForEditor || mgr.isSettingsOverrideMode
             }
+            settingsLockTicket={settingsLockTicket}
             terjemahanHeadline={terjemahanHeadline}
             terjemahanBody={terjemahanBody}
             terjemahanIntro={terjemahanIntro}

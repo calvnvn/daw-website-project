@@ -48,12 +48,7 @@ exports.createBusinessSection = async (req, res) => {
       owlToken,
     });
 
-    if (result.isDraft) {
-      return res.status(202).json({
-        message: "Pembuatan sektor diajukan. Sektor terkunci menunggu persetujuan.",
-        ticket: result.ticket,
-      });
-    }
+    if (res.headersSent) return;
 
     res.status(201).json({
       message: "Sektor bisnis baru berhasil dibuat secara langsung.",
@@ -78,7 +73,7 @@ exports.updateBusinessSection = async (req, res) => {
       owlToken,
     });
 
-    if (!result) return; // Means handleEditorStaging intercepted and responded
+    if (res.headersSent) return;
 
     if (result.isHybridMapUpdate) {
       return res.status(200).json({
@@ -108,13 +103,7 @@ exports.deleteSection = async (req, res) => {
       owlToken,
     });
 
-    if (result.isDraft) {
-      return res.status(202).json({
-        success: true,
-        message: "Permintaan hapus sektor dikirim ke Server. Data dikunci.",
-        ticket: result.ticket,
-      });
-    }
+    if (res.headersSent) return;
 
     res.status(200).json({ message: "Sektor berhasil dihapus secara permanen." });
   } catch (error) {

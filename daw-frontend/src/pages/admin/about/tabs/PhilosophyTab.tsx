@@ -19,6 +19,7 @@ import type { PhilosophyPillar } from "@/contexts/AboutContext";
 import { AVAILABLE_ICONS } from "../AboutConstants";
 import AboutLivePreview from "@/components/admin/about/AboutLivePreview";
 import MagicTranslationField from "@/components/admin/MagicTranslationField";
+import LockedStateTracker from "@/components/admin/LockedStateTracker";
 import { getErrorMessage } from "@/lib/utils";
 
 interface PhilosophyTabProps {
@@ -84,14 +85,14 @@ export default function PhilosophyTab({
       terjemahanTitle !== originalTerjemahanTitle,
     [titleForm, originalTitle, terjemahanTitle, originalTerjemahanTitle],
   );
-  const isTitleLocked = philosophyData?.is_locked && !isSuperadmin;
+  const isTitleLocked = !!(philosophyData?.is_locked && !isSuperadmin);
 
   const handleDiscardTitleDraft = async () => {
     if (!rejectedTitleDraft?.notrans) return;
     const loadingToast = toast.loading("Membersihkan notifikasi...");
     try {
       await api.patch("/approval/discard", {
-        notrans: rejectedPillarDraft.notrans,
+        notrans: rejectedTitleDraft.notrans,
       });
       setRejectedTitleDraft(null);
       await refreshData();
@@ -146,6 +147,16 @@ export default function PhilosophyTab({
     null,
   );
 
+  const selectedPillarForModal = editingPillarId
+    ? philosophyPillars.find((p) => p.id === editingPillarId)
+    : null;
+  const isPillarLocked = !!(
+    selectedPillarForModal?.is_locked &&
+    !selectedPillarForModal?.hasRejected &&
+    !isSuperadmin
+  );
+  const pillarLockTicket = selectedPillarForModal?.lock_ticket || null;
+
   const [pillarForm, setPillarForm] = useState({
     iconId: "human",
     title: "",
@@ -160,13 +171,6 @@ export default function PhilosophyTab({
   });
 
   const openPillarModal = async (pillar: PhilosophyPillar | null = null) => {
-    const isLockedAndNotRejected = pillar?.is_locked && !pillar?.hasRejected;
-    if (isLockedAndNotRejected && !isSuperadmin) {
-      return toast.warning("Akses Dibatasi", {
-        description: "Pilar ini sedang dalam peninjauan approver.",
-      });
-    }
-
     let draftData = null;
     if (pillar?.hasRejected && isEditor) {
       const toastId = toast.loading("Menarik catatan revisi...");
@@ -472,14 +476,10 @@ export default function PhilosophyTab({
                 Pengaturan judul utama halaman nilai-nilai perusahaan.
               </p>
             </div>
-            {isTitleLocked && (
-              <span className="flex items-center gap-1.5 text-[10px] font-black text-blue-600 bg-blue-50 px-3 py-1.5 rounded-full border border-blue-100 uppercase tracking-widest">
-                <Lock className="w-3.5 h-3.5" /> Terkunci (Review)
-              </span>
-            )}
           </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 lg:gap-10">
+          <LockedStateTracker isLocked={isTitleLocked} lockTicket={philosophyData?.lock_ticket || null}>
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 lg:gap-10">
             {/* English Column */}
             <div className="space-y-3">
               <label className="flex items-center gap-2 text-[11px] font-black text-slate-500 uppercase tracking-widest">
@@ -516,8 +516,9 @@ export default function PhilosophyTab({
                   className="!mt-0 !rounded-2xl !py-[18px] !px-5 !bg-slate-50/50 hover:!bg-white !border-slate-200 focus-within:!ring-4 focus-within:!ring-daw-green/10 focus-within:!border-daw-green transition-all"
                 />
               </div>
+              </div>
             </div>
-          </div>
+          </LockedStateTracker>
 
           <div className="flex items-center justify-end mt-8 pt-6 border-t border-slate-100">
             <button
@@ -593,10 +594,10 @@ export default function PhilosophyTab({
             return (
               <div
                 key={pillar.id}
-                className={`bg-slate-50 border border-slate-200 rounded-3xl p-6 flex flex-col items-start group relative transition-all overflow-hidden z-10 ${
+                className={`border rounded-3xl p-6 flex flex-col items-start group relative transition-all overflow-hidden z-10 ${
                   isRowLocked
-                    ? "opacity-60 grayscale-[30%]"
-                    : "hover:shadow-xl hover:border-daw-green/30 hover:-translate-y-1 hover:bg-white"
+                    ? "bg-blue-50/30 border-blue-200 shadow-sm"
+                    : "bg-slate-50 border-slate-200 hover:shadow-xl hover:border-daw-green/30 hover:-translate-y-1 hover:bg-white"
                 }`}>
                 {/* Number Watermark */}
                 <div className="absolute -bottom-4 -right-2 text-[100px] font-black text-slate-50 leading-none select-none pointer-events-none group-hover:text-daw-green/5 transition-colors z-0">
@@ -617,8 +618,8 @@ export default function PhilosophyTab({
                       </span>
                     )}
                     {isRowLocked ? (
-                      <span className="text-[9px] font-black text-blue-600 bg-blue-50 px-2.5 py-1 rounded-full border border-blue-100 flex items-center gap-1 uppercase tracking-widest">
-                        <Lock className="w-2.5 h-2.5" /> Pending
+                      <span className="text-[9px] font-black text-blue-600 bg-blue-100 px-2.5 py-1 rounded-full border border-blue-200 flex items-center gap-1 uppercase tracking-widest animate-pulse">
+                        <Lock className="w-2.5 h-2.5" /> Pending Review
                       </span>
                     ) : (
                       <div className="flex items-center gap-1 bg-slate-50 border border-slate-100 px-2 py-1 rounded-full text-[9px] font-bold text-slate-400">
@@ -644,7 +645,19 @@ export default function PhilosophyTab({
                   </p>
                 </div>
 
-                {/* Hover Actions Bar */}
+                {/* LOCKED: Always-visible Progress Button (tidak disembunyikan di hover) */}
+                {isRowLocked && (
+                  <div className="relative z-10 w-full pt-4 border-t border-blue-100 flex justify-end">
+                    <button
+                      onClick={() => openPillarModal(pillar)}
+                      className="inline-flex items-center gap-1.5 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold transition-all shadow-sm active:scale-95 uppercase tracking-wider"
+                      title="Lihat Progres Persetujuan">
+                      <Lock className="w-3.5 h-3.5" /> Lihat Progress
+                    </button>
+                  </div>
+                )}
+
+                {/* EDITING: Hover-reveal Edit/Delete buttons */}
                 {isEditing && !isRowLocked && (
                   <div className="absolute bottom-0 left-0 right-0 p-5 opacity-0 group-hover:opacity-100 translate-y-4 group-hover:translate-y-0 transition-all bg-gradient-to-t from-white via-white to-white/90 pt-10 z-20 flex justify-end gap-2">
                     <button
@@ -730,170 +743,172 @@ export default function PhilosophyTab({
 
             {/* FORM AREA */}
             <div className="overflow-y-auto p-6">
-              <form
-                id="pillar-form"
-                onSubmit={savePillar}
-                className="space-y-6">
-                {rejectedPillarDraft?.action === "DELETE" ? (
-                  <div className="p-4 bg-red-50 border border-red-200 rounded-xl text-center">
-                    <p className="text-sm text-red-600 font-medium">
-                      Pengajuan hapus ditolak. Klik "Abaikan Notifikasi" di atas
-                      untuk membuka kembali akses form ini.
-                    </p>
-                  </div>
-                ) : (
-                  <>
-                    <div className="grid grid-cols-1 sm:grid-cols-12 gap-6">
-                      <div className="sm:col-span-9">
-                        <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-3">
-                          Pilih Ikon Pilar
-                        </label>
-                        <div className="grid grid-cols-4 sm:grid-cols-6 lg:grid-cols-8 gap-3">
-                          {AVAILABLE_ICONS.map((opt) => {
-                            const isSelected = pillarForm.iconId === opt.id;
-                            return (
-                              <button
-                                key={opt.id}
-                                type="button"
-                                onClick={() =>
-                                  setPillarForm({
-                                    ...pillarForm,
-                                    iconId: opt.id,
-                                  })
-                                }
-                                className={`flex flex-col items-center justify-center gap-2 p-3 rounded-2xl border transition-all ${
-                                  isSelected
-                                    ? "bg-daw-green/10 border-daw-green shadow-inner ring-2 ring-daw-green/20 scale-105"
-                                    : "bg-slate-50 border-slate-200 hover:bg-white hover:border-daw-green hover:shadow-md"
-                                }`}
-                                title={opt.label}>
-                                <opt.icon
-                                  className={`w-6 h-6 ${isSelected ? "text-daw-green" : "text-slate-400"}`}
-                                />
-                                <span
-                                  className={`text-[9px] font-bold text-center line-clamp-1 ${isSelected ? "text-daw-green" : "text-slate-500"}`}>
-                                  {opt.label}
-                                </span>
-                              </button>
-                            );
-                          })}
-                        </div>
-                      </div>
-
-                      <div className="sm:col-span-3">
-                        <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-3">
-                          Urutan Tampil
-                        </label>
-                        <input
-                          type="number"
-                          min="1"
-                          required
-                          value={pillarForm.orderIndex}
-                          onChange={(e) =>
-                            setPillarForm({
-                              ...pillarForm,
-                              orderIndex: parseInt(e.target.value) || 1,
-                            })
-                          }
-                          className="w-full px-5 py-4 text-center font-black text-2xl text-slate-800 bg-slate-50 border border-slate-200 rounded-2xl focus:bg-white focus:ring-4 focus:ring-daw-green/10 focus:border-daw-green transition-all"
-                        />
-                      </div>
+              <LockedStateTracker isLocked={isPillarLocked} lockTicket={pillarLockTicket}>
+                <form
+                  id="pillar-form"
+                  onSubmit={savePillar}
+                  className="space-y-6">
+                  {rejectedPillarDraft?.action === "DELETE" ? (
+                    <div className="p-4 bg-red-50 border border-red-200 rounded-xl text-center">
+                      <p className="text-sm text-red-600 font-medium">
+                        Pengajuan hapus ditolak. Klik "Abaikan Notifikasi" di atas
+                        untuk membuka kembali akses form ini.
+                      </p>
                     </div>
+                  ) : (
+                    <>
+                      <div className="grid grid-cols-1 sm:grid-cols-12 gap-6">
+                        <div className="sm:col-span-9">
+                          <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-3">
+                            Pilih Ikon Pilar
+                          </label>
+                          <div className="grid grid-cols-4 sm:grid-cols-6 lg:grid-cols-8 gap-3">
+                            {AVAILABLE_ICONS.map((opt) => {
+                              const isSelected = pillarForm.iconId === opt.id;
+                              return (
+                                <button
+                                  key={opt.id}
+                                  type="button"
+                                  onClick={() =>
+                                    setPillarForm({
+                                      ...pillarForm,
+                                      iconId: opt.id,
+                                    })
+                                  }
+                                  className={`flex flex-col items-center justify-center gap-2 p-3 rounded-2xl border transition-all ${
+                                    isSelected
+                                      ? "bg-daw-green/10 border-daw-green shadow-inner ring-2 ring-daw-green/20 scale-105"
+                                      : "bg-slate-50 border-slate-200 hover:bg-white hover:border-daw-green hover:shadow-md"
+                                  }`}
+                                  title={opt.label}>
+                                  <opt.icon
+                                    className={`w-6 h-6 ${isSelected ? "text-daw-green" : "text-slate-400"}`}
+                                  />
+                                  <span
+                                    className={`text-[9px] font-bold text-center line-clamp-1 ${isSelected ? "text-daw-green" : "text-slate-500"}`}>
+                                    {opt.label}
+                                  </span>
+                                </button>
+                              );
+                            })}
+                          </div>
+                        </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-5 p-5 bg-slate-50/80 border border-slate-100 rounded-2xl">
-                      <div className="space-y-3">
-                        <label className="flex items-center gap-2 text-[10px] font-black text-slate-500 uppercase tracking-widest">
-                          <span className="w-5 h-5 rounded-md bg-slate-200 flex items-center justify-center text-slate-600">
-                            EN
-                          </span>{" "}
-                          Title (English)
-                        </label>
-                        <input
-                          type="text"
-                          required
-                          value={pillarForm.title}
-                          onChange={(e) =>
-                            setPillarForm({
-                              ...pillarForm,
-                              title: e.target.value,
-                            })
-                          }
-                          className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:bg-white focus:ring-4 focus:ring-daw-green/10 focus:border-daw-green transition-all"
-                        />
-                      </div>
-                      <div className="space-y-3">
-                        <label className="flex items-center gap-2 text-[10px] font-black text-daw-green uppercase tracking-widest">
-                          <span className="w-5 h-5 rounded-md bg-daw-green/10 flex items-center justify-center text-daw-green">
-                            ID
-                          </span>{" "}
-                          Title (Indonesian)
-                        </label>
-                        <div className="pt-0.5">
-                          <MagicTranslationField
-                            label="Terjemahan Judul (ID)"
-                            originalText={pillarForm.title}
-                            value={pillarForm.terjemahanTitle}
-                            onChange={(v) =>
+                        <div className="sm:col-span-3">
+                          <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-3">
+                            Urutan Tampil
+                          </label>
+                          <input
+                            type="number"
+                            min="1"
+                            required
+                            value={pillarForm.orderIndex}
+                            onChange={(e) =>
                               setPillarForm({
                                 ...pillarForm,
-                                terjemahanTitle: v,
+                                orderIndex: parseInt(e.target.value) || 1,
                               })
                             }
-                            disabled={isSavingPillar}
-                            className="!mt-0 !rounded-xl !py-[13px] !px-4 !bg-slate-50/50 hover:!bg-white !border-slate-200 focus-within:!ring-4 focus-within:!ring-daw-green/10 focus-within:!border-daw-green transition-all"
+                            className="w-full px-5 py-4 text-center font-black text-2xl text-slate-800 bg-slate-50 border border-slate-200 rounded-2xl focus:bg-white focus:ring-4 focus:ring-daw-green/10 focus:border-daw-green transition-all"
                           />
                         </div>
                       </div>
-                    </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-5 p-5 bg-slate-50/80 border border-slate-100 rounded-2xl">
-                      <div className="space-y-3">
-                        <label className="flex items-center gap-2 text-[10px] font-black text-slate-500 uppercase tracking-widest">
-                          <span className="w-5 h-5 rounded-md bg-slate-200 flex items-center justify-center text-slate-600">
-                            EN
-                          </span>{" "}
-                          Description (English)
-                        </label>
-                        <textarea
-                          rows={4}
-                          required
-                          value={pillarForm.text}
-                          onChange={(e) =>
-                            setPillarForm({
-                              ...pillarForm,
-                              text: e.target.value,
-                            })
-                          }
-                          className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:bg-white focus:ring-4 focus:ring-daw-green/10 focus:border-daw-green transition-all resize-none"
-                        />
-                      </div>
-                      <div className="space-y-3">
-                        <label className="flex items-center gap-2 text-[10px] font-black text-daw-green uppercase tracking-widest">
-                          <span className="w-5 h-5 rounded-md bg-daw-green/10 flex items-center justify-center text-daw-green">
-                            ID
-                          </span>{" "}
-                          Description (Indonesian)
-                        </label>
-                        <div className="pt-0.5">
-                          <MagicTranslationField
-                            label="Terjemahan Deskripsi (ID)"
-                            originalText={pillarForm.text}
-                            value={pillarForm.terjemahanText}
-                            onChange={(v) =>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-5 p-5 bg-slate-50/80 border border-slate-100 rounded-2xl">
+                        <div className="space-y-3">
+                          <label className="flex items-center gap-2 text-[10px] font-black text-slate-500 uppercase tracking-widest">
+                            <span className="w-5 h-5 rounded-md bg-slate-200 flex items-center justify-center text-slate-600">
+                              EN
+                            </span>{" "}
+                            Title (English)
+                          </label>
+                          <input
+                            type="text"
+                            required
+                            value={pillarForm.title}
+                            onChange={(e) =>
                               setPillarForm({
                                 ...pillarForm,
-                                terjemahanText: v,
+                                title: e.target.value,
                               })
                             }
-                            disabled={isSavingPillar}
-                            className="!mt-0 !rounded-xl !py-3 !px-4 !bg-slate-50/50 hover:!bg-white !border-slate-200 focus-within:!ring-4 focus-within:!ring-daw-green/10 focus-within:!border-daw-green transition-all"
+                            className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:bg-white focus:ring-4 focus:ring-daw-green/10 focus:border-daw-green transition-all"
                           />
                         </div>
+                        <div className="space-y-3">
+                          <label className="flex items-center gap-2 text-[10px] font-black text-daw-green uppercase tracking-widest">
+                            <span className="w-5 h-5 rounded-md bg-daw-green/10 flex items-center justify-center text-daw-green">
+                              ID
+                            </span>{" "}
+                            Title (Indonesian)
+                          </label>
+                          <div className="pt-0.5">
+                            <MagicTranslationField
+                              label="Terjemahan Judul (ID)"
+                              originalText={pillarForm.title}
+                              value={pillarForm.terjemahanTitle}
+                              onChange={(v) =>
+                                setPillarForm({
+                                  ...pillarForm,
+                                  terjemahanTitle: v,
+                                })
+                              }
+                              disabled={isSavingPillar}
+                              className="!mt-0 !rounded-xl !py-[13px] !px-4 !bg-slate-50/50 hover:!bg-white !border-slate-200 focus-within:!ring-4 focus-within:!ring-daw-green/10 focus-within:!border-daw-green transition-all"
+                            />
+                          </div>
+                        </div>
                       </div>
-                    </div>
-                  </>
-                )}
-              </form>
+
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-5 p-5 bg-slate-50/80 border border-slate-100 rounded-2xl">
+                        <div className="space-y-3">
+                          <label className="flex items-center gap-2 text-[10px] font-black text-slate-500 uppercase tracking-widest">
+                            <span className="w-5 h-5 rounded-md bg-slate-200 flex items-center justify-center text-slate-600">
+                              EN
+                            </span>{" "}
+                            Description (English)
+                          </label>
+                          <textarea
+                            rows={4}
+                            required
+                            value={pillarForm.text}
+                            onChange={(e) =>
+                              setPillarForm({
+                                ...pillarForm,
+                                text: e.target.value,
+                              })
+                            }
+                            className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:bg-white focus:ring-4 focus:ring-daw-green/10 focus:border-daw-green transition-all resize-none"
+                          />
+                        </div>
+                        <div className="space-y-3">
+                          <label className="flex items-center gap-2 text-[10px] font-black text-daw-green uppercase tracking-widest">
+                            <span className="w-5 h-5 rounded-md bg-daw-green/10 flex items-center justify-center text-daw-green">
+                              ID
+                            </span>{" "}
+                            Description (Indonesian)
+                          </label>
+                          <div className="pt-0.5">
+                            <MagicTranslationField
+                              label="Terjemahan Deskripsi (ID)"
+                              originalText={pillarForm.text}
+                              value={pillarForm.terjemahanText}
+                              onChange={(v) =>
+                                setPillarForm({
+                                  ...pillarForm,
+                                  terjemahanText: v,
+                                })
+                              }
+                              disabled={isSavingPillar}
+                              className="!mt-0 !rounded-xl !py-3 !px-4 !bg-slate-50/50 hover:!bg-white !border-slate-200 focus-within:!ring-4 focus-within:!ring-daw-green/10 focus-within:!border-daw-green transition-all"
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    </>
+                  )}
+                </form>
+              </LockedStateTracker>
             </div>
 
             {/* MODAL FOOTER */}
@@ -908,7 +923,7 @@ export default function PhilosophyTab({
                 <button
                   form="pillar-form"
                   type="submit"
-                  disabled={isSavingPillar || !hasPillarChanged}
+                  disabled={isSavingPillar || !hasPillarChanged || isPillarLocked}
                   className={`flex items-center justify-center gap-2 px-6 py-2.5 rounded-xl font-black text-[11px] uppercase tracking-widest transition-all shadow-lg active:scale-95 disabled:cursor-not-allowed disabled:shadow-none ${
                     isSavingPillar
                       ? "bg-slate-300 text-slate-700"

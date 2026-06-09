@@ -51,4 +51,13 @@ router.patch(
   approvalController.discardDraft,
 );
 
+// Fetch draft status and baton-pass tracker data for Editor
+// Note: notrans (e.g. "CMS/PROJ/...") is URL-encoded by frontend via encodeURIComponent,
+// Express automatically decodes :notrans back to the original string.
+router.get(
+  "/status/:notrans",
+  verifyToken,
+  approvalController.getDraftStatus,
+);
+
 module.exports = router;

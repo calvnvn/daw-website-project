@@ -25,6 +25,7 @@ import { useSettings } from "@/contexts/SettingsContext";
 import { getErrorMessage } from "@/lib/utils";
 import ImageAdjustmentModal from "@/components/admin/ImageAdjustmentModal";
 import { HelpTooltip } from "@/components/ui/HelpTooltip";
+import LockedStateTracker from "@/components/admin/LockedStateTracker";
 
 export default function GlobalSettings() {
   const {
@@ -334,23 +335,7 @@ export default function GlobalSettings() {
         </div>
       )}
 
-      {/* 2. Blue Banner (Editor Locked Warning) */}
-      {shouldLockUI && (
-        <div className="bg-blue-50 border border-blue-200 p-4 md:p-5 rounded-xl flex items-center gap-4 animate-pulse shadow-sm">
-          <div className="bg-blue-100 p-2 rounded-full text-blue-600 shrink-0">
-            <Lock className="w-5 h-5" />
-          </div>
-          <div>
-            <h4 className="text-xs md:text-sm font-black text-blue-900 uppercase tracking-tight">
-              Akses Dibatasi
-            </h4>
-            <p className="text-[11px] md:text-xs text-blue-700 leading-relaxed mt-0.5 max-w-2xl">
-              Pengaturan ini sedang ditinjau. Anda tidak dapat melakukan
-              perubahan hingga proses selesai.
-            </p>
-          </div>
-        </div>
-      )}
+      {/* 2. Blue Banner (Editor Locked Warning) - Handled by LockedStateTracker */}
 
       {/* REJECTION RIBBON */}
       {rejectedSettings && (
@@ -546,6 +531,7 @@ export default function GlobalSettings() {
         </div>
 
         {/* TAB CONTENT */}
+        <LockedStateTracker isLocked={!!shouldLockUI} lockTicket={settings?.lock_ticket || null}>
         <div className="flex-1 p-6 md:p-10 bg-white">
           
           {/* TAB 1: PROFILE & BRANDING */}
@@ -837,6 +823,7 @@ export default function GlobalSettings() {
             </div>
           )}
         </div>
+        </LockedStateTracker>
       </div>
 
       <ImageAdjustmentModal

@@ -8,6 +8,7 @@ const { invalidateOldDrafts } = require("../utils/draftCleanup");
 const { generateNotrans } = require("../utils/notransGenerator");
 const { autoTranslate } = require("./openaiService");
 const { saveManualTranslations } = require("../utils/translationHelper");
+const { handleEditorStaging } = require("../utils/editorHelper");
 
 const MODULE_NAME = "Management";
 const NOTRANS_PREFIX = "MGT";
@@ -97,7 +98,7 @@ class ManagementService {
     return translatedManagements;
   }
 
-  async createManagement({ userRole, body, file, actorId, owlToken }) {
+  async createManagement({ req, res, userRole, body, file, actorId, owlToken }) {
     const t = await sequelize.transaction();
     try {
       const { status } = body;
@@ -110,20 +111,16 @@ class ManagementService {
       );
 
       if (isEditor) {
-        const notrans = await generateNotrans(NOTRANS_PREFIX);
-        await ApprovalDraft.create({
-          notrans, module_name: MODULE_NAME, target_id: String(newRecord.id), action: "CREATE",
-          payload: { ...payload, status: "Published", _translations: body._translations }, created_by: actorId, status: "Pending",
-        }, { transaction: t });
-
-        await newRecord.update({ lock_ticket: notrans }, { transaction: t });
-        await t.commit();
-
-        try {
-          await ErpApprovalService.initiateApproval({ notrans, moduleName: MODULE_NAME, karyawanId: actorId, token: owlToken });
-        } catch (owlError) {}
-
-        return { success: true, isDraft: true, ticket: notrans };
+        return handleEditorStaging({
+          req, res, t,
+          moduleName: MODULE_NAME,
+          notransPrefix: NOTRANS_PREFIX,
+          action: "CREATE",
+          targetId: String(newRecord.id),
+          payload: { ...payload, status: "Published", _translations: body._translations },
+          recordToLock: newRecord,
+          successMessage: "Data manajemen baru diajukan ke ERP OWL.",
+        });
       }
 
       await saveManualTranslations(MODULE_NAME, newRecord.id, body._translations, t);
@@ -136,7 +133,7 @@ class ManagementService {
     }
   }
 
-  async updateManagement({ id, userRole, body, file, actorId, owlToken }) {
+  async updateManagement({ req, res, id, userRole, body, file, actorId, owlToken }) {
     const t = await sequelize.transaction();
     try {
       const { status, previous_notrans } = body;
@@ -155,25 +152,17 @@ class ManagementService {
       const isEditor = userRole === "editor" && status === "Published";
 
       if (isEditor) {
-        const notrans = await generateNotrans(NOTRANS_PREFIX);
-        const ticketToClear = previous_notrans || person.lock_ticket;
-        if (ticketToClear) {
-          await ApprovalDraft.update({ status: "Replaced" }, { where: { notrans: ticketToClear, module_name: MODULE_NAME }, transaction: t });
-        }
-
-        await ApprovalDraft.create({
-          notrans, module_name: MODULE_NAME, target_id: String(id), action: "UPDATE",
-          payload: { ...payload, status: "Published", _translations: body._translations }, created_by: actorId, status: "Pending",
-        }, { transaction: t });
-
-        await person.update({ is_locked: true, lock_ticket: notrans }, { transaction: t });
-        await t.commit();
-
-        try {
-          await ErpApprovalService.initiateApproval({ notrans, moduleName: MODULE_NAME, karyawanId: actorId, token: owlToken });
-        } catch (owlError) {}
-
-        return { success: true, isDraft: true, ticket: notrans };
+        return handleEditorStaging({
+          req, res, t,
+          moduleName: MODULE_NAME,
+          notransPrefix: NOTRANS_PREFIX,
+          action: "UPDATE",
+          targetId: String(id),
+          payload: { ...payload, status: "Published", _translations: body._translations },
+          recordToLock: person,
+          previousNotrans: previous_notrans,
+          successMessage: "Revisi data manajemen diajukan ke ERP OWL.",
+        });
       }
 
       await ApprovalDraft.update({ status: "Obsolete" }, { where: { module_name: MODULE_NAME, target_id: String(id), status: ["Pending", "Rejected"] }, transaction: t });
@@ -191,7 +180,7 @@ class ManagementService {
     }
   }
 
-  async deleteManagement({ id, userRole, actorId, owlToken }) {
+  async deleteManagement({ req, res, id, userRole, actorId, owlToken }) {
     const t = await sequelize.transaction();
     try {
       const person = await Management.findByPk(id, { transaction: t, lock: t.LOCK.UPDATE });
@@ -208,22 +197,16 @@ class ManagementService {
       const photoToDelete = person.photoUrl;
 
       if (userRole === "editor") {
-        const notrans = await generateNotrans(NOTRANS_PREFIX);
-        await ApprovalDraft.update({ status: "Obsolete" }, { where: { module_name: MODULE_NAME, target_id: String(id), status: ["Pending", "Rejected"] }, transaction: t });
-        
-        await ApprovalDraft.create({
-          notrans, module_name: MODULE_NAME, target_id: String(id), action: "DELETE",
-          payload: { name: person.name, role: person.role, photoUrl: person.photoUrl }, created_by: actorId, status: "Pending",
-        }, { transaction: t });
-
-        await person.update({ is_locked: true, lock_ticket: notrans }, { transaction: t });
-        await t.commit();
-
-        try {
-          await ErpApprovalService.initiateApproval({ notrans, moduleName: MODULE_NAME, karyawanId: actorId, token: owlToken });
-        } catch (e) {}
-
-        return { success: true, isDraft: true, ticket: notrans };
+        return handleEditorStaging({
+          req, res, t,
+          moduleName: MODULE_NAME,
+          notransPrefix: NOTRANS_PREFIX,
+          action: "DELETE",
+          targetId: String(id),
+          payload: { name: person.name, role: person.role, photoUrl: person.photoUrl },
+          recordToLock: person,
+          successMessage: "Permintaan hapus data manajemen diajukan ke ERP OWL.",
+        });
       }
 
       await invalidateOldDrafts(MODULE_NAME, id, t);

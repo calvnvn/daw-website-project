@@ -121,19 +121,14 @@ exports.deleteCategory = async (req, res) => {
 exports.updateSettings = async (req, res) => {
   try {
     const result = await investmentService.updateSettings({
+      req, res,
       userRole: getRole(req),
       body: req.body,
       actorId: getActorId(req),
       owlToken: getToken(req),
     });
 
-    if (result.isDraft) {
-      return res.status(202).json({
-        success: true,
-        message: "Revisi teks investasi berhasil diajukan.",
-        ticket: result.ticket,
-      });
-    }
+    if (res.headersSent) return;
 
     res.status(200).json({ success: true, message: "Pengaturan berhasil diperbarui secara langsung.", data: result.data });
   } catch (error) {
@@ -148,6 +143,7 @@ exports.updateSettings = async (req, res) => {
 exports.createAffiliate = async (req, res) => {
   try {
     const result = await investmentService.createAffiliate({
+      req, res,
       userRole: getRole(req),
       body: req.body,
       file: req.file,
@@ -155,13 +151,7 @@ exports.createAffiliate = async (req, res) => {
       owlToken: getToken(req),
     });
 
-    if (result.isDraft) {
-      return res.status(202).json({
-        success: true,
-        message: "Permintaan tambah afiliasi baru diajukan.",
-        ticket: result.ticket,
-      });
-    }
+    if (res.headersSent) return;
 
     res.status(201).json({ success: true, message: "Affiliate berhasil dibuat secara permanen.", data: result.data });
   } catch (error) {
@@ -172,6 +162,7 @@ exports.createAffiliate = async (req, res) => {
 exports.updateAffiliate = async (req, res) => {
   try {
     const result = await investmentService.updateAffiliate({
+      req, res,
       id: req.params.id,
       userRole: getRole(req),
       body: req.body,
@@ -180,16 +171,10 @@ exports.updateAffiliate = async (req, res) => {
       owlToken: getToken(req),
     });
 
-    if (result.noChanges) {
-      return res.status(200).json({ success: true, message: "Tidak ada perubahan data. Permintaan diabaikan." });
-    }
+    if (res.headersSent) return;
 
-    if (result.isDraft) {
-      return res.status(202).json({
-        success: true,
-        message: "Revisi afiliasi berhasil diajukan.",
-        ticket: result.ticket,
-      });
+    if (result && result.noChanges) {
+      return res.status(200).json({ success: true, message: "Tidak ada perubahan data. Permintaan diabaikan." });
     }
 
     res.status(200).json({ success: true, message: "Affiliate berhasil diperbarui secara permanen!", data: result.data });
@@ -201,19 +186,14 @@ exports.updateAffiliate = async (req, res) => {
 exports.deleteAffiliate = async (req, res) => {
   try {
     const result = await investmentService.deleteAffiliate({
+      req, res,
       id: req.params.id,
       userRole: getRole(req),
       actorId: getActorId(req),
       owlToken: getToken(req),
     });
 
-    if (result.isDraft) {
-      return res.status(202).json({
-        success: true,
-        message: "Permintaan hapus afiliasi diajukan. Data dikunci sementara.",
-        ticket: result.ticket,
-      });
-    }
+    if (res.headersSent) return;
 
     res.status(200).json({ success: true, message: "Affiliate beserta gambarnya berhasil dihapus secara permanen!" });
   } catch (error) {

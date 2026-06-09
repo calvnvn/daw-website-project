@@ -22,6 +22,7 @@ import AboutLivePreview from "@/components/admin/about/AboutLivePreview";
 import { getErrorMessage } from "@/lib/utils";
 import ImageAdjustmentModal from "@/components/admin/ImageAdjustmentModal";
 import MagicTranslationField from "@/components/admin/MagicTranslationField";
+import LockedStateTracker from "@/components/admin/LockedStateTracker";
 
 interface AchievementTabProps {
   isEditing: boolean;
@@ -90,13 +91,7 @@ export default function AchievementTab({
   });
 
   const openModal = async (achievement: AchievementItem | null = null) => {
-    // PROTEKSI: Jika ada gembok, modal tidak bisa dibuka sama sekali oleh Editor
-    if (achievement?.is_locked && !isSuperadmin) {
-      return toast.warning("Akses Dibatasi", {
-        description:
-          "Data penghargaan ini sedang dikunci karena proses approval OWL.",
-      });
-    }
+    // Editors can open modal to see approval progress via LockedStateTracker
 
     if (achievement) {
       setEditingId(achievement.id);
@@ -163,18 +158,23 @@ export default function AchievementTab({
         }),
       }));
 
-      api.get(`/translation/manual?modelName=Achievement&recordId=${achievement.id}`).then(res => {
-        if (res.data?.data?.id) {
-          const trans = res.data.data.id;
-          setForm(prev => ({
-            ...prev,
-            terjemahanTitle: trans.title || "",
-            originalTerjemahanTitle: trans.title || "",
-            terjemahanDescription: trans.description || "",
-            originalTerjemahanDescription: trans.description || "",
-          }));
-        }
-      }).catch(console.error);
+      api
+        .get(
+          `/translation/manual?modelName=Achievement&recordId=${achievement.id}`,
+        )
+        .then((res) => {
+          if (res.data?.data?.id) {
+            const trans = res.data.data.id;
+            setForm((prev) => ({
+              ...prev,
+              terjemahanTitle: trans.title || "",
+              originalTerjemahanTitle: trans.title || "",
+              terjemahanDescription: trans.description || "",
+              originalTerjemahanDescription: trans.description || "",
+            }));
+          }
+        })
+        .catch(console.error);
     } else {
       setEditingId(null);
       setForm({
@@ -235,7 +235,9 @@ export default function AchievementTab({
       form.terjemahanTitle !== form.originalTerjemahanTitle ||
       form.terjemahanDescription !== form.originalTerjemahanDescription;
 
-    return JSON.stringify(currentData) !== form.originalSnapshot || isTransChanged;
+    return (
+      JSON.stringify(currentData) !== form.originalSnapshot || isTransChanged
+    );
   }, [form, editingId]);
 
   const saveAchievement = async (e: React.FormEvent) => {
@@ -402,8 +404,6 @@ export default function AchievementTab({
           <tbody className="divide-y divide-slate-100">
             {achievements.map((item) => {
               const isRowLocked = item.is_locked && !isSuperadmin;
-              const lockStyles =
-                "opacity-60 grayscale-[30%] bg-slate-50 pointer-events-none select-none";
 
               const SelectedIcon =
                 AVAILABLE_ICONS.find((i) => i.id === item.iconId)?.icon ||
@@ -412,7 +412,7 @@ export default function AchievementTab({
               return (
                 <tr
                   key={item.id}
-                  className={`transition-colors ${isRowLocked ? lockStyles : "hover:bg-slate-50/50"}`}>
+                  className={`transition-colors hover:bg-slate-50/50`}>
                   <td className="px-6 py-4 text-center">
                     {item.imageUrl ? (
                       <div className="w-10 h-10 rounded-md overflow-hidden border border-slate-200 bg-white shadow-sm mx-auto">
@@ -455,9 +455,12 @@ export default function AchievementTab({
                   </td>
                   <td className="px-6 py-4 text-right">
                     {isRowLocked ? (
-                      <span className="inline-flex items-center gap-1 text-[10px] font-bold text-blue-600 bg-blue-50 px-2.5 py-1 rounded-md border border-blue-100 uppercase tracking-widest">
-                        <Lock className="w-3 h-3" /> Terkunci
-                      </span>
+                      <button
+                        onClick={() => openModal(item)}
+                        className="inline-flex items-center gap-1 text-[10px] font-bold text-blue-600 bg-blue-50 px-2.5 py-1 rounded-md border border-blue-100 uppercase tracking-widest hover:bg-blue-100 transition-colors"
+                        title="Lihat Progres Persetujuan">
+                        <Lock className="w-3 h-3" /> Progress
+                      </button>
                     ) : isEditing ? (
                       <div className="flex items-center justify-end gap-2">
                         <button
@@ -565,11 +568,25 @@ export default function AchievementTab({
             )}
 
             <div className="overflow-y-auto p-6">
-              <form
-                id="achievement-form"
-                onSubmit={saveAchievement}
-                className="space-y-6">
-                <div>
+              <LockedStateTracker
+                isLocked={
+                  !!(
+                    editingId &&
+                    achievements.find((a) => a.id === editingId)?.is_locked &&
+                    !isSuperadmin
+                  )
+                }
+                lockTicket={
+                  editingId
+                    ? achievements.find((a) => a.id === editingId)
+                        ?.lock_ticket || null
+                    : null
+                }>
+                <form
+                  id="achievement-form"
+                  onSubmit={saveAchievement}
+                  className="space-y-6">
+                  <div>
                     <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">
                       Title / Headline
                     </label>
@@ -588,7 +605,9 @@ export default function AchievementTab({
                         label="Title (Indonesian)"
                         originalText={form.title}
                         value={form.terjemahanTitle}
-                        onChange={(v) => setForm({...form, terjemahanTitle: v})}
+                        onChange={(v) =>
+                          setForm({ ...form, terjemahanTitle: v })
+                        }
                         disabled={isSaving}
                       />
                     </div>
@@ -610,7 +629,7 @@ export default function AchievementTab({
                       />
                     </div>
 
-                <div className="grid grid-cols-2 gap-5">
+                    <div className="grid grid-cols-2 gap-5">
                       <div>
                         <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">
                           Tahun
@@ -639,146 +658,153 @@ export default function AchievementTab({
                             const yearFromDate = newDate
                               ? newDate.split("-")[0]
                               : form.year;
-                            setForm({ ...form, date: newDate, year: yearFromDate });
+                            setForm({
+                              ...form,
+                              date: newDate,
+                              year: yearFromDate,
+                            });
                           }}
                           className="w-full px-3 py-2.5 border border-slate-200 rounded-lg focus:ring-2 focus:ring-daw-green/20 transition-all text-sm"
                         />
                       </div>
                     </div>
                   </div>
-                  
+
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
                     <div className="relative">
-                    <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">
-                      Ikon (Fallback)
-                    </label>
-                    <button
-                      type="button"
-                      onClick={() => setOpenIconPicker(!openIconPicker)}
-                      className="flex items-center justify-between w-full px-3 py-2.5 bg-white border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-daw-green/20">
-                      <div className="flex items-center gap-2">
-                        {React.createElement(
-                          AVAILABLE_ICONS.find((i) => i.id === form.iconId)
-                            ?.icon || Target,
-                          { className: "w-4 h-4 text-slate-500" },
-                        )}
-                        <span>
-                          {
+                      <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">
+                        Ikon (Fallback)
+                      </label>
+                      <button
+                        type="button"
+                        onClick={() => setOpenIconPicker(!openIconPicker)}
+                        className="flex items-center justify-between w-full px-3 py-2.5 bg-white border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-daw-green/20">
+                        <div className="flex items-center gap-2">
+                          {React.createElement(
                             AVAILABLE_ICONS.find((i) => i.id === form.iconId)
-                              ?.label
-                          }
-                        </span>
-                      </div>
-                      <ChevronDown className="w-4 h-4 text-slate-400" />
-                    </button>
-                    {openIconPicker && (
-                      <div className="absolute z-20 mt-1 w-full bg-white border border-slate-200 rounded-lg shadow-xl overflow-hidden max-h-48 overflow-y-auto">
-                        {AVAILABLE_ICONS.map((opt) => (
-                          <button
-                            key={opt.id}
-                            type="button"
-                            onClick={() => {
-                              setForm({ ...form, iconId: opt.id });
-                              setOpenIconPicker(false);
-                            }}
-                            className="flex items-center gap-3 w-full px-3 py-2.5 text-left text-sm hover:bg-slate-50">
-                            <opt.icon className="w-4 h-4 text-slate-400" />{" "}
-                            {opt.label}
-                          </button>
+                              ?.icon || Target,
+                            { className: "w-4 h-4 text-slate-500" },
+                          )}
+                          <span>
+                            {
+                              AVAILABLE_ICONS.find((i) => i.id === form.iconId)
+                                ?.label
+                            }
+                          </span>
+                        </div>
+                        <ChevronDown className="w-4 h-4 text-slate-400" />
+                      </button>
+                      {openIconPicker && (
+                        <div className="absolute z-20 mt-1 w-full bg-white border border-slate-200 rounded-lg shadow-xl overflow-hidden max-h-48 overflow-y-auto">
+                          {AVAILABLE_ICONS.map((opt) => (
+                            <button
+                              key={opt.id}
+                              type="button"
+                              onClick={() => {
+                                setForm({ ...form, iconId: opt.id });
+                                setOpenIconPicker(false);
+                              }}
+                              className="flex items-center gap-3 w-full px-3 py-2.5 text-left text-sm hover:bg-slate-50">
+                              <opt.icon className="w-4 h-4 text-slate-400" />{" "}
+                              {opt.label}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                        <Link2 className="w-3.5 h-3.5" />
+                        Hubungkan ke Artikel Berita (Opsional)
+                      </label>
+                      <select
+                        value={form.news_article_id}
+                        onChange={(e) =>
+                          setForm({ ...form, news_article_id: e.target.value })
+                        }
+                        className="w-full px-3 py-2.5 border border-slate-200 rounded-lg focus:ring-2 focus:ring-daw-green/20 transition-all text-sm bg-white">
+                        <option value="">— Tidak Ada Hubungan Artikel —</option>
+                        {publishedArticles.map((art) => (
+                          <option key={art.id} value={art.id}>
+                            {art.title}
+                          </option>
                         ))}
-                      </div>
-                    )}
+                      </select>
+                      <p className="text-[10px] text-slate-400 mt-1.5">
+                        Jika dihubungkan, pengunjung dapat menekan tombol "Read
+                        Full Story" pada kartu penghargaan untuk membaca cerita
+                        lengkapnya di News & Events.
+                      </p>
+                    </div>
                   </div>
 
                   <div>
-                    <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2 flex items-center gap-1.5">
-                      <Link2 className="w-3.5 h-3.5" />
-                      Hubungkan ke Artikel Berita (Opsional)
+                    <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">
+                      Deskripsi
                     </label>
-                    <select
-                      value={form.news_article_id}
+                    <textarea
+                      required
+                      rows={3}
+                      value={form.description}
                       onChange={(e) =>
-                        setForm({ ...form, news_article_id: e.target.value })
+                        setForm({ ...form, description: e.target.value })
                       }
-                      className="w-full px-3 py-2.5 border border-slate-200 rounded-lg focus:ring-2 focus:ring-daw-green/20 transition-all text-sm bg-white">
-                      <option value="">— Tidak Ada Hubungan Artikel —</option>
-                      {publishedArticles.map((art) => (
-                        <option key={art.id} value={art.id}>
-                          {art.title}
-                        </option>
-                      ))}
-                    </select>
-                    <p className="text-[10px] text-slate-400 mt-1.5">
-                      Jika dihubungkan, pengunjung dapat menekan tombol "Read Full Story" pada kartu penghargaan untuk membaca cerita lengkapnya di News & Events.
-                    </p>
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">
-                    Deskripsi
-                  </label>
-                  <textarea
-                    required
-                    rows={3}
-                    value={form.description}
-                    onChange={(e) =>
-                      setForm({ ...form, description: e.target.value })
-                    }
-                    className="w-full px-3 py-2.5 border border-slate-200 rounded-lg focus:ring-2 focus:ring-daw-green/20 resize-none transition-all text-sm"
-                  />
-                  <div className="mt-2">
-                    <MagicTranslationField
-                      label="Description (Indonesian)"
-                      originalText={form.description}
-                      value={form.terjemahanDescription}
-                      onChange={(v) => setForm({...form, terjemahanDescription: v})}
-                      disabled={isSaving}
+                      className="w-full px-3 py-2.5 border border-slate-200 rounded-lg focus:ring-2 focus:ring-daw-green/20 resize-none transition-all text-sm"
                     />
-                  </div>
-                </div>
-
-                
-
-                <div>
-                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">
-                    Visual Sertifikat / Trofi (Opsional)
-                  </label>
-                  <div className="flex items-center gap-5 p-4 border border-slate-100 bg-slate-50/50 rounded-xl">
-                    <PhotoPreviewer
-                      file={form.photo}
-                      savedUrl={form.removePhoto ? null : form.savedPhotoUrl}
-                    />
-                    <div className="flex flex-col gap-3 w-full">
-                      <input
-                        type="file"
-                        accept="image/jpeg, image/png, image/webp"
-                        ref={fileInputRef}
-                        onChange={handlePhotoChange}
-                        className="w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-bold file:bg-daw-green/10 file:text-daw-green hover:file:bg-daw-green/20 transition-colors cursor-pointer"
+                    <div className="mt-2">
+                      <MagicTranslationField
+                        label="Description (Indonesian)"
+                        originalText={form.description}
+                        value={form.terjemahanDescription}
+                        onChange={(v) =>
+                          setForm({ ...form, terjemahanDescription: v })
+                        }
+                        disabled={isSaving}
                       />
-                      {(form.photo ||
-                        (form.savedPhotoUrl && !form.removePhoto)) && (
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setForm({
-                              ...form,
-                              photo: null,
-                              removePhoto: true,
-                            });
-                            if (fileInputRef.current)
-                              fileInputRef.current.value = "";
-                          }}
-                          className="text-[10px] font-bold text-red-600 hover:text-red-700 bg-red-50 hover:bg-red-100 w-max px-3 py-1.5 rounded-md transition-colors flex items-center gap-1">
-                          <Trash2 className="w-3.5 h-3.5" /> Hapus Visual Saat
-                          Ini
-                        </button>
-                      )}
                     </div>
                   </div>
-                </div>
-              </form>
+
+                  <div>
+                    <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">
+                      Visual Sertifikat / Trofi (Opsional)
+                    </label>
+                    <div className="flex items-center gap-5 p-4 border border-slate-100 bg-slate-50/50 rounded-xl">
+                      <PhotoPreviewer
+                        file={form.photo}
+                        savedUrl={form.removePhoto ? null : form.savedPhotoUrl}
+                      />
+                      <div className="flex flex-col gap-3 w-full">
+                        <input
+                          type="file"
+                          accept="image/jpeg, image/png, image/webp"
+                          ref={fileInputRef}
+                          onChange={handlePhotoChange}
+                          className="w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-bold file:bg-daw-green/10 file:text-daw-green hover:file:bg-daw-green/20 transition-colors cursor-pointer"
+                        />
+                        {(form.photo ||
+                          (form.savedPhotoUrl && !form.removePhoto)) && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setForm({
+                                ...form,
+                                photo: null,
+                                removePhoto: true,
+                              });
+                              if (fileInputRef.current)
+                                fileInputRef.current.value = "";
+                            }}
+                            className="text-[10px] font-bold text-red-600 hover:text-red-700 bg-red-50 hover:bg-red-100 w-max px-3 py-1.5 rounded-md transition-colors flex items-center gap-1">
+                            <Trash2 className="w-3.5 h-3.5" /> Hapus Visual Saat
+                            Ini
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </form>
+              </LockedStateTracker>
             </div>
 
             <div className="px-6 py-4 flex justify-end gap-3 border-t border-slate-100 bg-slate-50 shrink-0">
@@ -791,7 +817,15 @@ export default function AchievementTab({
               <button
                 form="achievement-form"
                 type="submit"
-                disabled={isSaving || !hasDataChanged}
+                disabled={
+                  isSaving ||
+                  !hasDataChanged ||
+                  !!(
+                    editingId &&
+                    achievements.find((a) => a.id === editingId)?.is_locked &&
+                    !isSuperadmin
+                  )
+                }
                 className="flex items-center justify-center gap-2 px-6 py-2.5 rounded-xl font-black text-[11px] uppercase tracking-widest transition-all shadow-lg active:scale-95 disabled:cursor-not-allowed disabled:shadow-none bg-daw-green hover:bg-[#003b1c] text-white shadow-daw-green/20">
                 {isSaving ? (
                   <Loader2 className="w-4 h-4 animate-spin" />

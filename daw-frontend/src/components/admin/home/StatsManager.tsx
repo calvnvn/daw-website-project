@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { useHome, type ImpactStats } from "@/contexts/HomeContext";
 import HomeLivePreview from "./HomeLivePreview";
 import { useAuth } from "@/contexts/AuthContext";
+import LockedStateTracker from "@/components/admin/LockedStateTracker";
 import {
   Save,
   Plus,
@@ -579,9 +580,9 @@ export default function StatsManager({
           // 🎨 Semantic Styling Engine
           let cardStyle = "bg-slate-50 border-slate-100";
           if (shouldLockThisRowUI) {
-            // Blue/Slate untuk Pending Update
+            // Blue/Slate untuk Pending Update — pointer-events handled per-child to not block LockedStateTracker
             cardStyle =
-              "opacity-60 bg-blue-50/50 border-blue-100 pointer-events-none select-none";
+              "opacity-60 bg-blue-50/50 border-blue-100";
           } else if (isOverrideThisRow) {
             // Amber untuk Admin Override
             cardStyle =
@@ -596,215 +597,216 @@ export default function StatsManager({
           }
 
           return (
-            <div
-              key={stat.id}
-              draggable={isEditing && !shouldLockThisRowUI}
-              onDragStart={() => handleDragStart(index)}
-              onDragOver={handleDragOver}
-              onDrop={() => handleDrop(index)}
-              onDragEnd={() => setDraggedIndex(null)}
-              className={`flex gap-4 items-start p-5 rounded-xl border transition-all duration-300 relative overflow-hidden ${cardStyle} ${isDragging ? "opacity-30 scale-95 border-daw-green border-dashed" : ""}`}>
-              {/* 1. REJECTION BANNER (Prioritas Tertinggi untuk Editor) */}
-              {rejectedDraft && !isSuperadmin && (
-                <div className="absolute top-0 left-0 right-0 bg-red-500 text-white text-[10px] font-bold px-3 py-1.5 flex justify-between items-center z-10 animate-in slide-in-from-top-2">
-                  <span className="flex items-center gap-1.5 uppercase tracking-tighter truncate max-w-[60%]">
-                    <AlertTriangle className="w-3 h-3 shrink-0" /> Revisi
-                    Ditolak: "{rejectedDraft.rejection_reason}"
-                  </span>
-                  <div className="flex gap-2">
-                    <button
-                      onClick={() => handleRestoreDraft(stat.id)}
-                      className="bg-white/20 hover:bg-white/30 px-2 py-0.5 rounded transition-colors pointer-events-auto">
-                      <RotateCcw className="w-3 h-3 inline mr-1" /> Pulihkan
-                    </button>
-                    {/* Ghost Cleanup Button */}
-                    <button
-                      onClick={() => handleDiscardDraft(stat.id)}
-                      className="text-white/80 hover:text-white px-1 py-0.5 rounded transition-colors pointer-events-auto"
-                      title="Abaikan Notifikasi">
-                      <XCircle className="w-4 h-4" />
-                    </button>
-                  </div>
-                </div>
-              )}
-
-              {/* 2. OVERRIDE BANNER (Khusus Admin) */}
-              {isOverrideThisRow && (
-                <div className="absolute top-0 left-0 right-0 bg-amber-100 border-b border-amber-200 text-amber-800 text-[10px] font-bold px-3 py-1 flex items-center justify-center gap-1.5 z-10 uppercase tracking-widest">
-                  <Icons.ShieldAlert className="w-3 h-3 text-amber-600" /> Mode
-                  Override: Sedang Ditinjau Editor
-                </div>
-              )}
-
-              {/* 3. PENDING BANNER (Birokrasi Mengunci Editor) */}
-              {shouldLockThisRowUI && !rejectedDraft && (
-                <div className="absolute top-0 left-0 right-0 bg-blue-100 border-b border-blue-200 text-blue-700 text-[10px] font-bold px-3 py-1 flex items-center justify-center gap-1.5 z-10 uppercase tracking-widest">
-                  <Lock className="w-3 h-3" /> Akses Dibatasi (Menunggu
-                  Persetujuan)
-                </div>
-              )}
-
-              {/* CONTENT AREA */}
+            <LockedStateTracker key={stat.id} isLocked={shouldLockThisRowUI} lockTicket={stat.lock_ticket || null}>
               <div
-                className={`flex w-full gap-4 mt-${rejectedDraft || isLocked || isOverrideThisRow ? "6" : "0"} transition-all`}>
-                {/* Orders Control (Drag Handles) */}
-                {isEditing && (
-                  <div
-                    className={`flex flex-col items-center gap-1 pr-2 border-r border-slate-100 pt-1 shrink-0 ${shouldLockThisRowUI ? "opacity-20" : ""}`}>
-                    <button
-                      onClick={() =>
-                        !shouldLockThisRowUI &&
-                        index > 0 &&
-                        reorderStats(index, index - 1)
-                      }
-                      disabled={index === 0 || shouldLockThisRowUI}
-                      className="p-1 hover:bg-slate-100 rounded disabled:opacity-10 pointer-events-auto">
-                      <Icons.ChevronUp className="w-4 h-4 text-slate-500" />
-                    </button>
-                    <Icons.GripVertical className="w-4 h-4 text-slate-300 cursor-grab" />
-                    <button
-                      onClick={() =>
-                        !shouldLockThisRowUI &&
-                        index < stats.length - 1 &&
-                        reorderStats(index, index + 1)
-                      }
-                      disabled={
-                        index === stats.length - 1 || shouldLockThisRowUI
-                      }
-                      className="p-1 hover:bg-slate-100 rounded disabled:opacity-10 pointer-events-auto">
-                      <Icons.ChevronDown className="w-4 h-4 text-slate-500" />
-                    </button>
+                draggable={isEditing && !shouldLockThisRowUI}
+                onDragStart={() => handleDragStart(index)}
+                onDragOver={handleDragOver}
+                onDrop={() => handleDrop(index)}
+                onDragEnd={() => setDraggedIndex(null)}
+                className={`flex gap-4 items-start p-5 rounded-xl border transition-all duration-300 relative overflow-hidden ${cardStyle} ${isDragging ? "opacity-30 scale-95 border-daw-green border-dashed" : ""} ${shouldLockThisRowUI ? "pointer-events-none select-none" : ""}`}>
+                {/* 1. REJECTION BANNER (Prioritas Tertinggi untuk Editor) */}
+                {rejectedDraft && !isSuperadmin && (
+                  <div className="absolute top-0 left-0 right-0 bg-red-500 text-white text-[10px] font-bold px-3 py-1.5 flex justify-between items-center z-10 animate-in slide-in-from-top-2">
+                    <span className="flex items-center gap-1.5 uppercase tracking-tighter truncate max-w-[60%]">
+                      <AlertTriangle className="w-3 h-3 shrink-0" /> Revisi
+                      Ditolak: "{rejectedDraft.rejection_reason}"
+                    </span>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => handleRestoreDraft(stat.id)}
+                        className="bg-white/20 hover:bg-white/30 px-2 py-0.5 rounded transition-colors pointer-events-auto">
+                        <RotateCcw className="w-3 h-3 inline mr-1" /> Pulihkan
+                      </button>
+                      {/* Ghost Cleanup Button */}
+                      <button
+                        onClick={() => handleDiscardDraft(stat.id)}
+                        className="text-white/80 hover:text-white px-1 py-0.5 rounded transition-colors pointer-events-auto"
+                        title="Abaikan Notifikasi">
+                        <XCircle className="w-4 h-4" />
+                      </button>
+                    </div>
                   </div>
                 )}
 
-                {/* ICON AREA */}
-                <div className="w-16 shrink-0">
-                  <label className="block text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-1 text-center">
-                    Icon
-                  </label>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (isEditing && !shouldLockThisRowUI) {
-                        setActivePickerStatId(stat.id);
-                        setIconSearchQuery("");
-                        setIsIconPickerOpen(true);
-                      }
-                    }}
-                    disabled={!isEditing || shouldLockThisRowUI}
-                    className={`w-full aspect-square rounded-lg border flex flex-col items-center justify-center transition-all relative ${
-                      isOverrideThisRow
-                        ? "bg-amber-50 border-amber-200 text-amber-600"
-                        : isEditing && !shouldLockThisRowUI
-                          ? "bg-white border-slate-200 text-daw-green hover:border-daw-green hover:shadow-md cursor-pointer group"
-                          : "bg-slate-50 border-slate-200 text-slate-400 cursor-not-allowed"
-                    }`}
-                    title={
-                      isEditing && !shouldLockThisRowUI ? "Ganti Ikon" : ""
-                    }>
-                    <IconComponent className="w-7 h-7 stroke-[1.5px] group-hover:scale-110 transition-transform" />
-                    {isEditing && !shouldLockThisRowUI && (
-                      <span className="absolute bottom-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                        <Icons.Edit2 className="w-3 h-3 text-daw-green" />
-                      </span>
-                    )}
-                  </button>
-                </div>
+                {/* 2. OVERRIDE BANNER (Khusus Admin) */}
+                {isOverrideThisRow && (
+                  <div className="absolute top-0 left-0 right-0 bg-amber-100 border-b border-amber-200 text-amber-800 text-[10px] font-bold px-3 py-1 flex items-center justify-center gap-1.5 z-10 uppercase tracking-widest">
+                    <Icons.ShieldAlert className="w-3 h-3 text-amber-600" /> Mode
+                    Override: Sedang Ditinjau Editor
+                  </div>
+                )}
 
-                {/* DETAILS AREA */}
-                <div className="flex-1 space-y-3">
-                  <div className="flex justify-between items-center">
-                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
-                      Statistic #{index + 1}
-                      {typeof stat.id === "string" &&
-                        stat.id.startsWith("new-") && (
-                          <span className="ml-2 text-daw-green italic">
-                            (New)
-                          </span>
-                        )}
-                    </span>
+                {/* 3. PENDING BANNER (Birokrasi Mengunci Editor) */}
+                {shouldLockThisRowUI && !rejectedDraft && (
+                  <div className="absolute top-0 left-0 right-0 bg-blue-100 border-b border-blue-200 text-blue-700 text-[10px] font-bold px-3 py-1 flex items-center justify-center gap-1.5 z-10 uppercase tracking-widest">
+                    <Lock className="w-3 h-3" /> Akses Dibatasi (Menunggu
+                    Persetujuan)
+                  </div>
+                )}
 
-                    {/* Delete Button (Hanya jika tidak terkunci atau Admin) */}
-                    {isEditing && !shouldLockThisRowUI && (
+                {/* CONTENT AREA */}
+                <div
+                  className={`flex w-full gap-4 mt-${rejectedDraft || isLocked || isOverrideThisRow ? "6" : "0"} transition-all`}>
+                  {/* Orders Control (Drag Handles) */}
+                  {isEditing && (
+                    <div
+                      className={`flex flex-col items-center gap-1 pr-2 border-r border-slate-100 pt-1 shrink-0 ${shouldLockThisRowUI ? "opacity-20" : ""}`}>
                       <button
-                        onClick={() => removeStat(stat.id)}
-                        className="text-slate-300 hover:text-red-500 transition-colors pointer-events-auto z-10 relative">
-                        <Trash2 className="w-4 h-4" />
+                        onClick={() =>
+                          !shouldLockThisRowUI &&
+                          index > 0 &&
+                          reorderStats(index, index - 1)
+                        }
+                        disabled={index === 0 || shouldLockThisRowUI}
+                        className="p-1 hover:bg-slate-100 rounded disabled:opacity-10 pointer-events-auto">
+                        <Icons.ChevronUp className="w-4 h-4 text-slate-500" />
                       </button>
-                    )}
+                      <Icons.GripVertical className="w-4 h-4 text-slate-300 cursor-grab" />
+                      <button
+                        onClick={() =>
+                          !shouldLockThisRowUI &&
+                          index < stats.length - 1 &&
+                          reorderStats(index, index + 1)
+                        }
+                        disabled={
+                          index === stats.length - 1 || shouldLockThisRowUI
+                        }
+                        className="p-1 hover:bg-slate-100 rounded disabled:opacity-10 pointer-events-auto">
+                        <Icons.ChevronDown className="w-4 h-4 text-slate-500" />
+                      </button>
+                    </div>
+                  )}
+
+                  {/* ICON AREA */}
+                  <div className="w-16 shrink-0">
+                    <label className="block text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-1 text-center">
+                      Icon
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (isEditing && !shouldLockThisRowUI) {
+                          setActivePickerStatId(stat.id);
+                          setIconSearchQuery("");
+                          setIsIconPickerOpen(true);
+                        }
+                      }}
+                      disabled={!isEditing || shouldLockThisRowUI}
+                      className={`w-full aspect-square rounded-lg border flex flex-col items-center justify-center transition-all relative ${
+                        isOverrideThisRow
+                          ? "bg-amber-50 border-amber-200 text-amber-600"
+                          : isEditing && !shouldLockThisRowUI
+                            ? "bg-white border-slate-200 text-daw-green hover:border-daw-green hover:shadow-md cursor-pointer group"
+                            : "bg-slate-50 border-slate-200 text-slate-400 cursor-not-allowed"
+                      }`}
+                      title={
+                        isEditing && !shouldLockThisRowUI ? "Ganti Ikon" : ""
+                      }>
+                      <IconComponent className="w-7 h-7 stroke-[1.5px] group-hover:scale-110 transition-transform" />
+                      {isEditing && !shouldLockThisRowUI && (
+                        <span className="absolute bottom-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                          <Icons.Edit2 className="w-3 h-3 text-daw-green" />
+                        </span>
+                      )}
+                    </button>
                   </div>
 
-                  <div>
-                    <label className="block text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-1">
-                      Value
-                    </label>
-                    <input
-                      type="text"
-                      value={stat.value || ""}
-                      disabled={!isEditing || shouldLockThisRowUI}
-                      onChange={(e) =>
-                        updateStatField(stat.id, "value", e.target.value)
-                      }
-                      className={`w-full px-3 py-1.5 text-sm font-bold rounded-md transition-all ${isEditing && !shouldLockThisRowUI ? "bg-white border border-slate-200 focus:ring-2 focus:ring-daw-green/10 outline-none" : "bg-transparent border-transparent"}`}
-                      placeholder="E.g., 500+"
-                    />
-                  </div>
+                  {/* DETAILS AREA */}
+                  <div className="flex-1 space-y-3">
+                    <div className="flex justify-between items-center">
+                      <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                        Statistic #{index + 1}
+                        {typeof stat.id === "string" &&
+                          stat.id.startsWith("new-") && (
+                            <span className="ml-2 text-daw-green italic">
+                              (New)
+                            </span>
+                          )}
+                      </span>
 
-                  <div>
-                    <label className="block text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-1">
-                      Label
-                    </label>
-                    <input
-                      type="text"
-                      value={stat.label || ""}
-                      disabled={!isEditing || shouldLockThisRowUI}
-                      onChange={(e) =>
-                        updateStatField(stat.id, "label", e.target.value)
-                      }
-                      className={`w-full px-3 py-1.5 text-xs font-bold uppercase tracking-wide rounded-md transition-all ${isEditing && !shouldLockThisRowUI ? "bg-white border border-slate-200 focus:ring-2 focus:ring-daw-green/10" : "bg-transparent border-transparent"}`}
-                      placeholder="E.g., Global Projects"
-                    />
-                    {isEditing && !shouldLockThisRowUI && (
-                      <div className="mt-2 pl-3 border-l-2 border-slate-100">
-                        <MagicTranslationField
-                          label="Label (Indonesia)"
-                          originalText={stat.label}
-                          value={stat.terjemahan_label || ""}
-                          onChange={(val) => updateStatField(stat.id, "terjemahan_label" as any, val)}
-                          disabled={!isEditing || shouldLockThisRowUI}
-                        />
-                      </div>
-                    )}
-                  </div>
-                  <div>
-                    <label className="block text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-1">
-                      Description
-                    </label>
-                    <input
-                      type="text"
-                      value={stat.desc || ""}
-                      disabled={!isEditing || shouldLockThisRowUI}
-                      onChange={(e) =>
-                        updateStatField(stat.id, "desc", e.target.value)
-                      }
-                      className={`w-full px-3 py-1.5 text-[11px] rounded-md transition-all ${isEditing && !shouldLockThisRowUI ? "bg-white border border-slate-200 focus:ring-2 focus:ring-daw-green/10" : "bg-transparent border-transparent"}`}
-                      placeholder="Short description here..."
-                    />
-                    {isEditing && !shouldLockThisRowUI && (
-                      <div className="mt-2 pl-3 border-l-2 border-slate-100">
-                        <MagicTranslationField
-                          label="Description (Indonesia)"
-                          originalText={stat.desc}
-                          value={stat.terjemahan_desc || ""}
-                          onChange={(val) => updateStatField(stat.id, "terjemahan_desc" as any, val)}
-                          disabled={!isEditing || shouldLockThisRowUI}
-                        />
-                      </div>
-                    )}
+                      {/* Delete Button (Hanya jika tidak terkunci atau Admin) */}
+                      {isEditing && !shouldLockThisRowUI && (
+                        <button
+                          onClick={() => removeStat(stat.id)}
+                          className="text-slate-300 hover:text-red-500 transition-colors pointer-events-auto z-10 relative">
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      )}
+                    </div>
+
+                    <div>
+                      <label className="block text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-1">
+                        Value
+                      </label>
+                      <input
+                        type="text"
+                        value={stat.value || ""}
+                        disabled={!isEditing || shouldLockThisRowUI}
+                        onChange={(e) =>
+                          updateStatField(stat.id, "value", e.target.value)
+                        }
+                        className={`w-full px-3 py-1.5 text-sm font-bold rounded-md transition-all ${isEditing && !shouldLockThisRowUI ? "bg-white border border-slate-200 focus:ring-2 focus:ring-daw-green/10 outline-none" : "bg-transparent border-transparent"}`}
+                        placeholder="E.g., 500+"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-1">
+                        Label
+                      </label>
+                      <input
+                        type="text"
+                        value={stat.label || ""}
+                        disabled={!isEditing || shouldLockThisRowUI}
+                        onChange={(e) =>
+                          updateStatField(stat.id, "label", e.target.value)
+                        }
+                        className={`w-full px-3 py-1.5 text-xs font-bold uppercase tracking-wide rounded-md transition-all ${isEditing && !shouldLockThisRowUI ? "bg-white border border-slate-200 focus:ring-2 focus:ring-daw-green/10" : "bg-transparent border-transparent"}`}
+                        placeholder="E.g., Global Projects"
+                      />
+                      {isEditing && !shouldLockThisRowUI && (
+                        <div className="mt-2 pl-3 border-l-2 border-slate-100">
+                          <MagicTranslationField
+                            label="Label (Indonesia)"
+                            originalText={stat.label}
+                            value={stat.terjemahan_label || ""}
+                            onChange={(val) => updateStatField(stat.id, "terjemahan_label" as any, val)}
+                            disabled={!isEditing || shouldLockThisRowUI}
+                          />
+                        </div>
+                      )}
+                    </div>
+                    <div>
+                      <label className="block text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-1">
+                        Description
+                      </label>
+                      <input
+                        type="text"
+                        value={stat.desc || ""}
+                        disabled={!isEditing || shouldLockThisRowUI}
+                        onChange={(e) =>
+                          updateStatField(stat.id, "desc", e.target.value)
+                        }
+                        className={`w-full px-3 py-1.5 text-[11px] rounded-md transition-all ${isEditing && !shouldLockThisRowUI ? "bg-white border border-slate-200 focus:ring-2 focus:ring-daw-green/10" : "bg-transparent border-transparent"}`}
+                        placeholder="Short description here..."
+                      />
+                      {isEditing && !shouldLockThisRowUI && (
+                        <div className="mt-2 pl-3 border-l-2 border-slate-100">
+                          <MagicTranslationField
+                            label="Description (Indonesia)"
+                            originalText={stat.desc}
+                            value={stat.terjemahan_desc || ""}
+                            onChange={(val) => updateStatField(stat.id, "terjemahan_desc" as any, val)}
+                            disabled={!isEditing || shouldLockThisRowUI}
+                          />
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </div>
               </div>
-            </div>
+            </LockedStateTracker>
           );
         })}
 

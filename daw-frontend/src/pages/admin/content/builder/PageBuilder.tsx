@@ -34,6 +34,7 @@ import { getErrorMessage } from "@/lib/utils";
 import ImageAdjustmentModal from "@/components/admin/ImageAdjustmentModal";
 import MagicTranslationField from "@/components/admin/MagicTranslationField";
 import { HelpTooltip } from "@/components/ui/HelpTooltip";
+import LockedStateTracker from "@/components/admin/LockedStateTracker";
 
 interface Page {
   id: string;
@@ -940,7 +941,7 @@ export default function PageBuilder() {
                   className={`bg-white rounded-2xl border transition-all duration-500 shadow-sm overflow-hidden
                     ${activeItemLocked && !isSuperadmin ? "border-blue-200" : activeItemLocked && isSuperadmin ? "border-amber-200" : "border-slate-200"}`}>
                   {/* THE COMMAND CENTER (Banners Hierarchy) */}
-                  {(activeItemLocked || rejectedDraft) && (
+                  {((activeItemLocked && isSuperadmin) || rejectedDraft) && (
                     <div className="px-8 pt-6 pb-0 space-y-4">
                       {/* 1. SOVEREIGN OVERRIDE BANNER (Amber - Untuk Admin) */}
                       {activeItemLocked && isSuperadmin && (
@@ -958,26 +959,6 @@ export default function PageBuilder() {
                               Admin, Anda dapat mengabaikan birokrasi dan
                               memublikasikan perubahan secara langsung
                               (Override).
-                            </p>
-                          </div>
-                        </div>
-                      )}
-
-                      {/* 2. LOCKED UI BANNER (Biru - Untuk Editor) */}
-                      {activeItemLocked && !isSuperadmin && (
-                        <div className="flex items-start gap-3 p-4 bg-blue-50 border border-blue-200 rounded-2xl animate-in fade-in shadow-sm">
-                          <div className="p-2 bg-blue-100 text-blue-600 rounded-xl shrink-0">
-                            <Lock className="w-5 h-5 animate-pulse" />
-                          </div>
-                          <div>
-                            <h4 className="text-sm font-bold text-blue-900">
-                              Mode Baca (Read-Only)
-                            </h4>
-                            <p className="text-xs text-blue-700 mt-1 leading-relaxed">
-                              Halaman ini sedang dikunci karena dalam proses
-                              peninjauan (Tiket:{" "}
-                              <strong>{activeLockTicket}</strong>
-                              ).
                             </p>
                           </div>
                         </div>
@@ -1024,6 +1005,9 @@ export default function PageBuilder() {
                       )}
                     </div>
                   )}
+
+                  <LockedStateTracker isLocked={!!(activeItemLocked && !isSuperadmin)} lockTicket={activeLockTicket}>
+
 
                   {/* DYNAMIC WORKSPACE CONTENT */}
                   <div className="p-8 space-y-10">
@@ -1531,7 +1515,8 @@ export default function PageBuilder() {
                         disabled={activeItemLocked && !isSuperadmin}
                       />
                     </div>
-                  </div>
+                    </div>
+                  </LockedStateTracker>
                 </form>
               </div>
             )}

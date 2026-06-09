@@ -37,6 +37,7 @@ exports.getAllManagements = async (req, res) => {
 exports.createManagement = async (req, res) => {
   try {
     const result = await managementService.createManagement({
+      req, res,
       userRole: getRole(req),
       body: req.body,
       file: req.file,
@@ -44,13 +45,7 @@ exports.createManagement = async (req, res) => {
       owlToken: getToken(req),
     });
 
-    if (result.isDraft) {
-      return res.status(202).json({
-        success: true,
-        message: "Permintaan tambah anggota direksi/manajemen dikirim.",
-        ticket: result.ticket,
-      });
-    }
+    if (res.headersSent) return;
 
     res.status(201).json({ success: true, message: "Anggota berhasil ditambahkan secara live!", data: result.data });
   } catch (error) {
@@ -61,6 +56,7 @@ exports.createManagement = async (req, res) => {
 exports.updateManagement = async (req, res) => {
   try {
     const result = await managementService.updateManagement({
+      req, res,
       id: req.params.id,
       userRole: getRole(req),
       body: req.body,
@@ -69,13 +65,7 @@ exports.updateManagement = async (req, res) => {
       owlToken: getToken(req),
     });
 
-    if (result.isDraft) {
-      return res.status(202).json({
-        success: true,
-        message: "Draf revisi manajemen dikirim.",
-        ticket: result.ticket,
-      });
-    }
+    if (res.headersSent) return;
 
     res.status(200).json({ success: true, message: "Data manajemen berhasil diperbarui!" });
   } catch (error) {
@@ -86,19 +76,14 @@ exports.updateManagement = async (req, res) => {
 exports.deleteManagement = async (req, res) => {
   try {
     const result = await managementService.deleteManagement({
+      req, res,
       id: req.params.id,
       userRole: getRole(req),
       actorId: getActorId(req),
       owlToken: getToken(req),
     });
 
-    if (result.isDraft) {
-      return res.status(202).json({
-        success: true,
-        message: "Permintaan hapus dikirim. Data dikunci.",
-        ticket: result.ticket,
-      });
-    }
+    if (res.headersSent) return;
 
     res.status(200).json({ success: true, message: "Data berhasil dihapus secara permanen." });
   } catch (error) {

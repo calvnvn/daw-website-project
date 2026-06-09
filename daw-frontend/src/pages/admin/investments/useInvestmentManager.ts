@@ -615,6 +615,7 @@ export function useInvestmentManager() {
     // Lock states
     isSettingsLockedForEditor,
     isSettingsOverrideMode,
+    settingsLockTicket: settings?.lock_ticket || null,
     currentLockState,
     lockStyles,
 

@@ -1,3 +1,4 @@
+// ManagementTab v2.1 — showProgressBtn fix + LockedStateTracker integration
 import React, { useState, useRef, useMemo } from "react";
 import {
   Lock,
@@ -20,6 +21,7 @@ import AboutLivePreview from "@/components/admin/about/AboutLivePreview";
 import { getErrorMessage } from "@/lib/utils";
 import ImageAdjustmentModal from "@/components/admin/ImageAdjustmentModal";
 import MagicTranslationField from "@/components/admin/MagicTranslationField";
+import LockedStateTracker from "@/components/admin/LockedStateTracker";
 
 interface ManagementTabProps {
   isEditing: boolean;
@@ -40,6 +42,7 @@ export default function ManagementTab({
   const [isPersonModalOpen, setIsPersonModalOpen] = useState(false);
   const [editingPersonId, setEditingPersonId] = useState<number | null>(null);
   const [isLoadingDraft, setIsLoadingDraft] = useState(false);
+  const [isProgressMode, setIsProgressMode] = useState(false);
 
   // THE DRAFT & SYSTEM STATES
   const [isSaving, setIsSaving] = useState(false);
@@ -67,13 +70,10 @@ export default function ManagementTab({
   const [currentCropFile, setCurrentCropFile] = useState<File | null>(null);
 
   const openPersonModal = async (person: ManagementMember | null = null) => {
-    if (person?.is_locked && !person?.hasRejected && !isSuperadmin) {
-      return toast.warning("Akses Dibatasi", {
-        description: "Data profil ini sedang ditinjau dan tidak dapat diubah.",
-      });
-    }
-
     let draftData = null;
+    // Tentukan apakah ini mode "lihat progress" (locked tapi tidak rejected)
+    const isLockedPendingItem = !!(person?.is_locked && !person?.hasRejected && !isSuperadmin);
+    setIsProgressMode(isLockedPendingItem);
 
     if (person?.hasRejected && isEditor) {
       setIsLoadingDraft(true); // Tahan UI modal
@@ -414,17 +414,22 @@ export default function ManagementTab({
             {managementTeam.map((person) => {
               const isRowLocked =
                 person.is_locked && !person.hasRejected && !isSuperadmin;
-              const lockStyles =
-                "opacity-60 grayscale-[30%] bg-slate-50 pointer-events-none select-none";
+              // Show progress button for ALL locked items (regardless of rejection state) when not superadmin
+              const showProgressBtn = person.is_locked && !isSuperadmin;
+              const lockStyles = "opacity-60 grayscale-[30%] bg-slate-50";
 
               return (
                 <tr
                   key={person.id}
-                  className={`transition-colors ${isRowLocked ? lockStyles : "hover:bg-slate-50/50"}`}>
-                  <td className="px-6 py-4">
+                  className={`transition-colors ${
+                    isRowLocked
+                      ? lockStyles
+                      : "hover:bg-slate-50/50"
+                  }`}>
+                  <td className={`px-6 py-4 ${isRowLocked ? "pointer-events-none select-none" : ""}`}>
                     <ManagementImage src={person.photoUrl} alt={person.name} />
                   </td>
-                  <td className="px-6 py-4">
+                  <td className={`px-6 py-4 ${isRowLocked ? "pointer-events-none select-none" : ""}`}>
                     <div className="flex items-center gap-2">
                       <p className="text-sm font-bold text-slate-900">
                         {person.name}
@@ -438,16 +443,19 @@ export default function ManagementTab({
                     </div>
                     <p className="text-xs text-slate-500">{person.role}</p>
                   </td>
-                  <td className="px-6 py-4">
+                  <td className={`px-6 py-4 ${isRowLocked ? "pointer-events-none select-none" : ""}`}>
                     <span className="inline-flex items-center px-2 py-1 rounded text-[10px] font-bold uppercase tracking-wider bg-slate-200 text-slate-700">
                       {person.level} ({person.order})
                     </span>
                   </td>
                   <td className="px-6 py-4 text-right">
-                    {isRowLocked ? (
-                      <span className="inline-flex items-center gap-1 text-[10px] font-bold text-blue-600 bg-blue-50 px-2.5 py-1 rounded-md border border-blue-100 uppercase tracking-widest">
-                        <Lock className="w-3 h-3" /> Terkunci
-                      </span>
+                    {showProgressBtn ? (
+                      <button
+                        onClick={() => openPersonModal(person)}
+                        className="inline-flex items-center gap-1 text-[10px] font-bold text-blue-600 bg-blue-50 px-2.5 py-1 rounded-md border border-blue-100 uppercase tracking-widest hover:bg-blue-100 transition-colors"
+                        title="Lihat Progres Persetujuan">
+                        <Lock className="w-3 h-3" /> Progress
+                      </button>
                     ) : isEditing ? (
                       <div className="flex items-center justify-end gap-2">
                         <button
@@ -502,12 +510,16 @@ export default function ManagementTab({
             {/* MODAL HEADER */}
             <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50 shrink-0">
               <h3 className="font-bold text-lg text-slate-900 flex items-center gap-2">
-                {editingPersonId ? (
+                {editingPersonId && isProgressMode ? (
+                  <Lock className="w-5 h-5 text-blue-600" />
+                ) : editingPersonId ? (
                   <Edit className="w-5 h-5 text-daw-green" />
                 ) : (
                   <Plus className="w-5 h-5 text-daw-green" />
                 )}
-                {editingPersonId
+                {editingPersonId && isProgressMode
+                  ? "Progres Persetujuan"
+                  : editingPersonId
                   ? "Edit Profil Kepemimpinan"
                   : "Tambah Anggota Baru"}
               </h3>
@@ -556,6 +568,10 @@ export default function ManagementTab({
 
             {/* MODAL FORM (Scrollable area) */}
             <div className="overflow-y-auto p-6">
+              <LockedStateTracker 
+                isLocked={!!(editingPersonId && managementTeam.find(p => p.id === editingPersonId)?.is_locked && !managementTeam.find(p => p.id === editingPersonId)?.hasRejected && !isSuperadmin)} 
+                lockTicket={editingPersonId ? managementTeam.find(p => p.id === editingPersonId)?.lock_ticket || null : null}
+              >
               <form
                 id="management-form"
                 onSubmit={savePerson}
@@ -737,6 +753,7 @@ export default function ManagementTab({
                   </>
                 )}
               </form>
+              </LockedStateTracker>
             </div>
 
             {/* MODAL FOOTER */}
@@ -751,7 +768,7 @@ export default function ManagementTab({
                 <button
                   form="management-form"
                   type="submit"
-                  disabled={isSaving || !hasDataChanged}
+                  disabled={isSaving || !hasDataChanged || !!(editingPersonId && managementTeam.find(p => p.id === editingPersonId)?.is_locked && !managementTeam.find(p => p.id === editingPersonId)?.hasRejected && !isSuperadmin)}
                   className={`flex items-center justify-center gap-2 px-6 py-2.5 rounded-xl font-black text-[11px] uppercase tracking-widest transition-all shadow-lg active:scale-95 disabled:cursor-not-allowed disabled:shadow-none ${
                     isSaving
                       ? "bg-slate-300 text-slate-700"

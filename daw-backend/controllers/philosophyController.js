@@ -22,6 +22,7 @@ exports.updatePhilosophy = async (req, res) => {
     const owlToken = req.headers["authorization"]?.split(" ")[1] || req.owl_token;
 
     const result = await philosophyService.updatePhilosophy({
+      req, res,
       body: req.body,
       userRole: req.userRole,
       actorId,
@@ -29,9 +30,7 @@ exports.updatePhilosophy = async (req, res) => {
       owlToken,
     });
 
-    if (result.isDraft) {
-      return res.status(202).json({ success: true, ticket: result.ticket });
-    }
+    if (res.headersSent) return;
 
     res.status(200).json({ success: true, message: result.message });
   } catch (error) {

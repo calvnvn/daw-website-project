@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { useHome } from "@/contexts/HomeContext";
 import HomeLivePreview from "./HomeLivePreview";
 import { useAuth } from "@/contexts/AuthContext";
+import LockedStateTracker from "@/components/admin/LockedStateTracker";
 import {
   Save,
   Lock,
@@ -481,69 +482,71 @@ export default function IntroManager({
       </div>
 
       {/* --- FORM AREA (Aggressive Visual Lockdown) --- */}
-      <div
-        className={`bg-slate-50 p-6 rounded-xl border border-slate-200 transition-all duration-500 ${lockStyles}`}>
-        <div className="space-y-5">
-          <div>
-            <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-2">
-              Main Headline
-            </label>
-            <input
-              type="text"
-              value={settings.introHeadline}
-              disabled={isFormLocked}
-              onChange={(e) =>
-                setSettings({ ...settings, introHeadline: e.target.value })
-              }
-              className={`w-full px-4 py-3 rounded-lg font-serif text-2xl transition-all ${
-                isEditing && !isFormLocked
-                  ? "bg-white border border-slate-300 focus:ring-2 focus:ring-daw-green/20 shadow-sm"
-                  : "bg-slate-100/50 border-transparent text-slate-500 cursor-not-allowed"
-              }`}
-            />
-            {isEditing && !isFormLocked && (
-              <div className="mt-3 pl-4 border-l-2 border-slate-200">
-                <MagicTranslationField
-                  label="Headline (Indonesia)"
-                  originalText={settings.introHeadline}
-                  value={settings.terjemahan_introHeadline}
-                  onChange={(val) => setSettings({ ...settings, terjemahan_introHeadline: val })}
-                  disabled={isFormLocked}
-                />
-              </div>
-            )}
-          </div>
-          <div>
-            <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-2">
-              Body Content
-            </label>
-            <textarea
-              rows={5}
-              value={settings.introBody}
-              disabled={isFormLocked}
-              onChange={(e) =>
-                setSettings({ ...settings, introBody: e.target.value })
-              }
-              className={`w-full px-4 py-3 rounded-lg text-base transition-all resize-none ${
-                isEditing && !isFormLocked
-                  ? "bg-white border border-slate-300 focus:ring-2 focus:ring-daw-green/20 shadow-sm"
-                  : "bg-slate-100/50 border-transparent text-slate-500 cursor-not-allowed"
-              }`}
-            />
-            {isEditing && !isFormLocked && (
-              <div className="mt-3 pl-4 border-l-2 border-slate-200">
-                <MagicTranslationField
-                  label="Body (Indonesia)"
-                  originalText={settings.introBody}
-                  value={settings.terjemahan_introBody}
-                  onChange={(val) => setSettings({ ...settings, terjemahan_introBody: val })}
-                  disabled={isFormLocked}
-                />
-              </div>
-            )}
+      <LockedStateTracker isLocked={shouldLockUI} lockTicket={initialSettings?.lock_ticket || null}>
+        <div
+          className={`bg-slate-50 p-6 rounded-xl border border-slate-200 transition-all duration-500 ${lockStyles}`}>
+          <div className="space-y-5">
+            <div>
+              <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-2">
+                Main Headline
+              </label>
+              <input
+                type="text"
+                value={settings.introHeadline}
+                disabled={isFormLocked}
+                onChange={(e) =>
+                  setSettings({ ...settings, introHeadline: e.target.value })
+                }
+                className={`w-full px-4 py-3 rounded-lg font-serif text-2xl transition-all ${
+                  isEditing && !isFormLocked
+                    ? "bg-white border border-slate-300 focus:ring-2 focus:ring-daw-green/20 shadow-sm"
+                    : "bg-slate-100/50 border-transparent text-slate-500 cursor-not-allowed"
+                }`}
+              />
+              {isEditing && !isFormLocked && (
+                <div className="mt-3 pl-4 border-l-2 border-slate-200">
+                  <MagicTranslationField
+                    label="Headline (Indonesia)"
+                    originalText={settings.introHeadline}
+                    value={settings.terjemahan_introHeadline}
+                    onChange={(val) => setSettings({ ...settings, terjemahan_introHeadline: val })}
+                    disabled={isFormLocked}
+                  />
+                </div>
+              )}
+            </div>
+            <div>
+              <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-2">
+                Body Content
+              </label>
+              <textarea
+                rows={5}
+                value={settings.introBody}
+                disabled={isFormLocked}
+                onChange={(e) =>
+                  setSettings({ ...settings, introBody: e.target.value })
+                }
+                className={`w-full px-4 py-3 rounded-lg text-base transition-all resize-none ${
+                  isEditing && !isFormLocked
+                    ? "bg-white border border-slate-300 focus:ring-2 focus:ring-daw-green/20 shadow-sm"
+                    : "bg-slate-100/50 border-transparent text-slate-500 cursor-not-allowed"
+                }`}
+              />
+              {isEditing && !isFormLocked && (
+                <div className="mt-3 pl-4 border-l-2 border-slate-200">
+                  <MagicTranslationField
+                    label="Body (Indonesia)"
+                    originalText={settings.introBody}
+                    value={settings.terjemahan_introBody}
+                    onChange={(val) => setSettings({ ...settings, terjemahan_introBody: val })}
+                    disabled={isFormLocked}
+                  />
+                </div>
+              )}
+            </div>
           </div>
         </div>
-      </div>
+      </LockedStateTracker>
     </div>
   );
 }

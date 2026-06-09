@@ -1,6 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
 import {
-  Lock,
   AlertTriangle,
   RotateCcw,
   Plus,
@@ -16,6 +15,7 @@ import { useAbout } from "@/contexts/AboutContext";
 import AboutLivePreview from "@/components/admin/about/AboutLivePreview";
 import { getErrorMessage } from "@/lib/utils";
 import MagicTranslationField from "@/components/admin/MagicTranslationField";
+import LockedStateTracker from "@/components/admin/LockedStateTracker";
 
 interface HistoryTabProps {
   isEditing: boolean;
@@ -306,11 +306,6 @@ export default function HistoryTab({
           </p>
         </div>
         <div className="flex items-center gap-3">
-          {isModuleLocked && (
-            <span className="flex items-center gap-1.5 text-[10px] font-black text-blue-600 bg-blue-50 px-3 py-1.5 rounded-full border border-blue-100 uppercase tracking-widest">
-              <Lock className="w-3.5 h-3.5" /> Akses Dibatasi
-            </span>
-          )}
           {isEditing && !isModuleLocked && (
             <button
               onClick={addHistory}
@@ -321,6 +316,7 @@ export default function HistoryTab({
         </div>
       </div>
 
+      <LockedStateTracker isLocked={isModuleLocked} lockTicket={companyHistory.find(h => h.is_locked)?.lock_ticket || null}>
       <div className="space-y-4">
         {historyItems.map((item) => {
           const isItemDisabled = !isEditing || isModuleLocked;
@@ -401,6 +397,7 @@ export default function HistoryTab({
           </span>
         </button>
       </div>
+      </LockedStateTracker>
     </div>
   );
 }

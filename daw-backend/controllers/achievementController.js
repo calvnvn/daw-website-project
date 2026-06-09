@@ -52,6 +52,7 @@ exports.createAchievement = async (req, res) => {
     const owlToken = req.headers["authorization"]?.split(" ")[1] || req.owl_token;
 
     const result = await achievementService.createAchievement({
+      req, res,
       body: req.body,
       file: req.file,
       userRole: req.userRole,
@@ -60,13 +61,7 @@ exports.createAchievement = async (req, res) => {
       owlToken,
     });
 
-    if (result.isDraft) {
-      return res.status(202).json({
-        success: true,
-        message: "Permintaan tambah penghargaan dikirim.",
-        ticket: result.ticket,
-      });
-    }
+    if (res.headersSent) return;
 
     res.status(201).json({
       success: true,
@@ -87,6 +82,7 @@ exports.updateAchievement = async (req, res) => {
     const owlToken = req.headers["authorization"]?.split(" ")[1] || req.owl_token;
 
     const result = await achievementService.updateAchievement({
+      req, res,
       id: req.params.id,
       body: req.body,
       file: req.file,
@@ -96,13 +92,7 @@ exports.updateAchievement = async (req, res) => {
       owlToken,
     });
 
-    if (result.isDraft) {
-      return res.status(202).json({
-        success: true,
-        message: "Draf revisi penghargaan dikirim.",
-        ticket: result.ticket,
-      });
-    }
+    if (res.headersSent) return;
 
     res.status(200).json({
       success: true,
@@ -123,6 +113,7 @@ exports.deleteAchievement = async (req, res) => {
     const owlToken = req.headers["authorization"]?.split(" ")[1] || req.owl_token;
 
     const result = await achievementService.deleteAchievement({
+      req, res,
       id: req.params.id,
       userRole: req.userRole,
       actorId,
@@ -130,13 +121,7 @@ exports.deleteAchievement = async (req, res) => {
       owlToken,
     });
 
-    if (result.isDraft) {
-      return res.status(202).json({
-        success: true,
-        message: "Permintaan hapus dikirim. Data dikunci.",
-        ticket: result.ticket,
-      });
-    }
+    if (res.headersSent) return;
 
     res.status(200).json({
       success: true,

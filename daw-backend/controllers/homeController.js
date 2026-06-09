@@ -52,19 +52,14 @@ exports.getAdminHomepageData = async (req, res) => {
 exports.updateSettings = async (req, res) => {
   try {
     const result = await homeService.updateSettings({
+      req, res,
       userRole: getRole(req),
       body: req.body,
       actorId: getActorId(req),
       owlToken: getToken(req),
     });
 
-    if (result.isDraft) {
-      return res.status(202).json({
-        success: true,
-        message: "Revisi sambutan beranda diajukan ke ERP OWL.",
-        ticket: result.ticket,
-      });
-    }
+    if (res.headersSent) return;
 
     res.status(200).json({
       success: true,
@@ -78,6 +73,7 @@ exports.updateSettings = async (req, res) => {
 exports.createHeroSlide = async (req, res) => {
   try {
     const result = await homeService.createHeroSlide({
+      req, res,
       userRole: getRole(req),
       body: req.body,
       file: req.file,
@@ -85,13 +81,7 @@ exports.createHeroSlide = async (req, res) => {
       owlToken: getToken(req),
     });
 
-    if (result.isDraft) {
-      return res.status(202).json({
-        success: true,
-        message: "Permintaan slide baru diajukan.",
-        ticket: result.ticket,
-      });
-    }
+    if (res.headersSent) return;
 
     res.status(201).json({ success: true, message: "Slide created live", data: result.data });
   } catch (error) {
@@ -102,6 +92,7 @@ exports.createHeroSlide = async (req, res) => {
 exports.updateHeroSlide = async (req, res) => {
   try {
     const result = await homeService.updateHeroSlide({
+      req, res,
       id: req.params.id,
       userRole: getRole(req),
       body: req.body,
@@ -110,13 +101,7 @@ exports.updateHeroSlide = async (req, res) => {
       owlToken: getToken(req),
     });
 
-    if (result.isDraft) {
-      return res.status(202).json({
-        success: true,
-        message: "Revisi slide berhasil diajukan ke ERP OWL.",
-        ticket: result.ticket,
-      });
-    }
+    if (res.headersSent) return;
 
     res.status(200).json({ success: true, message: "Slide updated live!", data: result.data });
   } catch (error) {
@@ -127,19 +112,14 @@ exports.updateHeroSlide = async (req, res) => {
 exports.deleteHeroSlide = async (req, res) => {
   try {
     const result = await homeService.deleteHeroSlide({
+      req, res,
       id: req.params.id,
       userRole: getRole(req),
       actorId: getActorId(req),
       owlToken: getToken(req),
     });
 
-    if (result.isDraft) {
-      return res.status(202).json({
-        success: true,
-        message: "Permintaan hapus slide diajukan. Data dikunci sementara.",
-        ticket: result.ticket,
-      });
-    }
+    if (res.headersSent) return;
 
     res.status(200).json({ success: true, message: "Slide deleted live!" });
   } catch (error) {
@@ -150,19 +130,14 @@ exports.deleteHeroSlide = async (req, res) => {
 exports.createStat = async (req, res) => {
   try {
     const result = await homeService.createStat({
+      req, res,
       userRole: getRole(req),
       body: req.body,
       actorId: getActorId(req),
       owlToken: getToken(req),
     });
 
-    if (result.isDraft) {
-      return res.status(202).json({
-        success: true,
-        message: "Permintaan statistik diajukan.",
-        ticket: result.ticket,
-      });
-    }
+    if (res.headersSent) return;
 
     res.status(201).json({ success: true, message: "Stat created live", data: result.data });
   } catch (error) {
@@ -173,6 +148,7 @@ exports.createStat = async (req, res) => {
 exports.updateStat = async (req, res) => {
   try {
     const result = await homeService.updateStat({
+      req, res,
       id: req.params.id,
       userRole: getRole(req),
       body: req.body,
@@ -180,13 +156,7 @@ exports.updateStat = async (req, res) => {
       owlToken: getToken(req),
     });
 
-    if (result.isDraft) {
-      return res.status(202).json({
-        success: true,
-        message: "Revisi statistik diajukan.",
-        ticket: result.ticket,
-      });
-    }
+    if (res.headersSent) return;
 
     res.status(200).json({ success: true, message: "Statistik updated live!", data: result.data });
   } catch (error) {
@@ -197,19 +167,14 @@ exports.updateStat = async (req, res) => {
 exports.deleteStat = async (req, res) => {
   try {
     const result = await homeService.deleteStat({
+      req, res,
       id: req.params.id,
       userRole: getRole(req),
       actorId: getActorId(req),
       owlToken: getToken(req),
     });
 
-    if (result.isDraft) {
-      return res.status(202).json({
-        success: true,
-        message: "Permintaan hapus statistik diajukan. Data dikunci sementara.",
-        ticket: result.ticket,
-      });
-    }
+    if (res.headersSent) return;
 
     res.status(200).json({ success: true, message: "Statistik deleted live!" });
   } catch (error) {

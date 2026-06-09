@@ -19,6 +19,7 @@ import MapPickerModal from "./modals/MapPickerModal";
 import { useAuth } from "@/contexts/AuthContext";
 import { LockIcon, ShieldAlert } from "lucide-react";
 import { getErrorMessage } from "@/lib/utils";
+import LockedStateTracker from "@/components/admin/LockedStateTracker";
 
 const normalizeBool = (val: any): boolean => {
   return val === true || val === "true" || val === 1 || val === "1";
@@ -428,28 +429,18 @@ export default function ManageBusinesses() {
         </div>
       )}
 
-      {/* Blue/Rose Banner: Status Antrean Editor (Blueprint III) */}
-      {shouldLockUI && activeTab !== "categories" && (
-        <div
-          className={`p-4 rounded-xl flex items-center gap-4 shadow-sm animate-pulse ${
-            isDeleting
-              ? "bg-rose-50 border border-rose-200"
-              : "bg-blue-50 border border-blue-200"
-          }`}>
-          <div
-            className={`p-2 rounded-full shrink-0 ${isDeleting ? "bg-rose-100 text-rose-600" : "bg-blue-100 text-blue-600"}`}>
+      {/* Rose Banner: Status Antrean Hapus Editor (Blueprint III) */}
+      {shouldLockUI && activeTab !== "categories" && isDeleting && (
+        <div className="p-4 rounded-xl flex items-center gap-4 shadow-sm animate-pulse bg-rose-50 border border-rose-200">
+          <div className="p-2 rounded-full shrink-0 bg-rose-100 text-rose-600">
             <LockIcon className="w-5 h-5" />
           </div>
           <div>
-            <h4
-              className={`text-xs font-black uppercase tracking-tight ${isDeleting ? "text-rose-900" : "text-blue-900"}`}>
-              {isDeleting ? "Menunggu Penghapusan" : "Akses Dibatasi"}
+            <h4 className="text-xs font-black uppercase tracking-tight text-rose-900">
+              Menunggu Penghapusan
             </h4>
-            <p
-              className={`text-xs leading-relaxed mt-0.5 ${isDeleting ? "text-rose-700" : "text-blue-700"}`}>
-              {isDeleting
-                ? "Permintaan penghapusan sedang ditinjau. Data tidak dapat diubah."
-                : "Revisi sedang ditinjau. Anda tidak dapat mengubah data ini sampai ada keputusan."}
+            <p className="text-xs leading-relaxed mt-0.5 text-rose-700">
+              Permintaan penghapusan sedang ditinjau. Data tidak dapat diubah.
             </p>
           </div>
         </div>
@@ -506,6 +497,7 @@ export default function ManageBusinesses() {
 
       {/* MAIN CONTENT AREA (The Vault Perspective) */}
 
+      <LockedStateTracker isLocked={!!(shouldLockUI && activeTab !== "categories")} lockTicket={currentSection?.lock_ticket || null}>
       <main
         className={`bg-white rounded-b-xl border border-t-0 border-slate-200 shadow-sm p-6 lg:p-8 min-h-[500px] transition-all duration-500 ${lockStyles}`}>
         {activeTab === "categories" ? (
@@ -549,6 +541,7 @@ export default function ManageBusinesses() {
           </div>
         )}
       </main>
+      </LockedStateTracker>
 
       {/* MODAL OVERLAYS */}
       {isAddModalOpen && (

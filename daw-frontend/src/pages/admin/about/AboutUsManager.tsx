@@ -139,23 +139,7 @@ export default function AboutUsManager() {
         </div>
       )}
 
-      {/* B. BLUE BANNER: Locked UI Info */}
-      {isGlobalLockActive && (
-        <div className="bg-blue-50 border-l-4 border-l-blue-500 border-y border-r border-blue-200 p-4 rounded-xl flex items-center gap-4 animate-pulse shadow-sm">
-          <div className="bg-blue-100 p-2 rounded-full text-blue-600 shrink-0">
-            <Lock className="w-5 h-5" />
-          </div>
-          <div>
-            <h4 className="text-xs font-black text-blue-900 uppercase tracking-tight">
-              Akses Dibatasi
-            </h4>
-            <p className="text-xs text-blue-700 leading-relaxed mt-0.5">
-              Data pada tab ini sedang ditinjau. Anda tidak dapat melakukan
-              perubahan hingga proses selesai.
-            </p>
-          </div>
-        </div>
-      )}
+
 
       {/* GLOBAL HEADER & ACTION MATRIX */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white p-6 rounded-2xl border border-slate-200 shadow-sm top-0 z-30">

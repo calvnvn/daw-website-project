@@ -8,6 +8,7 @@ const { invalidateOldDrafts } = require("../utils/draftCleanup");
 const { deleteSingleFile } = require("../utils/fileRemover");
 const { generateNotrans } = require("../utils/notransGenerator");
 const { saveManualTranslations } = require("../utils/translationHelper");
+const { handleEditorStaging } = require("../utils/editorHelper");
 const ErpApprovalService = require("./erpApprovalService");
 const { autoTranslate } = require("./openaiService");
 
@@ -297,7 +298,7 @@ class InvestmentService {
   // SETTINGS MUTATIONS
   // ==========================================
 
-  async updateSettings({ userRole, body, actorId, owlToken }) {
+  async updateSettings({ req, res, userRole, body, actorId, owlToken }) {
     const t = await sequelize.transaction();
     try {
       const { status, previous_notrans } = body;
@@ -312,25 +313,17 @@ class InvestmentService {
       const { payload } = await this.processInvestmentPayload(body, settings);
 
       if (userRole === "editor" && status === "Published") {
-        const notrans = await generateNotrans("INV_SET");
-
-        if (previous_notrans) {
-          await ApprovalDraft.update({ status: "Replaced" }, { where: { notrans: previous_notrans }, transaction: t });
-        }
-
-        await ApprovalDraft.create({
-          notrans, module_name: "InvestmentSettings", action: "UPDATE", target_id: "1",
-          payload: { ...payload, _translations: body._translations, status: "Published" }, created_by: actorId, status: "Pending",
-        }, { transaction: t });
-
-        await settings.update({ is_locked: true, lock_ticket: notrans }, { transaction: t });
-        await t.commit();
-
-        try {
-          await ErpApprovalService.initiateApproval({ notrans, karyawanId: actorId, token: owlToken, moduleName: "InvestmentSettings" });
-        } catch (erpError) {}
-
-        return { success: true, isDraft: true, ticket: notrans };
+        return handleEditorStaging({
+          req, res, t,
+          moduleName: "InvestmentSettings",
+          notransPrefix: "INV_SET",
+          action: "UPDATE",
+          targetId: "1",
+          payload: { ...payload, _translations: body._translations, status: "Published" },
+          recordToLock: settings,
+          previousNotrans: previous_notrans,
+          successMessage: "Revisi teks investasi berhasil diajukan.",
+        });
       }
 
       await invalidateOldDrafts("InvestmentSettings", "1", t);
@@ -353,7 +346,7 @@ class InvestmentService {
   // AFFILIATE MUTATIONS
   // ==========================================
 
-  async createAffiliate({ userRole, body, file, actorId, owlToken }) {
+  async createAffiliate({ req, res, userRole, body, file, actorId, owlToken }) {
     const t = await sequelize.transaction();
     try {
       const { status } = body;
@@ -363,19 +356,16 @@ class InvestmentService {
       const newCompany = await Affiliate.create({ ...payload, is_locked: isEditor }, { transaction: t });
 
       if (isEditor && status === "Published") {
-        const notrans = await generateNotrans("AFF");
-        await ApprovalDraft.create({
-          notrans, module_name: "Affiliate", action: "CREATE", target_id: String(newCompany.id),
-          payload: { ...payload, status: "Published" }, created_by: actorId, status: "Pending",
-        }, { transaction: t });
-        await newCompany.update({ lock_ticket: notrans }, { transaction: t });
-        await t.commit();
-
-        try {
-          await ErpApprovalService.initiateApproval({ notrans, moduleName: "Affiliate", karyawanId: actorId, token: owlToken });
-        } catch (erpError) {}
-
-        return { success: true, isDraft: true, ticket: notrans };
+        return handleEditorStaging({
+          req, res, t,
+          moduleName: "Affiliate",
+          notransPrefix: "AFF",
+          action: "CREATE",
+          targetId: String(newCompany.id),
+          payload: { ...payload, status: "Published" },
+          recordToLock: newCompany,
+          successMessage: "Permintaan tambah afiliasi baru diajukan.",
+        });
       }
 
       await t.commit();
@@ -386,7 +376,7 @@ class InvestmentService {
     }
   }
 
-  async updateAffiliate({ id, userRole, body, file, actorId, owlToken }) {
+  async updateAffiliate({ req, res, id, userRole, body, file, actorId, owlToken }) {
     const t = await sequelize.transaction();
     try {
       const { status, previous_notrans } = body;
@@ -410,22 +400,17 @@ class InvestmentService {
       }
 
       if (userRole === "editor" && status === "Published") {
-        const notrans = await generateNotrans("AFF");
-        if (previous_notrans) await ApprovalDraft.update({ status: "Replaced" }, { where: { notrans: previous_notrans }, transaction: t });
-
-        await ApprovalDraft.create({
-          notrans, module_name: "Affiliate", action: "UPDATE", target_id: String(id),
-          payload: { ...payload, _translations: body._translations, status: "Published" }, created_by: actorId, status: "Pending",
-        }, { transaction: t });
-
-        await company.update({ is_locked: true, lock_ticket: notrans }, { transaction: t });
-        await t.commit();
-
-        try {
-          await ErpApprovalService.initiateApproval({ notrans, moduleName: "Affiliate", karyawanId: actorId, token: owlToken });
-        } catch (erpError) {}
-
-        return { success: true, isDraft: true, ticket: notrans };
+        return handleEditorStaging({
+          req, res, t,
+          moduleName: "Affiliate",
+          notransPrefix: "AFF",
+          action: "UPDATE",
+          targetId: String(id),
+          payload: { ...payload, _translations: body._translations, status: "Published" },
+          recordToLock: company,
+          previousNotrans: previous_notrans,
+          successMessage: "Revisi afiliasi berhasil diajukan.",
+        });
       }
 
       await invalidateOldDrafts("Affiliate", String(id), t);
@@ -446,7 +431,7 @@ class InvestmentService {
     }
   }
 
-  async deleteAffiliate({ id, userRole, actorId, owlToken }) {
+  async deleteAffiliate({ req, res, id, userRole, actorId, owlToken }) {
     const t = await sequelize.transaction();
     try {
       const company = await Affiliate.findByPk(id, { transaction: t, lock: t.LOCK.UPDATE });
@@ -463,20 +448,16 @@ class InvestmentService {
       const logoToDelete = company.logoUrl;
 
       if (userRole === "editor") {
-        const notrans = await generateNotrans("AFF_DEL");
-        await ApprovalDraft.create({
-          notrans, module_name: "Affiliate", action: "DELETE", target_id: String(id),
-          payload: { ...company.get({ plain: true }), reason: "Request Delete" }, created_by: actorId, status: "Pending",
-        }, { transaction: t });
-
-        await company.update({ is_locked: true, lock_ticket: notrans }, { transaction: t });
-        await t.commit();
-
-        try {
-          await ErpApprovalService.initiateApproval({ notrans, moduleName: "Affiliate", karyawanId: actorId, token: owlToken });
-        } catch (erpError) {}
-
-        return { success: true, isDraft: true, ticket: notrans };
+        return handleEditorStaging({
+          req, res, t,
+          moduleName: "Affiliate",
+          notransPrefix: "AFF_DEL",
+          action: "DELETE",
+          targetId: String(id),
+          payload: { ...company.get({ plain: true }), reason: "Request Delete" },
+          recordToLock: company,
+          successMessage: "Permintaan hapus afiliasi diajukan. Data dikunci sementara.",
+        });
       }
 
       await invalidateOldDrafts("Affiliate", String(id), t);

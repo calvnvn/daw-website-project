@@ -149,8 +149,12 @@ export const BusinessProvider = ({ children }: { children: ReactNode }) => {
 
     try {
       const isAdminArea = window.location.pathname.startsWith("/admin");
-      const langParam = isAdminArea ? "en" : (i18n.language === "id" ? "id" : "en");
-      
+      const langParam = isAdminArea
+        ? "en"
+        : i18n.language === "id"
+          ? "id"
+          : "en";
+
       const promises: Promise<any>[] = [
         api.get("/map-categories", {
           params: { lang: langParam },
@@ -231,9 +235,7 @@ export const BusinessProvider = ({ children }: { children: ReactNode }) => {
       data: Partial<SectionData> & { previous_notrans?: string },
     ) => {
       setIsProcessing(true);
-      const toastId = toast.loading(
-        "Menyinkronkan revisi dengan sistem OWL...",
-      );
+      const toastId = toast.loading("Menyinkronkan revisi dengan ERP...");
       try {
         const res = await api.put(`/businesses/admin/${id}`, data);
 

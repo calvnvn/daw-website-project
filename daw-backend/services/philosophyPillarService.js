@@ -6,6 +6,7 @@ const { saveManualTranslations } = require("../utils/translationHelper");
 const { autoTranslate } = require("./openaiService");
 const ErpApprovalService = require("./erpApprovalService");
 const { generateNotrans } = require("../utils/notransGenerator");
+const { handleEditorStaging } = require("../utils/editorHelper");
 
 const MODULE_NAME = "PhilosophyPillar";
 const NOTRANS_PREFIX = "PLR";
@@ -84,7 +85,7 @@ class PhilosophyPillarService {
   /**
    * Orchestrate new pillar creation (Editor staging vs Admin direct commit)
    */
-  async createPillar({ body, userRole, actorId, karyawanId, owlToken }) {
+  async createPillar({ req, res, body, userRole, actorId, karyawanId, owlToken }) {
     const t = await sequelize.transaction();
     try {
       const normalizedRole = userRole?.toLowerCase().trim();
@@ -92,40 +93,21 @@ class PhilosophyPillarService {
 
       // Editor Flow: Create locked placeholder and stage for ERP approval
       if (normalizedRole === "editor") {
-        const notrans = await generateNotrans(NOTRANS_PREFIX);
-
         const newPillar = await PhilosophyPillar.create(
-          { ...payload, is_locked: true, lock_ticket: notrans },
+          { ...payload, is_locked: true, lock_ticket: null },
           { transaction: t }
         );
 
-        await ApprovalDraft.create(
-          {
-            notrans,
-            module_name: MODULE_NAME,
-            target_id: String(newPillar.id),
-            action: "CREATE",
-            payload: { ...payload, status: "Published", _translations: body._translations },
-            created_by: actorId,
-            status: "Pending",
-          },
-          { transaction: t }
-        );
-
-        await t.commit();
-
-        try {
-          await ErpApprovalService.initiateApproval({
-            notrans,
-            moduleName: MODULE_NAME,
-            karyawanId: karyawanId,
-            token: owlToken,
-          });
-        } catch (e) {
-          console.error("ERP Sync Fail:", e.message);
-        }
-
-        return { success: true, isDraft: true, ticket: notrans };
+        return handleEditorStaging({
+          req, res, t,
+          moduleName: MODULE_NAME,
+          notransPrefix: NOTRANS_PREFIX,
+          action: "CREATE",
+          targetId: String(newPillar.id),
+          payload: { ...payload, status: "Published", _translations: body._translations },
+          recordToLock: newPillar,
+          successMessage: "Pilar filosofi baru diajukan ke ERP OWL.",
+        });
       }
 
       // Admin Flow: Direct live commit
@@ -146,7 +128,7 @@ class PhilosophyPillarService {
   /**
    * Mutate existing pillar with pessimistic locking and role-based routing
    */
-  async updatePillar({ id, body, userRole, actorId, karyawanId, owlToken }) {
+  async updatePillar({ req, res, id, body, userRole, actorId, karyawanId, owlToken }) {
     const t = await sequelize.transaction();
     try {
       const normalizedRole = userRole?.toLowerCase().trim();
@@ -165,50 +147,17 @@ class PhilosophyPillarService {
       const payload = this.processPillarPayload(body);
 
       if (normalizedRole === "editor") {
-        const notrans = await generateNotrans(NOTRANS_PREFIX);
-        const ticketToClear = previous_notrans || pillar.lock_ticket;
-
-        if (ticketToClear) {
-          await ApprovalDraft.update(
-            { status: "Replaced" },
-            {
-              where: { notrans: ticketToClear, module_name: MODULE_NAME },
-              transaction: t,
-            }
-          );
-        }
-
-        await ApprovalDraft.create(
-          {
-            notrans,
-            module_name: MODULE_NAME,
-            target_id: String(id),
-            action: "UPDATE",
-            payload: { ...payload, status: "Published", _translations: body._translations },
-            created_by: actorId,
-            status: "Pending",
-          },
-          { transaction: t }
-        );
-
-        await pillar.update(
-          { is_locked: true, lock_ticket: notrans },
-          { transaction: t }
-        );
-        await t.commit();
-
-        try {
-          await ErpApprovalService.initiateApproval({
-            notrans,
-            moduleName: MODULE_NAME,
-            karyawanId: karyawanId,
-            token: owlToken,
-          });
-        } catch (e) {
-          console.error("ERP Sync Fail:", e.message);
-        }
-
-        return { success: true, isDraft: true, ticket: notrans };
+        return handleEditorStaging({
+          req, res, t,
+          moduleName: MODULE_NAME,
+          notransPrefix: NOTRANS_PREFIX,
+          action: "UPDATE",
+          targetId: String(id),
+          payload: { ...payload, status: "Published", _translations: body._translations },
+          recordToLock: pillar,
+          previousNotrans: previous_notrans,
+          successMessage: "Revisi pilar filosofi diajukan ke ERP OWL.",
+        });
       }
 
       await ApprovalDraft.update(
@@ -239,7 +188,7 @@ class PhilosophyPillarService {
   /**
    * Safely remove pillar via ERP staging or direct database purge
    */
-  async deletePillar({ id, userRole, actorId, karyawanId, owlToken }) {
+  async deletePillar({ req, res, id, userRole, actorId, karyawanId, owlToken }) {
     const t = await sequelize.transaction();
     try {
       const normalizedRole = userRole?.toLowerCase().trim();
@@ -255,40 +204,18 @@ class PhilosophyPillarService {
       }
 
       if (normalizedRole === "editor") {
-        const notrans = await generateNotrans(NOTRANS_PREFIX);
         const payload = { title: pillar.title, iconId: pillar.iconId };
 
-        await ApprovalDraft.create(
-          {
-            notrans,
-            module_name: MODULE_NAME,
-            target_id: String(id),
-            action: "DELETE",
-            payload,
-            created_by: actorId,
-            status: "Pending",
-          },
-          { transaction: t }
-        );
-
-        await pillar.update(
-          { is_locked: true, lock_ticket: notrans },
-          { transaction: t }
-        );
-        await t.commit();
-
-        try {
-          await ErpApprovalService.initiateApproval({
-            notrans,
-            moduleName: MODULE_NAME,
-            karyawanId: karyawanId,
-            token: owlToken,
-          });
-        } catch (e) {
-          console.error("ERP Sync Fail:", e.message);
-        }
-
-        return { success: true, isDraft: true, ticket: notrans };
+        return handleEditorStaging({
+          req, res, t,
+          moduleName: MODULE_NAME,
+          notransPrefix: NOTRANS_PREFIX,
+          action: "DELETE",
+          targetId: String(id),
+          payload,
+          recordToLock: pillar,
+          successMessage: "Permintaan hapus pilar filosofi diajukan ke ERP OWL.",
+        });
       }
 
       await ApprovalDraft.update(

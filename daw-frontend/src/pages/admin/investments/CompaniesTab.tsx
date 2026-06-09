@@ -23,6 +23,7 @@ import { CATEGORY_ICONS } from "./InvestmentConstants";
 import type { LocalAffiliate, LocalCategory } from "./InvestmentConstants";
 import ImageAdjustmentModal from "@/components/admin/ImageAdjustmentModal";
 import MagicTranslationField from "@/components/admin/MagicTranslationField";
+import LockedStateTracker from "@/components/admin/LockedStateTracker";
 
 // LOGO PREVIEWER (Memoized sub-component)
 
@@ -484,8 +485,8 @@ export default function CompaniesTab({
                           : "bg-slate-50 border-slate-200 hover:border-slate-300 hover:shadow-sm";
 
                     return (
+                      <LockedStateTracker key={company.id} isLocked={!!isLockedForEditor} lockTicket={company.lock_ticket || null}>
                       <div
-                        key={company.id}
                         className={`flex flex-col gap-3 p-4 rounded-xl border transition-all relative ${cardStyle}`}>
                         {isNeedsRevision && draft && (
                           <div className="w-full bg-red-50 border-l-4 border-l-red-500 border-y border-r border-red-200 rounded-lg p-3 shadow-sm animate-in fade-in">
@@ -644,6 +645,7 @@ export default function CompaniesTab({
                             )}
                         </div>
                       </div>
+                      </LockedStateTracker>
                     );
                   })}
                 </div>

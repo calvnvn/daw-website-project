@@ -6,6 +6,7 @@ const { autoTranslate } = require("./openaiService");
 const ErpApprovalService = require("./erpApprovalService");
 const { generateNotrans } = require("../utils/notransGenerator");
 const { saveManualTranslations } = require("../utils/translationHelper");
+const { handleEditorStaging } = require("../utils/editorHelper");
 
 const MODULE_NAME = "AboutInfo";
 const NOTRANS_PREFIX = "ABT";
@@ -83,7 +84,7 @@ class AboutService {
   /**
    * Conditionally update live data or stage approval drafts based on role.
    */
-  async updateAboutInfo({ body, userRole, actorId, karyawanId, owlToken }) {
+  async updateAboutInfo({ req, res, body, userRole, actorId, karyawanId, owlToken }) {
     const t = await sequelize.transaction();
     try {
       const normalizedRole = userRole?.toLowerCase().trim();
@@ -104,50 +105,17 @@ class AboutService {
       const payload = this.processAboutPayload(body, info);
 
       if (normalizedRole === "editor" && status === "Published") {
-        const notrans = await generateNotrans(NOTRANS_PREFIX);
-        const ticketToClear = previous_notrans || info.lock_ticket;
-
-        if (ticketToClear) {
-          await ApprovalDraft.update(
-            { status: "Replaced" },
-            {
-              where: { notrans: ticketToClear, module_name: MODULE_NAME },
-              transaction: t,
-            },
-          );
-        }
-
-        await ApprovalDraft.create(
-          {
-            notrans,
-            module_name: MODULE_NAME,
-            target_id: "1",
-            action: "UPDATE",
-            payload: { ...payload, status: "Published", _translations: body._translations },
-            created_by: actorId,
-            status: "Pending",
-          },
-          { transaction: t },
-        );
-
-        await info.update(
-          { is_locked: true, lock_ticket: notrans },
-          { transaction: t },
-        );
-        await t.commit();
-
-        try {
-          await ErpApprovalService.initiateApproval({
-            notrans,
-            moduleName: MODULE_NAME,
-            karyawanId: karyawanId,
-            token: owlToken,
-          });
-        } catch (e) {
-          console.error("ERP Sync Fail:", e.message);
-        }
-
-        return { success: true, isDraft: true, ticket: notrans };
+        return handleEditorStaging({
+          req, res, t,
+          moduleName: MODULE_NAME,
+          notransPrefix: NOTRANS_PREFIX,
+          action: "UPDATE",
+          targetId: "1",
+          payload: { ...payload, status: "Published", _translations: body._translations },
+          recordToLock: info,
+          previousNotrans: previous_notrans,
+          successMessage: "Revisi profil diajukan. Data dikunci menunggu persetujuan.",
+        });
       }
 
       // ADMIN PATH

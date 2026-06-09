@@ -6,6 +6,7 @@ const { saveManualTranslations } = require("../utils/translationHelper");
 const { autoTranslate } = require("./openaiService");
 const ErpApprovalService = require("./erpApprovalService");
 const { generateNotrans } = require("../utils/notransGenerator");
+const { handleEditorStaging } = require("../utils/editorHelper");
 
 const MODULE_NAME = "Philosophy";
 const NOTRANS_PREFIX = "PHL";
@@ -76,7 +77,7 @@ class PhilosophyService {
   /**
    * Updates Philosophy or stages a revision request depending on the requester's role.
    */
-  async updatePhilosophy({ body, userRole, actorId, karyawanId, owlToken }) {
+  async updatePhilosophy({ req, res, body, userRole, actorId, karyawanId, owlToken }) {
     const t = await sequelize.transaction();
     try {
       const normalizedRole = userRole?.toLowerCase().trim();
@@ -101,55 +102,17 @@ class PhilosophyService {
 
       // Flow 1: Editor initiates staging and ERP sync
       if (normalizedRole === "editor" && status === "Published") {
-        const notrans = await generateNotrans(NOTRANS_PREFIX);
-        const ticketToClear = previous_notrans || info.lock_ticket;
-
-        // Invalidate replaced draft if resubmitting
-        if (ticketToClear) {
-          await ApprovalDraft.update(
-            { status: "Replaced" },
-            {
-              where: { notrans: ticketToClear, module_name: MODULE_NAME },
-              transaction: t,
-            }
-          );
-        }
-
-        // Stage mutation payload
-        await ApprovalDraft.create(
-          {
-            notrans,
-            module_name: MODULE_NAME,
-            target_id: "1",
-            action: "UPDATE",
-            payload: { ...payload, status: "Published", _translations: body._translations },
-            created_by: actorId,
-            status: "Pending",
-          },
-          { transaction: t }
-        );
-
-        // Lock live record
-        await info.update(
-          { is_locked: true, lock_ticket: notrans },
-          { transaction: t }
-        );
-        
-        await t.commit();
-
-        // Dispatch to external ERP engine
-        try {
-          await ErpApprovalService.initiateApproval({
-            notrans,
-            moduleName: MODULE_NAME,
-            karyawanId: karyawanId,
-            token: owlToken,
-          });
-        } catch (e) {
-          console.error("🚨 ERP Sync Fail:", e.message);
-        }
-
-        return { success: true, isDraft: true, ticket: notrans };
+        return handleEditorStaging({
+          req, res, t,
+          moduleName: MODULE_NAME,
+          notransPrefix: NOTRANS_PREFIX,
+          action: "UPDATE",
+          targetId: "1",
+          payload: { ...payload, status: "Published", _translations: body._translations },
+          recordToLock: info,
+          previousNotrans: previous_notrans,
+          successMessage: "Revisi filosofi diajukan ke ERP OWL.",
+        });
       }
 
       // Flow 2: Admin overrides staging and performs direct live commit

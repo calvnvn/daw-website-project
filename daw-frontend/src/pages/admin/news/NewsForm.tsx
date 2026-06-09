@@ -29,6 +29,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { getErrorMessage } from "@/lib/utils";
 import ImageAdjustmentModal from "@/components/admin/ImageAdjustmentModal";
 import MagicTranslationField from "@/components/admin/MagicTranslationField";
+import LockedStateTracker from "@/components/admin/LockedStateTracker";
 
 interface NewsCategory {
   id: string;
@@ -803,23 +804,7 @@ export default function NewsForm() {
                     </div>
                   )}
 
-                  {/* 2. LOCKED UI BANNER */}
-                  {shouldLockUI && (
-                    <div className="flex items-start gap-3 p-4 bg-blue-50 border border-blue-200 rounded-2xl animate-in fade-in shadow-sm">
-                      <div className="p-2 bg-blue-100 text-blue-600 rounded-xl shrink-0">
-                        <Lock className="w-5 h-5 animate-pulse" />
-                      </div>
-                      <div>
-                        <h4 className="text-sm font-bold text-blue-900">
-                          Mode Baca (Read-Only)
-                        </h4>
-                        <p className="text-xs text-blue-700 mt-1 leading-relaxed">
-                          Halaman dikunci karena dalam proses peninjauan (Tiket:{" "}
-                          <strong>{formData.lock_ticket}</strong>).
-                        </p>
-                      </div>
-                    </div>
-                  )}
+
 
                   {/* 3. REJECTION BANNER & RESTORE */}
                   {rejectedDraft && showDraftBanner && !formData.is_locked && (
@@ -863,8 +848,12 @@ export default function NewsForm() {
               )}
 
               {/* DYNAMIC WORKSPACE CONTENT */}
-              <div className="p-8 space-y-10">
-                {/* SECTION 1: CORE IDENTITY */}
+              <div className="p-8">
+                <LockedStateTracker
+                  isLocked={shouldLockUI}
+                  lockTicket={formData.lock_ticket}>
+                  <div className="space-y-10">
+                    {/* SECTION 1: CORE IDENTITY */}
                 <div className="space-y-8">
                   <div className="flex items-center gap-2 border-b border-slate-100 pb-2">
                     <FileText className="w-4 h-4 text-slate-400" />
@@ -1350,6 +1339,8 @@ export default function NewsForm() {
                     )}
                   </div>
                 </div>
+                  </div>
+                </LockedStateTracker>
               </div>
             </div>
           </div>

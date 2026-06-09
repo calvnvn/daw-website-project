@@ -1,6 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
 import {
-  Lock,
   AlertTriangle,
   RotateCcw,
   Save,
@@ -14,6 +13,7 @@ import { useAbout } from "@/contexts/AboutContext";
 import AboutLivePreview from "@/components/admin/about/AboutLivePreview";
 import { getErrorMessage } from "@/lib/utils";
 import MagicTranslationField from "@/components/admin/MagicTranslationField";
+import LockedStateTracker from "@/components/admin/LockedStateTracker";
 
 interface AboutInfoTabProps {
   isEditing: boolean;
@@ -318,17 +318,12 @@ export default function AboutInfoTab({
           </div>
       )}
 
-      {/* BUREAUCRATIC MIRROR: Local Lock Indicator */}
       <div className="flex items-center justify-between mb-4 border-b border-slate-100 pb-2">
         <h3 className="text-lg font-bold text-slate-900">Identitas Utama</h3>
-        {isItemLocked && (
-          <span className="flex items-center gap-1.5 text-[10px] font-black text-blue-600 bg-blue-50 px-3 py-1.5 rounded-full border border-blue-100 uppercase tracking-widest">
-            <Lock className="w-3.5 h-3.5" /> AKSES DIBATASI
-          </span>
-        )}
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <LockedStateTracker isLocked={isItemLocked} lockTicket={aboutData?.lock_ticket || null}>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {/* FOUNDERS SPIRIT */}
         <div className="md:col-span-2 bg-slate-50 p-5 rounded-xl border border-slate-200">
           <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">
@@ -437,6 +432,7 @@ export default function AboutInfoTab({
           </div>
         </div>
       </div>
+      </LockedStateTracker>
 
       {/* TAB FOOTER */}
       <div className="flex justify-end pt-6">

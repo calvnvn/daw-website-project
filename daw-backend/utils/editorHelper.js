@@ -101,7 +101,7 @@ const handleEditorStaging = async ({
   try {
     const erpResult = await ErpApprovalService.initiateApproval({
       notrans,
-      karyawanId: actorId,
+      karyawanId: req.karyawanId ? String(req.karyawanId) : actorId,
       token: req.owl_token,
     });
 

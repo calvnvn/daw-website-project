@@ -539,6 +539,23 @@ class ApprovalService {
 
     return filesToTrash;
   }
+
+  // --- EDITOR TRACKING ENDPOINT ---
+  async getDraftStatus(notrans) {
+    const draft = await ApprovalDraft.findByPk(notrans, {
+      attributes: [
+        "notrans",
+        "module_name",
+        "action",
+        "status",
+        "current_level",
+        "approver_roadmap",
+        "created_by",
+        "rejection_reason"
+      ]
+    });
+    return draft;
+  }
 }
 
 module.exports = new ApprovalService();

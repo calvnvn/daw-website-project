@@ -7,6 +7,7 @@ const { autoTranslate } = require("./openaiService");
 const { invalidateOldDrafts } = require("../utils/draftCleanup");
 const { generateNotrans } = require("../utils/notransGenerator");
 const { saveManualTranslations } = require("../utils/translationHelper");
+const { handleEditorStaging } = require("../utils/editorHelper");
 
 const MODULE_NAME = "History";
 const NOTRANS_PREFIX = "HIS";
@@ -87,7 +88,7 @@ class HistoryService {
   /**
    * Orchestrate timeline updates (Editor Staging vs Admin Direct)
    */
-  async updateHistories({ body, userRole, actorId, karyawanId, owlToken }) {
+  async updateHistories({ req, res, body, userRole, actorId, karyawanId, owlToken }) {
     const t = await sequelize.transaction();
     try {
       const normalizedRole = userRole?.toLowerCase().trim();
@@ -105,44 +106,28 @@ class HistoryService {
 
       const payload = this.processHistoryPayload(body);
 
-      // Flow 1: Editor (Stage draft & Sync ERP)
+      // Flow 1: Editor (Stage draft & Sync ERP via handleEditorStaging)
       if (normalizedRole === "editor" && status === "Published") {
-        const notrans = await generateNotrans(NOTRANS_PREFIX);
-
-        await invalidateOldDrafts(MODULE_NAME, TARGET_ID, t);
-
-        await ApprovalDraft.create(
-          {
-            notrans,
-            module_name: MODULE_NAME,
-            target_id: TARGET_ID,
-            action: "UPDATE",
-            payload: { ...payload, _translations: body._translations },
-            created_by: actorId,
-            status: "Pending",
-          },
-          { transaction: t }
-        );
-
+        // Lock all history rows before staging
         await History.update(
-          { is_locked: true, lock_ticket: notrans },
+          { is_locked: true },
           { where: {}, transaction: t }
         );
 
-        await t.commit();
+        // Use a placeholder record to satisfy handleEditorStaging's recordToLock requirement
+        // The helper will set is_locked + lock_ticket on this record
+        const firstRow = await History.findOne({ transaction: t, lock: t.LOCK.UPDATE });
 
-        try {
-          await ErpApprovalService.initiateApproval({
-            notrans,
-            moduleName: MODULE_NAME,
-            karyawanId: karyawanId,
-            token: owlToken,
-          });
-        } catch (e) {
-          console.error(`🚨 [SYNC WARNING] Ticket ${notrans} registered locally but ERP sync failed:`, e.message);
-        }
-
-        return { success: true, isDraft: true, ticket: notrans };
+        return handleEditorStaging({
+          req, res, t,
+          moduleName: MODULE_NAME,
+          notransPrefix: NOTRANS_PREFIX,
+          action: "UPDATE",
+          targetId: TARGET_ID,
+          payload: { ...payload, _translations: body._translations },
+          recordToLock: firstRow,
+          successMessage: "Revisi timeline sejarah diajukan ke ERP OWL.",
+        });
       }
 
       // Flow 2: Admin (Direct overwrite)

@@ -7,6 +7,7 @@ const { deleteSingleFile } = require("../utils/fileRemover");
 const { invalidateOldDrafts } = require("../utils/draftCleanup");
 const sequelize = require("../config/database");
 const { generateNotrans } = require("../utils/notransGenerator");
+const { handleEditorStaging } = require("../utils/editorHelper");
 
 const MODULE_NAME = "Settings";
 const NOTRANS_PREFIX = "SET";
@@ -79,7 +80,7 @@ class SettingsService {
   /**
    * Orchestrates logic based on user role to update settings.
    */
-  async updateSettings({ body, files, userRole, actorId, karyawanId, owlToken }) {
+  async updateSettings({ req, res, body, files, userRole, actorId, karyawanId, owlToken }) {
     const t = await sequelize.transaction();
     const uploadedLogo = files?.["logo"] ? files["logo"][0] : null;
     const uploadedFavicon = files?.["favicon"] ? files["favicon"][0] : null;
@@ -150,51 +151,17 @@ class SettingsService {
           updatePayload.faviconUrl = tempFaviconPath;
         }
 
-        if (previous_notrans) {
-          await ApprovalDraft.update(
-            { status: "Replaced" },
-            { where: { notrans: previous_notrans }, transaction: t },
-          );
-        }
-        await invalidateOldDrafts(MODULE_NAME, id, t);
-
-        const notrans = await generateNotrans(NOTRANS_PREFIX);
-
-        await ApprovalDraft.create(
-          {
-            notrans,
-            module_name: MODULE_NAME,
-            target_id: String(id),
-            action: "UPDATE",
-            payload: updatePayload,
-            created_by: actorId,
-            status: "Pending",
-          },
-          { transaction: t },
-        );
-
-        await settings.update(
-          {
-            is_locked: true,
-            lock_ticket: notrans,
-          },
-          { transaction: t },
-        );
-
-        await t.commit();
-
-        try {
-          await ErpApprovalService.initiateApproval({
-            notrans,
-            moduleName: MODULE_NAME,
-            karyawanId: karyawanId,
-            token: owlToken,
-          });
-        } catch (owlError) {
-          console.error("🚨 [SETTINGS] ERP Initiate Failed (Local Draft Secured):", owlError.message);
-        }
-
-        return { success: true, isDraft: true, ticket: notrans };
+        return handleEditorStaging({
+          req, res, t,
+          moduleName: MODULE_NAME,
+          notransPrefix: NOTRANS_PREFIX,
+          action: "UPDATE",
+          targetId: id,
+          payload: updatePayload,
+          recordToLock: settings,
+          previousNotrans: previous_notrans,
+          successMessage: "Revisi profil diajukan. Data sekarang dikunci.",
+        });
       }
 
       throw new Error("FORBIDDEN: Role Anda tidak valid.");

@@ -193,34 +193,17 @@ class BusinessService {
       };
 
       if (normalizedRole === "editor" && status === "Published") {
-        const notrans = await generateNotrans(MODULE_NAME);
-
-        await BusinessSection.create({ ...sectionPayload, is_locked: true, lock_ticket: notrans }, { transaction: t });
-        await ApprovalDraft.create(
-          {
-            notrans,
-            module_name: MODULE_NAME,
-            action: "CREATE",
-            target_id: String(generatedId),
-            payload: { category, title, status: "Published" },
-            created_by: actorId,
-            status: "Pending",
-          },
-          { transaction: t }
-        );
-
-        await t.commit();
-
-        try {
-          await ErpApprovalService.initiateApproval({
-            notrans,
-            karyawanId: actorId,
-            token: owlToken,
-          });
-        } catch (owlError) {
-          console.error("🚨 [ERP SYNC FAILED]:", owlError.message);
-        }
-        return { success: true, isDraft: true, ticket: notrans };
+        const newSection = await BusinessSection.create({ ...sectionPayload, is_locked: true }, { transaction: t });
+        return handleEditorStaging({
+          req, res, t,
+          moduleName: MODULE_NAME,
+          notransPrefix: MODULE_NAME,
+          action: "CREATE",
+          targetId: String(generatedId),
+          payload: { category, title, status: "Published" },
+          recordToLock: newSection,
+          successMessage: "Sektor bisnis baru diajukan. Menunggu persetujuan.",
+        });
       }
 
       const newSection = await BusinessSection.create(sectionPayload, { transaction: t });
@@ -352,33 +335,16 @@ class BusinessService {
       }
 
       if (normalizedRole === "editor") {
-        const notrans = await generateNotrans(MODULE_NAME);
-        await ApprovalDraft.create(
-          {
-            notrans,
-            module_name: MODULE_NAME,
-            action: "DELETE",
-            target_id: String(id),
-            payload: { title: section.title, reason: "Request Delete" },
-            created_by: actorId,
-            status: "Pending",
-          },
-          { transaction: t }
-        );
-
-        await section.update({ is_locked: true, lock_ticket: notrans }, { transaction: t });
-        await t.commit();
-
-        try {
-          await ErpApprovalService.initiateApproval({
-            notrans,
-            karyawanId: actorId,
-            token: owlToken,
-          });
-        } catch (owlError) {
-          console.error("🚨 [ERP SYNC FAILED]:", owlError.message);
-        }
-        return { success: true, isDraft: true, ticket: notrans };
+        return handleEditorStaging({
+          req, res, t,
+          moduleName: MODULE_NAME,
+          notransPrefix: MODULE_NAME,
+          action: "DELETE",
+          targetId: id,
+          payload: { title: section.title, reason: "Request Delete" },
+          recordToLock: section,
+          successMessage: "Permintaan hapus sektor bisnis diajukan. Menunggu persetujuan.",
+        });
       }
 
       await invalidateOldDrafts(MODULE_NAME, id, t);
