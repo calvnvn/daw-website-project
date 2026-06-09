@@ -90,47 +90,68 @@ class ErpApprovalService {
 
       // --- [NEW LOGIC] TRIGGER EMAIL TO APPROVER 1 ---
       try {
-        const firstApprover = cleanApproverRows.find((row) => Number(row.level) === 1);
+        const firstApprover = cleanApproverRows.find(
+          (row) => Number(row.level) === 1,
+        );
         if (firstApprover) {
           const ApprovalDraft = require("../models/ApprovalDraft");
           const User = require("../models/User");
           const { sendApprovalNotification } = require("../utils/mailer");
 
-          const draftData = await ApprovalDraft.findOne({ where: { notrans: String(notrans) } });
-          const targetUser = await User.findOne({ where: { owl_username: firstApprover.karyawanid } });
+          const draftData = await ApprovalDraft.findOne({
+            where: { notrans: String(notrans) },
+          });
+          let targetUser = await User.findOne({
+            where: { owl_username: firstApprover.karyawanid },
+          });
+          if (!targetUser && firstApprover.namakaryawan) {
+            targetUser = await User.findOne({
+              where: { name: firstApprover.namakaryawan.trim() },
+            });
+          }
 
-          console.log(`\n================ [ERP COURIER - APPROVER 1 DETECTED] ================`);
-          console.log(`   👉 NIK Approver 1 : ${firstApprover.karyawanid}`);
-          console.log(`   👉 Nama Approver 1: ${firstApprover.namakaryawan || "-"}`);
-          console.log(`   👉 Target User DB : ${targetUser ? `Ditemukan (${targetUser.email})` : "TIDAK DITEMUKAN (Menggunakan Fallback)"}`);
-          console.log(`======================================================================\n`);
-
-          const toEmail = (targetUser && targetUser.email) ? targetUser.email : `${firstApprover.karyawanid}@daw.co.id`;
-          const recipientName = (targetUser && targetUser.name) ? targetUser.name : (firstApprover.namakaryawan || "Approver 1");
+          console.log(
+            `[ERP COURIER] Ticket ${notrans} - Approver 1: ${firstApprover.namakaryawan || "-"} (${firstApprover.karyawanid}) | Local User DB: ${targetUser ? `Found (${targetUser.email})` : "Not Found"}`
+          );
 
           if (draftData) {
-            await sendApprovalNotification({
-              toEmail: toEmail,
-              recipientName: recipientName,
-              type: "NEW_REQUEST",
-              draftInfo: {
-                notrans: String(notrans),
-                module_name: draftData.module_name,
-                action: draftData.action,
-                created_by: draftData.created_by,
-              },
-            });
+            if (targetUser && targetUser.email) {
+              await sendApprovalNotification({
+                toEmail: targetUser.email,
+                recipientName:
+                  targetUser.name || firstApprover.namakaryawan || "Approver 1",
+                type: "NEW_REQUEST",
+                draftInfo: {
+                  notrans: String(notrans),
+                  module_name: draftData.module_name,
+                  action: draftData.action,
+                  created_by: draftData.created_by,
+                },
+              });
+            } else {
+              console.warn(
+                `⚠️ [ERP COURIER] Email tidak dikirim karena user NIK ${firstApprover.karyawanid} (${firstApprover.namakaryawan || "Approver 1"}) tidak ditemukan di tabel Users lokal.`,
+              );
+            }
           }
         }
       } catch (mailError) {
-        console.error("🚨 [ERP COURIER] Gagal mengirim email ke Approver 1:", mailError.message);
+        console.error(
+          "🚨 [ERP COURIER] Gagal mengirim email ke Approver 1:",
+          mailError.message,
+        );
       }
       // ----------------------------------------------
 
       // console.log(
       //   `>>> [ERP COURIER] ✅ Success: Ticket ${notrans} registered to ERP.`,
       // );
-      return { success: true, notrans, data: response.data, roadmap: cleanApproverRows };
+      return {
+        success: true,
+        notrans,
+        data: response.data,
+        roadmap: cleanApproverRows,
+      };
     } catch (error) {
       this._handleError(error, "initiateApproval - /trans/add");
     }

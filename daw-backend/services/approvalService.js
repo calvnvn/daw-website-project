@@ -167,6 +167,7 @@ class ApprovalService {
       const { module_name: moduleName, target_id: targetId, action } = draftData;
 
       let pureNextApp = "";
+      let pureNextAppName = "";
       let isFinalLocal = false;
 
       if (status === "1") {
@@ -176,6 +177,7 @@ class ApprovalService {
           const nextData = approverRows.find((row) => Number(row.level) === targetLevel);
           if (nextData && nextData.karyawanid) {
             pureNextApp = String(nextData.karyawanid);
+            pureNextAppName = nextData.namakaryawan || "";
           } else {
             isFinalLocal = true;
           }
@@ -237,7 +239,7 @@ class ApprovalService {
         } else {
           await draftData.update({ current_level: currentLevel + 1 }, { transaction: t });
           await t.commit();
-          this._notifyActor({ type: "NEW_REQUEST", pureNextApp, draftData });
+          this._notifyActor({ type: "NEW_REQUEST", pureNextApp, pureNextAppName, draftData });
           return { message: `Disetujui di Level ${currentLevel}. Menunggu persetujuan level selanjutnya.` };
         }
       }
@@ -378,7 +380,7 @@ class ApprovalService {
 
   // ─── UTILITIES ───
 
-  async _notifyActor({ type, pureNextApp, draftData, reason }) {
+  async _notifyActor({ type, pureNextApp, pureNextAppName, draftData, reason }) {
     try {
       const HIGH_PRIORITY_MODULES = ["NewsArticle", "Project", "Affiliate", "Management", "Achievement", "AboutInfo", "BusinessSection"];
       if (type === "APPROVED" && !HIGH_PRIORITY_MODULES.includes(draftData.module_name)) return;
@@ -386,6 +388,9 @@ class ApprovalService {
       let targetUser = null;
       if (type === "NEW_REQUEST" && pureNextApp) {
         targetUser = await User.findOne({ where: { owl_username: pureNextApp } });
+        if (!targetUser && pureNextAppName) {
+          targetUser = await User.findOne({ where: { name: pureNextAppName.trim() } });
+        }
       } else if (type === "REJECTED" || type === "APPROVED") {
         targetUser = await User.findOne({
           where: {

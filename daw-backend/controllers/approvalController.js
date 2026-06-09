@@ -206,7 +206,7 @@ exports.getDraftStatus = async (req, res) => {
       return res.status(404).json({ success: false, message: "Tiket approval tidak ditemukan." });
     }
 
-    console.log(`[getDraftStatus] notrans=${notrans} | created_by=${draft.created_by} | identities=${JSON.stringify(currentUserIdentities)} | role=${userRole}`);
+
 
     // Security Check: Editor hanya bisa melihat tiket miliknya sendiri.
     // Admin/superadmin/approver bebas akses.
@@ -215,7 +215,7 @@ exports.getDraftStatus = async (req, res) => {
     const isOwner = currentUserIdentities.includes(draftOwner);
 
     if (!isAdmin && !isOwner) {
-      console.warn(`[getDraftStatus] FORBIDDEN — user tidak memiliki akses ke tiket ${notrans}`);
+
       return res.status(403).json({ success: false, message: "Akses ditolak." });
     }
 
