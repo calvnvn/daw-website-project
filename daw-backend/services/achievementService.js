@@ -181,6 +181,26 @@ class AchievementService {
         throw new Error(`LOCKED: tiket ${achievement.lock_ticket}`);
       }
 
+      // Populate translations if not provided (e.g. on partial updates)
+      if (!body._translations) {
+        const existingTrans = await Translation.findAll({
+          where: {
+            modelName: MODULE_NAME,
+            recordId: String(id),
+          },
+          transaction: t,
+        });
+        if (existingTrans.length > 0) {
+          const transMap = { id: {} };
+          existingTrans.forEach((t) => {
+            if (t.locale === "id") {
+              transMap.id[t.field] = t.translatedText;
+            }
+          });
+          body._translations = transMap;
+        }
+      }
+
       // Handle photo updates or removals
       let finalImageUrl = achievement.imageUrl;
       let oldImageToDelete = null;

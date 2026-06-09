@@ -27,6 +27,30 @@ class ErpApprovalService {
     throw newError;
   }
 
+  // Helper: POST request with exponential backoff retry on database deadlock errors
+  static async _postWithDeadlockRetry(url, payload, headers, maxRetries = 4) {
+    let attempt = 0;
+    while (attempt < maxRetries) {
+      try {
+        const response = await dawApi.post(url, payload, { headers });
+        return response;
+      } catch (error) {
+        attempt++;
+        const status = error.response?.status;
+        const errMsg = error.response?.data?.message || "";
+        const isDeadlock = (status === 500 && (errMsg.includes("Deadlock") || errMsg.includes("lock")));
+
+        if (isDeadlock && attempt < maxRetries) {
+          const delay = Math.pow(2, attempt) * 1000 + Math.random() * 1000;
+          console.warn(`⚠️ [ERP DEADLOCK DETECTED at ${url}] Retrying in ${delay.toFixed(0)}ms (Attempt ${attempt}/${maxRetries})...`);
+          await new Promise((resolve) => setTimeout(resolve, delay));
+          continue;
+        }
+        throw error;
+      }
+    }
+  }
+
   // Validate approval configuration (POST /node/approval/setup/cekSetup)
   static async _cekSetup(notrans, token) {
     try {
@@ -80,12 +104,10 @@ class ErpApprovalService {
       //   JSON.stringify(payloadTransAdd, null, 2),
       // );
 
-      const response = await dawApi.post(
+      const response = await this._postWithDeadlockRetry(
         "/node/approval/trans/add",
         payloadTransAdd,
-        {
-          headers: { Authorization: `Bearer ${token}` },
-        },
+        { Authorization: `Bearer ${token}` }
       );
 
       // --- [NEW LOGIC] TRIGGER EMAIL TO APPROVER 1 ---
@@ -219,12 +241,10 @@ class ErpApprovalService {
       //   JSON.stringify(payload, null, 2),
       // );
 
-      const response = await dawApi.post(
+      const response = await this._postWithDeadlockRetry(
         "/node/approval/trans/submitApp",
         payload,
-        {
-          headers: { Authorization: `Bearer ${token}` },
-        },
+        { Authorization: `Bearer ${token}` }
       );
       return response.data;
     } catch (error) {

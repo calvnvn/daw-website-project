@@ -221,12 +221,12 @@ export default function AchievementTab({
     if (form.photo || form.removePhoto) return true;
 
     const currentData = {
-      year: form.year.trim(),
-      title: form.title.trim(),
-      category: form.category.trim(),
+      year: String(form.year || "").trim(),
+      title: String(form.title || "").trim(),
+      category: String(form.category || "").trim(),
       iconId: form.iconId,
-      date: form.date.trim(),
-      description: form.description.trim(),
+      date: String(form.date || "").trim(),
+      description: String(form.description || "").trim(),
       imageUrl: form.savedPhotoUrl,
       news_article_id: form.news_article_id || "",
     };
@@ -244,11 +244,11 @@ export default function AchievementTab({
     e.preventDefault();
 
     if (
-      !form.year.trim() ||
-      !form.title.trim() ||
-      !form.category.trim() ||
-      !form.date.trim() ||
-      !form.description.trim()
+      !String(form.year || "").trim() ||
+      !String(form.title || "").trim() ||
+      !String(form.category || "").trim() ||
+      !String(form.date || "").trim() ||
+      !String(form.description || "").trim()
     ) {
       return toast.error("Lengkapi semua kolom wajib.");
     }
@@ -261,12 +261,12 @@ export default function AchievementTab({
     const loadingToast = toast.loading("Menyimpan penghargaan...");
 
     const formData = new FormData();
-    formData.append("year", form.year.trim());
-    formData.append("title", form.title.trim());
-    formData.append("category", form.category.trim());
+    formData.append("year", String(form.year || "").trim());
+    formData.append("title", String(form.title || "").trim());
+    formData.append("category", String(form.category || "").trim());
     formData.append("iconId", form.iconId);
-    formData.append("date", form.date.trim());
-    formData.append("description", form.description.trim());
+    formData.append("date", String(form.date || "").trim());
+    formData.append("description", String(form.description || "").trim());
 
     if (form.removePhoto) formData.append("removePhoto", "true");
     if (form.photo) formData.append("image", form.photo);

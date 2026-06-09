@@ -98,6 +98,26 @@ class PhilosophyService {
         throw new Error(`LOCKED: tiket ${info.lock_ticket}`);
       }
 
+      // Populate translations if not provided (e.g. on partial updates)
+      if (!body._translations) {
+        const existingTrans = await Translation.findAll({
+          where: {
+            modelName: MODULE_NAME,
+            recordId: "1",
+          },
+          transaction: t,
+        });
+        if (existingTrans.length > 0) {
+          const transMap = { id: {} };
+          existingTrans.forEach((t) => {
+            if (t.locale === "id") {
+              transMap.id[t.field] = t.translatedText;
+            }
+          });
+          body._translations = transMap;
+        }
+      }
+
       const payload = this.sanitizePayload(body, info);
 
       // Flow 1: Editor initiates staging and ERP sync

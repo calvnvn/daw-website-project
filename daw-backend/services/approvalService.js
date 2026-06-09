@@ -267,7 +267,7 @@ class ApprovalService {
       result = record ? record.toJSON() : null;
     } else if (module === "History") {
       const histories = await History.findAll({ order: [["year", "ASC"]] });
-      result = { histories: histories.map((h) => ({ year: h.year, text: h.description })) };
+      result = { histories: histories.map((h) => ({ year: h.year, description: h.description })) };
     } else {
       if (!cleanTargetId) return null;
       const record = await Model.findByPk(cleanTargetId);
@@ -518,24 +518,31 @@ class ApprovalService {
     try {
       if (effectiveModule === "History") {
         await Translation.destroy({ where: { modelName: effectiveModule, locale: "id" }, transaction });
+        if (manualTranslations) {
+          const { saveManualTranslations } = require("../utils/translationHelper");
+          for (const [year, fields] of Object.entries(manualTranslations)) {
+            if (fields && typeof fields === "object") {
+              await saveManualTranslations(effectiveModule, String(year), { id: fields }, transaction);
+            }
+          }
+        }
       } else if (finalTargetId && finalTargetId !== "ALL_TREE") {
         await Translation.destroy({
           where: { modelName: effectiveModule, recordId: String(finalTargetId), locale: "id" },
           transaction
         });
-      }
-
-      if (manualTranslations && manualTranslations.id && finalTargetId !== "ALL_TREE") {
-        for (const [field, text] of Object.entries(manualTranslations.id)) {
-           if (text) {
-             await Translation.create({
-                 modelName: effectiveModule,
-                 recordId: String(finalTargetId),
-                 field: field,
-                 locale: 'id',
-                 translatedText: text
-             }, { transaction });
-           }
+        if (manualTranslations && manualTranslations.id) {
+          for (const [field, text] of Object.entries(manualTranslations.id)) {
+             if (text) {
+               await Translation.create({
+                   modelName: effectiveModule,
+                   recordId: String(finalTargetId),
+                   field: field,
+                   locale: 'id',
+                   translatedText: text
+               }, { transaction });
+             }
+          }
         }
       }
     } catch (err) {

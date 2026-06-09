@@ -6,6 +6,6 @@ const aboutSchema = z.object({
   visionText: z.string().optional(),
   status: z.string().optional(),
   previous_notrans: z.string().nullable().optional(),
-});
+}).passthrough();
 
 module.exports = { aboutSchema };

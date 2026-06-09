@@ -78,7 +78,7 @@ class HistoryService {
     const translatedHistories = [];
     for (let i = 0; i < formatted.length; i++) {
       let item = formatted[i];
-      item.description = await safeTranslate(MODULE_NAME, item.id, "description", item.description);
+      item.description = await safeTranslate(MODULE_NAME, String(item.year), "description", item.description);
       translatedHistories.push(item);
     }
 
@@ -102,6 +102,26 @@ class HistoryService {
 
       if (lockedRow && normalizedRole === "editor") {
         throw new Error(`LOCKED: tiket ${lockedRow.lock_ticket}`);
+      }
+
+      // Populate translations if not provided (e.g. on partial updates)
+      if (!body._translations) {
+        const existingTrans = await Translation.findAll({
+          where: {
+            modelName: MODULE_NAME,
+          },
+          transaction: t,
+        });
+        if (existingTrans.length > 0) {
+          const transMap = {};
+          existingTrans.forEach((t) => {
+            if (t.locale === "id") {
+              if (!transMap[t.recordId]) transMap[t.recordId] = {};
+              transMap[t.recordId][t.field] = t.translatedText;
+            }
+          });
+          body._translations = transMap;
+        }
       }
 
       const payload = this.processHistoryPayload(body);

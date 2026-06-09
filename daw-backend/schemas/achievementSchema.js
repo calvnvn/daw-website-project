@@ -29,7 +29,7 @@ const createAchievementSchema = z.object({
     (val) => (val === "null" || val === "" || val === undefined ? null : val),
     z.string().uuid("ID Artikel Berita tidak valid.").nullable().optional()
   ),
-});
+}).passthrough();
 
 const updateAchievementSchema = createAchievementSchema.extend({
   removePhoto: z
@@ -37,6 +37,6 @@ const updateAchievementSchema = createAchievementSchema.extend({
     .transform((val) => val === "true" || val === true)
     .optional(),
   previous_notrans: z.string().nullable().optional(),
-}).partial();
+}).partial().passthrough();
 
 module.exports = { createAchievementSchema, updateAchievementSchema };
