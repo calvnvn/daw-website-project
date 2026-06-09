@@ -15,6 +15,8 @@ class AuthService {
       "manage_content",
       "manage_homepage",
       "manage_about",
+      "manage_philosophy",
+      "manage_achievements",
       "manage_settings",
       "manage_news",
     ];
