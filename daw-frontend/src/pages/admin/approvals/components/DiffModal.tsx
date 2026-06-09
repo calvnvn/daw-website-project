@@ -170,6 +170,7 @@ const DiffModal = ({
         text = `Mengisi bagian ${label} yang sebelumnya kosong`;
         subtext = `Menambahkan tulisan: "${cleanNew.slice(0, 60)}${cleanNew.length > 60 ? '...' : ''}"`;
       } else if (cleanOld && !cleanNew) {
+        if (isTrans) return; // Skip translation deletions to avoid false-positives
         icon = "➖";
         text = `Menghapus seluruh tulisan di ${label}`;
         subtext = `Tulisan lama: "${cleanOld.slice(0, 60)}${cleanOld.length > 60 ? '...' : ''}"`;
@@ -439,8 +440,8 @@ const DiffModal = ({
                 {/* AI INSIGHT CARD (RINGKASAN PERUBAHAN) */}
                 {!isBrandNewData &&
                   !isDeleteAction &&
-                  changedFields.length > 0 &&
-                  aiInsights && (
+                  aiInsights &&
+                  (changedFields.length > 0 || aiInsights.media.length > 0 || aiInsights.settings.length > 0) && (
                     <div className="bg-gradient-to-r from-violet-600 via-indigo-600 to-cyan-600 p-[1.5px] rounded-3xl shadow-xl shadow-indigo-100/30 mb-6 overflow-hidden">
                       <div className="bg-white/95 backdrop-blur-md p-6 rounded-[22.5px] flex flex-col gap-5">
                         

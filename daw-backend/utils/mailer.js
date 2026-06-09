@@ -28,6 +28,23 @@ const transporter = nodemailer.createTransport({
   },
 });
 
+const sendMailWithRetry = async (mailOptions, retries = 2, delay = 1500) => {
+  if (process.env.DISABLE_EMAIL === "true") {
+    console.log(`🔕 [MAILER BYPASS] Pengiriman email ke ${mailOptions.to} disimulasikan (DISABLE_EMAIL=true).`);
+    return { messageId: "simulated-id" };
+  }
+
+  for (let i = 0; i <= retries; i++) {
+    try {
+      return await transporter.sendMail(mailOptions);
+    } catch (err) {
+      if (i === retries) throw err;
+      console.warn(`⚠️ [MAILER WARNING] Gagal mengirim email (Percobaan ${i + 1}/${retries + 1}): ${err.message}. Mencoba kembali dalam ${delay}ms...`);
+      await new Promise((resolve) => setTimeout(resolve, delay));
+    }
+  }
+};
+
 const sendApprovalNotification = async ({
   toEmail,
   recipientName,
@@ -275,7 +292,7 @@ const sendApprovalNotification = async ({
       });
     }
 
-    await transporter.sendMail({
+    await sendMailWithRetry({
       from: sender,
       to: recipient,
       subject: subject,
@@ -485,7 +502,7 @@ const sendInquiryNotification = async ({
       });
     }
 
-    await transporter.sendMail({
+    await sendMailWithRetry({
       from: sender,
       to: recipient,
       replyTo: email,

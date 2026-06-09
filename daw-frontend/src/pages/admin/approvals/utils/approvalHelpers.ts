@@ -30,6 +30,11 @@ export const isHtmlString = (str: any): boolean => {
 export const cleanHtmlText = (val: any): string => {
   if (val === null || val === undefined) return "";
   if (typeof val === "object") return "";
+  
+  // Normalize booleans and boolean-like values
+  if (val === true || val === "true" || val === 1 || val === "1") return "true";
+  if (val === false || val === "false" || val === 0 || val === "0") return "false";
+
   let str = String(val);
   if (isHtmlString(str)) {
     str = str.replace(/<[^>]*>?/gm, "");
@@ -45,6 +50,9 @@ export const cleanHtmlText = (val: any): string => {
 };
 
 export const isMeaningfulTextField = (key: string, val: any): boolean => {
+  // Ignore specific map marker translation keys
+  if (key.includes("marker_")) return false;
+
   const skippedFields = [
     "order",
     "orderIndex",
@@ -55,6 +63,12 @@ export const isMeaningfulTextField = (key: string, val: any): boolean => {
     "lat",
     "lng",
     "category_id",
+    "category",
+    "date",
+    "year",
+    "mapMarkers",
+    "hasMap",
+    "has_map",
     "type",
     "externalLink",
     "pageId",
@@ -181,7 +195,7 @@ export const sanitizeForDiff = (data: any) => {
     if (obj === null || obj === undefined) return {};
     const res: any = {};
     for (const [key, rawVal] of Object.entries(obj)) {
-      if (systemFields.includes(key)) continue;
+      if (systemFields.includes(key) || key === "mapMarkers") continue;
 
       const val = maybeParseJSON(rawVal);
       const newKey = prefix ? `${prefix}_${key}` : key;

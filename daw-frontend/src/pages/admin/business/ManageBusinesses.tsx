@@ -446,30 +446,6 @@ export default function ManageBusinesses() {
         </div>
       )}
 
-      {/* Recovery Banner: Draf Ditolak (Resilient Form Pattern) */}
-      {isNeedsRevision && !isEditing && (
-        <div className="bg-red-50 border border-red-200 p-4 rounded-xl flex items-center justify-between gap-4 animate-in slide-in-from-top-4 shadow-sm">
-          <div className="flex items-center gap-4">
-            <div className="bg-red-100 p-2 rounded-full text-red-600 shrink-0">
-              <ShieldAlert className="w-5 h-5" />
-            </div>
-            <div>
-              <h4 className="text-xs font-black text-red-900 uppercase tracking-tight">
-                Revisi Diperlukan
-              </h4>
-              <p className="text-xs text-red-700 leading-relaxed mt-0.5">
-                Pengajuan sebelumnya ditolak:{" "}
-                <strong>"{currentSection?.rejection_reason}"</strong>
-              </p>
-            </div>
-          </div>
-          <button
-            onClick={() => setIsEditing(true)}
-            className="px-4 py-2 bg-red-600 text-white text-xs font-bold rounded-lg hover:bg-red-700 transition-all shadow-md active:scale-95">
-            Perbaiki Sekarang
-          </button>
-        </div>
-      )}
 
       {/* HEADER & NAVIGATION CONTROL */}
 

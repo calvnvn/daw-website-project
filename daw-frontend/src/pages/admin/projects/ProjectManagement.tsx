@@ -496,24 +496,33 @@ export default function ProjectManagement() {
                       {/* KOLOM 5: ACTIONS (DYNAMIC UX) */}
                       <td className="px-6 py-4 text-right">
                         <div
-                          className={`flex items-center justify-end gap-1 transition-opacity ${isLockedForEditor ? "opacity-50" : "opacity-0 group-hover:opacity-100"}`}>
+                          className={`flex items-center justify-end gap-1 transition-opacity ${isLockedForEditor ? "opacity-100" : "opacity-0 group-hover:opacity-100"}`}>
                           {/* PUBLIC PREVIEW */}
-                          <Link
+                          {project.status !== "Published" ? (
+                            <button
+                              disabled
+                              className="p-2 text-slate-200 cursor-not-allowed"
+                              title="Pratinjau publik hanya tersedia untuk proyek yang sudah terbit (Published)">
+                              <Eye className="w-4 h-4 opacity-50" />
+                            </button>
+                          ) : (
+                            <Link
                             to={`/projects/${project.slug || project.id}`}
                             target="_blank"
                             className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
                             title="Pratinjau Publik">
                             <Eye className="w-4 h-4" />
                           </Link>
+                          )}
 
                           {/* EDIT / VIEW ACTION */}
                           {isLockedForEditor ? (
                             /* SENIOR FIX: Jangan matikan tombol. Arahkan ke mode View agar Editor bisa baca data. */
                             <Link
                               to={`/admin/projects/edit/${project.id}?mode=view`}
-                              title="Lihat Detail (Data Terkunci)"
-                              className="p-2 text-blue-400 hover:bg-blue-50 rounded-lg cursor-pointer">
-                              <Lock className="w-4 h-4" />
+                              title="Lihat Detail & Progress Approval"
+                              className="p-2 text-blue-600 hover:text-blue-800 hover:bg-blue-100 rounded-lg cursor-pointer transition-colors shadow-sm bg-blue-50 border border-blue-200 inline-flex items-center justify-center">
+                              <Lock className="w-4 h-4 text-blue-600" />
                             </Link>
                           ) : (
                             <Link
