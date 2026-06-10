@@ -99,10 +99,7 @@ class ErpApprovalService {
         data: cleanApproverRows,
       };
 
-      console.log(
-        ">>> [STRICT DEBUG] Payload to /trans/add:",
-        JSON.stringify(payloadTransAdd, null, 2),
-      );
+
 
       const response = await this._postWithDeadlockRetry(
         "/node/approval/trans/add",
@@ -165,10 +162,7 @@ class ErpApprovalService {
       }
       // ----------------------------------------------
 
-      console.log(
-        `>>> [ERP COURIER] ✅ Success: Ticket ${notrans} registered to ERP.`,
-        JSON.stringify(response.data, null, 2)
-      );
+
       return {
         success: true,
         notrans,
@@ -190,9 +184,7 @@ class ErpApprovalService {
         limit: Number(limit),
       };
 
-      console.log(
-        `>>> [ERP COURIER] Membuka Data (getData) untuk NIK: ${karyawanid}...`,
-      );
+
 
       const response = await dawApi.post(
         "/node/approval/trans/getData",
@@ -204,9 +196,7 @@ class ErpApprovalService {
 
       if (response.data) {
         const rowCount = response.data.data?.rows?.length || 0;
-        console.log(
-          `>>> [ERP COURIER] Response: ${response.data.message} | Rows Received: ${rowCount}`,
-        );
+
       }
       return response.data;
     } catch (error) {
@@ -237,10 +227,7 @@ class ErpApprovalService {
         karyawanid: String(karyawanid),
       };
 
-      console.log(
-        ">>> [ERP COURIER PRE-FLIGHT] Submit Decision Payload:",
-        JSON.stringify(payload, null, 2),
-      );
+
 
       const response = await this._postWithDeadlockRetry(
         "/node/approval/trans/submitApp",
