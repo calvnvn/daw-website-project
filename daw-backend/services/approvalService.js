@@ -53,7 +53,9 @@ const MODEL_MAPPING = {
 function getModelByModuleName(moduleName) {
   if (!moduleName) return null;
   const normalizedName = moduleName;
-  const standardKey = Object.keys(MODEL_MAPPING).find((k) => k.toLowerCase() === normalizedName.toLowerCase());
+  const standardKey = Object.keys(MODEL_MAPPING).find(
+    (k) => k.toLowerCase() === normalizedName.toLowerCase(),
+  );
   return MODEL_MAPPING[standardKey] || null;
 }
 
@@ -72,7 +74,9 @@ class ApprovalService {
     const taskTicketsNormalized = [];
 
     myOwlTasks.forEach((item) => {
-      const ticketNo = (item.notransaksi || item.notrans || "").trim().toLowerCase();
+      const ticketNo = (item.notransaksi || item.notrans || "")
+        .trim()
+        .toLowerCase();
       if (ticketNo) {
         owlMap.set(ticketNo, item);
         taskTicketsNormalized.push(ticketNo);
@@ -84,7 +88,10 @@ class ApprovalService {
     if (isApproverRole) {
       detailedDrafts = await ApprovalDraft.findAll({
         where: {
-          [Op.or]: [{ status: "Pending" }, { notrans: { [Op.in]: taskTicketsNormalized } }],
+          [Op.or]: [
+            { status: "Pending" },
+            { notrans: { [Op.in]: taskTicketsNormalized } },
+          ],
         },
         order: [["createdAt", "DESC"]],
       });
@@ -103,7 +110,9 @@ class ApprovalService {
 
       const owlStatusFinal = myRow ? String(myRow.status) : "9";
 
-      const isActuallyMyTurn = owlStatusFinal === "0" || (owlStatusFinal === "2" && draft.status === "Pending");
+      const isActuallyMyTurn =
+        owlStatusFinal === "0" ||
+        (owlStatusFinal === "2" && draft.status === "Pending");
 
       return {
         ...draftJson,
@@ -118,7 +127,9 @@ class ApprovalService {
     });
 
     if (isApproverRole) {
-      const existingNotrans = new Set(draftsWithExtraData.map((d) => d.notrans.toLowerCase()));
+      const existingNotrans = new Set(
+        draftsWithExtraData.map((d) => d.notrans.toLowerCase()),
+      );
 
       myOwlTasks.forEach((owlItem) => {
         const owlNo = (owlItem.notransaksi || owlItem.notrans || "").trim();
@@ -142,132 +153,257 @@ class ApprovalService {
     return draftsWithExtraData;
   }
 
-  async executeDecision({ status, notrans, level, komentar, tokenOWL, nikApprover }) {
-    const currentLevel = Number(level);
-    const t = await sequelize.transaction();
-
-    try {
-      const owlResponse = await ErpApprovalService.getPendingList({
-        karyawanid: nikApprover,
-        token: tokenOWL,
-        limit: 100,
-      });
-
-      const myOwlTasks = owlResponse?.data?.rows || [];
-      const realErpTask = myOwlTasks.find((task) => (task.notransaksi || task.notrans || "").trim().toLowerCase() === notrans.toLowerCase());
-
-      if (!realErpTask) throw new Error("Tiket tidak ditemukan di antrean ERP Anda yang aktif. Mungkin sudah dieksekusi.");
-
-      const validExecutionId = realErpTask.nourut || realErpTask.kodeapp;
-      if (!validExecutionId) throw new Error("Akses Ditolak: Gagal mengekstrak ID eksekusi dari ERP.");
-
-      const draftData = await ApprovalDraft.findByPk(notrans, { transaction: t });
-      if (!draftData) throw new Error("Draf tidak ditemukan di server lokal.");
-
-      const { module_name: moduleName, target_id: targetId, action } = draftData;
-
-      let pureNextApp = "";
-      let pureNextAppName = "";
-      let isFinalLocal = false;
-
-      if (status === "1") {
-        const approverRows = await ErpApprovalService._cekSetup(notrans, tokenOWL);
-        if (approverRows && approverRows.length > 0) {
-          const targetLevel = currentLevel + 1;
-          const nextData = approverRows.find((row) => Number(row.level) === targetLevel);
-          if (nextData && nextData.karyawanid) {
-            pureNextApp = String(nextData.karyawanid);
-            pureNextAppName = nextData.namakaryawan || "";
-          } else {
-            isFinalLocal = true;
+  async runWithDeadlockRetry(fn, maxRetries = 4) {
+    let attempt = 0;
+    while (true) {
+      attempt++;
+      const t = await sequelize.transaction();
+      try {
+        const result = await fn(t);
+        await t.commit();
+        return result;
+      } catch (error) {
+        if (t && !t.finished) {
+          try {
+            await t.rollback();
+          } catch (rollbackErr) {
+            console.error("Rollback failed:", rollbackErr);
           }
+        }
+
+        const isDeadlock =
+          error.name === "SequelizeDatabaseError" &&
+          (error.parent?.code === "ER_LOCK_DEADLOCK" ||
+            error.original?.code === "ER_LOCK_DEADLOCK" ||
+            error.message?.includes("Deadlock"));
+
+        if (isDeadlock && attempt < maxRetries) {
+          const delay = Math.pow(2, attempt) * 100 + Math.random() * 100;
+          console.warn(
+            `⚠️ [DB DEADLOCK DETECTED] Retrying local transaction in ${delay.toFixed(0)}ms (Attempt ${attempt}/${maxRetries})...`,
+          );
+          await new Promise((resolve) => setTimeout(resolve, delay));
+          continue;
+        }
+        throw error;
+      }
+    }
+  }
+
+  async executeDecision({
+    status,
+    notrans,
+    level,
+    komentar,
+    tokenOWL,
+    nikApprover,
+  }) {
+    const currentLevel = Number(level);
+
+    // 1. Fetch baseline data outside database transaction
+    const owlResponse = await ErpApprovalService.getPendingList({
+      karyawanid: nikApprover,
+      token: tokenOWL,
+      limit: 100,
+    });
+
+    const myOwlTasks = owlResponse?.data?.rows || [];
+    console.log("=== ISI ANTREAN DARI ERP OWL ===");
+    myOwlTasks.forEach((task) => {
+      console.log(
+        `Tiket: ${task.notransaksi || task.notrans} | kodeapp: ${task.kodeapp} | nourut: ${task.nourut}`,
+      );
+    });
+
+    const realErpTask = myOwlTasks.find(
+      (task) =>
+        (task.notransaksi || task.notrans || "").trim().toLowerCase() ===
+        notrans.toLowerCase(),
+    );
+
+    if (!realErpTask)
+      throw new Error(
+        "Tiket tidak ditemukan di antrean ERP Anda yang aktif. Mungkin sudah dieksekusi.",
+      );
+
+    const validExecutionId = realErpTask.nourut || realErpTask.kodeapp;
+    if (!validExecutionId)
+      throw new Error("Akses Ditolak: Gagal mengekstrak ID eksekusi dari ERP.");
+
+    const draftData = await ApprovalDraft.findByPk(notrans);
+    if (!draftData) throw new Error("Draf tidak ditemukan di server lokal.");
+
+    const { module_name: moduleName, target_id: targetId, action } = draftData;
+
+    let pureNextApp = "";
+    let pureNextAppName = "";
+    let isFinalLocal = false;
+
+    if (status === "1") {
+      const approverRows = await ErpApprovalService._cekSetup(
+        notrans,
+        tokenOWL,
+      );
+      if (approverRows && approverRows.length > 0) {
+        const targetLevel = currentLevel + 1;
+        const nextData = approverRows.find(
+          (row) => Number(row.level) === targetLevel,
+        );
+        if (nextData && nextData.karyawanid) {
+          pureNextApp = String(nextData.karyawanid);
+          pureNextAppName = nextData.namakaryawan || "";
         } else {
           isFinalLocal = true;
         }
+      } else {
+        isFinalLocal = true;
       }
+    }
 
-      await ErpApprovalService.submitDecision({
-        status,
-        kodeapp: validExecutionId,
-        nourut: validExecutionId,
-        notrans,
-        level: status === "1" ? currentLevel + 1 : currentLevel,
-        komentar,
-        nextApp: pureNextApp,
-        token: tokenOWL,
-        karyawanid: nikApprover,
+    // 2. Submit decision to ERP outside database transaction
+    await ErpApprovalService.submitDecision({
+      status,
+      kodeapp: validExecutionId,
+      nourut: validExecutionId,
+      notrans,
+      level: status === "1" ? currentLevel + 1 : currentLevel,
+      komentar,
+      nextApp: pureNextApp,
+      token: tokenOWL,
+      karyawanid: nikApprover,
+    });
+
+    // 3. Execute database updates with local deadlock retry
+    let filesToTrash = [];
+    const dbResult = await this.runWithDeadlockRetry(async (t) => {
+      // Re-fetch draft with lock inside transaction to guarantee state integrity
+      const txDraft = await ApprovalDraft.findByPk(notrans, {
+        transaction: t,
+        lock: t.LOCK.UPDATE,
       });
+      if (!txDraft)
+        throw new Error(
+          "Draf tidak ditemukan di server lokal saat memproses transaksi.",
+        );
 
       if (status === "2") {
         const Model = getModelByModuleName(moduleName);
         if (Model && targetId) {
-          await Model.update({ is_locked: false, lock_ticket: null }, { where: { id: targetId }, transaction: t });
+          await Model.update(
+            { is_locked: false, lock_ticket: null },
+            { where: { id: targetId }, transaction: t },
+          );
         }
-        await draftData.update({ status: "Rejected", rejection_reason: komentar }, { transaction: t });
-
-        await t.commit();
-        this._notifyActor({ type: "REJECTED", draftData, reason: komentar });
-        return { message: "Keputusan ditolak. Data telah dibuka kembali untuk revisi." };
+        await txDraft.update(
+          { status: "Rejected", rejection_reason: komentar },
+          { transaction: t },
+        );
+        return { type: "REJECTED" };
       }
 
       if (status === "1") {
         if (isFinalLocal) {
           let cleanPayload;
           try {
-            const rawPayload = draftData.payload;
-            cleanPayload = typeof rawPayload === "string" ? JSON.parse(rawPayload) : JSON.parse(JSON.stringify(rawPayload));
+            const rawPayload = txDraft.payload;
+            cleanPayload =
+              typeof rawPayload === "string"
+                ? JSON.parse(rawPayload)
+                : JSON.parse(JSON.stringify(rawPayload));
           } catch (e) {
             throw new Error("Payload draf korup.");
           }
-          ["id", "createdAt", "updatedAt", "is_locked", "lock_ticket"].forEach((f) => delete cleanPayload[f]);
+          ["id", "createdAt", "updatedAt", "is_locked", "lock_ticket"].forEach(
+            (f) => delete cleanPayload[f],
+          );
 
           cleanPayload.is_locked = false;
           cleanPayload.lock_ticket = null;
           cleanPayload = this.handleFileCommit(cleanPayload);
 
-          const filesToTrash = await this.executeModelUpdate(moduleName, targetId, cleanPayload, action, t);
+          filesToTrash = await this.executeModelUpdate(
+            moduleName,
+            targetId,
+            cleanPayload,
+            action,
+            t,
+          );
 
-          await draftData.update({ status: "Approved" }, { transaction: t });
-          await t.commit();
-
-          if (filesToTrash && Array.isArray(filesToTrash)) {
-            filesToTrash.forEach((file) => file && deleteSingleFile(file));
-          }
-
-          this._notifyActor({ type: "APPROVED", draftData });
-          return { message: "Persetujuan Final Berhasil. Data telah dipublikasikan!" };
+          await txDraft.update({ status: "Approved" }, { transaction: t });
+          return { type: "APPROVED" };
         } else {
-          await draftData.update({ current_level: currentLevel + 1 }, { transaction: t });
-          await t.commit();
-          this._notifyActor({ type: "NEW_REQUEST", pureNextApp, pureNextAppName, draftData });
-          return { message: `Disetujui di Level ${currentLevel}. Menunggu persetujuan level selanjutnya.` };
+          await txDraft.update(
+            { current_level: currentLevel + 1 },
+            { transaction: t },
+          );
+          return { type: "NEW_REQUEST" };
         }
       }
-    } catch (error) {
-      if (t && !t.finished) await t.rollback();
-      throw error;
+    });
+
+    // 4. Trigger notifications and side effects outside database transaction
+    if (dbResult.type === "REJECTED") {
+      this._notifyActor({ type: "REJECTED", draftData, reason: komentar });
+      return {
+        message: "Keputusan ditolak. Data telah dibuka kembali untuk revisi.",
+      };
+    }
+
+    if (dbResult.type === "APPROVED") {
+      if (filesToTrash && Array.isArray(filesToTrash)) {
+        filesToTrash.forEach((file) => file && deleteSingleFile(file));
+      }
+      this._notifyActor({ type: "APPROVED", draftData });
+      return {
+        message: "Persetujuan Final Berhasil. Data telah dipublikasikan!",
+      };
+    }
+
+    if (dbResult.type === "NEW_REQUEST") {
+      this._notifyActor({
+        type: "NEW_REQUEST",
+        pureNextApp,
+        pureNextAppName,
+        draftData,
+      });
+      return {
+        message: `Disetujui di Level ${currentLevel}. Menunggu persetujuan level selanjutnya.`,
+      };
     }
   }
 
   async getOriginalData(module, targetId, action) {
-    if (action === "CREATE") return { _system_note: "Ini adalah data baru, belum ada versi Live." };
+    if (action === "CREATE")
+      return { _system_note: "Ini adalah data baru, belum ada versi Live." };
 
     const Model = getModelByModuleName(module);
     if (!Model) return null;
 
-    let cleanTargetId = targetId && typeof targetId === "string" ? targetId.trim() : targetId;
+    let cleanTargetId =
+      targetId && typeof targetId === "string" ? targetId.trim() : targetId;
     if (["null", "undefined", ""].includes(cleanTargetId)) cleanTargetId = null;
 
     let result = null;
     if (module === "BusinessSection") {
-      const record = await BusinessSection.findByPk(cleanTargetId, { include: [{ model: BusinessMapMarker, as: "mapMarkers" }] });
+      const record = await BusinessSection.findByPk(cleanTargetId, {
+        include: [{ model: BusinessMapMarker, as: "mapMarkers" }],
+      });
       result = record ? record.toJSON() : null;
-    } else if (["AboutInfo", "HomeSettings", "InvestmentSettings", "Settings"].includes(module)) {
+    } else if (
+      ["AboutInfo", "HomeSettings", "InvestmentSettings", "Settings"].includes(
+        module,
+      )
+    ) {
       const record = await Model.findByPk(1);
       result = record ? record.toJSON() : null;
     } else if (module === "History") {
       const histories = await History.findAll({ order: [["year", "ASC"]] });
-      result = { histories: histories.map((h) => ({ year: h.year, description: h.description })) };
+      result = {
+        histories: histories.map((h) => ({
+          year: h.year,
+          description: h.description,
+        })),
+      };
     } else {
       if (!cleanTargetId) return null;
       const record = await Model.findByPk(cleanTargetId);
@@ -280,8 +416,8 @@ class ApprovalService {
         const trans = await Translation.findAll({
           where: {
             modelName: "History",
-            locale: "id"
-          }
+            locale: "id",
+          },
         });
         const transObj = {};
         trans.forEach((t) => {
@@ -294,8 +430,8 @@ class ApprovalService {
           where: {
             modelName: module,
             recordId: String(cleanTargetId || 1),
-            locale: "id"
-          }
+            locale: "id",
+          },
         });
         if (trans.length > 0) {
           const translationMap = {};
@@ -338,18 +474,25 @@ class ApprovalService {
 
       if (!currentUserIdentities.includes(String(draft.created_by))) {
         await t.rollback();
-        throw new Error("FORBIDDEN: Anda tidak memiliki akses untuk membuang draf ini.");
+        throw new Error(
+          "FORBIDDEN: Anda tidak memiliki akses untuk membuang draf ini.",
+        );
       }
 
       if (draft.status !== "Rejected") {
         await t.rollback();
-        throw new Error("VALIDATION: Hanya draf yang ditolak yang bisa diabaikan.");
+        throw new Error(
+          "VALIDATION: Hanya draf yang ditolak yang bisa diabaikan.",
+        );
       }
 
       await draft.update({ status: "Discarded" }, { transaction: t });
       const Model = getModelByModuleName(draft.module_name);
       if (Model && draft.target_id) {
-        await Model.update({ is_locked: false, lock_ticket: null }, { where: { id: String(draft.target_id).trim() }, transaction: t });
+        await Model.update(
+          { is_locked: false, lock_ticket: null },
+          { where: { id: String(draft.target_id).trim() }, transaction: t },
+        );
       }
       await t.commit();
       return { success: true };
@@ -363,9 +506,9 @@ class ApprovalService {
   //   const owlResponse = await ErpApprovalService.getPendingList({ karyawanid: nikApprover, token: tokenOWL, limit: 100 });
   //   const pendingTasks = owlResponse?.data?.rows || [];
   //   const targetTicket = pendingTasks.find((t) => (t.notransaksi || t.notrans || "").trim().toLowerCase() === notrans.toLowerCase());
-  // 
+  //
   //   if (!targetTicket) throw new Error("NOT_FOUND: Tiket tidak ditemukan di antrean ERP Anda.");
-  // 
+  //
   //   await ErpApprovalService.submitDecision({
   //     status: "2",
   //     nourut: nourut,
@@ -380,21 +523,47 @@ class ApprovalService {
 
   // ─── UTILITIES ───
 
-  async _notifyActor({ type, pureNextApp, pureNextAppName, draftData, reason }) {
+  async _notifyActor({
+    type,
+    pureNextApp,
+    pureNextAppName,
+    draftData,
+    reason,
+  }) {
     try {
-      const HIGH_PRIORITY_MODULES = ["NewsArticle", "Project", "Affiliate", "Management", "Achievement", "AboutInfo", "BusinessSection"];
-      if (type === "APPROVED" && !HIGH_PRIORITY_MODULES.includes(draftData.module_name)) return;
+      const HIGH_PRIORITY_MODULES = [
+        "NewsArticle",
+        "Project",
+        "Affiliate",
+        "Management",
+        "Achievement",
+        "AboutInfo",
+        "BusinessSection",
+      ];
+      if (
+        type === "APPROVED" &&
+        !HIGH_PRIORITY_MODULES.includes(draftData.module_name)
+      )
+        return;
 
       let targetUser = null;
       if (type === "NEW_REQUEST" && pureNextApp) {
-        targetUser = await User.findOne({ where: { owl_username: pureNextApp } });
+        targetUser = await User.findOne({
+          where: { owl_username: pureNextApp },
+        });
         if (!targetUser && pureNextAppName) {
-          targetUser = await User.findOne({ where: { name: pureNextAppName.trim() } });
+          targetUser = await User.findOne({
+            where: { name: pureNextAppName.trim() },
+          });
         }
       } else if (type === "REJECTED" || type === "APPROVED") {
         targetUser = await User.findOne({
           where: {
-            [Op.or]: [{ owl_username: String(draftData.created_by) }, { id: String(draftData.created_by) }, { name: String(draftData.created_by) }],
+            [Op.or]: [
+              { owl_username: String(draftData.created_by) },
+              { id: String(draftData.created_by) },
+              { name: String(draftData.created_by) },
+            ],
           },
         });
       }
@@ -423,7 +592,10 @@ class ApprovalService {
       return payload.map((item) => this.handleFileCommit(item));
     } else if (payload !== null && typeof payload === "object") {
       for (const key in payload) {
-        if (typeof payload[key] === "string" && payload[key].startsWith("TEMP_")) {
+        if (
+          typeof payload[key] === "string" &&
+          payload[key].startsWith("TEMP_")
+        ) {
           payload[key] = commitTempFile(payload[key]);
         } else if (typeof payload[key] === "object") {
           payload[key] = this.handleFileCommit(payload[key]);
@@ -436,7 +608,8 @@ class ApprovalService {
   async executeModelUpdate(module, targetId, payload, action, transaction) {
     const effectiveModule = module;
     const Model = getModelByModuleName(effectiveModule);
-    if (!Model) throw new Error(`Mapping Model untuk modul '${module}' tidak ditemukan.`);
+    if (!Model)
+      throw new Error(`Mapping Model untuk modul '${module}' tidak ditemukan.`);
 
     const filesToTrash = payload._filesToDelete || [];
     delete payload._filesToDelete;
@@ -462,19 +635,38 @@ class ApprovalService {
     scrubbedPayload.lock_ticket = null;
 
     if (action === "DELETE") {
-      if (effectiveModule === "BusinessSection") await BusinessMapMarker.destroy({ where: { sectionId: targetId }, transaction });
+      if (effectiveModule === "BusinessSection")
+        await BusinessMapMarker.destroy({
+          where: { sectionId: targetId },
+          transaction,
+        });
       await Model.destroy({ where: { id: targetId }, transaction });
-      await Translation.destroy({ where: { modelName: effectiveModule, recordId: String(targetId) }, transaction });
+      await Translation.destroy({
+        where: { modelName: effectiveModule, recordId: String(targetId) },
+        transaction,
+      });
       return filesToTrash;
     }
 
-    const singletonModules = ["AboutInfo", "HomeSettings", "InvestmentSettings", "Settings"];
-    const finalTargetId = singletonModules.includes(effectiveModule) ? "1" : targetId;
+    const singletonModules = [
+      "AboutInfo",
+      "HomeSettings",
+      "InvestmentSettings",
+      "Settings",
+    ];
+    const finalTargetId = singletonModules.includes(effectiveModule)
+      ? "1"
+      : targetId;
 
     if (action === "CREATE") {
       const placeholder = await Model.findByPk(finalTargetId, { transaction });
-      if (placeholder) await placeholder.update(scrubbedPayload, { transaction });
-      else await Model.create({ ...scrubbedPayload, id: finalTargetId }, { transaction });
+      if (placeholder)
+        await placeholder.update(scrubbedPayload, { transaction });
+      else
+        await Model.create(
+          { ...scrubbedPayload, id: finalTargetId },
+          { transaction },
+        );
     } else {
       if (singletonModules.includes(effectiveModule)) {
         await Model.update(scrubbedPayload, { where: { id: 1 }, transaction });
@@ -483,32 +675,61 @@ class ApprovalService {
           case "History":
             await History.destroy({ where: {}, transaction });
             if (payload.histories && Array.isArray(payload.histories)) {
-              const historyData = payload.histories.map((h) => ({ year: h.year, description: h.description, is_locked: false, lock_ticket: null }));
+              const historyData = payload.histories.map((h) => ({
+                year: h.year,
+                description: h.description,
+                is_locked: false,
+                lock_ticket: null,
+              }));
               await History.bulkCreate(historyData, { transaction });
             }
             break;
           case "BusinessSection":
             const parentPayload = { ...scrubbedPayload };
             delete parentPayload.mapMarkers;
-            await BusinessSection.update(parentPayload, { where: { id: finalTargetId }, transaction });
+            await BusinessSection.update(parentPayload, {
+              where: { id: finalTargetId },
+              transaction,
+            });
             if (payload.mapMarkers && Array.isArray(payload.mapMarkers)) {
-              await BusinessMapMarker.destroy({ where: { sectionId: finalTargetId }, transaction });
-              const newMarkers = payload.mapMarkers.map((m) => ({ ...m, id: undefined, sectionId: finalTargetId, is_locked: false, lock_ticket: null }));
+              await BusinessMapMarker.destroy({
+                where: { sectionId: finalTargetId },
+                transaction,
+              });
+              const newMarkers = payload.mapMarkers.map((m) => ({
+                ...m,
+                id: undefined,
+                sectionId: finalTargetId,
+                is_locked: false,
+                lock_ticket: null,
+              }));
               await BusinessMapMarker.bulkCreate(newMarkers, { transaction });
             }
             break;
           case "Menu":
             if (finalTargetId === "ALL_TREE") {
               for (const item of payload.updatedMenus) {
-                await Menu.update({ orderIndex: item.orderIndex, parentId: item.parentId }, { where: { id: item.id }, transaction });
+                await Menu.update(
+                  { orderIndex: item.orderIndex, parentId: item.parentId },
+                  { where: { id: item.id }, transaction },
+                );
               }
-              await Menu.update({ is_locked: false, lock_ticket: null }, { where: {}, transaction });
+              await Menu.update(
+                { is_locked: false, lock_ticket: null },
+                { where: {}, transaction },
+              );
             } else {
-              await Model.update(scrubbedPayload, { where: { id: finalTargetId }, transaction });
+              await Model.update(scrubbedPayload, {
+                where: { id: finalTargetId },
+                transaction,
+              });
             }
             break;
           default:
-            await Model.update(scrubbedPayload, { where: { id: finalTargetId }, transaction });
+            await Model.update(scrubbedPayload, {
+              where: { id: finalTargetId },
+              transaction,
+            });
             break;
         }
       }
@@ -517,31 +738,48 @@ class ApprovalService {
     // 🧹 [CACHE INVALIDATION & MANUAL OVERRIDE]
     try {
       if (effectiveModule === "History") {
-        await Translation.destroy({ where: { modelName: effectiveModule, locale: "id" }, transaction });
+        await Translation.destroy({
+          where: { modelName: effectiveModule, locale: "id" },
+          transaction,
+        });
         if (manualTranslations) {
-          const { saveManualTranslations } = require("../utils/translationHelper");
+          const {
+            saveManualTranslations,
+          } = require("../utils/translationHelper");
           for (const [year, fields] of Object.entries(manualTranslations)) {
             if (fields && typeof fields === "object") {
-              await saveManualTranslations(effectiveModule, String(year), { id: fields }, transaction);
+              await saveManualTranslations(
+                effectiveModule,
+                String(year),
+                { id: fields },
+                transaction,
+              );
             }
           }
         }
       } else if (finalTargetId && finalTargetId !== "ALL_TREE") {
         await Translation.destroy({
-          where: { modelName: effectiveModule, recordId: String(finalTargetId), locale: "id" },
-          transaction
+          where: {
+            modelName: effectiveModule,
+            recordId: String(finalTargetId),
+            locale: "id",
+          },
+          transaction,
         });
         if (manualTranslations && manualTranslations.id) {
           for (const [field, text] of Object.entries(manualTranslations.id)) {
-             if (text) {
-               await Translation.create({
-                   modelName: effectiveModule,
-                   recordId: String(finalTargetId),
-                   field: field,
-                   locale: 'id',
-                   translatedText: text
-               }, { transaction });
-             }
+            if (text) {
+              await Translation.create(
+                {
+                  modelName: effectiveModule,
+                  recordId: String(finalTargetId),
+                  field: field,
+                  locale: "id",
+                  translatedText: text,
+                },
+                { transaction },
+              );
+            }
           }
         }
       }
@@ -563,8 +801,8 @@ class ApprovalService {
         "current_level",
         "approver_roadmap",
         "created_by",
-        "rejection_reason"
-      ]
+        "rejection_reason",
+      ],
     });
     return draft;
   }
