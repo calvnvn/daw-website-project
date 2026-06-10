@@ -21,7 +21,7 @@ class AuthService {
       "manage_news",
     ];
 
-    if (normalizedRole === "superadmin" || normalizedRole === "admin") {
+    if (normalizedRole === "superadmin" || normalizedRole === "admin" || normalizedRole === "owner") {
       return [...common, ...content, "manage_approvals", "manage_users"];
     }
 

@@ -143,7 +143,7 @@ export default function AdminSidebar({
           if (!item.perm) return true;
 
           const isMasterAdmin =
-            user?.role === "admin" || user?.role === "superadmin";
+            user?.role === "admin" || user?.role === "superadmin" || user?.role === "owner";
           if (isMasterAdmin) return true;
 
           return can(item.perm);

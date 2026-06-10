@@ -61,7 +61,7 @@ function getModelByModuleName(moduleName) {
 
 class ApprovalService {
   async getPendingApprovals(userRole, karyawanIdForOwl, tokenOWL) {
-    const isApproverRole = ["superadmin", "approver"].includes(userRole);
+    const isApproverRole = ["owner", "superadmin", "approver"].includes(userRole);
 
     const owlResponse = await ErpApprovalService.getPendingList({
       karyawanid: karyawanIdForOwl,

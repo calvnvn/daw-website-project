@@ -118,7 +118,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
 
   const can = (permission: string) => {
     if (!user) return false;
-    if (user.role === "admin" || user.role === "superadmin") return true;
+    if (user.role === "admin" || user.role === "superadmin" || user.role === "owner") return true;
     return (
       Array.isArray(user.permissions) && user.permissions.includes(permission)
     );

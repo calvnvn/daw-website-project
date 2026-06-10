@@ -83,8 +83,8 @@ const verifyToken = (req, res, next) => {
  */
 const checkPermission = (requiredPermission) => {
   return (req, res, next) => {
-    // Implement administrative override for superadmin and admin roles
-    if (req.userRole === "superadmin" || req.userRole === "admin") {
+    // Implement administrative override for owner, superadmin, and admin roles
+    if (req.userRole === "owner" || req.userRole === "superadmin" || req.userRole === "admin") {
       return next();
     }
 

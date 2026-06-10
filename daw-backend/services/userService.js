@@ -32,8 +32,8 @@ class UserService {
   async createUser(payload, requesterRole) {
     const { email, roleId, owl_username } = payload;
 
-    if (requesterRole !== "superadmin") {
-      throw new Error("ACCESS_DENIED: Hanya superadmin yang berwenang mendaftarkan user baru.");
+    if (requesterRole !== "superadmin" && requesterRole !== "owner") {
+      throw new Error("ACCESS_DENIED: Hanya superadmin atau owner yang berwenang mendaftarkan user baru.");
     }
 
     if (!owl_username) {
@@ -77,23 +77,30 @@ class UserService {
 
     const targetRoleName = user.roleData?.name?.toLowerCase() || "";
     const targetIsSuperadmin = targetRoleName === "superadmin";
+    const targetIsOwner = targetRoleName === "owner";
     const isEditingSelf = String(requesterId) === String(targetId);
 
-    // 1. Anti-Self-Demotion / Suspension: Prevent users (especially superadmins) from altering their own critical access vectors
+    // 1. Anti-Self-Demotion / Suspension: Prevent users (especially superadmins/owners) from altering their own critical access vectors
     if (isEditingSelf && (roleId || status)) {
       throw new Error("FORBIDDEN: Demi keamanan, Anda tidak diizinkan mengubah Role atau Status akun Anda sendiri.");
     }
 
-    // 2. Enforce immutable state for Superadmin records against non-owner modifications
-    if (targetIsSuperadmin && !isEditingSelf) {
-      if (roleId || status || email || name) {
-        throw new Error("FORBIDDEN: Akun superadmin tidak bisa diubah oleh administrator lain.");
+    // 2. Enforce immutable state for Owner and Superadmin records
+    if (targetIsOwner && !isEditingSelf) {
+      if (requesterRole !== "owner") {
+        throw new Error("FORBIDDEN: Akun owner hanya bisa diubah oleh Owner lainnya.");
       }
     }
 
-    // 3. Whitelist Privilege Escalation: Strictly restrict Role and Status modifications to superadmins only
-    if (requesterRole !== "superadmin" && (roleId || status)) {
-      throw new Error("FORBIDDEN: Hanya Superadmin yang berwenang mengubah Role atau Status akun.");
+    if (targetIsSuperadmin && !isEditingSelf) {
+      if (requesterRole !== "owner") {
+        throw new Error("FORBIDDEN: Akun superadmin hanya bisa diubah oleh Owner.");
+      }
+    }
+
+    // 3. Whitelist Privilege Escalation: Strictly restrict Role and Status modifications to superadmins and owners only
+    if (requesterRole !== "superadmin" && requesterRole !== "owner" && (roleId || status)) {
+      throw new Error("FORBIDDEN: Hanya Superadmin atau Owner yang berwenang mengubah Role atau Status akun.");
     }
 
     // Map and synchronize only defined delta fields to the persistence layer
@@ -132,12 +139,18 @@ class UserService {
       throw new Error("FORBIDDEN: You cannot delete your own account!");
     }
 
-    if (user.roleData?.name === "superadmin") {
-      throw new Error("FORBIDDEN: superadmin accounts are protected.");
+    if (user.roleData?.name === "owner") {
+      throw new Error("FORBIDDEN: owner accounts are protected.");
     }
 
-    if (requesterRole !== "superadmin") {
-      throw new Error("FORBIDDEN: Only superadmin can delete users.");
+    if (user.roleData?.name === "superadmin") {
+      if (requesterRole !== "owner") {
+        throw new Error("FORBIDDEN: superadmin accounts can only be deleted by an owner.");
+      }
+    }
+
+    if (requesterRole !== "superadmin" && requesterRole !== "owner") {
+      throw new Error("FORBIDDEN: Only superadmin or owner can delete users.");
     }
 
     await user.destroy();

@@ -187,9 +187,11 @@ export default function UserManagement() {
     }
 
     const targetUser = users.find((u) => String(u.id) === String(id));
-    if (targetUser?.roleData?.name === "superadmin") {
+    const targetRole = targetUser?.roleData?.name || "";
+    const isProtected = targetRole === "owner" || (targetRole === "superadmin" && currentUser?.role !== "owner");
+    if (isProtected) {
       return toast.error("Action Denied", {
-        description: "superadmin accounts are immutable.",
+        description: `${targetRole} accounts are protected.`,
       });
     }
 
@@ -235,11 +237,18 @@ export default function UserManagement() {
       return;
     }
 
-    // 3. GUARD: Hierarchy Protection (superadmin vs superadmin)
-    if (targetUser?.roleData?.name === "superadmin" && !isEditingSelf) {
+    // 3. GUARD: Hierarchy Protection (owner / superadmin protection)
+    if (targetUser?.roleData?.name === "owner" && !isEditingSelf) {
+      toast.error("Action Denied", {
+        description: "Owner accounts are immutable.",
+      });
+      return;
+    }
+
+    if (targetUser?.roleData?.name === "superadmin" && !isEditingSelf && currentUser?.role !== "owner") {
       toast.error("Action Denied", {
         description:
-          "Hierarchy Protection: superadmin accounts are immutable by other administrators.",
+          "Hierarchy Protection: superadmin accounts can only be modified by the Owner.",
       });
       return;
     }
@@ -408,7 +417,8 @@ export default function UserManagement() {
                 filteredUsers.map((user: any) => {
                   const isSelf = String(user.id) === String(currentUserId);
                   const roleName = user.roleData?.name || "Unknown Role";
-                  const isSuperadmin = roleName === "superadmin";
+                  const isSuperOrOwner = roleName === "superadmin" || roleName === "owner";
+                  const isProtected = roleName === "owner" || (roleName === "superadmin" && currentUser?.role !== "owner");
 
                   // DETEKSI STATUS SYNC SSO (Robust)
                   const isPendingSync = !user.lastLogin;
@@ -477,7 +487,7 @@ export default function UserManagement() {
 
                       {/* KOLOM 2: TINGKAT AKSES */}
                       <td className="px-6 py-4">
-                        {currentUser?.role === "superadmin" && !isSelf ? (
+                        {(currentUser?.role === "superadmin" || currentUser?.role === "owner") && !isSelf ? (
                           <div className="relative inline-block">
                             <select
                               value={user.roleId}
@@ -500,7 +510,7 @@ export default function UserManagement() {
                         ) : (
                           <span
                             className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold border shadow-sm ${getRoleBadgeColor(roleName)}`}>
-                            {isSuperadmin && <Shield className="w-3.5 h-3.5" />}
+                            {isSuperOrOwner && <Shield className="w-3.5 h-3.5" />}
                             {roleName}
                           </span>
                         )}
@@ -554,20 +564,20 @@ export default function UserManagement() {
                         <button
                           onClick={() =>
                             !isSelf &&
-                            !isSuperadmin &&
+                            !isProtected &&
                             handleDeleteUser(user.id)
                           }
-                          disabled={isSelf || isSuperadmin}
+                          disabled={isSelf || isProtected}
                           title={
                             isSelf
                               ? "Tidak bisa hapus diri sendiri"
-                              : isSuperadmin
-                                ? "superadmin dilindungi"
+                              : isProtected
+                                ? `${roleName} dilindungi`
                                 : "Hapus Akun"
                           }
                           className={`p-2 rounded-lg transition-all border shadow-sm flex items-center justify-center ml-auto
                             ${
-                              isSelf || isSuperadmin
+                              isSelf || isProtected
                                 ? "bg-slate-50 text-slate-300 border-slate-100 cursor-not-allowed"
                                 : "bg-white text-slate-500 border-slate-200 hover:text-red-600 hover:border-red-200 hover:bg-red-50 active:scale-95"
                             }`}>

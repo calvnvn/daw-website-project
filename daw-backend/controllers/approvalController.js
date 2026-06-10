@@ -30,7 +30,7 @@ exports.getPendingApprovals = async (req, res) => {
     let data = await approvalService.getPendingApprovals(userRole, karyawanIdForOwl, tokenOWL);
     
     // SERVER-SIDE DERIVED PIPELINE
-    const isSuperadmin = userRole === "superadmin" || userRole === "admin";
+    const isSuperadmin = userRole === "superadmin" || userRole === "admin" || userRole === "owner";
 
     // 1. FILTER
     let filteredData = data.filter((d) => {
@@ -210,7 +210,7 @@ exports.getDraftStatus = async (req, res) => {
 
     // Security Check: Editor hanya bisa melihat tiket miliknya sendiri.
     // Admin/superadmin/approver bebas akses.
-    const isAdmin = ["superadmin", "admin", "approver"].includes(userRole);
+    const isAdmin = ["owner", "superadmin", "admin", "approver"].includes(userRole);
     const draftOwner = draft.created_by ? String(draft.created_by).toLowerCase().trim() : "";
     const isOwner = currentUserIdentities.includes(draftOwner);
 

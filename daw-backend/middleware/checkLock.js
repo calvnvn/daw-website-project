@@ -17,7 +17,7 @@ const checkLock = (Model) => {
       const userRole = req.userRole;
 
       // Implement administrative override to bypass synchronization locks
-      if (userRole === "superadmin") {
+      if (userRole === "superadmin" || userRole === "owner") {
         return next();
       }
 

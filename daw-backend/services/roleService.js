@@ -20,8 +20,8 @@ class RoleService {
     const role = await Role.findByPk(id);
     if (!role) throw new Error("NOT_FOUND: Role tidak ditemukan.");
 
-    if (role.name === "superadmin" && name !== "superadmin") {
-      throw new Error("FORBIDDEN: Dilarang mengubah nama role sistem (superadmin).");
+    if ((role.name === "superadmin" || role.name === "owner") && name !== role.name) {
+      throw new Error(`FORBIDDEN: Dilarang mengubah nama role sistem (${role.name}).`);
     }
 
     await role.update({ name, description });
@@ -32,7 +32,7 @@ class RoleService {
     const role = await Role.findByPk(id);
     if (!role) throw new Error("NOT_FOUND: Role tidak ditemukan.");
 
-    if (["superadmin", "Editor", "Approver"].includes(role.name)) {
+    if (["owner", "superadmin", "Editor", "Approver"].includes(role.name)) {
       throw new Error(`FORBIDDEN: Role sistem '${role.name}' dilindungi dan tidak dapat dihapus.`);
     }
 
