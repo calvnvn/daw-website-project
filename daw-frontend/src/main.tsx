@@ -13,6 +13,19 @@ import { HomeProvider } from "./contexts/HomeContext";
 import { HelmetProvider } from "react-helmet-async";
 import { AuthProvider } from "./contexts/AuthContext.tsx";
 
+// === GLOBAL CONSOLE OVERRIDE (PRODUCTION MODE) ===
+// Secara otomatis membungkam seluruh log debugging dan error di browser klien saat production,
+// MENCEGAH kebocoran data rahasia. Bisa dinyalakan paksa dengan VITE_ENABLE_DEBUG_LOGS=true di .env
+const SHOW_DEBUG_LOGS = import.meta.env.VITE_ENABLE_DEBUG_LOGS === "true";
+
+if (import.meta.env.PROD && !SHOW_DEBUG_LOGS) {
+  console.log = () => {};
+  console.warn = () => {};
+  console.debug = () => {};
+  console.error = () => {};
+}
+// ==================================================
+
 const queryClient = new QueryClient();
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
