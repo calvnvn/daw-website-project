@@ -379,7 +379,9 @@ export function useInvestmentManager() {
 
     if (dirtyCompanies.length === 0) return;
 
-    const saveTasks = dirtyCompanies.map((comp) => {
+    const results: Array<{ status: "fulfilled" | "rejected"; value?: { id: number | string; response: any }; reason?: any }> = [];
+
+    for (const comp of dirtyCompanies) {
       const formData = new FormData();
       formData.append("name", comp.name);
       formData.append("desc", comp.desc || "");
@@ -403,14 +405,19 @@ export function useInvestmentManager() {
 
       const config = { timeout: 60000 };
 
-      const request = comp.isNew
-        ? api.post("/investments/affiliates", formData, config)
-        : api.put(`/investments/affiliates/${comp.id}`, formData, config);
-
-      return request.then((res) => ({ id: comp.id, response: res }));
-    });
-
-    const results = await Promise.allSettled(saveTasks);
+      try {
+        const res = await (comp.isNew
+          ? api.post("/investments/affiliates", formData, config)
+          : api.put(`/investments/affiliates/${comp.id}`, formData, config));
+        
+        results.push({ status: "fulfilled", value: { id: comp.id, response: res } });
+        
+        // MITIGASI BURST: Beri jeda 200ms sebelum lanjut agar ERP OWL punya waktu men-generate nourut unik
+        await new Promise((resolve) => setTimeout(resolve, 200));
+      } catch (err) {
+        results.push({ status: "rejected", reason: err });
+      }
+    }
 
     const successfulIds = new Set(
       results

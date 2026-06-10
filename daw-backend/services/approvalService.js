@@ -61,12 +61,14 @@ function getModelByModuleName(moduleName) {
 
 class ApprovalService {
   async getPendingApprovals(userRole, karyawanIdForOwl, tokenOWL) {
-    const isApproverRole = ["owner", "superadmin", "approver"].includes(userRole);
+    const isApproverRole = ["owner", "superadmin", "approver"].includes(
+      userRole,
+    );
 
     const owlResponse = await ErpApprovalService.getPendingList({
       karyawanid: karyawanIdForOwl,
       token: tokenOWL,
-      limit: 100,
+      limit: 200,
     });
 
     const myOwlTasks = owlResponse?.data?.rows || [];
@@ -204,16 +206,16 @@ class ApprovalService {
     const owlResponse = await ErpApprovalService.getPendingList({
       karyawanid: nikApprover,
       token: tokenOWL,
-      limit: 100,
+      limit: 200,
     });
 
     const myOwlTasks = owlResponse?.data?.rows || [];
-    console.log("=== ISI ANTREAN DARI ERP OWL ===");
-    myOwlTasks.forEach((task) => {
-      console.log(
-        `Tiket: ${task.notransaksi || task.notrans} | kodeapp: ${task.kodeapp} | nourut: ${task.nourut}`,
-      );
-    });
+    // console.log("=== ISI ANTREAN DARI ERP OWL ===");
+    // myOwlTasks.forEach((task) => {
+    //   console.log(
+    //     `Tiket: ${task.notransaksi || task.notrans} | kodeapp: ${task.kodeapp} | nourut: ${task.nourut}`,
+    //   );
+    // });
 
     const realErpTask = myOwlTasks.find(
       (task) =>
@@ -262,15 +264,15 @@ class ApprovalService {
 
     // 2. Submit decision to ERP outside database transaction
     await ErpApprovalService.submitDecision({
-      status,
-      kodeapp: validExecutionId,
-      nourut: validExecutionId,
-      notrans,
-      level: status === "1" ? currentLevel + 1 : currentLevel,
-      komentar,
-      nextApp: pureNextApp,
+      status: String(status),
+      kodeapp: String(validExecutionId),
+      nourut: String(validExecutionId),
+      notrans: String(notrans),
+      level: currentLevel + 1,
+      komentar: komentar || (status === "1" ? "Disetujui" : "Ditolak"),
+      nextApp: pureNextApp ? String(pureNextApp) : "",
       token: tokenOWL,
-      karyawanid: nikApprover,
+      karyawanid: String(nikApprover),
     });
 
     // 3. Execute database updates with local deadlock retry
