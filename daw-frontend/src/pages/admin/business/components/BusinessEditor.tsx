@@ -6,7 +6,7 @@ import {
   Info,
   CheckCircle2,
   Clock,
-  X, // Tambahan icon X untuk tombol Abaikan
+  X, 
 } from "lucide-react";
 import { useBusiness, type SectionData } from "@/contexts/BusinessContext";
 import "react-quill-new/dist/quill.snow.css";

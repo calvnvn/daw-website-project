@@ -30,10 +30,11 @@ export const isHtmlString = (str: any): boolean => {
 export const cleanHtmlText = (val: any): string => {
   if (val === null || val === undefined) return "";
   if (typeof val === "object") return "";
-  
+
   // Normalize booleans and boolean-like values
   if (val === true || val === "true" || val === 1 || val === "1") return "true";
-  if (val === false || val === "false" || val === 0 || val === "0") return "false";
+  if (val === false || val === "false" || val === 0 || val === "0")
+    return "false";
 
   let str = String(val);
   if (isHtmlString(str)) {
@@ -223,8 +224,8 @@ export const sanitizeForDiff = (data: any) => {
 // ─── HUMAN-READABLE LABEL DICTIONARIES ───
 export const MODULE_LABELS: Record<string, string> = {
   Project: "Proyek Portfolio",
-  NewsArticle: "Artikel Berita",
-  Management: "Manajemen & Direksi",
+  NewsArticle: "Artikel",
+  Management: "Manajemen",
   BusinessSection: "Sektor Bisnis",
   BusinessMapMarker: "Penanda Lokasi Peta",
   MapCategory: "Kategori Peta",
@@ -358,10 +359,12 @@ export const getFieldLabel = (field: string): string => {
     const parentField = arrayMatch[1];
     const index = arrayMatch[2];
     const subfield = arrayMatch[3];
-    
-    const parentLabel = FIELD_LABELS[parentField] || parentField.replace(/^\w/, (c) => c.toUpperCase());
+
+    const parentLabel =
+      FIELD_LABELS[parentField] ||
+      parentField.replace(/^\w/, (c) => c.toUpperCase());
     const subLabel = getFieldLabel(subfield);
-    
+
     return `${parentLabel} (Item ${index}) - ${subLabel}`;
   }
 
