@@ -21,7 +21,6 @@ export default function DynamicNavbar() {
   const { settings } = useSettings();
   const { t, i18n } = useTranslation();
 
-  // FIX 2: Destructuring dengan Alias untuk sinkronisasi sektor bisnis
   const { sections: businessSections } = useBusiness();
 
   const [menus, setMenus] = useState<any[]>([]);
@@ -174,7 +173,6 @@ export default function DynamicNavbar() {
                   className={`h-4 w-4 ml-1 transition-transform duration-300 group-hover:rotate-180 ${isTransparent ? "opacity-100" : "text-slate-500"}`}
                 />
               </span>
-              {/* FIX 3: Tambahkan focus-within untuk Aksesibilitas Keyboard */}
               <div className="absolute top-full left-0 mt-2 w-64 bg-white shadow-xl border border-slate-100 border-t-2 border-t-daw-green rounded-b-md opacity-0 invisible group-hover:opacity-100 group-hover:visible focus-within:opacity-100 focus-within:visible transition-all duration-300 transform translate-y-2 group-hover:translate-y-0 focus-within:translate-y-0 flex flex-col overflow-hidden">
                 {/* Looping Sektor dari Database */}
                 {businessSections.map((sec) => (
@@ -203,7 +201,7 @@ export default function DynamicNavbar() {
             {menus.map((menu) => {
               const hasChildren = menu.children && menu.children.length > 0;
               const link = resolveLink(menu);
-              const isExternal = menu.type === "external"; //  FIX: Deklarasi isExternal ditambahkan
+              const isExternal = menu.type === "external"; 
 
               return (
                 <div key={menu.id} className="relative group py-2">
@@ -286,12 +284,15 @@ export default function DynamicNavbar() {
                   ? "text-white border-transparent hover:bg-white/10"
                   : "text-slate-800 border-slate-200 hover:bg-slate-50 shadow-sm"
               }`}
-              aria-label={`Ubah bahasa ke ${i18n.language === "en" ? "Indonesia" : "Inggris"}`}
-            >
-              <Globe className={`h-4 w-4 transition-transform duration-500 ${
-                isTransparent ? "text-white" : "text-daw-green"
-              } ${i18n.language === "id" ? "rotate-180" : ""}`} />
-              <span className="font-extrabold uppercase select-none">{i18n.language}</span>
+              aria-label={`Ubah bahasa ke ${i18n.language === "en" ? "Indonesia" : "Inggris"}`}>
+              <Globe
+                className={`h-4 w-4 transition-transform duration-500 ${
+                  isTransparent ? "text-white" : "text-daw-green"
+                } ${i18n.language === "id" ? "rotate-180" : ""}`}
+              />
+              <span className="font-extrabold uppercase select-none">
+                {i18n.language}
+              </span>
             </button>
             <Link
               to="/contact-us"
@@ -436,7 +437,7 @@ export default function DynamicNavbar() {
             {menus.map((menu) => {
               const hasChildren = menu.children && menu.children.length > 0;
               const link = resolveLink(menu);
-              const isExternal = menu.type === "external"; //  FIX: Deklarasi isExternal ditambahkan
+              const isExternal = menu.type === "external";
               const isOpen = openMobileAccordions[menu.id] || false;
 
               return (
@@ -541,11 +542,12 @@ export default function DynamicNavbar() {
                   toggleLanguage();
                   closeMenu();
                 }}
-                className="flex items-center gap-2 px-4 py-2 rounded-full border border-slate-200 text-[12px] font-extrabold text-slate-700 bg-slate-50 active:scale-95 focus:outline-none"
-              >
+                className="flex items-center gap-2 px-4 py-2 rounded-full border border-slate-200 text-[12px] font-extrabold text-slate-700 bg-slate-50 active:scale-95 focus:outline-none">
                 <Globe className="h-4 w-4 text-daw-green" />
                 <span className="uppercase font-extrabold">
-                  {i18n.language === "en" ? t("nav.english", "English (EN)") : t("nav.indonesian", "Indonesia (ID)")}
+                  {i18n.language === "en"
+                    ? t("nav.english", "English (EN)")
+                    : t("nav.indonesian", "Indonesia (ID)")}
                 </span>
               </button>
             </div>

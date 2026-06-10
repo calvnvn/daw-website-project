@@ -55,7 +55,6 @@ export default function OtherInvestmentsTeaser() {
           <div className="lg:col-span-7">
             <div className="grid grid-cols-2 md:grid-cols-3 gap-4 sm:gap-6">
               {displayCompanies.map((company, index) => {
-                // 🔥 THE FIX: Tentukan tag (a atau div) dan propertinya secara dinamis
                 const Wrapper = company.websiteUrl ? "a" : "div";
                 const wrapperProps = company.websiteUrl
                   ? {
@@ -71,7 +70,6 @@ export default function OtherInvestmentsTeaser() {
                     direction="up"
                     delay={index * 100}
                   >
-                    {/* 🔥 THE FIX: Gunakan <Wrapper> menggantikan <div> */}
                     <Wrapper
                       {...wrapperProps}
                       className={`group aspect-[4/3] bg-white rounded-2xl flex items-center justify-center p-6 sm:p-8 border border-transparent hover:border-daw-yellow transition-all duration-500 hover:-translate-y-2 hover:shadow-[0_15px_35px_rgba(0,0,0,0.3)] h-full ${

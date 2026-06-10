@@ -54,7 +54,6 @@ export default function HistoryTab({
   const [optimisticLock, setOptimisticLock] = useState(false);
   const [rejectedDraft, setRejectedDraft] = useState<any | null>(null);
 
-  // 1. DATA SYNCHRONIZATION
   useEffect(() => {
     const normalizedData = companyHistory.map((h) => ({
       id: h.id,
@@ -66,7 +65,6 @@ export default function HistoryTab({
     setHistoryItems(normalizedData);
     setOriginalItems(JSON.parse(JSON.stringify(normalizedData)));
 
-    // Jika server bilang sudah tidak locked, matikan optimistic lock lokal
     if (!companyHistory.some((h) => h.is_locked)) {
       setOptimisticLock(false);
     }
@@ -79,11 +77,9 @@ export default function HistoryTab({
     }).catch(console.error);
   }, [companyHistory]);
 
-  // 2. REJECTION RADAR (Gated by saving/optimistic states)
   const hasAnyRejected = companyHistory.some((h) => h.hasRejected);
 
   useEffect(() => {
-    // 🚀 FIX A: Jangan narik draf kalau lagi saving atau baru aja disubmit (optimisticLock)
     if (
       hasAnyRejected &&
       !rejectedDraft &&
@@ -104,7 +100,6 @@ export default function HistoryTab({
     }
   }, [hasAnyRejected, isEditor, rejectedDraft, isSaving, optimisticLock]);
 
-  // 3. DIFF ENGINE
   const hasDataChanged = useMemo(() => {
     let isTransChanged = JSON.stringify(historyTranslations) !== JSON.stringify(originalTranslations);
     if (historyItems.length !== originalItems.length) return true || isTransChanged;
@@ -116,14 +111,10 @@ export default function HistoryTab({
     );
   }, [historyItems, originalItems, historyTranslations, originalTranslations]);
 
-  // 4. MODULE-LEVEL LOCK ISOLATION
-  // 🚀 FIX B: Logic gembok yang lebih agresif.
-  // Jika sedang OptimisticLock (habis klik Send), WAJIB locked tanpa peduli status server.
   const isPendingLock =
     companyHistory.some((h) => h.is_locked) && !hasAnyRejected;
   const isModuleLocked = (optimisticLock || isPendingLock) && !isSuperadmin;
 
-  // --- ACTIONS ---
   const addHistory = () => {
     setHistoryItems((prev) => [
       ...prev,
@@ -224,9 +215,8 @@ export default function HistoryTab({
 
       await api.put("/history", payload, { timeout: 60000 });
 
-      // 🚀 URUTAN KRUSIAL:
-      setRejectedDraft(null); // Hapus draf lokal instan
-      if (isEditor) setOptimisticLock(true); // Gembok layar instan
+      setRejectedDraft(null);
+      if (isEditor) setOptimisticLock(true);
 
       await refreshData();
       toast.success(isSuperadmin ? "Disimpan!" : "Draf diajukan!", {
@@ -241,10 +231,7 @@ export default function HistoryTab({
     }
   };
 
-  // --- RENDER ---
   if (mode === "preview") {
-    // Sort items by year conceptually? The public site usually displays them as provided or sorted by year? 
-    // Public site renders them in order, so we just pass historyItems.
     return (
       <div className="animate-in fade-in zoom-in-95 duration-500">
         <AboutLivePreview type="history" data={historyItems} />
@@ -295,7 +282,6 @@ export default function HistoryTab({
         </div>
       )}
 
-      {/* HEADER & LIST (Sama seperti sebelumnya tapi menggunakan logic gembok baru) */}
       <div className="flex items-center justify-between mb-4 border-b border-slate-100 pb-4">
         <div>
           <h3 className="text-lg font-bold text-slate-900 flex items-center gap-2">

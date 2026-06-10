@@ -40,7 +40,6 @@ export default function SectionHeader({
 }: SectionHeaderProps) {
   const isCategoryTab = activeTab === "categories";
 
-  // 🚀 THE FIX: Pisahkan logika kunci antara Editor dan Superadmin
   const shouldLockUI = isLocked && !isSuperadmin;
   const isOverrideMode = isLocked && isSuperadmin;
 

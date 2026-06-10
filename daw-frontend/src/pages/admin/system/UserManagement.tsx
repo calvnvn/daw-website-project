@@ -225,7 +225,6 @@ export default function UserManagement() {
     const targetUser = users.find((u) => String(u.id) === String(userId));
     const newRole = roles.find((r) => String(r.id) === String(newRoleId));
 
-    // FIX: Definisikan isEditingSelf di dalam scope fungsi ini
     const isEditingSelf = String(userId) === String(currentUserId);
 
     // 2. GUARD: Anti-Self-Demotion

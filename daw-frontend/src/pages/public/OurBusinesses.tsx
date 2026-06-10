@@ -43,7 +43,6 @@ export default function OurBusinesses() {
     }
   }, [isLoading, hash, pageData]);
 
-  // FIX 4: Masukkan refreshData ke dalam dependency array
   useEffect(() => {
     refreshData();
   }, [refreshData]);

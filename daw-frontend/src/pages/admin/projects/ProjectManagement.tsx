@@ -528,7 +528,6 @@ export default function ProjectManagement() {
 
                           {/* EDIT / VIEW ACTION */}
                           {isLockedForEditor ? (
-                            /* SENIOR FIX: Jangan matikan tombol. Arahkan ke mode View agar Editor bisa baca data. */
                             <Link
                               to={`/admin/projects/edit/${project.id}?mode=view`}
                               title="Lihat Detail & Progress Approval"

@@ -20,7 +20,7 @@ const DynamicBusinessSection = memo(
   function DynamicBusinessSection({
     data,
   }: {
-    data: SectionData | null | undefined; // 1. TS FIX: Izinkan null/undefined
+    data: SectionData | null | undefined;
   }) {
     const { categories, publicProjects } = useBusiness();
     const { t } = useTranslation();
@@ -49,14 +49,12 @@ const DynamicBusinessSection = memo(
     }, [data.htmlContent]);
 
     return (
-      // 4. LAYOUT FIX: Hapus `overflow-x-hidden` di root agar tooltip map & shadow tidak terpotong
       <div className="flex flex-col w-full relative bg-white">
         {/* 1. CINEMATIC BACKGROUND EFFECTS */}
         <div className="absolute top-0 left-0 w-full h-full bg-[radial-gradient(ellipse_at_top_left,_var(--tw-gradient-stops))] from-daw-green/[0.04] via-transparent to-transparent pointer-events-none"></div>
         <div className="absolute top-[20%] right-[-5%] w-[400px] h-[400px] bg-[#D97706]/[0.02] rounded-full blur-[100px] pointer-events-none hidden lg:block"></div>
 
         {/* --- BAGIAN 1: EDITORIAL TEXT LAYOUT --- */}
-        {/* 5. MOBILE UX FIX: pt-10 untuk mobile agar tidak terlalu kosong, pt-16 untuk desktop */}
         <div className="container mx-auto px-6 max-w-7xl pt-10 lg:pt-16 pb-12 relative z-10">
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-16 xl:gap-24 items-start w-full">
             {/* KOLOM KIRI: Judul Utama */}
@@ -69,7 +67,6 @@ const DynamicBusinessSection = memo(
                   </h3>
                 </div>
 
-                {/* 6. MOBILE UX FIX: Base text diturunkan ke 4xl agar tidak meluber di layar iPhone SE */}
                 <h2 className="text-4xl md:text-5xl lg:text-[4.5rem] xl:text-[5rem] font-serif font-bold text-transparent bg-clip-text bg-gradient-to-br from-[#004B23] via-[#006E33] to-[#10B981] leading-[1.05] tracking-tight drop-shadow-sm pb-2">
                   {data.category}
                 </h2>
@@ -133,13 +130,14 @@ const DynamicBusinessSection = memo(
                   <span className="w-16 h-[2px] bg-gradient-to-r from-daw-green to-transparent rounded-r-full"></span>
                 </div>
                 <h2 className="text-4xl md:text-5xl font-serif font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-[#004B23] to-[#006E33] tracking-tight pb-2">
-                  {t("business.categoryProjects", "{{category}} Projects", { category: data.category })}
+                  {t("business.categoryProjects", "{{category}} Projects", {
+                    category: data.category,
+                  })}
                 </h2>
               </ScrollReveal>
             </div>
 
             <ScrollReveal direction="up" delay={200}>
-              {/* 7. TS FIX: Hapus 'as any'. Pastikan komponen BusinessGrid diupdate agar properti `filter` menerima string */}
               <BusinessGrid filter={data.id} hideFilters />
             </ScrollReveal>
           </div>
@@ -147,8 +145,6 @@ const DynamicBusinessSection = memo(
       </div>
     );
   },
-  // 8. PERFORMANCE FIX: Custom Comparison untuk `memo`
-  // Hanya re-render jika ID, Teks HTML, atau Peta berubah
   (prevProps, nextProps) => {
     return (
       prevProps.data?.id === nextProps.data?.id &&

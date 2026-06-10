@@ -37,7 +37,6 @@ export default function PhilosophyTab({
 }: PhilosophyTabProps) {
   const { philosophyData, philosophyPillars, refreshData } = useAbout();
 
-  // SINGLETON LOGIC (Main Title)
   const [titleForm, setTitleForm] = useState("Our Philosophy");
   const [originalTitle, setOriginalTitle] = useState("Our Philosophy");
   const [terjemahanTitle, setTerjemahanTitle] = useState("");
@@ -139,7 +138,6 @@ export default function PhilosophyTab({
     }
   };
 
-  // COLLECTION LOGIC (Pillars & Modal)
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingPillarId, setEditingPillarId] = useState<number | null>(null);
   const [isSavingPillar, setIsSavingPillar] = useState(false);
@@ -397,11 +395,7 @@ export default function PhilosophyTab({
     });
   };
 
-  // --- RENDER ---
   if (mode === "preview") {
-    // For philosophy preview, we need to merge the local titleForm and philosophyPillars
-    // Wait, what if the user edited a pillar in the modal and didn't save?
-    // Actually, philosophy pillars save independently. So we just pass the updated titleForm and the current philosophyPillars.
     return (
       <div className="animate-in fade-in zoom-in-95 duration-500">
         <AboutLivePreview
@@ -415,15 +409,11 @@ export default function PhilosophyTab({
 
   return (
     <div className="space-y-12 animate-in fade-in duration-300">
-      {/*
-          SECTION 1: MAIN TITLE (SINGLETON)
-         */}
       <div
         className={`bg-white border border-slate-200 rounded-3xl p-6 lg:p-8 shadow-sm relative overflow-hidden ${isTitleLocked ? "opacity-75 grayscale-[20%] pointer-events-none select-none" : ""}`}>
         {/* Background Accent */}
         <div className="absolute top-0 right-0 w-64 h-64 bg-daw-green/5 rounded-full blur-3xl -translate-y-1/2 translate-x-1/3 pointer-events-none" />
 
-        {/* REFACTOR: BUREAUCRATIC MIRROR - Red Recovery Banner untuk Title */}
         {rejectedTitleDraft && !isTitleLocked && (
           <div className="p-5 rounded-2xl bg-red-50 border border-red-200 flex items-start gap-4 text-red-700 shadow-sm mb-8 animate-in slide-in-from-top-4 duration-300 relative z-10">
             <div className="p-2 bg-red-100 rounded-xl h-fit shrink-0 shadow-inner">
@@ -538,13 +528,9 @@ export default function PhilosophyTab({
         </div>
       </div>
 
-      {/*
-          SECTION 2: PILLARS COLLECTION (GRANULAR)
-        */}
       <div className="bg-white/80 backdrop-blur-xl border border-slate-200 rounded-3xl p-6 lg:p-8 shadow-sm relative overflow-hidden group">
         {/* Background Accent */}
         <div className="absolute bottom-0 left-0 w-80 h-80 bg-daw-green/5 rounded-full blur-3xl translate-y-1/2 -translate-x-1/4 pointer-events-none z-0" />
-        {/* REJECTION RIBBON (Pillars) */}
         {isEditor && philosophyPillars.some((p) => p.hasRejected) && (
           <div className="p-4 rounded-xl bg-red-50 border border-red-200 flex items-start gap-3 text-red-700 shadow-sm mb-6">
             <div className="p-2 bg-red-100 rounded-lg">
@@ -587,7 +573,6 @@ export default function PhilosophyTab({
               Target;
             const isRowLocked =
               pillar.is_locked && !pillar.hasRejected && !isSuperadmin;
-            // Cek apakah ada data ID di payload, fallback ke check field ID
             const hasTranslation =
               !!(pillar as any)._translations?.id?.title || pillar.title !== "";
 

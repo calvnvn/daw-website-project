@@ -34,7 +34,7 @@ interface AchievementTabProps {
 const toSafeInputDate = (dateStr: string) => {
   if (!dateStr) return "";
   const d = new Date(dateStr);
-  if (isNaN(d.getTime())) return dateStr; // fallback to whatever string is there
+  if (isNaN(d.getTime())) return dateStr;
   return d.toISOString().split("T")[0];
 };
 
@@ -57,7 +57,6 @@ export default function AchievementTab({
   const [currentCropFile, setCurrentCropFile] = useState<File | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Fetch published news articles for the linking dropdown
   useEffect(() => {
     api
       .get("/news", { params: { status: "Published" } })
@@ -91,15 +90,12 @@ export default function AchievementTab({
   });
 
   const openModal = async (achievement: AchievementItem | null = null) => {
-    // Editors can open modal to see approval progress via LockedStateTracker
-
     if (achievement) {
       setEditingId(achievement.id);
       let payload = { ...achievement };
       let draftNotrans = undefined;
       let draftReason = undefined;
 
-      // 🔄 DATA RECOVERY FLOW (Blueprint 3)
       if (achievement.hasRejected && isEditor) {
         const loadingToast = toast.loading("Memuat draf revisi terakhir...");
         try {
@@ -216,7 +212,7 @@ export default function AchievementTab({
   };
 
   const hasDataChanged = useMemo(() => {
-    if (!editingId) return true; // Data baru
+    if (!editingId) return true;
     if (!form.originalSnapshot) return true;
     if (form.photo || form.removePhoto) return true;
 
@@ -280,7 +276,6 @@ export default function AchievementTab({
     };
     formData.append("_translations", JSON.stringify(transObj));
 
-    // Inject Editor status for approval workflow
     if (isEditor) {
       formData.append("status", "Published");
       if (form.previous_notrans) {
@@ -318,7 +313,7 @@ export default function AchievementTab({
           const loadingToast = toast.loading("Memproses...");
           try {
             await api.delete(`/achievements/${id}`, { timeout: 60000 });
-            await refreshData(); // Optimistic data update
+            await refreshData();
             toast.success("Penghargaan dihapus!", { id: loadingToast });
           } catch (error: unknown) {
             toast.error(getErrorMessage(error) || "Gagal menghapus", {
@@ -339,7 +334,6 @@ export default function AchievementTab({
 
   return (
     <div className="space-y-8 animate-in fade-in duration-300 relative">
-      {/* REJECTION RIBBON (Blueprint 3) */}
       {isEditor && achievements.some((item) => item.hasRejected) && (
         <div className="p-4 rounded-xl bg-red-50 border border-red-200 flex items-start gap-3 text-red-700 shadow-sm">
           <div className="p-2 bg-red-100 rounded-lg">
@@ -421,7 +415,7 @@ export default function AchievementTab({
                           alt={item.title}
                           className="w-full h-full object-cover bg-slate-50"
                           onError={(e) => {
-                            (e.target as HTMLImageElement).src = ""; // Clear src to trigger fallback rendering (using css/parent if needed) but simple way is just replace with div later.
+                            (e.target as HTMLImageElement).src = "";
                             (e.target as HTMLElement).parentElement!.innerHTML =
                               '<div class="w-full h-full flex items-center justify-center bg-slate-100 text-slate-400"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="1" y1="1" x2="23" y2="23"></line><path d="M21 21H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h3m3-3h6l2 3h4a2 2 0 0 1 2 2v9.34m-7.72-2.06a4 4 0 1 1-5.56-5.56"></path></svg></div>';
                           }}

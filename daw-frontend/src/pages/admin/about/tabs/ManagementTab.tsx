@@ -1,4 +1,3 @@
-// ManagementTab v2.1 — showProgressBtn fix + LockedStateTracker integration
 import React, { useState, useRef, useMemo } from "react";
 import {
   Lock,
@@ -72,7 +71,11 @@ export default function ManagementTab({
   const openPersonModal = async (person: ManagementMember | null = null) => {
     let draftData = null;
     // Tentukan apakah ini mode "lihat progress" (locked tapi tidak rejected)
-    const isLockedPendingItem = !!(person?.is_locked && !person?.hasRejected && !isSuperadmin);
+    const isLockedPendingItem = !!(
+      person?.is_locked &&
+      !person?.hasRejected &&
+      !isSuperadmin
+    );
     setIsProgressMode(isLockedPendingItem);
 
     if (person?.hasRejected && isEditor) {
@@ -133,12 +136,21 @@ export default function ManagementTab({
         originalTerjemahanDescription: "",
       });
 
-      api.get(`/translation/manual?modelName=Management&recordId=${person.id}`).then(res => {
-         if (res.data?.data?.id) {
-           const trans = res.data.data.id;
-           setPersonForm(prev => ({ ...prev, terjemahanRole: trans.role || "", originalTerjemahanRole: trans.role || "", terjemahanDescription: trans.description || "", originalTerjemahanDescription: trans.description || "" }));
-         }
-      }).catch(console.error);
+      api
+        .get(`/translation/manual?modelName=Management&recordId=${person.id}`)
+        .then((res) => {
+          if (res.data?.data?.id) {
+            const trans = res.data.data.id;
+            setPersonForm((prev) => ({
+              ...prev,
+              terjemahanRole: trans.role || "",
+              originalTerjemahanRole: trans.role || "",
+              terjemahanDescription: trans.description || "",
+              originalTerjemahanDescription: trans.description || "",
+            }));
+          }
+        })
+        .catch(console.error);
     } else {
       setEditingPersonId(null);
       setPersonForm({
@@ -180,9 +192,8 @@ export default function ManagementTab({
     setCurrentCropFile(null);
   };
 
-  // THE DIFF ENGINE (Blueprint 2.2)
   const hasDataChanged = useMemo(() => {
-    if (!editingPersonId) return true; // Data Baru pasti berubah
+    if (!editingPersonId) return true;
     if (!personForm.originalSnapshot) return true;
 
     if (personForm.photo || personForm.removePhoto) return true;
@@ -196,8 +207,14 @@ export default function ManagementTab({
       photoUrl: personForm.savedPhotoUrl,
     };
 
-    const isTransChanged = personForm.terjemahanRole !== personForm.originalTerjemahanRole || personForm.terjemahanDescription !== personForm.originalTerjemahanDescription;
-    return JSON.stringify(currentData) !== personForm.originalSnapshot || isTransChanged;
+    const isTransChanged =
+      personForm.terjemahanRole !== personForm.originalTerjemahanRole ||
+      personForm.terjemahanDescription !==
+        personForm.originalTerjemahanDescription;
+    return (
+      JSON.stringify(currentData) !== personForm.originalSnapshot ||
+      isTransChanged
+    );
   }, [personForm, editingPersonId]);
 
   const handleRestoreDraft = () => {
@@ -226,8 +243,11 @@ export default function ManagementTab({
         level: payload.level ?? prev.level,
         order: payload.order ?? prev.order,
         removePhoto: false,
-        terjemahanRole: (payload as any)?._translations?.id?.role ?? prev.terjemahanRole,
-        terjemahanDescription: (payload as any)?._translations?.id?.description ?? prev.terjemahanDescription,
+        terjemahanRole:
+          (payload as any)?._translations?.id?.role ?? prev.terjemahanRole,
+        terjemahanDescription:
+          (payload as any)?._translations?.id?.description ??
+          prev.terjemahanDescription,
       }));
 
       toast.success("Data teks dipulihkan dari draf!");
@@ -288,12 +308,12 @@ export default function ManagementTab({
     formData.append("status", isSuperadmin ? "Active" : "Published");
 
     if (personForm.removePhoto) formData.append("removePhoto", "true");
-    
+
     const transObj = {
       id: {
         role: personForm.terjemahanRole,
-        description: personForm.terjemahanDescription
-      }
+        description: personForm.terjemahanDescription,
+      },
     };
     formData.append("_translations", JSON.stringify(transObj));
     if (personForm.photo) formData.append("photo", personForm.photo);
@@ -360,7 +380,6 @@ export default function ManagementTab({
 
   return (
     <div className="space-y-8 animate-in fade-in duration-300 relative">
-      {/* REJECTION RIBBON (Blueprint 3) */}
       {isEditor && managementTeam.some((person) => person.hasRejected) && (
         <div className="p-4 rounded-xl bg-red-50 border border-red-200 flex items-start gap-3 text-red-700 shadow-sm mb-6">
           <div className="p-2 bg-red-100 rounded-lg">
@@ -422,14 +441,14 @@ export default function ManagementTab({
                 <tr
                   key={person.id}
                   className={`transition-colors ${
-                    isRowLocked
-                      ? lockStyles
-                      : "hover:bg-slate-50/50"
+                    isRowLocked ? lockStyles : "hover:bg-slate-50/50"
                   }`}>
-                  <td className={`px-6 py-4 ${isRowLocked ? "pointer-events-none select-none" : ""}`}>
+                  <td
+                    className={`px-6 py-4 ${isRowLocked ? "pointer-events-none select-none" : ""}`}>
                     <ManagementImage src={person.photoUrl} alt={person.name} />
                   </td>
-                  <td className={`px-6 py-4 ${isRowLocked ? "pointer-events-none select-none" : ""}`}>
+                  <td
+                    className={`px-6 py-4 ${isRowLocked ? "pointer-events-none select-none" : ""}`}>
                     <div className="flex items-center gap-2">
                       <p className="text-sm font-bold text-slate-900">
                         {person.name}
@@ -443,7 +462,8 @@ export default function ManagementTab({
                     </div>
                     <p className="text-xs text-slate-500">{person.role}</p>
                   </td>
-                  <td className={`px-6 py-4 ${isRowLocked ? "pointer-events-none select-none" : ""}`}>
+                  <td
+                    className={`px-6 py-4 ${isRowLocked ? "pointer-events-none select-none" : ""}`}>
                     <span className="inline-flex items-center px-2 py-1 rounded text-[10px] font-bold uppercase tracking-wider bg-slate-200 text-slate-700">
                       {person.level} ({person.order})
                     </span>
@@ -520,8 +540,8 @@ export default function ManagementTab({
                 {editingPersonId && isProgressMode
                   ? "Progres Persetujuan"
                   : editingPersonId
-                  ? "Edit Profil Kepemimpinan"
-                  : "Tambah Anggota Baru"}
+                    ? "Edit Profil Kepemimpinan"
+                    : "Tambah Anggota Baru"}
               </h3>
               <button
                 onClick={() => setIsPersonModalOpen(false)}
@@ -568,191 +588,214 @@ export default function ManagementTab({
 
             {/* MODAL FORM (Scrollable area) */}
             <div className="overflow-y-auto p-6">
-              <LockedStateTracker 
-                isLocked={!!(editingPersonId && managementTeam.find(p => p.id === editingPersonId)?.is_locked && !managementTeam.find(p => p.id === editingPersonId)?.hasRejected && !isSuperadmin)} 
-                lockTicket={editingPersonId ? managementTeam.find(p => p.id === editingPersonId)?.lock_ticket || null : null}
-              >
-              <form
-                id="management-form"
-                onSubmit={savePerson}
-                className="space-y-6">
-                {isLoadingDraft ? (
-                  <div className="py-16 flex flex-col items-center justify-center gap-3">
-                    <Loader2 className="w-8 h-8 text-daw-green animate-spin" />
-                    <p className="text-sm font-bold text-slate-500 animate-pulse">
-                      Menarik catatan draf...
-                    </p>
-                  </div>
-                ) : rejectedDraft?.action === "DELETE" ? (
-                  <div className="p-4 bg-red-50 border border-red-200 rounded-xl text-center">
-                    <p className="text-sm text-red-600 font-medium">
-                      Tidak dapat mengedit data saat pengajuan hapus sedang
-                      ditolak. <br />
-                      Abaikan notifikasi di atas terlebih dahulu.
-                    </p>
-                  </div>
-                ) : (
-                  <>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
-                      <div>
-                        <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">
-                          Full Name
-                        </label>
-                        <input
-                          required
-                          type="text"
-                          value={personForm.name}
-                          onChange={(e) =>
-                            setPersonForm({
-                              ...personForm,
-                              name: e.target.value,
-                            })
-                          }
-                          className="w-full px-3 py-2.5 border border-slate-200 rounded-lg focus:ring-2 focus:ring-daw-green/20 focus:border-daw-green transition-all text-sm"
-                        />
-                      </div>
-                      <div className="grid grid-cols-2 gap-5">
+              <LockedStateTracker
+                isLocked={
+                  !!(
+                    editingPersonId &&
+                    managementTeam.find((p) => p.id === editingPersonId)
+                      ?.is_locked &&
+                    !managementTeam.find((p) => p.id === editingPersonId)
+                      ?.hasRejected &&
+                    !isSuperadmin
+                  )
+                }
+                lockTicket={
+                  editingPersonId
+                    ? managementTeam.find((p) => p.id === editingPersonId)
+                        ?.lock_ticket || null
+                    : null
+                }>
+                <form
+                  id="management-form"
+                  onSubmit={savePerson}
+                  className="space-y-6">
+                  {isLoadingDraft ? (
+                    <div className="py-16 flex flex-col items-center justify-center gap-3">
+                      <Loader2 className="w-8 h-8 text-daw-green animate-spin" />
+                      <p className="text-sm font-bold text-slate-500 animate-pulse">
+                        Menarik catatan draf...
+                      </p>
+                    </div>
+                  ) : rejectedDraft?.action === "DELETE" ? (
+                    <div className="p-4 bg-red-50 border border-red-200 rounded-xl text-center">
+                      <p className="text-sm text-red-600 font-medium">
+                        Tidak dapat mengedit data saat pengajuan hapus sedang
+                        ditolak. <br />
+                        Abaikan notifikasi di atas terlebih dahulu.
+                      </p>
+                    </div>
+                  ) : (
+                    <>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
                         <div>
                           <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">
-                            Tingkat Jabatan
-                          </label>
-                          <select
-                            value={personForm.level}
-                            onChange={(e) =>
-                              setPersonForm({
-                                ...personForm,
-                                level: e.target.value as any,
-                              })
-                            }
-                            className="w-full px-3 py-2.5 border border-slate-200 rounded-lg focus:ring-2 focus:ring-daw-green/20 focus:border-daw-green transition-all bg-white text-sm">
-                            <option value="chairman">Chairman</option>
-                            <option value="director">Director</option>
-                            <option value="division">Division Head</option>
-                          </select>
-                        </div>
-                        <div>
-                          <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">
-                            Urutan
+                            Full Name
                           </label>
                           <input
                             required
-                            type="number"
-                            min="1"
-                            value={personForm.order}
+                            type="text"
+                            value={personForm.name}
                             onChange={(e) =>
                               setPersonForm({
                                 ...personForm,
-                                order: parseInt(e.target.value) || 1,
+                                name: e.target.value,
                               })
                             }
                             className="w-full px-3 py-2.5 border border-slate-200 rounded-lg focus:ring-2 focus:ring-daw-green/20 focus:border-daw-green transition-all text-sm"
                           />
                         </div>
-                      </div>
-                    </div>
-
-                    <div>
-                      <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">
-                        Job Title / Role
-                      </label>
-                      <input
-                        required
-                        type="text"
-                        value={personForm.role}
-                        onChange={(e) =>
-                          setPersonForm({
-                            ...personForm,
-                            role: e.target.value,
-                          })
-                        }
-                        className="w-full px-3 py-2.5 border border-slate-200 rounded-lg focus:ring-2 focus:ring-daw-green/20 focus:border-daw-green transition-all text-sm"
-                      />
-                      <div className="mt-2">
-                        <MagicTranslationField
-                          label="Role (Indonesian)"
-                          originalText={personForm.role}
-                          value={personForm.terjemahanRole}
-                          onChange={(v: string) => setPersonForm({...personForm, terjemahanRole: v})}
-                          disabled={isSaving}
-                        />
-                      </div>
-                    </div>
-
-                    <div>
-                      <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">
-                        Description / Bio
-                      </label>
-                      <textarea
-                        required
-                        rows={3}
-                        value={personForm.description}
-                        onChange={(e) =>
-                          setPersonForm({
-                            ...personForm,
-                            description: e.target.value,
-                          })
-                        }
-                        className="w-full px-3 py-2.5 border border-slate-200 rounded-lg focus:ring-2 focus:ring-daw-green/20 focus:border-daw-green resize-none transition-all text-sm"
-                      />
-                      <div className="mt-2">
-                        <MagicTranslationField
-                          label="Description (Indonesian)"
-                          originalText={personForm.description}
-                          value={personForm.terjemahanDescription}
-                          onChange={(v: string) => setPersonForm({...personForm, terjemahanDescription: v})}
-                          disabled={isSaving}
-                        />
-                      </div>
-                    </div>
-
-                    {/* PHOTO UPLOAD AREA */}
-                    <div>
-                      <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">
-                        Profile Photo (Opsional)
-                      </label>
-                      <div className="flex items-center gap-5 p-4 border border-slate-100 bg-slate-50/50 rounded-xl">
-                        <PhotoPreviewer
-                          file={personForm.photo}
-                          savedUrl={
-                            personForm.removePhoto
-                              ? null
-                              : personForm.savedPhotoUrl
-                          }
-                        />
-
-                        <div className="flex flex-col gap-3 w-full">
-                          <input
-                            type="file"
-                            accept="image/jpeg, image/png, image/webp"
-                            ref={fileInputRef}
-                            onChange={handlePhotoChange}
-                            className="w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-bold file:bg-daw-green/10 file:text-daw-green hover:file:bg-daw-green/20 transition-colors cursor-pointer"
-                          />
-                          {(personForm.photo ||
-                            (personForm.savedPhotoUrl &&
-                              !personForm.removePhoto)) && (
-                            <button
-                              type="button"
-                              onClick={() => {
+                        <div className="grid grid-cols-2 gap-5">
+                          <div>
+                            <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">
+                              Tingkat Jabatan
+                            </label>
+                            <select
+                              value={personForm.level}
+                              onChange={(e) =>
                                 setPersonForm({
                                   ...personForm,
-                                  photo: null,
-                                  removePhoto: true,
-                                });
-                                if (fileInputRef.current)
-                                  fileInputRef.current.value = "";
-                              }}
-                              className="text-[10px] font-bold text-red-600 hover:text-red-700 bg-red-50 hover:bg-red-100 w-max px-3 py-1.5 rounded-md transition-colors flex items-center gap-1">
-                              <Trash2 className="w-3.5 h-3.5" /> Hapus Foto Saat
-                              Ini
-                            </button>
-                          )}
+                                  level: e.target.value as any,
+                                })
+                              }
+                              className="w-full px-3 py-2.5 border border-slate-200 rounded-lg focus:ring-2 focus:ring-daw-green/20 focus:border-daw-green transition-all bg-white text-sm">
+                              <option value="chairman">Chairman</option>
+                              <option value="director">Director</option>
+                              <option value="division">Division Head</option>
+                            </select>
+                          </div>
+                          <div>
+                            <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">
+                              Urutan
+                            </label>
+                            <input
+                              required
+                              type="number"
+                              min="1"
+                              value={personForm.order}
+                              onChange={(e) =>
+                                setPersonForm({
+                                  ...personForm,
+                                  order: parseInt(e.target.value) || 1,
+                                })
+                              }
+                              className="w-full px-3 py-2.5 border border-slate-200 rounded-lg focus:ring-2 focus:ring-daw-green/20 focus:border-daw-green transition-all text-sm"
+                            />
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  </>
-                )}
-              </form>
+
+                      <div>
+                        <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">
+                          Job Title / Role
+                        </label>
+                        <input
+                          required
+                          type="text"
+                          value={personForm.role}
+                          onChange={(e) =>
+                            setPersonForm({
+                              ...personForm,
+                              role: e.target.value,
+                            })
+                          }
+                          className="w-full px-3 py-2.5 border border-slate-200 rounded-lg focus:ring-2 focus:ring-daw-green/20 focus:border-daw-green transition-all text-sm"
+                        />
+                        <div className="mt-2">
+                          <MagicTranslationField
+                            label="Role (Indonesian)"
+                            originalText={personForm.role}
+                            value={personForm.terjemahanRole}
+                            onChange={(v: string) =>
+                              setPersonForm({
+                                ...personForm,
+                                terjemahanRole: v,
+                              })
+                            }
+                            disabled={isSaving}
+                          />
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">
+                          Description / Bio
+                        </label>
+                        <textarea
+                          required
+                          rows={3}
+                          value={personForm.description}
+                          onChange={(e) =>
+                            setPersonForm({
+                              ...personForm,
+                              description: e.target.value,
+                            })
+                          }
+                          className="w-full px-3 py-2.5 border border-slate-200 rounded-lg focus:ring-2 focus:ring-daw-green/20 focus:border-daw-green resize-none transition-all text-sm"
+                        />
+                        <div className="mt-2">
+                          <MagicTranslationField
+                            label="Description (Indonesian)"
+                            originalText={personForm.description}
+                            value={personForm.terjemahanDescription}
+                            onChange={(v: string) =>
+                              setPersonForm({
+                                ...personForm,
+                                terjemahanDescription: v,
+                              })
+                            }
+                            disabled={isSaving}
+                          />
+                        </div>
+                      </div>
+
+                      {/* PHOTO UPLOAD AREA */}
+                      <div>
+                        <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">
+                          Profile Photo (Opsional)
+                        </label>
+                        <div className="flex items-center gap-5 p-4 border border-slate-100 bg-slate-50/50 rounded-xl">
+                          <PhotoPreviewer
+                            file={personForm.photo}
+                            savedUrl={
+                              personForm.removePhoto
+                                ? null
+                                : personForm.savedPhotoUrl
+                            }
+                          />
+
+                          <div className="flex flex-col gap-3 w-full">
+                            <input
+                              type="file"
+                              accept="image/jpeg, image/png, image/webp"
+                              ref={fileInputRef}
+                              onChange={handlePhotoChange}
+                              className="w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-bold file:bg-daw-green/10 file:text-daw-green hover:file:bg-daw-green/20 transition-colors cursor-pointer"
+                            />
+                            {(personForm.photo ||
+                              (personForm.savedPhotoUrl &&
+                                !personForm.removePhoto)) && (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setPersonForm({
+                                    ...personForm,
+                                    photo: null,
+                                    removePhoto: true,
+                                  });
+                                  if (fileInputRef.current)
+                                    fileInputRef.current.value = "";
+                                }}
+                                className="text-[10px] font-bold text-red-600 hover:text-red-700 bg-red-50 hover:bg-red-100 w-max px-3 py-1.5 rounded-md transition-colors flex items-center gap-1">
+                                <Trash2 className="w-3.5 h-3.5" /> Hapus Foto
+                                Saat Ini
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    </>
+                  )}
+                </form>
               </LockedStateTracker>
             </div>
 
@@ -768,7 +811,18 @@ export default function ManagementTab({
                 <button
                   form="management-form"
                   type="submit"
-                  disabled={isSaving || !hasDataChanged || !!(editingPersonId && managementTeam.find(p => p.id === editingPersonId)?.is_locked && !managementTeam.find(p => p.id === editingPersonId)?.hasRejected && !isSuperadmin)}
+                  disabled={
+                    isSaving ||
+                    !hasDataChanged ||
+                    !!(
+                      editingPersonId &&
+                      managementTeam.find((p) => p.id === editingPersonId)
+                        ?.is_locked &&
+                      !managementTeam.find((p) => p.id === editingPersonId)
+                        ?.hasRejected &&
+                      !isSuperadmin
+                    )
+                  }
                   className={`flex items-center justify-center gap-2 px-6 py-2.5 rounded-xl font-black text-[11px] uppercase tracking-widest transition-all shadow-lg active:scale-95 disabled:cursor-not-allowed disabled:shadow-none ${
                     isSaving
                       ? "bg-slate-300 text-slate-700"
