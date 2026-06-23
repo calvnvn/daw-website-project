@@ -200,8 +200,14 @@ Normalize editor-generated alignment classes within Tailwind Prose containers */
 ** Enforce strict typographic alignment and word-wrapping behaviors
  */
 .prose p,
+.daw-editorial-content p {
+  text-align: left !important;
+  word-break: normal !important;
+  overflow-wrap: break-word !important;
+  display: block;
+  max-width: 100%;
+}
 .prose span,
-.daw-editorial-content p,
 .daw-editorial-content span {
   text-align: left !important;
   word-break: normal !important;
