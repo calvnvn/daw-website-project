@@ -14,13 +14,13 @@ import { useBusiness } from "@/contexts/BusinessContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
 import { getErrorMessage } from "@/lib/utils";
-
 export default function CategoryManager() {
   const { user } = useAuth();
 
   const canManageCategories =
     user?.role === "superadmin" ||
     user?.role === "admin" ||
+    user?.role === "owner" ||
     user?.role === "editor";
 
   const {

@@ -21,7 +21,7 @@ export default function HomepageManager() {
   const [activeSubTab, setActiveSubTab] = useState<"edit" | "preview">("edit");
 
   const { user } = useAuth();
-  const isSuperadmin = user?.role === "superadmin" || user?.role === "admin";
+  const isSuperadmin = user?.role === "superadmin" || user?.role === "admin" || user?.role === "owner";
 
   const {
     slides,

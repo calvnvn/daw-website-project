@@ -45,7 +45,7 @@ interface AdminArticle {
 
 export default function NewsManagement() {
   const { user } = useAuth();
-  const isSuperadmin = user?.role === "superadmin" || user?.role === "admin";
+  const isSuperadmin = user?.role === "superadmin" || user?.role === "admin" || user?.role === "owner";
   const [articles, setArticles] = useState<AdminArticle[]>([]);
   const [categories, setCategories] = useState<NewsCategory[]>([]);
   const [isLoading, setIsLoading] = useState(true);

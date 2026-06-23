@@ -331,7 +331,7 @@ export default function ProjectForm() {
   const quillRef = useRef<ReactQuill>(null);
 
   const { user, can } = useAuth();
-  const isSuperadmin = user?.role === "superadmin" || user?.role === "admin";
+  const isSuperadmin = user?.role === "superadmin" || user?.role === "admin" || user?.role === "owner";
   // const isEditor = !isSuperadmin;
   const { sections } = useBusiness();
 

@@ -61,7 +61,8 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth();
   const isSuperadmin =
     user?.role?.toLowerCase() === "superadmin" ||
-    user?.role?.toLowerCase() === "admin";
+    user?.role?.toLowerCase() === "admin" ||
+    user?.role?.toLowerCase() === "owner";
 
   const fetchSettings = useCallback(async (signal?: AbortSignal) => {
     setIsLoading(true);

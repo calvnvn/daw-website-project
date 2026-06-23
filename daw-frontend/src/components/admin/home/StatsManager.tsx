@@ -91,7 +91,7 @@ export default function StatsManager({
   const { stats: initialStats, refreshData, rejectedStatsMap } = useHome();
   const { user } = useAuth();
 
-  const isSuperadmin = user?.role === "superadmin" || user?.role === "admin";
+  const isSuperadmin = user?.role === "superadmin" || user?.role === "admin" || user?.role === "owner";
   const isEditor = user?.role?.toLowerCase() === "editor";
 
   // States

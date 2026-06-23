@@ -81,7 +81,7 @@ export default function ManageBusinesses() {
     return Object.fromEntries(categories.map((cat) => [cat.id, cat.color]));
   }, [categories]);
 
-  const isSuperadmin = user?.role === "superadmin" || user?.role === "admin";
+  const isSuperadmin = user?.role === "superadmin" || user?.role === "admin" || user?.role === "owner";
   const currentSection = useMemo(
     () => sections.find((s) => s.id === activeTab),
     [sections, activeTab],

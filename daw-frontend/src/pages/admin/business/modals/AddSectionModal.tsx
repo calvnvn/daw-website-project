@@ -14,7 +14,7 @@ export default function AddSectionModal({
   addSection,
 }: AddSectionModalProps) {
   const { user } = useAuth();
-  const isSuperadmin = user?.role === "superadmin" || user?.role === "admin";
+  const isSuperadmin = user?.role === "superadmin" || user?.role === "admin" || user?.role === "owner";
   const [newSectionName, setNewSectionName] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
 

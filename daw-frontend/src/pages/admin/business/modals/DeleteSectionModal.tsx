@@ -21,7 +21,7 @@ export default function DeleteSectionModal({
   setActiveTab,
 }: DeleteSectionModalProps) {
   const { user } = useAuth();
-  const isSuperadmin = user?.role === "superadmin" || user?.role === "admin";
+  const isSuperadmin = user?.role === "superadmin" || user?.role === "admin" || user?.role === "owner";
   const [confirmText, setConfirmText] = useState("");
   const [isDeleting, setIsDeleting] = useState(false);
 

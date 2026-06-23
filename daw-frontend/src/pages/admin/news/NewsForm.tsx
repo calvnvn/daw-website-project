@@ -60,7 +60,7 @@ export default function NewsForm() {
   const quillRef = useRef<ReactQuill>(null);
 
   const { user, can } = useAuth();
-  const isSuperadmin = user?.role === "superadmin" || user?.role === "admin";
+  const isSuperadmin = user?.role === "superadmin" || user?.role === "admin" || user?.role === "owner";
 
   const [categories, setCategories] = useState<NewsCategory[]>([]);
   const [isFetching, setIsFetching] = useState(isEditMode);

@@ -64,7 +64,7 @@ export default function PageBuilder() {
   const { pages: rawPages, flatMenus, isLoading, refreshData } = useContent();
   const pages = rawPages as Page[];
   const { user } = useAuth();
-  const isSuperadmin = user?.role === "superadmin" || user?.role === "admin";
+  const isSuperadmin = user?.role === "superadmin" || user?.role === "admin" || user?.role === "owner";
 
   const [isSaving, setIsSaving] = useState(false);
   const [isDiscarding, setIsDiscarding] = useState(false);

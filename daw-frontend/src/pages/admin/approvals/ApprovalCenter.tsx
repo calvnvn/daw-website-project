@@ -29,7 +29,7 @@ const DiffModal = React.lazy(() => import("./components/DiffModal"));
 // MAIN COMPONENT: APPROVAL CENTER
 export default function ApprovalCenter() {
   const { can, user } = useAuth();
-  const isSuperadmin = user?.role === "superadmin" || user?.role === "admin";
+  const isSuperadmin = user?.role === "superadmin" || user?.role === "admin" || user?.role === "owner";
 
   const {
     isLoading,

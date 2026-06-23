@@ -43,7 +43,8 @@ export default function AboutUsManager() {
 
   const isSuperadmin =
     user?.role?.toLowerCase() === "superadmin" ||
-    user?.role?.toLowerCase() === "admin";
+    user?.role?.toLowerCase() === "admin" ||
+    user?.role?.toLowerCase() === "owner";
   const isEditor = user?.role?.toLowerCase() === "editor";
 
   // EARLY RETURN GUARD

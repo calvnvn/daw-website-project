@@ -28,7 +28,8 @@ export default function IntroManager({
   const { user } = useAuth();
   const isSuperadmin =
     user?.role?.toLowerCase() === "superadmin" ||
-    user?.role?.toLowerCase() === "admin";
+    user?.role?.toLowerCase() === "admin" ||
+    user?.role?.toLowerCase() === "owner";
   const isEditor = user?.role?.toLowerCase() === "editor";
 
   // 🚀 Global Intelligence: Tarik rejectedIntro dari Context v1.2
