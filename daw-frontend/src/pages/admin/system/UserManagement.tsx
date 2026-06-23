@@ -125,8 +125,10 @@ export default function UserManagement() {
 
     // 2. Tab Filter
     if (activeFilter === "all") return true;
-    if (activeFilter === "superadmin") return user.roleData?.name?.toLowerCase() === "superadmin";
-    if (activeFilter === "editor") return user.roleData?.name?.toLowerCase() === "editor";
+    if (activeFilter === "superadmin")
+      return user.roleData?.name?.toLowerCase() === "superadmin";
+    if (activeFilter === "editor")
+      return user.roleData?.name?.toLowerCase() === "editor";
     if (activeFilter === "pending") return !user.lastLogin;
     if (activeFilter === "suspended") return user.status === "Suspended";
 
@@ -173,9 +175,7 @@ export default function UserManagement() {
       toast.success(`Berhasil ${actionText} user ${user.owl_username}.`);
       fetchUsersAndRoles();
     } catch (error: unknown) {
-      toast.error(
-        getErrorMessage(error) || "Gagal mengubah status user.",
-      );
+      toast.error(getErrorMessage(error) || "Gagal mengubah status user.");
     }
   };
 
@@ -188,7 +188,9 @@ export default function UserManagement() {
 
     const targetUser = users.find((u) => String(u.id) === String(id));
     const targetRole = targetUser?.roleData?.name || "";
-    const isProtected = targetRole === "owner" || (targetRole === "superadmin" && currentUser?.role !== "owner");
+    const isProtected =
+      targetRole === "owner" ||
+      (targetRole === "superadmin" && currentUser?.role !== "owner");
     if (isProtected) {
       return toast.error("Action Denied", {
         description: `${targetRole} accounts are protected.`,
@@ -244,7 +246,11 @@ export default function UserManagement() {
       return;
     }
 
-    if (targetUser?.roleData?.name === "superadmin" && !isEditingSelf && currentUser?.role !== "owner") {
+    if (
+      targetUser?.roleData?.name === "superadmin" &&
+      !isEditingSelf &&
+      currentUser?.role !== "owner"
+    ) {
       toast.error("Action Denied", {
         description:
           "Hierarchy Protection: superadmin accounts can only be modified by the Owner.",
@@ -269,8 +275,7 @@ export default function UserManagement() {
       } catch (error: unknown) {
         toast.error("Gagal Update", {
           id: loadingToast,
-          description:
-            getErrorMessage(error) || "Internal server error.",
+          description: getErrorMessage(error) || "Internal server error.",
         });
         fetchUsersAndRoles(); // Revert UI
       }
@@ -353,7 +358,7 @@ export default function UserManagement() {
             { id: "all", label: "Semua Pengguna" },
             { id: "superadmin", label: "Superadmin" },
             { id: "editor", label: "Editor" },
-            { id: "pending", label: "Pending SSO" },
+            { id: "pending", label: "Pending" },
             { id: "suspended", label: "Suspended" },
           ].map((filter) => (
             <button
@@ -365,7 +370,9 @@ export default function UserManagement() {
                   : "bg-white text-slate-500 border border-slate-200 hover:bg-slate-50"
               }`}>
               {filter.label}
-              {filter.id === "all" && <span className="ml-1.5 opacity-60">({users.length})</span>}
+              {filter.id === "all" && (
+                <span className="ml-1.5 opacity-60">({users.length})</span>
+              )}
             </button>
           ))}
         </div>
@@ -416,14 +423,21 @@ export default function UserManagement() {
                 filteredUsers.map((user: any) => {
                   const isSelf = String(user.id) === String(currentUserId);
                   const roleName = user.roleData?.name || "Unknown Role";
-                  const isSuperOrOwner = roleName === "superadmin" || roleName === "owner";
-                  const isProtected = roleName === "owner" || (roleName === "superadmin" && currentUser?.role !== "owner");
+                  const isSuperOrOwner =
+                    roleName === "superadmin" || roleName === "owner";
+                  const isProtected =
+                    roleName === "owner" ||
+                    (roleName === "superadmin" &&
+                      currentUser?.role !== "owner");
 
                   // DETEKSI STATUS SYNC SSO (Robust)
                   const isPendingSync = !user.lastLogin;
 
                   // DETEKSI AKTIVITAS TERAKHIR (Aktif dalam 10 menit)
-                  const isOnline = user.lastLogin && (new Date().getTime() - new Date(user.lastLogin).getTime() < 10 * 60 * 1000);
+                  const isOnline =
+                    user.lastLogin &&
+                    new Date().getTime() - new Date(user.lastLogin).getTime() <
+                      10 * 60 * 1000;
 
                   return (
                     <tr
@@ -442,7 +456,9 @@ export default function UserManagement() {
                                 : user.name.charAt(0).toUpperCase()}
                             </div>
                             {isOnline && (
-                              <span className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 border-2 border-white rounded-full" title="Online baru-baru ini"></span>
+                              <span
+                                className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 border-2 border-white rounded-full"
+                                title="Online baru-baru ini"></span>
                             )}
                           </div>
 
@@ -486,7 +502,9 @@ export default function UserManagement() {
 
                       {/* KOLOM 2: TINGKAT AKSES */}
                       <td className="px-6 py-4">
-                        {(currentUser?.role === "superadmin" || currentUser?.role === "owner") && !isSelf ? (
+                        {(currentUser?.role === "superadmin" ||
+                          currentUser?.role === "owner") &&
+                        !isSelf ? (
                           <div className="relative inline-block">
                             <select
                               value={user.roleId}
@@ -509,7 +527,9 @@ export default function UserManagement() {
                         ) : (
                           <span
                             className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold border shadow-sm ${getRoleBadgeColor(roleName)}`}>
-                            {isSuperOrOwner && <Shield className="w-3.5 h-3.5" />}
+                            {isSuperOrOwner && (
+                              <Shield className="w-3.5 h-3.5" />
+                            )}
                             {roleName}
                           </span>
                         )}
@@ -562,9 +582,7 @@ export default function UserManagement() {
                       <td className="px-6 py-4 text-right">
                         <button
                           onClick={() =>
-                            !isSelf &&
-                            !isProtected &&
-                            handleDeleteUser(user.id)
+                            !isSelf && !isProtected && handleDeleteUser(user.id)
                           }
                           disabled={isSelf || isProtected}
                           title={
@@ -595,10 +613,14 @@ export default function UserManagement() {
                         <UserPlus className="w-8 h-8 text-slate-300" />
                       </div>
                       <p className="text-sm font-bold text-slate-600">
-                        {searchTerm || activeFilter !== "all" ? "Tidak ada pengguna yang cocok dengan filter" : "Belum ada user terdaftar"}
+                        {searchTerm || activeFilter !== "all"
+                          ? "Tidak ada pengguna yang cocok dengan filter"
+                          : "Belum ada user terdaftar"}
                       </p>
                       <p className="text-xs text-slate-400 mt-1">
-                        {searchTerm || activeFilter !== "all" ? "Coba ubah kata kunci atau hapus filter di atas." : "Daftarkan akses admin baru untuk memulai."}
+                        {searchTerm || activeFilter !== "all"
+                          ? "Coba ubah kata kunci atau hapus filter di atas."
+                          : "Daftarkan akses admin baru untuk memulai."}
                       </p>
                     </div>
                   </td>
