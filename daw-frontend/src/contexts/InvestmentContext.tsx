@@ -85,7 +85,7 @@ export function InvestmentProvider({ children }: { children: ReactNode }) {
       const hasPhysicalToken = !!token;
       const canAccessAdmin =
         hasPhysicalToken &&
-        ["superadmin", "admin", "editor", "approver"].includes(
+        ["superadmin", "admin", "owner", "editor", "approver"].includes(
           user?.role?.toLowerCase() || "",
         );
 

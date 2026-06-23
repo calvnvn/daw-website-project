@@ -106,6 +106,7 @@ export function HomeProvider({ children }: { children: ReactNode }) {
       const canAccessAdmin = isAdminArea && [
         "superadmin",
         "admin",
+        "owner",
         "editor",
         "approver",
       ].includes(user?.role?.toLowerCase() || "");

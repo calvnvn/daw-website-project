@@ -141,8 +141,8 @@ export const BusinessProvider = ({ children }: { children: ReactNode }) => {
     const token = localStorage.getItem("daw_token");
     if (token && user === null) return;
 
-    const canAccessAdmin = ["superadmin", "admin", "editor"].includes(
-      user?.role || "",
+    const canAccessAdmin = ["superadmin", "admin", "owner", "editor", "approver"].includes(
+      user?.role?.toLowerCase() || "",
     );
 
     if (sections.length === 0) setIsLoading(true);

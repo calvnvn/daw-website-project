@@ -18,7 +18,7 @@ import type { LocalAffiliate, LocalCategory } from "./InvestmentConstants";
 
 export function useInvestmentManager() {
   const { user } = useAuth();
-  const isSuperadmin = user?.role === "superadmin" || user?.role === "admin";
+  const isSuperadmin = user?.role === "superadmin" || user?.role === "admin" || user?.role === "owner";
 
   const [activeTab, setActiveTab] = useState<"content" | "companies">("content");
   const [isEditing, setIsEditing] = useState(false);
