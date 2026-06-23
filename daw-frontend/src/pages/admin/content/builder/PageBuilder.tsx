@@ -593,12 +593,16 @@ export default function PageBuilder() {
     }
 
     try {
-      const parser = new DOMParser();
-      const doc = parser.parseFromString(formData.content, "text/html");
-
-      let plainText = doc.body.textContent || "";
-
-      plainText = plainText.replace(/\s+/g, " ").trim();
+      // Decode HTML entities and strip tags
+      const plainText = formData.content
+        .replace(/<[^>]*>?/gm, " ") // Replace tags with space to avoid word joining
+        .replace(/&nbsp;|\u00A0/gi, " ") // Explicitly nuke Non-Breaking Spaces
+        .replace(/&amp;/gi, "&")
+        .replace(/&quot;/gi, '"')
+        .replace(/&lt;/gi, "<")
+        .replace(/&gt;/gi, ">")
+        .replace(/\s+/g, " ") // Collapse multiple spaces
+        .trim();
 
       if (plainText.length === 0) {
         return "Mulai menulis subtitle atau konten untuk melihat deskripsi otomatis di sini.";
@@ -607,11 +611,7 @@ export default function PageBuilder() {
       return plainText.slice(0, 150) + (plainText.length > 150 ? "..." : "");
     } catch (e) {
       console.error("🚨 SEO Fallback Parsing Failed:", e);
-      const plainText = formData.content
-        .replace(/<[^>]*>?/gm, "")
-        .replace(/&nbsp;|\u00A0/g, " ")
-        .trim();
-      return plainText.slice(0, 150) + (plainText.length > 150 ? "..." : "");
+      return "DAW Group Article";
     }
   };
 
@@ -1522,7 +1522,16 @@ export default function PageBuilder() {
             )}
 
             {/* RIGHT: LIVE PREVIEW PANEL */}
-            {(viewLayout === "preview" || viewLayout === "split") && (
+            {(viewLayout === "preview" || viewLayout === "split") && (() => {
+              const hasPreviewToc = previewToc.length > 0;
+              const hasPreviewSidebar = formData.sidebarLinks.length > 0;
+              
+              let previewMainColClass = "lg:col-span-12 max-w-4xl mx-auto"; 
+              if (hasPreviewToc && hasPreviewSidebar) previewMainColClass = "lg:col-span-9 xl:col-span-6 max-w-[720px]";
+              else if (hasPreviewToc && !hasPreviewSidebar) previewMainColClass = "lg:col-span-9 max-w-4xl w-full";
+              else if (!hasPreviewToc && hasPreviewSidebar) previewMainColClass = "lg:col-span-9 max-w-4xl w-full";
+
+              return (
               <div
                 className={`h-full overflow-y-auto custom-scrollbar bg-slate-50 ${viewLayout === "preview" ? "w-full max-w-7xl mx-auto p-8" : "w-1/2 p-6"}`}>
                 <div className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden relative pb-32 min-h-full">
@@ -1540,18 +1549,21 @@ export default function PageBuilder() {
                     {/* Hero Section Simulation */}
                     <section className="relative h-[350px] flex items-center justify-center overflow-hidden">
                       <div
-                        className="absolute inset-0 bg-cover bg-center transition-transform duration-700"
-                        style={{
-                          backgroundImage: `url(${
-                            heroImage
-                              ? heroImage.startsWith("blob:")
-                                ? heroImage
-                                : `${BASE_UPLOAD_URL}/${heroImage}`
-                              : "/placeholder.jpg"
-                          })`,
-                        }}
+                        className={`absolute inset-0 bg-cover bg-center transition-transform duration-700 ${!heroImage ? "bg-slate-800" : ""}`}
+                        style={heroImage ? {
+                          backgroundImage: `url(${heroImage.startsWith("blob:") ? heroImage : `${BASE_UPLOAD_URL}/${heroImage}`})`,
+                        } : {}}
                       />
-                      <div className="absolute inset-0 bg-[#004B23]/70 mix-blend-multiply" />
+                      
+                      {/* MESH PATTERN FALLBACK */}
+                      {!heroImage && (
+                        <div 
+                          className="absolute inset-0 opacity-20 mix-blend-overlay" 
+                          style={{ backgroundImage: "radial-gradient(#10b981 1.5px, transparent 1.5px)", backgroundSize: "32px 32px" }} 
+                        />
+                      )}
+
+                      <div className="absolute inset-0 bg-daw-green/20 mix-blend-multiply" />
                       <div className="absolute inset-0 bg-gradient-to-b from-slate-900/60 via-slate-900/40 to-slate-900/80" />
 
                       <div className="relative z-10 text-center px-6 max-w-3xl mt-8">
@@ -1574,7 +1586,7 @@ export default function PageBuilder() {
                     {/* Full Layout Container Simulation */}
                     <div className="bg-white relative z-20 shadow-[0_-20px_40px_rgba(0,0,0,0.05)] pt-12 pb-24">
                       <div className="container mx-auto px-6 max-w-[90rem]">
-                        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12 items-start">
+                        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-10 items-start">
                           
                           {/* Sidebar Navigation: Table of Contents Preview */}
                           <aside className="hidden lg:block lg:col-span-3 sticky top-6 self-start w-full max-w-[280px]">
@@ -1601,33 +1613,44 @@ export default function PageBuilder() {
                           </aside>
 
                           {/* Dynamic Content Area */}
-                          <div className="lg:col-span-9 xl:col-span-6 min-w-0 w-full overflow-hidden">
-                            <div className="max-w-[720px] mx-auto">
+                          <div className={`${previewMainColClass} min-w-0 overflow-hidden`}>
+                            <div className="w-full">
                               <article
-                                className={`w-full text-left
+                                className={`w-full text-left break-words
                         [&>*:first-child]:mt-0
-                        prose prose-slate prose-lg max-w-none
-                        prose-p:leading-[1.8] prose-p:text-slate-600 prose-p:mb-5 
+                        prose prose-slate prose-lg md:prose-xl max-w-none
+                        prose-p:leading-[1.9] prose-p:text-slate-600 prose-p:mb-6 
+                        prose-p:text-[1.125rem] md:prose-p:text-[1.2rem]
                         prose-headings:font-serif prose-headings:text-slate-900 
-                        prose-h2:text-3xl prose-h2:mt-10 prose-h2:mb-8
+                        prose-h2:text-3xl md:prose-h2:text-5xl prose-h2:mt-12 prose-h2:mb-8
                         prose-headings:tracking-tight prose-headings:font-bold
-                        prose-h3:text-2xl prose-h3:mt-10
-                        [&_img]:rounded-[2rem] [&_img]:my-5
-                        [&_iframe]:rounded-[1.5rem] [&_iframe]:shadow-2xl [&_iframe]:my-5
+                        prose-h3:text-2xl md:prose-h3:text-3xl prose-h3:mt-10
+                        [&_img]:rounded-[2rem] [&_img]:my-8 [&_img]:shadow-xl
+                        [&_iframe]:rounded-[1.5rem] [&_iframe]:shadow-2xl [&_iframe]:my-8
                         ${
                           formData.showDropCap
-                            ? `prose-p:first-of-type:first-letter:text-[5rem] 
+                            ? `prose-p:first-of-type:first-letter:text-[6rem] 
                               prose-p:first-of-type:first-letter:font-serif 
                               prose-p:first-of-type:first-letter:font-black 
                               prose-p:first-of-type:first-letter:text-daw-green 
-                              prose-p:first-of-type:first-letter:mr-4 
+                              prose-p:first-of-type:first-letter:mr-5 
                               prose-p:first-of-type:first-letter:float-left 
-                              prose-p:first-of-type:first-letter:leading-[0.7] 
-                              prose-p:first-of-type:first-letter:mt-2
+                              prose-p:first-of-type:first-letter:leading-[0.75] 
+                              prose-p:first-of-type:first-letter:mt-3
                               prose-p:first-of-type:first-letter:drop-shadow-sm`
                             : ""
                         }
-                        prose-li:marker:text-daw-green prose-li:my-2`}
+                        prose-li:marker:text-daw-green prose-li:my-2
+                        prose-blockquote:border-l-[6px] prose-blockquote:border-daw-green 
+                        prose-blockquote:bg-slate-50/80 prose-blockquote:py-4 prose-blockquote:px-8 
+                        prose-blockquote:rounded-r-2xl prose-blockquote:font-serif 
+                        prose-blockquote:text-2xl prose-blockquote:italic prose-blockquote:text-slate-700
+                        prose-blockquote:shadow-sm prose-blockquote:my-10
+                        prose-strong:text-slate-900 prose-strong:font-bold
+                        prose-a:text-daw-green prose-a:no-underline hover:prose-a:text-emerald-700 hover:prose-a:underline hover:prose-a:decoration-2 hover:prose-a:underline-offset-4 transition-all
+                        prose-table:w-full prose-table:rounded-xl prose-table:overflow-hidden prose-table:shadow-sm
+                        prose-thead:bg-slate-50 prose-th:px-6 prose-th:py-4 prose-th:text-slate-800 prose-th:font-bold
+                        prose-td:px-6 prose-td:py-4 prose-td:border-b prose-td:border-slate-100`}
                                 dangerouslySetInnerHTML={{
                                   __html:
                                     formData.content.replace(/&nbsp;|\u00A0/g, " ") ||
@@ -1671,7 +1694,8 @@ export default function PageBuilder() {
                   </div>
                 </div>
               </div>
-            )}
+              );
+            })()}
           </div>
         </div>
       )}

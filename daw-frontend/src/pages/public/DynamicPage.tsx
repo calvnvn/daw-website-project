@@ -323,12 +323,36 @@ export default function DynamicPage() {
     );
   }
 
+  // SMART GRID LOGIC
+  const hasToc = toc.length > 0;
+  const hasSidebar = safeSidebarLinks.length > 0;
+
+  let mainColClass = "lg:col-span-12 max-w-4xl mx-auto"; 
+  if (hasToc && hasSidebar) mainColClass = "lg:col-span-9 xl:col-span-6 max-w-[720px]";
+  else if (hasToc && !hasSidebar) mainColClass = "lg:col-span-9 max-w-4xl w-full";
+  else if (!hasToc && hasSidebar) mainColClass = "lg:col-span-9 max-w-4xl w-full";
+
+  // Generate SEO Description Fallback
+  let seoFallback = "DAW Group Article";
+  if (pageData) {
+    seoFallback = pageData.content
+        .replace(/<[^>]*>?/gm, " ")
+        .replace(/&nbsp;|\u00A0/gi, " ")
+        .replace(/&amp;/gi, "&")
+        .replace(/&quot;/gi, '"')
+        .replace(/&lt;/gi, "<")
+        .replace(/&gt;/gi, ">")
+        .replace(/\s+/g, " ")
+        .trim()
+        .slice(0, 150) + "...";
+  }
+
   return (
     <>
       <SEO
         title={`${pageData.title} | DAW Group`}
         description={
-          pageData.metaDescription || pageData.subtitle || "DAW Group Article"
+          pageData.metaDescription || pageData.subtitle || seoFallback
         }
         image={pageData.heroImage || undefined}
         type="article"
@@ -338,16 +362,27 @@ export default function DynamicPage() {
         {/* Hero Section */}
         <section className="relative h-[85vh] flex items-center justify-center overflow-hidden">
           <div
-            className="absolute inset-0 bg-cover bg-center transition-transform duration-700 hover:scale-105"
-            style={{
-              backgroundImage: `url(${
-                pageData.heroImage
-                  ? getCleanImageUrl(pageData.heroImage)
-                  : "/placeholder.jpg"
-              })`,
-              backgroundAttachment: "fixed",
-            }}
+            className={`absolute inset-0 bg-cover bg-center transition-transform duration-1000 hover:scale-105 ${
+              !pageData.heroImage ? "bg-slate-800" : ""
+            }`}
+            style={
+              pageData.heroImage
+                ? {
+                    backgroundImage: `url(${getCleanImageUrl(pageData.heroImage)})`,
+                    backgroundAttachment: "fixed",
+                  }
+                : {}
+            }
           />
+          
+          {/* MESH PATTERN FALLBACK */}
+          {!pageData.heroImage && (
+            <div 
+              className="absolute inset-0 opacity-20 mix-blend-overlay" 
+              style={{ backgroundImage: "radial-gradient(#10b981 1.5px, transparent 1.5px)", backgroundSize: "32px 32px" }} 
+            />
+          )}
+
           <div className="absolute inset-0 bg-daw-green/20 mix-blend-multiply" />
           <div className="absolute inset-0 bg-gradient-to-b from-slate-900/60 via-slate-900/40 to-slate-900/80" />
 
@@ -359,7 +394,7 @@ export default function DynamicPage() {
                   {pageData.subtitle}
                 </p>
               )}
-              <h1 className="text-5xl md:text-7xl lg:text-8xl font-serif font-bold text-white mb-10 leading-[1.1] tracking-tight drop-shadow-lg">
+              <h1 className="text-5xl md:text-7xl lg:text-8xl font-serif font-bold text-white mb-10 leading-[1.1] tracking-tight drop-shadow-2xl mix-blend-normal">
                 {pageData.title}
               </h1>
             </ScrollReveal>
@@ -375,18 +410,18 @@ export default function DynamicPage() {
           </div>
 
           {/* Scroll Down Indicator */}
-          <div className="absolute bottom-12 left-1/2 -translate-x-1/2 flex flex-col items-center gap-2 text-white/50 animate-bounce">
-            <span className="text-[10px] font-bold tracking-widest uppercase">
+          <div className="absolute bottom-12 left-1/2 -translate-x-1/2 flex flex-col items-center gap-2 text-slate-500 animate-bounce">
+            <span className="text-[10px] font-bold tracking-widest uppercase text-slate-400">
               {t("ui.scroll", "Scroll to Explore")}
             </span>
-            <ChevronRight className="rotate-90 w-4 h-4" />
+            <ChevronRight className="rotate-90 w-4 h-4 text-slate-400" />
           </div>
         </section>
 
         {/* Main Layout Container */}
         <div className="bg-white relative z-20 shadow-[0_-20px_40px_rgba(0,0,0,0.05)] pt-18 pb-32">
           <div className="container mx-auto px-6 max-w-[90rem]">
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 lg:gap-16 items-start">
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-10 items-start">
               {/* Sidebar Navigation: Table of Contents */}
               <aside className="hidden lg:block lg:col-span-3 sticky top-22 self-start w-full max-w-[280px]">
                 {toc.length > 0 && (
@@ -436,28 +471,29 @@ export default function DynamicPage() {
               </aside>
 
               {/* Dynamic Content Area */}
-              <div className="lg:col-span-9 xl:col-span-6 min-w-0 w-full overflow-hidden">
-                <div className="max-w-[720px] mx-auto">
+              <div className={`${mainColClass} min-w-0 overflow-hidden`}>
+                <div className="w-full">
                   <article
                     ref={articleRef}
                     className={`w-full text-left
                     /* 1. KUNCI ANTI OVERFLOW: Gunakan break-words sebagai jaring pengaman */
+                    break-words
                     
                     [&>*:first-child]:mt-0
                     /* 2. PROSE CORE */ 
                     prose prose-slate prose-lg md:prose-xl max-w-none
-                    prose-p:leading-[1.8] prose-p:text-slate-600 prose-p:mb-5 
+                    prose-p:leading-[1.9] prose-p:text-slate-600 prose-p:mb-6 
                     prose-p:text-[1.125rem] md:prose-p:text-[1.2rem]
                     prose-headings:font-serif prose-headings:text-slate-900 prose-headings:scroll-mt-32 
                     
                     /* 3. HEADINGS - Serif Elegance */
-                    prose-h2:text-3xl md:prose-h2:text-5xl prose-h2:mt-10 prose-h2:mb-8
+                    prose-h2:text-3xl md:prose-h2:text-5xl prose-h2:mt-12 prose-h2:mb-8
                     prose-headings:tracking-tight prose-headings:font-bold
                     prose-h3:text-2xl md:prose-h3:text-3xl prose-h3:mt-10
                     
                     /* 4. MEDIA - Round & Polished */
-                    [&_img]:rounded-[2rem] [&_img]:my-5
-                    [&_iframe]:rounded-[1.5rem] [&_iframe]:shadow-2xl [&_iframe]:my-5
+                    [&_img]:rounded-[2rem] [&_img]:my-8 [&_img]:shadow-xl
+                    [&_iframe]:rounded-[1.5rem] [&_iframe]:shadow-2xl [&_iframe]:my-8
                     
                     /* 5. DROP CAP - The "Vogue" Style */
                     ${
@@ -468,14 +504,30 @@ export default function DynamicPage() {
                          prose-p:first-of-type:first-letter:text-daw-green 
                          prose-p:first-of-type:first-letter:mr-5 
                          prose-p:first-of-type:first-letter:float-left 
-                         prose-p:first-of-type:first-letter:leading-[0.7] 
+                         prose-p:first-of-type:first-letter:leading-[0.75] 
                          prose-p:first-of-type:first-letter:mt-3
                          prose-p:first-of-type:first-letter:drop-shadow-sm`
                         : ""
                     }
 
                     /* 6. LISTS & BULLETS */
-                    prose-li:marker:text-daw-green prose-li:my-2`}
+                    prose-li:marker:text-daw-green prose-li:my-2
+                    
+                    /* 7. BLOCKQUOTE - Premium Editorial */
+                    prose-blockquote:border-l-[6px] prose-blockquote:border-daw-green 
+                    prose-blockquote:bg-slate-50/80 prose-blockquote:py-4 prose-blockquote:px-8 
+                    prose-blockquote:rounded-r-2xl prose-blockquote:font-serif 
+                    prose-blockquote:text-2xl prose-blockquote:italic prose-blockquote:text-slate-700
+                    prose-blockquote:shadow-sm prose-blockquote:my-10
+                    
+                    /* 8. STRONG & LINKS */
+                    prose-strong:text-slate-900 prose-strong:font-bold
+                    prose-a:text-daw-green prose-a:no-underline hover:prose-a:text-emerald-700 hover:prose-a:underline hover:prose-a:decoration-2 hover:prose-a:underline-offset-4 transition-all
+                    
+                    /* 9. TABLES */
+                    prose-table:w-full prose-table:rounded-xl prose-table:overflow-hidden prose-table:shadow-sm
+                    prose-thead:bg-slate-50 prose-th:px-6 prose-th:py-4 prose-th:text-slate-800 prose-th:font-bold
+                    prose-td:px-6 prose-td:py-4 prose-td:border-b prose-td:border-slate-100`}
                     dangerouslySetInnerHTML={{
                       __html: parsedContent.replace(/&nbsp;|\u00A0/g, " "),
                     }}
@@ -484,8 +536,8 @@ export default function DynamicPage() {
               </div>
 
               {/* Supplementary Widget */}
-              {safeSidebarLinks.length > 0 ? (
-                <aside className="lg:col-span-12 xl:col-span-3 sticky top-32">
+              {hasSidebar && (
+                <aside className="lg:col-span-3 sticky top-32">
                   <div className="p-8 bg-slate-50 rounded-[2rem] border border-slate-100 shadow-sm">
                     <h4 className="text-lg font-serif font-bold text-slate-900 mb-4 flex items-center gap-2">
                       <Share2 className="w-5 h-5 text-daw-green" /> Inside this
@@ -509,8 +561,6 @@ export default function DynamicPage() {
                     </div>
                   </div>
                 </aside>
-              ) : (
-                <div className="hidden xl:block xl:col-span-3" />
               )}
             </div>
           </div>
