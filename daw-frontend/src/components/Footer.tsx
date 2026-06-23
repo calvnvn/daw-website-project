@@ -1,6 +1,6 @@
 import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
-import { MapPin, ChevronUp, ArrowUpRight } from "lucide-react";
+import { MapPin, ChevronUp, ArrowUpRight, Linkedin, Briefcase } from "lucide-react";
 import logoDaw from "@/assets/logo-daw.png";
 import { useSettings } from "@/contexts/SettingsContext";
 import { getCleanImageUrl } from "@/lib/utils";
@@ -205,6 +205,33 @@ export default function Footer() {
             <p className="text-[12px] text-slate-400 font-medium tracking-wide">
               {t("ui.copyright", { year: new Date().getFullYear() })}
             </p>
+
+            {/* Social & Career Links (Expanding Icon Buttons) */}
+            <div className="flex flex-wrap items-center justify-center gap-4">
+              <a
+                href="https://id.linkedin.com/company/dharma-agung-wijaya"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="group flex items-center h-10 px-3 bg-white/5 border border-white/10 rounded-full hover:bg-[#0A66C2] hover:border-[#0A66C2] transition-all duration-500 shadow-sm overflow-hidden"
+              >
+                <Linkedin className="w-4 h-4 text-slate-400 group-hover:text-white shrink-0 transition-colors duration-500" />
+                <span className="max-w-0 overflow-hidden whitespace-nowrap text-[10px] font-bold uppercase tracking-widest text-white transition-all duration-500 ease-[cubic-bezier(0.25,1,0.5,1)] group-hover:max-w-[100px] group-hover:pl-2 opacity-0 group-hover:opacity-100">
+                  LinkedIn
+                </span>
+              </a>
+
+              <a
+                href="https://id.jobstreet.com/id/companies/dharma-agung-wijaya-group-168556134678985"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="group flex items-center h-10 px-3 bg-white/5 border border-white/10 rounded-full hover:bg-[#E60278] hover:border-[#E60278] transition-all duration-500 shadow-sm overflow-hidden"
+              >
+                <Briefcase className="w-4 h-4 text-slate-400 group-hover:text-white shrink-0 transition-colors duration-500" />
+                <span className="max-w-0 overflow-hidden whitespace-nowrap text-[10px] font-bold uppercase tracking-widest text-white transition-all duration-500 ease-[cubic-bezier(0.25,1,0.5,1)] group-hover:max-w-[100px] group-hover:pl-2 opacity-0 group-hover:opacity-100">
+                  JobStreet
+                </span>
+              </a>
+            </div>
 
             <button
               onClick={scrollToTop}
