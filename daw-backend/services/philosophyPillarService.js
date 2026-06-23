@@ -1,3 +1,4 @@
+const { Op } = require("sequelize");
 const sequelize = require("../config/database");
 const PhilosophyPillar = require("../models/PhilosophyPillar");
 const ApprovalDraft = require("../models/ApprovalDraft");
@@ -54,7 +55,14 @@ class PhilosophyPillarService {
       return item;
     });
 
-    if (lang === "en") return formattedPillars;
+    // Filter out draft-created records (Pending or Rejected CREATE drafts should never appear publicly)
+    const createDrafts = await ApprovalDraft.findAll({
+      where: { module_name: MODULE_NAME, action: "CREATE", status: { [Op.in]: ["Pending", "Rejected"] } },
+    });
+    const draftIds = new Set(createDrafts.map((d) => String(d.target_id)));
+    const publicData = formattedPillars.filter((item) => !draftIds.has(String(item.id)));
+
+    if (lang === "en") return publicData;
 
     // ─── LAZY TRANSLATION ───
     const safeTranslate = async (moduleName, id, field, sourceValue) => {
@@ -72,8 +80,8 @@ class PhilosophyPillarService {
     };
 
     const translatedPillars = [];
-    for (let i = 0; i < formattedPillars.length; i++) {
-      let item = formattedPillars[i];
+    for (let i = 0; i < publicData.length; i++) {
+      let item = publicData[i];
       item.title = await safeTranslate(MODULE_NAME, item.id, "title", item.title);
       item.text = await safeTranslate(MODULE_NAME, item.id, "text", item.text);
       translatedPillars.push(item);

@@ -1,3 +1,4 @@
+const { Op } = require("sequelize");
 const sequelize = require("../config/database");
 const BusinessSection = require("../models/BusinessSection");
 const BusinessMapMarker = require("../models/BusinessMapMarker");
@@ -127,7 +128,14 @@ class BusinessService {
       order: [["orderIndex", "ASC"]],
     });
 
-    if (lang === "en") return rawSections;
+    // Filter out draft-created sections (Pending or Rejected CREATE drafts should never appear publicly)
+    const createDrafts = await ApprovalDraft.findAll({
+      where: { module_name: MODULE_NAME, action: "CREATE", status: { [Op.in]: ["Pending", "Rejected"] } },
+    });
+    const draftIds = new Set(createDrafts.map((d) => String(d.target_id)));
+    const filteredSections = rawSections.filter((s) => !draftIds.has(String(s.id)));
+
+    if (lang === "en") return filteredSections;
 
     const safeTranslate = async (moduleName, id, field, sourceValue) => {
       let transRecord = await Translation.findOne({ where: { modelName: moduleName, recordId: String(id), field, locale: "id" } });
@@ -144,8 +152,8 @@ class BusinessService {
     };
 
     const translatedSections = [];
-    for (let i = 0; i < rawSections.length; i++) {
-      let sec = rawSections[i].get({ plain: true });
+    for (let i = 0; i < filteredSections.length; i++) {
+      let sec = filteredSections[i].get({ plain: true });
 
       sec.category = await safeTranslate(MODULE_NAME, sec.id, "category", sec.category);
       sec.title = await safeTranslate(MODULE_NAME, sec.id, "title", sec.title);

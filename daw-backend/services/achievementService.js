@@ -1,3 +1,4 @@
+const { Op } = require("sequelize");
 const sequelize = require("../config/database");
 const Achievement = require("../models/Achievement");
 const NewsArticle = require("../models/NewsArticle");
@@ -61,8 +62,15 @@ class AchievementService {
       return item;
     });
 
+    // Filter out draft-created records (Pending or Rejected CREATE drafts should never appear publicly)
+    const createDrafts = await ApprovalDraft.findAll({
+      where: { module_name: MODULE_NAME, action: "CREATE", status: { [Op.in]: ["Pending", "Rejected"] } },
+    });
+    const draftIds = new Set(createDrafts.map((d) => String(d.target_id)));
+    const publicData = formattedData.filter((item) => !draftIds.has(String(item.id)));
+
     if (lang === "en") {
-      return formattedData;
+      return publicData;
     }
 
     // Lazy Translation Pipeline
@@ -81,8 +89,8 @@ class AchievementService {
     };
 
     const translatedAchievements = [];
-    for (let i = 0; i < formattedData.length; i++) {
-      let item = formattedData[i];
+    for (let i = 0; i < publicData.length; i++) {
+      let item = publicData[i];
       item.title = await safeTranslate(MODULE_NAME, item.id, "title", item.title);
       item.description = await safeTranslate(MODULE_NAME, item.id, "description", item.description);
       translatedAchievements.push(item);

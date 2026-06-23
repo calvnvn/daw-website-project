@@ -1,3 +1,4 @@
+const { Op } = require("sequelize");
 const sequelize = require("../config/database");
 const InvestmentSettings = require("../models/InvestmentSettings");
 const Affiliate = require("../models/Affiliate");
@@ -171,9 +172,9 @@ class InvestmentService {
       }],
     });
 
-    // Filter out draft-created affiliates
+    // Filter out draft-created affiliates (Pending or Rejected CREATE drafts should never appear publicly)
     const createDrafts = await ApprovalDraft.findAll({
-      where: { module_name: "Affiliate", action: "CREATE", status: "Pending" },
+      where: { module_name: "Affiliate", action: "CREATE", status: { [Op.in]: ["Pending", "Rejected"] } },
     });
     const newDraftIds = new Set(createDrafts.map((d) => String(d.target_id)));
 

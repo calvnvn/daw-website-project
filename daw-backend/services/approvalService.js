@@ -291,10 +291,19 @@ class ApprovalService {
       if (status === "2") {
         const Model = getModelByModuleName(moduleName);
         if (Model && targetId) {
-          await Model.update(
-            { is_locked: false, lock_ticket: null },
-            { where: { id: targetId }, transaction: t },
-          );
+          // For CREATE drafts: keep is_locked=true so the record stays hidden from public APIs.
+          // For UPDATE/DELETE drafts: unlock the record so the original content remains live.
+          if (action === "CREATE") {
+            await Model.update(
+              { lock_ticket: null },
+              { where: { id: targetId }, transaction: t },
+            );
+          } else {
+            await Model.update(
+              { is_locked: false, lock_ticket: null },
+              { where: { id: targetId }, transaction: t },
+            );
+          }
         }
         await txDraft.update(
           { status: "Rejected", rejection_reason: komentar },
@@ -491,10 +500,23 @@ class ApprovalService {
       await draft.update({ status: "Discarded" }, { transaction: t });
       const Model = getModelByModuleName(draft.module_name);
       if (Model && draft.target_id) {
-        await Model.update(
-          { is_locked: false, lock_ticket: null },
-          { where: { id: String(draft.target_id).trim() }, transaction: t },
-        );
+        const targetId = String(draft.target_id).trim();
+        if (draft.action === "CREATE") {
+          // CREATE discard: destroy the orphaned record that was never approved.
+          await Model.destroy({ where: { id: targetId }, transaction: t });
+          // Clean up any associated translations for this orphaned record
+          const Translation = require("../models/Translation");
+          await Translation.destroy({
+            where: { modelName: draft.module_name, recordId: targetId },
+            transaction: t,
+          });
+        } else {
+          // UPDATE/DELETE discard: simply unlock the original record.
+          await Model.update(
+            { is_locked: false, lock_ticket: null },
+            { where: { id: targetId }, transaction: t },
+          );
+        }
       }
       await t.commit();
       return { success: true };
