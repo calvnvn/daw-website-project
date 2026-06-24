@@ -172,7 +172,22 @@ export default function SubjectManagerModal({
         {/* Modal Body */}
         <div className="p-6 space-y-6 max-h-[80vh] overflow-y-auto custom-scrollbar">
           {/* KOTAK 1: THE SMART SWITCHER FORM */}
-          <div className="bg-slate-50 p-5 rounded-xl border border-slate-200 shadow-inner flex flex-col gap-5 transition-all duration-300">
+          <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm flex flex-col gap-5 relative overflow-hidden transition-all duration-300">
+            {editingSubjectId && (
+              <div className="absolute top-0 left-0 w-full h-1 bg-amber-500"></div>
+            )}
+
+            <div className="flex items-center justify-between">
+              <h3 className="text-sm font-bold text-slate-800">
+                {editingSubjectId ? "Edit Subject Setup" : "Add New Subject"}
+              </h3>
+              {editingSubjectId && (
+                <span className="text-[9px] font-bold bg-amber-100 text-amber-700 px-2 py-0.5 rounded-md tracking-wider">
+                  EDIT MODE
+                </span>
+              )}
+            </div>
+
             {/* Baris 1: Nama & Action Type */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
               <div className="space-y-1.5">
@@ -184,37 +199,37 @@ export default function SubjectManagerModal({
                   onChange={(e) =>
                     setNewSubject({ ...newSubject, name: e.target.value })
                   }
-                  className="w-full px-3 py-2.5 rounded-lg border border-slate-200 text-sm focus:ring-2 focus:ring-daw-green/20 focus:border-daw-green outline-none transition-all bg-white shadow-sm"
+                  className="w-full px-3 py-2 rounded-lg border border-slate-200 text-sm focus:ring-2 focus:ring-daw-green/20 focus:border-daw-green outline-none transition-all bg-slate-50 focus:bg-white"
                   placeholder="e.g. Careers & Internships"
                 />
               </div>
 
               <div className="space-y-1.5">
                 <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
-                  Inquiry Action Type
+                  Action Type
                 </label>
-                <div className="flex p-1 bg-slate-200/50 rounded-lg border border-slate-200">
+                <div className="flex p-1 bg-slate-100 rounded-lg border border-slate-200/60">
                   <button
                     onClick={() =>
                       setNewSubject({ ...newSubject, is_redirect: false })
                     }
-                    className={`flex-1 flex items-center justify-center gap-2 py-1.5 text-[10px] font-bold uppercase tracking-wider rounded-md transition-all duration-300 ${
+                    className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 text-[10px] font-bold uppercase tracking-wider rounded-md transition-all duration-300 ${
                       !newSubject.is_redirect
-                        ? "bg-white text-daw-green shadow-sm ring-1 ring-slate-200"
-                        : "text-slate-500 hover:text-slate-700 hover:bg-slate-200/50"
+                        ? "bg-white text-daw-green shadow-sm"
+                        : "text-slate-400 hover:text-slate-600"
                     }`}>
-                    <Mail className="w-3.5 h-3.5" /> Email Routing
+                    <Mail className="w-3.5 h-3.5" /> Routing
                   </button>
                   <button
                     onClick={() =>
                       setNewSubject({ ...newSubject, is_redirect: true })
                     }
-                    className={`flex-1 flex items-center justify-center gap-2 py-1.5 text-[10px] font-bold uppercase tracking-wider rounded-md transition-all duration-300 ${
+                    className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 text-[10px] font-bold uppercase tracking-wider rounded-md transition-all duration-300 ${
                       newSubject.is_redirect
-                        ? "bg-blue-600 text-white shadow-sm ring-1 ring-blue-700"
-                        : "text-slate-500 hover:text-slate-700 hover:bg-slate-200/50"
+                        ? "bg-white text-blue-600 shadow-sm"
+                        : "text-slate-400 hover:text-slate-600"
                     }`}>
-                    <LinkIcon className="w-3.5 h-3.5" /> External Link
+                    <LinkIcon className="w-3.5 h-3.5" /> Link
                   </button>
                 </div>
               </div>
@@ -237,7 +252,7 @@ export default function SubjectManagerModal({
                           recipient_email: e.target.value,
                         })
                       }
-                      className="w-full pl-3 pr-10 py-2.5 rounded-lg border border-slate-200 text-sm focus:ring-2 focus:ring-daw-green/20 focus:border-daw-green outline-none transition-all bg-white shadow-sm"
+                      className="w-full pl-3 pr-10 py-2 rounded-lg border border-slate-200 text-sm focus:ring-2 focus:ring-daw-green/20 focus:border-daw-green outline-none transition-all bg-slate-50 focus:bg-white"
                       placeholder="e.g. hr@dawgroup.com"
                     />
                     {!newSubject.recipient_email && (
@@ -264,7 +279,7 @@ export default function SubjectManagerModal({
                         redirect_url: e.target.value,
                       })
                     }
-                    className="w-full px-3 py-2.5 rounded-lg border border-blue-200 text-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 outline-none transition-all bg-white shadow-sm font-mono text-blue-800"
+                    className="w-full px-3 py-2 rounded-lg border border-blue-200 text-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 outline-none transition-all bg-white shadow-sm font-mono text-blue-800"
                     placeholder="https://id.jobstreet.com/..."
                   />
                   <p className="text-[10px] text-blue-500 font-medium leading-relaxed">
@@ -276,7 +291,7 @@ export default function SubjectManagerModal({
             </div>
 
             {/* Baris 3: Footer (Status & Save Button) */}
-            <div className="flex flex-col sm:flex-row items-center justify-between pt-4 border-t border-slate-200 gap-4 mt-2">
+            <div className="flex flex-col sm:flex-row items-center justify-between pt-4 border-t border-slate-100 gap-4 mt-2">
               <label className="flex items-center gap-2 cursor-pointer group">
                 <input
                   type="checkbox"
@@ -296,20 +311,34 @@ export default function SubjectManagerModal({
                 </div>
               </label>
 
-              <button
-                onClick={handleSaveSubject}
-                className={`px-8 py-2.5 rounded-lg font-bold text-xs transition-all shadow-md flex items-center gap-2 active:scale-95 ${
-                  newSubject.is_redirect
-                    ? "bg-blue-600 hover:bg-blue-700 text-white shadow-blue-500/30"
-                    : "bg-daw-green hover:bg-emerald-700 text-white shadow-emerald-500/30"
-                }`}>
-                {newSubject.is_redirect ? (
-                  <LinkIcon className="w-3.5 h-3.5" />
-                ) : (
-                  <Save className="w-3.5 h-3.5" />
+              <div className="flex w-full sm:w-auto items-center gap-2">
+                {editingSubjectId && (
+                  <button
+                    onClick={() => {
+                      setEditingSubjectId(null);
+                      setNewSubject({
+                        name: "",
+                        isActive: true,
+                        recipient_email: "",
+                        is_redirect: false,
+                        redirect_url: "",
+                      });
+                    }}
+                    className="px-4 py-2.5 rounded-lg font-bold text-xs bg-slate-100 hover:bg-slate-200 text-slate-600 transition-all flex-1 sm:flex-none text-center">
+                    Cancel
+                  </button>
                 )}
-                {editingSubjectId ? "Update Subject Setup" : "Save New Subject"}
-              </button>
+                <button
+                  onClick={handleSaveSubject}
+                  className={`px-6 py-2.5 rounded-lg font-bold text-xs transition-all shadow-sm flex items-center justify-center gap-2 active:scale-95 flex-1 sm:flex-none ${
+                    newSubject.is_redirect
+                      ? "bg-blue-600 hover:bg-blue-700 text-white"
+                      : "bg-daw-green hover:bg-emerald-700 text-white"
+                  }`}>
+                  <Save className="w-3.5 h-3.5" />
+                  {editingSubjectId ? "Update Setup" : "Save Subject"}
+                </button>
+              </div>
             </div>
           </div>
 
