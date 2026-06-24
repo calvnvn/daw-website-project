@@ -108,7 +108,8 @@ exports.deleteProject = async (req, res) => {
 exports.uploadInlineImage = async (req, res) => {
   try {
     if (!req.file) return res.status(400).json({ message: "No image file provided." });
-    const fileUrl = `${req.protocol}://${req.get("host")}/uploads/${req.file.filename}`;
+    const baseUrl = (process.env.BACKEND_URL || `${req.protocol}://${req.get("host")}`).replace(/\/$/, "");
+    const fileUrl = `${baseUrl}/uploads/${req.file.filename}`;
     res.status(200).json({ message: "Image uploaded succesfully", url: fileUrl });
   } catch (error) {
     res.status(500).json({ message: error.message });

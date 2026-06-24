@@ -47,7 +47,8 @@ exports.uploadInlineImage = async (req, res) => {
     if (!req.file) {
       return res.status(400).json({ message: "No image file provided." });
     }
-    const fileUrl = `${req.protocol}://${req.get("host")}/uploads/${req.file.filename}`;
+    const baseUrl = (process.env.BACKEND_URL || `${req.protocol}://${req.get("host")}`).replace(/\/$/, "");
+    const fileUrl = `${baseUrl}/uploads/${req.file.filename}`;
     res.status(200).json({
       message: "Image uploaded successfully",
       url: fileUrl,

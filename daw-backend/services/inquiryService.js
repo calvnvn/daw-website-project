@@ -25,7 +25,7 @@ class InquiryService {
     }
 
     const logoUrl = companySettings?.companyLogo
-      ? `${process.env.BASE_URL}/uploads/${companySettings.companyLogo}`
+      ? `${process.env.BACKEND_URL}/uploads/${companySettings.companyLogo}`
       : null;
 
     // Persist the inquiry to the database
@@ -149,7 +149,7 @@ class InquiryService {
     // Send a new email to the new department
     const companySettings = await Settings.findOne();
     const logoUrl = companySettings?.companyLogo
-      ? `${process.env.BASE_URL}/uploads/${companySettings.companyLogo}`
+      ? `${process.env.BACKEND_URL}/uploads/${companySettings.companyLogo}`
       : null;
 
     const primaryEmail = process.env.SMTP_USER;
