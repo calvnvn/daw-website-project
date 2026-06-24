@@ -186,6 +186,9 @@ export default function NewsEventDetail() {
 
   const getImageUrl = (img: string) => {
     if (!img) return "";
+    if (img.includes("/uploads/")) {
+      img = img.split("/uploads/").pop() || img;
+    }
     if (img.startsWith("http")) return img;
     return `${BASE_UPLOAD_URL}/${img}`;
   };
@@ -367,9 +370,15 @@ export default function NewsEventDetail() {
                   prose-li:marker:text-daw-green prose-li:my-2`}
                 dangerouslySetInnerHTML={{
                   __html: (() => {
-                    const rawHtml = (article.content || "").replace(
+                    let rawHtml = (article.content || "").replace(
                       /&nbsp;|\u00A0/g,
                       " ",
+                    );
+
+                    // Path normalization: Replace any environment's /uploads/ URLs with the current BASE_UPLOAD_URL
+                    rawHtml = rawHtml.replace(
+                      /src="[^"]*\/uploads\/([^"'\s>]+)"/g,
+                      `src="${BASE_UPLOAD_URL}/$1"`
                     );
 
                     // DOMPurify Sanitization

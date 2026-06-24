@@ -18,8 +18,23 @@ export function cn(...inputs: ClassValue[]) {
 export const getCleanImageUrl = (path: string | null | undefined): string => {
   if (!path) return "";
 
-  // Preserve absolute protocols and local preview blobs
-  if (path.startsWith("blob:") || path.startsWith("http")) {
+  // Preserve local preview blobs
+  if (path.startsWith("blob:")) {
+    return path;
+  }
+
+  // Normalize absolute URLs that contain /uploads/ (e.g. http://localhost:5550/uploads/file.webp)
+  // This ensures images uploaded in one environment work correctly in another
+  if (path.includes("/uploads/")) {
+    const filename = path.split("/uploads/").pop();
+    if (filename) {
+      const baseUrl = BASE_UPLOAD_URL.replace(/\/$/, "");
+      return `${baseUrl}/${filename}`;
+    }
+  }
+
+  // Preserve external URLs that don't involve /uploads/
+  if (path.startsWith("http")) {
     return path;
   }
 

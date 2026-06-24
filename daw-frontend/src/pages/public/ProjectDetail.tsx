@@ -10,7 +10,7 @@ import {
 } from "lucide-react";
 import ScrollReveal from "@/components/ScrollReveal";
 import ProjectDetailSkeleton from "@/components/ProjectDetailSkeleton";
-import api from "@/lib/api";
+import api, { BASE_UPLOAD_URL } from "@/lib/api";
 import { getCleanImageUrl } from "@/lib/utils";
 import DOMPurify from "dompurify";
 import SEO from "@/components/SEO";
@@ -75,9 +75,6 @@ export default function ProjectDetail() {
   const cleanContent = useMemo(() => {
     if (!project?.content) return "";
 
-    const apiUrl = import.meta.env.VITE_API_URL || "http://localhost:5550";
-    const baseHost = apiUrl.replace(/\/api$/, "");
-
     // 1. Destroy Non-Breaking Spaces (&nbsp;) to allow natural word wrapping
     let sanitizedHtml = project.content.replace(/&nbsp;|\u00A0/g, " ");
 
@@ -87,15 +84,11 @@ export default function ProjectDetail() {
     // 3. Forcefully remove alignment classes that override layout constraints
     sanitizedHtml = sanitizedHtml.replace(/ql-align-justify/gi, "");
 
-    // Path normalization
-    return sanitizedHtml
-      .replace(/src="[^"]*\\uploads\\/g, `src="${baseHost}/uploads/`)
-      .replace(/src="\/uploads\//g, `src="${baseHost}/uploads/`)
-      .replace(/src="\/api\/uploads\//g, `src="${baseHost}/uploads/`)
-      .replace(
-        /src="https?:\/\/(localhost:5000|localhost:5550|172\.30\.1\.20:5550)\/(api\/)?uploads\//g,
-        `src="${baseHost}/uploads/`,
-      );
+    // Path normalization: replace any environment's uploads URL with BASE_UPLOAD_URL
+    return sanitizedHtml.replace(
+      /src="[^"]*\/uploads\/([^"'\s>]+)"/g,
+      `src="${BASE_UPLOAD_URL}/$1"`
+    );
   }, [project?.content]);
 
   // SCROLL EVENT LISTENERS

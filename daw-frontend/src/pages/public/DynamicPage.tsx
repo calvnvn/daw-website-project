@@ -3,7 +3,7 @@ import { useParams, Link } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { Share2, ChevronRight, AlertTriangle, RefreshCw } from "lucide-react";
 import DOMPurify from "dompurify";
-import api, { API_URL } from "@/lib/api";
+import api, { BASE_UPLOAD_URL } from "@/lib/api";
 import ScrollReveal from "@/components/ScrollReveal";
 import { getCleanImageUrl } from "@/lib/utils";
 import SEO from "@/components/SEO";
@@ -193,15 +193,16 @@ export default function DynamicPage() {
         });
       });
 
-      let backendOrigin = "";
       try {
-        backendOrigin = new URL(API_URL).origin;
         virtualDoc.querySelectorAll("img").forEach((img) => {
           const src = img.getAttribute("src");
-          if (src?.startsWith("/uploads")) img.src = `${backendOrigin}${src}`;
+          if (src?.includes("/uploads/")) {
+            const filename = src.split("/uploads/").pop();
+            img.src = `${BASE_UPLOAD_URL}/${filename}`;
+          }
         });
       } catch (e) {
-        console.error("API_URL Origin Fix Failed", e);
+        console.error("Image Path Normalization Failed", e);
       }
       setToc(items);
       setParsedContent(virtualDoc.body.innerHTML);
