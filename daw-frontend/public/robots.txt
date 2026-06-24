@@ -1,10 +1,7 @@
-# Strategi SEO Frontend DAW Group
 User-agent: *
 Allow: /
 
-# Jangan indeks area administratif dan login
 Disallow: /admin/
 Disallow: /login
 
-# Berikan koordinat peta situs untuk bot
 Sitemap: https://daw.co.id/sitemap.xml
