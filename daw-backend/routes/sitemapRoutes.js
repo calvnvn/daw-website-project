@@ -7,6 +7,7 @@ const { verifyToken, checkPermission } = require("../middleware/authJwt");
 // Dynamic XML sitemap for SEO indexing (pages, projects, news)
 router.get("/sitemap.xml", sitemapController.generateSitemap);
 
+/* 
 // Dynamic robots.txt serving crawler instructions and sitemap link
 router.get("/robots.txt", sitemapController.generateRobotsTxt);
 
@@ -24,5 +25,6 @@ router.put(
   checkPermission("manage_settings"),
   sitemapController.updateRobotsContent,
 );
+*/
 
 module.exports = router;

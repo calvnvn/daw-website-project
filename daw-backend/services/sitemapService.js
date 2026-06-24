@@ -47,6 +47,7 @@ class SitemapService {
     return xml;
   }
 
+/*
   async generateRobotsTxt() {
     const robotsPath = path.join(process.cwd(), "public", "robots.txt");
     if (fs.existsSync(robotsPath)) {
@@ -96,6 +97,7 @@ Sitemap: ${baseUrl}/sitemap.xml`;
     fs.writeFileSync(robotsPath, content, "utf8");
     return { success: true };
   }
+  */
 }
 
 module.exports = new SitemapService();

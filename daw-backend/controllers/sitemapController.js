@@ -11,6 +11,7 @@ exports.generateSitemap = async (req, res) => {
   }
 };
 
+/*
 exports.generateRobotsTxt = async (req, res) => {
   try {
     const content = await sitemapService.generateRobotsTxt();
@@ -42,3 +43,4 @@ exports.updateRobotsContent = async (req, res) => {
     res.status(500).json({ success: false, message: error.message });
   }
 };
+*/
